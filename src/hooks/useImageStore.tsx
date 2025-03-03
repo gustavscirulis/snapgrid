@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { analyzeImage } from "@/services/aiAnalysisService";
 
@@ -106,7 +105,7 @@ export function useImageStore() {
         type: "url",
         url: url,
         width: 400, // Default width for URL cards
-        height: 180, // Reduced height for URL cards to match image content
+        height: 120, // Reduced height for URL cards to make them compact
         createdAt: new Date(),
         title: metadata.title || url,
         thumbnailUrl: metadata.thumbnailUrl,
@@ -124,7 +123,7 @@ export function useImageStore() {
         type: "url",
         url: url,
         width: 400,
-        height: 180, // Reduced height to match content
+        height: 120, // Reduced height for URL cards to make them compact
         createdAt: new Date(),
         title: url,
         sourceUrl: url

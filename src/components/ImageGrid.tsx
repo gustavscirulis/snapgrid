@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from "react";
 import { ImageItem, ImageItemType } from "@/hooks/useImageStore";
 import { calculateGridRowSpan } from "@/lib/imageUtils";
@@ -75,7 +74,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
   const renderItem = (item: ImageItem) => {
     if (item.type === "url") {
       return (
-        <div className="url-card h-full">
+        <div className="url-card h-full flex flex-col">
           <div className="p-4 flex flex-col h-full">
             <div className="flex items-start gap-3">
               {item.thumbnailUrl && (

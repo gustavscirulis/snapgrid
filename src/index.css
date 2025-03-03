@@ -92,5 +92,6 @@
     @apply bg-card border border-border rounded-lg;
     display: flex;
     flex-direction: column;
+    height: 100%; /* Ensure full height */
   }
 }
