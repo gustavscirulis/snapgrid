@@ -1,7 +1,13 @@
 
 import { useState, useCallback } from "react";
+import { analyzeImage } from "@/services/aiAnalysisService";
 
 export type ImageItemType = "image" | "url";
+
+export interface PatternTag {
+  name: string;
+  confidence: number;
+}
 
 export interface ImageItem {
   id: string;
@@ -13,6 +19,8 @@ export interface ImageItem {
   title?: string;
   thumbnailUrl?: string;
   sourceUrl?: string;
+  patterns?: PatternTag[]; // Added this field for UI pattern tags
+  isAnalyzing?: boolean;
 }
 
 export function useImageStore() {
@@ -28,13 +36,13 @@ export function useImageStore() {
     localStorage.setItem("ui-reference-images", JSON.stringify(updatedImages));
   }, []);
 
-  const addImage = useCallback((file: File) => {
+  const addImage = useCallback(async (file: File) => {
     setIsUploading(true);
     
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const newImage: ImageItem = {
           id: crypto.randomUUID(),
           type: "image",
@@ -42,12 +50,45 @@ export function useImageStore() {
           width: img.width,
           height: img.height,
           createdAt: new Date(),
+          isAnalyzing: true,
         };
         
+        // Add image right away
         const updatedImages = [newImage, ...images];
         setImages(updatedImages);
         saveToLocalStorage(updatedImages);
         setIsUploading(false);
+        
+        // Start pattern analysis
+        try {
+          const patterns = await analyzeImage(newImage.url);
+          
+          // Update the image with patterns
+          const imageWithPatterns = {
+            ...newImage,
+            patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
+            isAnalyzing: false
+          };
+          
+          // Update the image in the state
+          setImages(prevImages => {
+            const updatedWithPatterns = prevImages.map(img => 
+              img.id === newImage.id ? imageWithPatterns : img
+            );
+            saveToLocalStorage(updatedWithPatterns);
+            return updatedWithPatterns;
+          });
+        } catch (error) {
+          console.error("Failed to analyze image:", error);
+          // Update to remove analyzing state
+          setImages(prevImages => {
+            const updated = prevImages.map(img => 
+              img.id === newImage.id ? { ...img, isAnalyzing: false } : img
+            );
+            saveToLocalStorage(updated);
+            return updated;
+          });
+        }
       };
       img.src = e.target?.result as string;
     };
@@ -65,7 +106,7 @@ export function useImageStore() {
         type: "url",
         url: url,
         width: 400, // Default width for URL cards
-        height: 300, // Default height for URL cards
+        height: 180, // Reduced height for URL cards to match image content
         createdAt: new Date(),
         title: metadata.title || url,
         thumbnailUrl: metadata.thumbnailUrl,
@@ -83,7 +124,7 @@ export function useImageStore() {
         type: "url",
         url: url,
         width: 400,
-        height: 300,
+        height: 180, // Reduced height to match content
         createdAt: new Date(),
         title: url,
         sourceUrl: url

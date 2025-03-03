@@ -1,8 +1,8 @@
 
 import React, { useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { ImageItem } from "@/hooks/useImageStore";
-import { X, ExternalLink } from "lucide-react";
+import { ImageItem, PatternTag } from "@/hooks/useImageStore";
+import { X, ExternalLink, Scan } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageModalProps {
@@ -29,6 +29,39 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     if (image.type === "url" && image.sourceUrl) {
       window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
     }
+  };
+
+  const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean) => {
+    if (!patterns || patterns.length === 0) {
+      if (isAnalyzing) {
+        return (
+          <div className="flex items-center gap-2 text-sm bg-primary/10 px-3 py-2 rounded-md mt-4">
+            <Scan className="w-4 h-4 animate-pulse text-primary" />
+            <span>Analyzing UI patterns...</span>
+          </div>
+        );
+      }
+      return null;
+    }
+
+    return (
+      <div className="mt-4">
+        <h4 className="text-sm font-medium mb-2 text-white/80">Detected UI Patterns</h4>
+        <div className="flex flex-wrap gap-2">
+          {patterns.map((pattern, index) => (
+            <div 
+              key={index} 
+              className="text-sm bg-primary/20 text-white px-3 py-1.5 rounded-md flex items-center gap-1"
+            >
+              <span>{pattern.name}</span>
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
+                {Math.round(pattern.confidence * 100)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -85,13 +118,17 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                   }}
                 />
                 
-                <div className="mt-4 flex justify-between items-center text-white/90 px-2">
-                  <p className="text-sm font-medium">
-                    {image.width} × {image.height}
-                  </p>
-                  <p className="text-sm">
-                    {new Date(image.createdAt).toLocaleDateString()}
-                  </p>
+                <div className="mt-4 flex flex-col text-white/90 px-2">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-medium">
+                      {image.width} × {image.height}
+                    </p>
+                    <p className="text-sm">
+                      {new Date(image.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  
+                  {renderPatternTags(image.patterns, image.isAnalyzing)}
                 </div>
               </>
             )}

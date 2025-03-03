@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from "react";
 import { ImageItem, ImageItemType } from "@/hooks/useImageStore";
 import { calculateGridRowSpan } from "@/lib/imageUtils";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Scan } from "lucide-react";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -44,24 +44,55 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
     };
   }, [images]);
 
+  const renderPatternTags = (item: ImageItem) => {
+    if (!item.patterns || item.patterns.length === 0) {
+      if (item.isAnalyzing) {
+        return (
+          <div className="flex items-center gap-1 text-xs text-primary-foreground bg-primary/80 px-2 py-1 rounded-md">
+            <Scan className="w-3 h-3 animate-pulse" />
+            <span>Analyzing...</span>
+          </div>
+        );
+      }
+      return null;
+    }
+
+    return (
+      <div className="flex flex-wrap gap-1 mt-2">
+        {item.patterns.map((pattern, index) => (
+          <span 
+            key={index} 
+            className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md"
+            title={`Confidence: ${Math.round(pattern.confidence * 100)}%`}
+          >
+            {pattern.name}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   const renderItem = (item: ImageItem) => {
     if (item.type === "url") {
       return (
-        <div className="url-card flex flex-col h-full">
-          <div className="flex-1 p-4 flex flex-col">
-            {item.thumbnailUrl && (
-              <div className="w-16 h-16 bg-muted rounded-md mb-3 overflow-hidden flex items-center justify-center">
-                <img 
-                  src={item.thumbnailUrl} 
-                  alt={item.title || "Website"} 
-                  className="max-w-full max-h-full object-contain" 
-                />
+        <div className="url-card h-full">
+          <div className="p-4 flex flex-col h-full">
+            <div className="flex items-start gap-3">
+              {item.thumbnailUrl && (
+                <div className="w-12 h-12 bg-muted rounded-md overflow-hidden flex items-center justify-center flex-shrink-0">
+                  <img 
+                    src={item.thumbnailUrl} 
+                    alt={item.title || "Website"} 
+                    className="max-w-full max-h-full object-contain" 
+                  />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-base mb-1 line-clamp-2">{item.title || item.url}</h3>
+                <p className="text-xs text-muted-foreground truncate">{item.url}</p>
               </div>
-            )}
-            <h3 className="font-medium text-base mb-2 line-clamp-2">{item.title || item.url}</h3>
-            <p className="text-xs text-muted-foreground truncate mb-2">{item.url}</p>
-            <div className="flex-grow"></div>
-            <div className="flex items-center text-xs text-primary font-medium">
+            </div>
+            <div className="mt-auto pt-3 flex items-center text-xs text-primary font-medium">
               <ExternalLink className="w-3 h-3 mr-1" />
               <span>Open URL</span>
             </div>
@@ -70,12 +101,17 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
       );
     } else {
       return (
-        <img
-          src={item.url}
-          alt="UI Screenshot"
-          className="w-full h-auto object-cover"
-          loading="lazy"
-        />
+        <div className="relative">
+          <img
+            src={item.url}
+            alt="UI Screenshot"
+            className="w-full h-auto object-cover"
+            loading="lazy"
+          />
+          <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+            {renderPatternTags(item)}
+          </div>
+        </div>
       );
     }
   };

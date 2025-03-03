@@ -75,6 +75,8 @@
   
   .masonry-item {
     transition: transform 0.25s ease, box-shadow 0.25s ease;
+    display: flex;
+    flex-direction: column;
   }
   
   .masonry-item:hover {
@@ -88,7 +90,7 @@
 
   .url-card {
     @apply bg-card border border-border rounded-lg;
-    min-height: 120px;
+    display: flex;
+    flex-direction: column;
   }
 }
-
