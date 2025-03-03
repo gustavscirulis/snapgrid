@@ -46,7 +46,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
     // Simulate API processing time
     setTimeout(() => {
       // Create a deterministic but seemingly random selection based on the image URL
-      const seed = Array.from(imageUrl).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+      let seed = Array.from(imageUrl).reduce((sum, char) => sum + char.charCodeAt(0), 0);
       const shuffled = [...UI_PATTERNS].sort(() => {
         const x = Math.sin(seed++) * 10000;
         return x - Math.floor(x) - 0.5;
