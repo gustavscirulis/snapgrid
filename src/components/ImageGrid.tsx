@@ -1,7 +1,8 @@
 
 import React, { useEffect, useRef } from "react";
-import { ImageItem } from "@/hooks/useImageStore";
+import { ImageItem, ImageItemType } from "@/hooks/useImageStore";
 import { calculateGridRowSpan } from "@/lib/imageUtils";
+import { ExternalLink } from "lucide-react";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -43,6 +44,42 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
     };
   }, [images]);
 
+  const renderItem = (item: ImageItem) => {
+    if (item.type === "url") {
+      return (
+        <div className="url-card flex flex-col h-full">
+          <div className="flex-1 p-4 flex flex-col">
+            {item.thumbnailUrl && (
+              <div className="w-16 h-16 bg-muted rounded-md mb-3 overflow-hidden flex items-center justify-center">
+                <img 
+                  src={item.thumbnailUrl} 
+                  alt={item.title || "Website"} 
+                  className="max-w-full max-h-full object-contain" 
+                />
+              </div>
+            )}
+            <h3 className="font-medium text-base mb-2 line-clamp-2">{item.title || item.url}</h3>
+            <p className="text-xs text-muted-foreground truncate mb-2">{item.url}</p>
+            <div className="flex-grow"></div>
+            <div className="flex items-center text-xs text-primary font-medium">
+              <ExternalLink className="w-3 h-3 mr-1" />
+              <span>Open URL</span>
+            </div>
+          </div>
+        </div>
+      );
+    } else {
+      return (
+        <img
+          src={item.url}
+          alt="UI Screenshot"
+          className="w-full h-auto object-cover"
+          loading="lazy"
+        />
+      );
+    }
+  };
+
   return (
     <div className="px-4 py-6 w-full">
       {images.length === 0 ? (
@@ -63,16 +100,18 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
               <polyline points="21 15 16 10 5 21" />
             </svg>
           </div>
-          <h3 className="text-2xl font-medium mb-2">No screenshots yet</h3>
+          <h3 className="text-2xl font-medium mb-2">No items yet</h3>
           <p className="text-muted-foreground max-w-md">
-            Drag and drop images anywhere on this page, or click the upload button to add your first screenshot.
+            Drag and drop images anywhere, paste URLs, or use the upload buttons to add your first item.
           </p>
-          <label 
-            htmlFor="file-upload"
-            className="mt-6 inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors cursor-pointer"
-          >
-            Upload first image
-          </label>
+          <div className="mt-6 flex gap-3">
+            <label 
+              htmlFor="file-upload"
+              className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors cursor-pointer"
+            >
+              Upload image
+            </label>
+          </div>
         </div>
       ) : (
         <div className="masonry-grid" ref={gridRef}>
@@ -84,12 +123,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
               data-width={image.width}
               onClick={() => onImageClick(image)}
             >
-              <img
-                src={image.url}
-                alt="UI Screenshot"
-                className="w-full h-auto object-cover"
-                loading="lazy"
-              />
+              {renderItem(image)}
             </div>
           ))}
         </div>

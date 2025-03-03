@@ -85,4 +85,10 @@
   .drag-active {
     @apply bg-primary/5 border-primary/30;
   }
+
+  .url-card {
+    @apply bg-card border border-border rounded-lg;
+    min-height: 120px;
+  }
 }
+
