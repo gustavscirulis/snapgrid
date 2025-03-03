@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from "react";
 import { analyzeImage } from "@/services/aiAnalysisService";
 
@@ -25,14 +26,26 @@ export interface ImageItem {
 export function useImageStore() {
   const [images, setImages] = useState<ImageItem[]>(() => {
     // Load saved images from localStorage on initialization
-    const savedImages = localStorage.getItem("ui-reference-images");
-    return savedImages ? JSON.parse(savedImages) : [];
+    try {
+      const savedImages = localStorage.getItem("ui-reference-images");
+      return savedImages ? JSON.parse(savedImages) : [];
+    } catch (error) {
+      console.error("Error loading images from localStorage:", error);
+      return [];
+    }
   });
   const [isUploading, setIsUploading] = useState(false);
 
   // Save to localStorage whenever images change
   const saveToLocalStorage = useCallback((updatedImages: ImageItem[]) => {
-    localStorage.setItem("ui-reference-images", JSON.stringify(updatedImages));
+    try {
+      // Limit the number of stored images to prevent quota issues
+      const limitedImages = updatedImages.slice(0, 20); // Store only the 20 most recent images
+      localStorage.setItem("ui-reference-images", JSON.stringify(limitedImages));
+    } catch (error) {
+      console.error("Error saving to localStorage:", error);
+      // If we hit quota issues, show a warning to the user (in a real app)
+    }
   }, []);
 
   const addImage = useCallback(async (file: File) => {

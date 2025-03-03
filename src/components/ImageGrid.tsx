@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from "react";
-import { ImageItem, ImageItemType } from "@/hooks/useImageStore";
-import { calculateGridRowSpan } from "@/lib/imageUtils";
+
+import React from "react";
+import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan } from "lucide-react";
 
 interface ImageGridProps {
@@ -9,40 +9,6 @@ interface ImageGridProps {
 }
 
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  // Resize the grid items to create a masonry layout
-  useEffect(() => {
-    const resizeGridItems = () => {
-      const grid = gridRef.current;
-      if (!grid) return;
-
-      const items = grid.querySelectorAll(".masonry-item");
-      items.forEach((item) => {
-        const dataHeight = item.getAttribute("data-height");
-        const dataWidth = item.getAttribute("data-width");
-        
-        if (dataHeight && dataWidth) {
-          const height = parseInt(dataHeight);
-          const width = parseInt(dataWidth);
-          const rowSpan = calculateGridRowSpan(height, width);
-          (item as HTMLElement).style.gridRowEnd = `span ${rowSpan}`;
-        }
-      });
-    };
-
-    // Initialize
-    resizeGridItems();
-    
-    // Add event listener for window resize
-    window.addEventListener("resize", resizeGridItems);
-    
-    // Cleanup
-    return () => {
-      window.removeEventListener("resize", resizeGridItems);
-    };
-  }, [images]);
-
   const renderPatternTags = (item: ImageItem) => {
     if (!item.patterns || item.patterns.length === 0) {
       if (item.isAnalyzing) {
@@ -104,7 +70,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
           <img
             src={item.url}
             alt="UI Screenshot"
-            className="w-full h-auto object-cover"
+            className="w-full h-auto object-cover rounded-t-lg"
             loading="lazy"
           />
           <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
@@ -149,13 +115,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
           </div>
         </div>
       ) : (
-        <div className="masonry-grid" ref={gridRef}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {images.map((image) => (
             <div
               key={image.id}
-              className="masonry-item rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all cursor-pointer"
-              data-height={image.height}
-              data-width={image.width}
+              className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all cursor-pointer"
               onClick={() => onImageClick(image)}
             >
               {renderItem(image)}
