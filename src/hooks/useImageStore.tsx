@@ -30,15 +30,25 @@ export function useImageStore() {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
+    // Check if running in Electron
+    const isRunningInElectron = typeof window !== 'undefined' && window.electron !== undefined;
+    setIsElectron(isRunningInElectron);
+    
     const loadImages = async () => {
       try {
-        const loadedImages = await window.electron.loadImages();
-        setImages(loadedImages);
+        if (isRunningInElectron) {
+          const loadedImages = await window.electron.loadImages();
+          setImages(loadedImages);
+        } else {
+          // When running in browser, start with empty state
+          setImages([]);
+        }
       } catch (error) {
-        console.error("Error loading images from filesystem:", error);
-        toast.error("Failed to load images from disk");
+        console.error("Error loading images:", error);
+        toast.error("Failed to load images");
       }
       setIsLoading(false);
     };
@@ -71,34 +81,38 @@ export function useImageStore() {
         const updatedImages = [newImage, ...images];
         setImages(updatedImages);
         
-        try {
-          console.log("Saving image to filesystem:", newImage.id);
-          const result = await window.electron.saveImage({
-            id: newImage.id,
-            dataUrl: newImage.url,
-            metadata: {
+        if (isElectron) {
+          try {
+            console.log("Saving image to filesystem:", newImage.id);
+            const result = await window.electron.saveImage({
               id: newImage.id,
-              type: newImage.type,
-              width: newImage.width,
-              height: newImage.height,
-              createdAt: newImage.createdAt,
-              isAnalyzing: newImage.isAnalyzing
-            }
-          });
-          
-          if (result.success && result.path) {
-            console.log("Image saved successfully at:", result.path);
-            newImage.actualFilePath = result.path;
-            setImages([newImage, ...images.filter(img => img.id !== newImage.id)]);
+              dataUrl: newImage.url,
+              metadata: {
+                id: newImage.id,
+                type: newImage.type,
+                width: newImage.width,
+                height: newImage.height,
+                createdAt: newImage.createdAt,
+                isAnalyzing: newImage.isAnalyzing
+              }
+            });
             
-            toast.success(`Image saved to: ${result.path}`);
-          } else {
-            console.error("Failed to save image:", result.error);
-            toast.error(`Failed to save image: ${result.error || "Unknown error"}`);
+            if (result.success && result.path) {
+              console.log("Image saved successfully at:", result.path);
+              newImage.actualFilePath = result.path;
+              setImages([newImage, ...images.filter(img => img.id !== newImage.id)]);
+              
+              toast.success(`Image saved to: ${result.path}`);
+            } else {
+              console.error("Failed to save image:", result.error);
+              toast.error(`Failed to save image: ${result.error || "Unknown error"}`);
+            }
+          } catch (error) {
+            console.error("Failed to save image to filesystem:", error);
+            toast.error("Failed to save image to disk");
           }
-        } catch (error) {
-          console.error("Failed to save image to filesystem:", error);
-          toast.error("Failed to save image to disk");
+        } else {
+          toast.info("Running in browser mode. Image is only stored in memory.");
         }
         
         setIsUploading(false);
@@ -118,17 +132,19 @@ export function useImageStore() {
                 img.id === newImage.id ? imageWithPatterns : img
               );
               
-              try {
-                window.electron.saveImage({
-                  id: imageWithPatterns.id,
-                  dataUrl: imageWithPatterns.url,
-                  metadata: {
-                    ...imageWithPatterns,
-                    url: undefined
-                  }
-                });
-              } catch (error) {
-                console.error("Failed to update image metadata after analysis:", error);
+              if (isElectron) {
+                try {
+                  window.electron.saveImage({
+                    id: imageWithPatterns.id,
+                    dataUrl: imageWithPatterns.url,
+                    metadata: {
+                      ...imageWithPatterns,
+                      url: undefined
+                    }
+                  });
+                } catch (error) {
+                  console.error("Failed to update image metadata after analysis:", error);
+                }
               }
               
               return updatedWithPatterns;
@@ -142,19 +158,21 @@ export function useImageStore() {
                 img.id === newImage.id ? { ...img, isAnalyzing: false, error: errorMessage } : img
               );
               
-              try {
-                window.electron.saveImage({
-                  id: newImage.id,
-                  dataUrl: newImage.url,
-                  metadata: {
-                    ...newImage,
-                    isAnalyzing: false,
-                    error: errorMessage,
-                    url: undefined
-                  }
-                });
-              } catch (saveError) {
-                console.error("Failed to update image metadata after analysis error:", saveError);
+              if (isElectron) {
+                try {
+                  window.electron.saveImage({
+                    id: newImage.id,
+                    dataUrl: newImage.url,
+                    metadata: {
+                      ...newImage,
+                      isAnalyzing: false,
+                      error: errorMessage,
+                      url: undefined
+                    }
+                  });
+                } catch (saveError) {
+                  console.error("Failed to update image metadata after analysis error:", saveError);
+                }
               }
               
               return updated;
@@ -168,7 +186,7 @@ export function useImageStore() {
     };
     
     reader.readAsDataURL(file);
-  }, [images]);
+  }, [images, isElectron]);
 
   const addUrlCard = useCallback(async (url: string) => {
     setIsUploading(true);
@@ -190,15 +208,19 @@ export function useImageStore() {
       const updatedImages = [newCard, ...images];
       setImages(updatedImages);
       
-      try {
-        await window.electron.saveUrlCard({
-          id: newCard.id,
-          metadata: newCard
-        });
-        toast.success(`URL card saved to disk`);
-      } catch (error) {
-        console.error("Failed to save URL card:", error);
-        toast.error("Failed to save URL card to disk");
+      if (isElectron) {
+        try {
+          await window.electron.saveUrlCard({
+            id: newCard.id,
+            metadata: newCard
+          });
+          toast.success(`URL card saved to disk`);
+        } catch (error) {
+          console.error("Failed to save URL card:", error);
+          toast.error("Failed to save URL card to disk");
+        }
+      } else {
+        toast.info("Running in browser mode. URL card is only stored in memory.");
       }
     } catch (error) {
       console.error("Error adding URL card:", error);
@@ -217,32 +239,36 @@ export function useImageStore() {
       const updatedImages = [fallbackCard, ...images];
       setImages(updatedImages);
       
-      try {
-        await window.electron.saveUrlCard({
-          id: fallbackCard.id,
-          metadata: fallbackCard
-        });
-      } catch (saveError) {
-        console.error("Failed to save fallback URL card:", saveError);
-        toast.error("Failed to save URL card to disk");
+      if (isElectron) {
+        try {
+          await window.electron.saveUrlCard({
+            id: fallbackCard.id,
+            metadata: fallbackCard
+          });
+        } catch (saveError) {
+          console.error("Failed to save fallback URL card:", saveError);
+          toast.error("Failed to save URL card to disk");
+        }
       }
     } finally {
       setIsUploading(false);
     }
-  }, [images]);
+  }, [images, isElectron]);
 
   const removeImage = useCallback(async (id: string) => {
-    try {
-      await window.electron.deleteImage(id);
-      toast.success("Image deleted from disk");
-    } catch (error) {
-      console.error("Failed to delete image from filesystem:", error);
-      toast.error("Failed to delete image from disk");
+    if (isElectron) {
+      try {
+        await window.electron.deleteImage(id);
+        toast.success("Image deleted from disk");
+      } catch (error) {
+        console.error("Failed to delete image from filesystem:", error);
+        toast.error("Failed to delete image from disk");
+      }
     }
     
     const updatedImages = images.filter(img => img.id !== id);
     setImages(updatedImages);
-  }, [images]);
+  }, [images, isElectron]);
 
   return {
     images,

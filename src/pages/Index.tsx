@@ -18,15 +18,25 @@ const Index = () => {
   const [urlModalOpen, setUrlModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [storageDir, setStorageDir] = useState<string | null>(null);
+  const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    window.electron.getAppStorageDir().then((dir: string) => {
-      setStorageDir(dir);
-      console.log("App storage directory:", dir);
-    }).catch(error => {
-      console.error("Failed to get storage directory:", error);
-      toast.error("Failed to get storage directory");
-    });
+    // Check if running in Electron
+    const isRunningInElectron = window.electron !== undefined;
+    setIsElectron(isRunningInElectron);
+    
+    if (isRunningInElectron) {
+      window.electron.getAppStorageDir().then((dir: string) => {
+        setStorageDir(dir);
+        console.log("App storage directory:", dir);
+      }).catch(error => {
+        console.error("Failed to get storage directory:", error);
+        toast.error("Failed to get storage directory");
+      });
+    } else {
+      console.log("Running in browser mode. Electron APIs not available.");
+      toast.warning("Running in browser mode. Some features may be limited.");
+    }
     
     const savedApiKey = localStorage.getItem("openai-api-key");
     if (savedApiKey) {
@@ -71,7 +81,7 @@ const Index = () => {
   };
 
   const openStorageLocation = () => {
-    if (window.electron && window.electron.openStorageDir) {
+    if (isElectron && window.electron?.openStorageDir) {
       window.electron.openStorageDir()
         .then(() => {
           toast.success("Storage folder opened");
@@ -113,6 +123,7 @@ const Index = () => {
                 size="sm"
                 className="flex items-center gap-1"
                 onClick={openStorageLocation}
+                disabled={!isElectron}
               >
                 <HardDrive className="h-4 w-4" />
                 <span>Storage</span>
@@ -158,9 +169,15 @@ const Index = () => {
         />
 
         <footer className="py-6 text-center text-sm text-muted-foreground">
-          <p>
-            Images are stored at: {storageDir || "Loading..."} (Click 'Storage' button to open)
-          </p>
+          {isElectron ? (
+            <p>
+              Images are stored at: {storageDir || "Loading..."} (Click 'Storage' button to open)
+            </p>
+          ) : (
+            <p>
+              Running in browser mode. Local storage features are not available.
+            </p>
+          )}
         </footer>
       </div>
     </UploadZone>
