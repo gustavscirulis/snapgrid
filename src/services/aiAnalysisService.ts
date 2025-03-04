@@ -1,6 +1,5 @@
 
-// A service to identify UI patterns in images using deterministic pattern matching
-// In a production app, this would connect to a real AI vision service
+// A service to identify UI patterns in images using OpenAI's Vision API
 
 interface PatternMatch {
   pattern: string;
@@ -38,8 +37,7 @@ const UI_PATTERNS = [
   "Minimalist UI"
 ];
 
-// Simple image analysis rules to better detect patterns
-// These are simplified rules - a real system would use computer vision
+// Pattern keywords for fallback
 const PATTERN_KEYWORDS: Record<string, string[]> = {
   "Card Layout": ["card", "container", "box", "panel", "tile", "rect"],
   "Grid System": ["grid", "column", "row", "layout", "table"],
@@ -58,8 +56,100 @@ const PATTERN_KEYWORDS: Record<string, string[]> = {
   "Button": ["button", "btn", "cta", "action", "click"]
 };
 
+// OpenAI API configuration
+let apiKey = '';
+
+export function setOpenAIApiKey(key: string): void {
+  apiKey = key;
+}
+
+export function hasApiKey(): boolean {
+  return !!apiKey;
+}
+
 export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
-  // In a real app, this would call a computer vision API
+  if (!apiKey) {
+    console.warn("OpenAI API key not set. Using fallback analysis method.");
+    return fallbackAnalysis(imageUrl);
+  }
+
+  try {
+    // For base64 images (data URLs)
+    const isBase64 = imageUrl.startsWith('data:');
+    
+    // Prepare the API request to OpenAI
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: "gpt-4o", // Using GPT-4o which supports vision
+        messages: [
+          {
+            role: "system",
+            content: "You are an AI specialized in UI/UX design pattern recognition. Analyze the image and identify common UI patterns present in it. Focus on design elements, layouts, and components."
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Analyze this UI design image and identify the UI patterns present. Return only the top 5 patterns you can identify with a confidence score from 0 to 1. Format your response as a JSON array with 'pattern' and 'confidence' fields. Only respond with valid JSON."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: isBase64 ? imageUrl : imageUrl,
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 300
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("OpenAI API error:", error);
+      throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content;
+
+    // Parse the JSON response from OpenAI
+    try {
+      let patterns: PatternMatch[] = JSON.parse(content);
+      
+      // Validate and clean up the response
+      if (Array.isArray(patterns)) {
+        patterns = patterns
+          .filter(p => p && p.pattern && typeof p.confidence === 'number')
+          .map(p => ({
+            pattern: p.pattern,
+            confidence: Math.min(Math.max(p.confidence, 0), 1) // Ensure confidence is between 0 and 1
+          }))
+          .slice(0, 5); // Limit to top 5
+        
+        return patterns;
+      }
+      throw new Error('Invalid response format from OpenAI');
+    } catch (e) {
+      console.error("Failed to parse OpenAI response:", e, content);
+      throw new Error('Failed to parse response from OpenAI');
+    }
+  } catch (error) {
+    console.error("Error analyzing image with OpenAI:", error);
+    // If OpenAI fails, fall back to our deterministic method
+    return fallbackAnalysis(imageUrl);
+  }
+}
+
+// Fallback method if OpenAI API is not available or fails
+function fallbackAnalysis(imageUrl: string): Promise<PatternMatch[]> {
   return new Promise((resolve) => {
     // Simulate API processing time
     setTimeout(() => {
@@ -90,7 +180,8 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
         // Create a deterministic but seemingly random selection based on the image URL
         let seed = Array.from(imageUrl).reduce((sum, char) => sum + char.charCodeAt(0), 0);
         const shuffled = [...UI_PATTERNS].sort(() => {
-          const x = Math.sin(seed++) * 10000;
+          const x = Math.sin(seed) * 10000;
+          seed++; // Increment seed after using it
           return x - Math.floor(x) - 0.5;
         });
         

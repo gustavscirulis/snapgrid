@@ -1,17 +1,27 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
 import ImageModal from "@/components/ImageModal";
 import { ImagePlus, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ApiKeyInput } from "@/components/ApiKeyInput";
+import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 
 const Index = () => {
   const { images, isUploading, addImage, addUrlCard } = useImageStore();
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [urlModalOpen, setUrlModalOpen] = useState(false);
+
+  // Load API key from localStorage on component mount
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem("openai-api-key");
+    if (savedApiKey) {
+      setOpenAIApiKey(savedApiKey);
+    }
+  }, []);
 
   const handleImageClick = (image: ImageItem) => {
     if (image.type === "url" && image.sourceUrl) {
@@ -38,6 +48,7 @@ const Index = () => {
           <div className="max-w-screen-xl mx-auto flex justify-between items-center">
             <h1 className="text-xl font-medium">UI Reference</h1>
             <div className="flex gap-2">
+              <ApiKeyInput />
               <Button
                 variant="outline"
                 size="sm"
