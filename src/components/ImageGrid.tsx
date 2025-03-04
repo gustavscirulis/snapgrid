@@ -1,14 +1,18 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { ExternalLink, Scan } from "lucide-react";
+import { ExternalLink, Scan, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ImageGridProps {
   images: ImageItem[];
   onImageClick: (image: ImageItem) => void;
+  onImageDelete?: (id: string) => void;
 }
 
-const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
+const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete }) => {
+  const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
+
   const renderPatternTags = (item: ImageItem) => {
     if (!item.patterns || item.patterns.length === 0) {
       if (item.isAnalyzing) {
@@ -73,9 +77,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
             className="w-full h-auto object-cover rounded-t-lg"
             loading="lazy"
           />
-          <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-            {renderPatternTags(item)}
-          </div>
+          {hoveredImageId === item.id && (
+            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+              {renderPatternTags(item)}
+            </div>
+          )}
         </div>
       );
     }
@@ -119,10 +125,27 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick }) => {
           {images.map((image) => (
             <div
               key={image.id}
-              className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all cursor-pointer"
+              className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group"
               onClick={() => onImageClick(image)}
+              onMouseEnter={() => setHoveredImageId(image.id)}
+              onMouseLeave={() => setHoveredImageId(null)}
             >
               {renderItem(image)}
+              
+              {/* Delete Button */}
+              {onImageDelete && (
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onImageDelete(image.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           ))}
         </div>

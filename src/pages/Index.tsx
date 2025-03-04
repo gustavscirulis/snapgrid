@@ -4,16 +4,18 @@ import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
 import ImageModal from "@/components/ImageModal";
-import { ImagePlus, Link } from "lucide-react";
+import { ImagePlus, Link, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { setOpenAIApiKey } from "@/services/aiAnalysisService";
+import { Input } from "@/components/ui/input";
 
 const Index = () => {
-  const { images, isUploading, addImage, addUrlCard } = useImageStore();
+  const { images, isUploading, addImage, addUrlCard, removeImage } = useImageStore();
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [urlModalOpen, setUrlModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Load API key from localStorage on component mount
   useEffect(() => {
@@ -22,6 +24,27 @@ const Index = () => {
       setOpenAIApiKey(savedApiKey);
     }
   }, []);
+
+  // Filter images based on search query
+  const filteredImages = images.filter(image => {
+    const query = searchQuery.toLowerCase();
+    if (query === "") return true;
+    
+    // Search in URL and title for URL cards
+    if (image.type === "url") {
+      return (
+        (image.url?.toLowerCase().includes(query)) ||
+        (image.title?.toLowerCase().includes(query))
+      );
+    }
+    
+    // Search in patterns for image cards
+    if (image.patterns && image.patterns.length > 0) {
+      return image.patterns.some(pattern => pattern.name.toLowerCase().includes(query));
+    }
+    
+    return false;
+  });
 
   const handleImageClick = (image: ImageItem) => {
     if (image.type === "url" && image.sourceUrl) {
@@ -37,6 +60,10 @@ const Index = () => {
     setTimeout(() => setSelectedImage(null), 300); // Clean up after animation completes
   };
 
+  const handleDeleteImage = (id: string) => {
+    removeImage(id);
+  };
+
   return (
     <UploadZone 
       onImageUpload={addImage} 
@@ -48,6 +75,15 @@ const Index = () => {
           <div className="max-w-screen-xl mx-auto flex justify-between items-center">
             <h1 className="text-xl font-medium">UI Reference</h1>
             <div className="flex gap-2">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by pattern or URL..."
+                  className="pl-9"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
               <ApiKeyInput />
               <Button
                 variant="outline"
@@ -70,7 +106,11 @@ const Index = () => {
         </header>
 
         <main className="max-w-screen-xl mx-auto">
-          <ImageGrid images={images} onImageClick={handleImageClick} />
+          <ImageGrid 
+            images={filteredImages} 
+            onImageClick={handleImageClick} 
+            onImageDelete={handleDeleteImage}
+          />
         </main>
 
         <ImageModal
