@@ -22,13 +22,16 @@ const getAppStorageDir = () => {
     
     if (fs.existsSync(iCloudDrive)) {
       appStorageDir = path.join(iCloudDrive, 'UIReferenceApp');
+      console.log('Using iCloud storage path:', appStorageDir);
     } else {
       // Fallback to Documents folder
       appStorageDir = path.join(homeDir, 'Documents', 'UIReferenceApp');
+      console.log('Using Documents folder path:', appStorageDir);
     }
   } else {
     // For other platforms, use app.getPath('userData')
     appStorageDir = path.join(app.getPath('userData'), 'images');
+    console.log('Using userData path:', appStorageDir);
   }
   
   // Ensure directory exists
@@ -44,12 +47,21 @@ function createWindow() {
   appStorageDir = getAppStorageDir();
   console.log('App storage directory:', appStorageDir);
   
+  // Create dialog to show storage path to user
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Storage Location',
+    message: 'App files are stored at:',
+    detail: appStorageDir,
+    buttons: ['OK']
+  });
+  
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false,
+      contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
   });

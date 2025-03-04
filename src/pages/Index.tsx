@@ -1,15 +1,14 @@
-
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
 import ImageModal from "@/components/ImageModal";
-import { ImagePlus, Link, Search } from "lucide-react";
+import { ImagePlus, Link, Search, Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 
 const Index = () => {
   const { images, isUploading, isLoading, addImage, addUrlCard, removeImage } = useImageStore();
@@ -20,22 +19,18 @@ const Index = () => {
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    // Check if running in Electron
     setIsElectron(window.electron !== undefined);
     
-    // Load API key from localStorage on component mount
     const savedApiKey = localStorage.getItem("openai-api-key");
     if (savedApiKey) {
       setOpenAIApiKey(savedApiKey);
     }
   }, []);
 
-  // Filter images based on search query
   const filteredImages = images.filter(image => {
     const query = searchQuery.toLowerCase();
     if (query === "") return true;
     
-    // Search in URL and title for URL cards
     if (image.type === "url") {
       return (
         (image.url?.toLowerCase().includes(query)) ||
@@ -43,7 +38,6 @@ const Index = () => {
       );
     }
     
-    // Search in patterns for image cards
     if (image.patterns && image.patterns.length > 0) {
       return image.patterns.some(pattern => pattern.name.toLowerCase().includes(query));
     }
@@ -62,7 +56,7 @@ const Index = () => {
 
   const closeModal = () => {
     setModalOpen(false);
-    setTimeout(() => setSelectedImage(null), 300); // Clean up after animation completes
+    setTimeout(() => setSelectedImage(null), 300);
   };
 
   const handleDeleteImage = (id: string) => {
