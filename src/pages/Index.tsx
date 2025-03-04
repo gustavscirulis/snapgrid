@@ -4,7 +4,7 @@ import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
 import ImageModal from "@/components/ImageModal";
-import { ImagePlus, Link, Search, Folder, HardDrive } from "lucide-react";
+import { ImagePlus, Link, Search, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { setOpenAIApiKey } from "@/services/aiAnalysisService";
@@ -21,11 +21,20 @@ const Index = () => {
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    // Check if running in Electron
-    const isRunningInElectron = window.electron !== undefined;
+    // Check if running in Electron - more reliable detection
+    const isRunningInElectron = window && 
+      typeof window.electron !== 'undefined' && 
+      window.electron !== null;
+      
+    console.log("Electron detection:", {
+      electronExists: typeof window.electron !== 'undefined',
+      electronValue: window.electron
+    });
+    
     setIsElectron(isRunningInElectron);
     
     if (isRunningInElectron) {
+      console.log("Running in Electron mode");
       window.electron.getAppStorageDir().then((dir: string) => {
         setStorageDir(dir);
         console.log("App storage directory:", dir);
@@ -35,7 +44,7 @@ const Index = () => {
       });
     } else {
       console.log("Running in browser mode. Electron APIs not available.");
-      toast.warning("Running in browser mode. Some features may be limited.");
+      toast.warning("Running in browser mode. Local storage features are not available.");
     }
     
     const savedApiKey = localStorage.getItem("openai-api-key");

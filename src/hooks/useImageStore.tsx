@@ -33,18 +33,30 @@ export function useImageStore() {
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    // Check if running in Electron
-    const isRunningInElectron = typeof window !== 'undefined' && window.electron !== undefined;
+    // More reliable detection for Electron
+    const isRunningInElectron = window && 
+      typeof window.electron !== 'undefined' && 
+      window.electron !== null;
+    
+    console.log("useImageStore - Electron detection:", {
+      electronExists: typeof window.electron !== 'undefined',
+      electronValue: window.electron
+    });
+    
     setIsElectron(isRunningInElectron);
     
     const loadImages = async () => {
       try {
         if (isRunningInElectron) {
+          console.log("Loading images from filesystem...");
           const loadedImages = await window.electron.loadImages();
+          console.log("Loaded images:", loadedImages.length);
           setImages(loadedImages);
         } else {
           // When running in browser, start with empty state
+          console.log("Browser mode - starting with empty images array");
           setImages([]);
+          toast.warning("Running in browser mode. Images will not be saved permanently.");
         }
       } catch (error) {
         console.error("Error loading images:", error);
