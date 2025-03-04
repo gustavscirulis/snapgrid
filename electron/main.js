@@ -1,14 +1,8 @@
-
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs-extra';
-import isDev from 'electron-is-dev';
-import os from 'os';
-
-// Get the directory name of the current module
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const path = require('path');
+const fs = require('fs-extra');
+const isDev = require('electron-is-dev');
+const os = require('os');
 
 // Global storage path that will be exposed to the renderer
 let appStorageDir;
@@ -57,7 +51,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: true,
+      nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
