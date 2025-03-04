@@ -2,7 +2,7 @@
 import React, { useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
-import { X, ExternalLink, Scan } from "lucide-react";
+import { X, ExternalLink, Scan, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageModalProps {
@@ -31,7 +31,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     }
   };
 
-  const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean) => {
+  const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean, error?: string) => {
     if (!patterns || patterns.length === 0) {
       if (isAnalyzing) {
         return (
@@ -41,7 +41,21 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
           </div>
         );
       }
-      return null;
+
+      if (error) {
+        return (
+          <div className="flex items-center gap-2 text-sm bg-destructive/10 px-3 py-2 rounded-md mt-4">
+            <AlertCircle className="w-4 h-4 text-destructive" />
+            <span>Analysis failed: {error}</span>
+          </div>
+        );
+      }
+
+      return (
+        <div className="flex items-center gap-2 text-sm bg-muted/50 px-3 py-2 rounded-md mt-4">
+          <span>No UI patterns detected. Set an OpenAI API key to enable analysis.</span>
+        </div>
+      );
     }
 
     return (
@@ -128,7 +142,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                     </p>
                   </div>
                   
-                  {renderPatternTags(image.patterns, image.isAnalyzing)}
+                  {renderPatternTags(image.patterns, image.isAnalyzing, image.error)}
                 </div>
               </>
             )}

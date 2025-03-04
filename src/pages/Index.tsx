@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
+import { Toaster } from "sonner";
 
 const Index = () => {
   const { images, isUploading, addImage, addUrlCard, removeImage } = useImageStore();
@@ -71,6 +72,7 @@ const Index = () => {
       isUploading={isUploading}
     >
       <div className="min-h-screen">
+        <Toaster />
         <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border py-4 px-6">
           <div className="max-w-screen-xl mx-auto flex justify-between items-center">
             <h1 className="text-xl font-medium">UI Reference</h1>

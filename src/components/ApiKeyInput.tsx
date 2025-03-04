@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Key } from "lucide-react";
 import { setOpenAIApiKey, hasApiKey } from "@/services/aiAnalysisService";
+import { toast } from "sonner";
 
 export function ApiKeyInput() {
   const [isOpen, setIsOpen] = useState(!hasApiKey());
@@ -36,9 +37,11 @@ export function ApiKeyInput() {
       localStorage.setItem("openai-api-key", apiKey.trim());
       
       setIsOpen(false);
+      toast.success("API key saved successfully. New images will now be analyzed with OpenAI Vision.");
     } catch (err) {
       console.error("Error saving API key:", err);
       setError("Failed to save API key");
+      toast.error("Failed to save API key");
     } finally {
       setIsSubmitting(false);
     }
@@ -97,6 +100,9 @@ export function ApiKeyInput() {
                 Get an API key
               </a>
             </p>
+            <div className="text-sm bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-md">
+              <strong>Note:</strong> Image analysis requires the gpt-4o model access. Make sure your API key has access to the latest GPT-4o model.
+            </div>
           </div>
           
           <DialogFooter>

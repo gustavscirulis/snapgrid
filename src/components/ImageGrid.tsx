@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { ExternalLink, Scan, Trash2 } from "lucide-react";
+import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageGridProps {
@@ -20,6 +20,14 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           <div className="flex items-center gap-1 text-xs text-primary-foreground bg-primary/80 px-2 py-1 rounded-md">
             <Scan className="w-3 h-3 animate-pulse" />
             <span>Analyzing...</span>
+          </div>
+        );
+      }
+      if (item.error) {
+        return (
+          <div className="flex items-center gap-1 text-xs text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-md">
+            <AlertCircle className="w-3 h-3" />
+            <span>Analysis failed</span>
           </div>
         );
       }

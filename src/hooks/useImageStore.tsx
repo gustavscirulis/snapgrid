@@ -1,6 +1,7 @@
 
 import { useState, useCallback } from "react";
-import { analyzeImage } from "@/services/aiAnalysisService";
+import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
+import { toast } from "sonner";
 
 export type ImageItemType = "image" | "url";
 
@@ -21,6 +22,7 @@ export interface ImageItem {
   sourceUrl?: string;
   patterns?: PatternTag[]; // Added this field for UI pattern tags
   isAnalyzing?: boolean;
+  error?: string;
 }
 
 export function useImageStore() {
@@ -62,7 +64,7 @@ export function useImageStore() {
           width: img.width,
           height: img.height,
           createdAt: new Date(),
-          isAnalyzing: true,
+          isAnalyzing: hasApiKey(),
         };
         
         // Add image right away
@@ -71,35 +73,40 @@ export function useImageStore() {
         saveToLocalStorage(updatedImages);
         setIsUploading(false);
         
-        // Start pattern analysis
-        try {
-          const patterns = await analyzeImage(newImage.url);
-          
-          // Update the image with patterns
-          const imageWithPatterns = {
-            ...newImage,
-            patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
-            isAnalyzing: false
-          };
-          
-          // Update the image in the state
-          setImages(prevImages => {
-            const updatedWithPatterns = prevImages.map(img => 
-              img.id === newImage.id ? imageWithPatterns : img
-            );
-            saveToLocalStorage(updatedWithPatterns);
-            return updatedWithPatterns;
-          });
-        } catch (error) {
-          console.error("Failed to analyze image:", error);
-          // Update to remove analyzing state
-          setImages(prevImages => {
-            const updated = prevImages.map(img => 
-              img.id === newImage.id ? { ...img, isAnalyzing: false } : img
-            );
-            saveToLocalStorage(updated);
-            return updated;
-          });
+        // Start pattern analysis if API key is set
+        if (hasApiKey()) {
+          try {
+            const patterns = await analyzeImage(newImage.url);
+            
+            // Update the image with patterns
+            const imageWithPatterns = {
+              ...newImage,
+              patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
+              isAnalyzing: false
+            };
+            
+            // Update the image in the state
+            setImages(prevImages => {
+              const updatedWithPatterns = prevImages.map(img => 
+                img.id === newImage.id ? imageWithPatterns : img
+              );
+              saveToLocalStorage(updatedWithPatterns);
+              return updatedWithPatterns;
+            });
+          } catch (error) {
+            console.error("Failed to analyze image:", error);
+            // Update to remove analyzing state and set error
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            setImages(prevImages => {
+              const updated = prevImages.map(img => 
+                img.id === newImage.id ? { ...img, isAnalyzing: false, error: errorMessage } : img
+              );
+              saveToLocalStorage(updated);
+              return updated;
+            });
+            
+            toast.error("Failed to analyze image: " + errorMessage);
+          }
         }
       };
       img.src = e.target?.result as string;
