@@ -21,5 +21,5 @@ export default defineConfig(({ mode }) => ({
     },
   },
   // Ensure base path is set properly for both development and production
-  base: './',
+  base: mode === 'development' ? '/' : './',
 }));
