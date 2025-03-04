@@ -8,7 +8,9 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:8080 && electron electron/main.js\"",
+    "electron:build": "npm run build && electron-builder build"
   },
   "dependencies": {
     "@esbuild-kit/cjs-loader": "^2.4.4",
