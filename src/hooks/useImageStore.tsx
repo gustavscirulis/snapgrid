@@ -20,46 +20,10 @@ export interface ImageItem {
   title?: string;
   thumbnailUrl?: string;
   sourceUrl?: string;
-  patterns?: PatternTag[]; 
+  patterns?: PatternTag[]; // Added this field for UI pattern tags
   isAnalyzing?: boolean;
   error?: string;
 }
-
-// Maximum size for the localStorage storage in bytes (approximately 2MB)
-const MAX_STORAGE_SIZE = 2 * 1024 * 1024;
-
-// Maximum number of images to store
-const MAX_IMAGES = 10;
-
-// Compress image to a smaller size for localStorage
-const compressImage = async (dataUrl: string, maxWidth = 600): Promise<string> => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      
-      // Calculate new dimensions while maintaining aspect ratio
-      let width = img.width;
-      let height = img.height;
-      
-      if (width > maxWidth) {
-        const ratio = maxWidth / width;
-        width = maxWidth;
-        height = height * ratio;
-      }
-      
-      canvas.width = width;
-      canvas.height = height;
-      
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(img, 0, 0, width, height);
-      
-      // Compress with reduced quality
-      resolve(canvas.toDataURL('image/jpeg', 0.6));
-    };
-    img.src = dataUrl;
-  });
-};
 
 export function useImageStore() {
   const [images, setImages] = useState<ImageItem[]>(() => {
@@ -74,40 +38,15 @@ export function useImageStore() {
   });
   const [isUploading, setIsUploading] = useState(false);
 
-  // Save to localStorage with error handling and compression
-  const saveToLocalStorage = useCallback(async (updatedImages: ImageItem[]) => {
+  // Save to localStorage whenever images change
+  const saveToLocalStorage = useCallback((updatedImages: ImageItem[]) => {
     try {
-      // Limit the number of stored images more aggressively
-      const limitedImages = updatedImages.slice(0, MAX_IMAGES);
-      
-      // Create a copy since we'll be modifying the URLs
-      const storedImages = JSON.parse(JSON.stringify(limitedImages));
-      
-      // Compress image URLs for localStorage
-      for (let i = 0; i < storedImages.length; i++) {
-        if (storedImages[i].type === "image" && storedImages[i].url.startsWith('data:image')) {
-          // Only compress actual data URLs, not thumbnail URLs
-          storedImages[i].url = await compressImage(storedImages[i].url);
-        }
-      }
-      
-      const serializedData = JSON.stringify(storedImages);
-      
-      // Check if the data size exceeds the maximum size
-      if (serializedData.length > MAX_STORAGE_SIZE) {
-        console.warn("Data exceeds localStorage limit, reducing number of stored images");
-        // If it's still too big, reduce the number of images further
-        storedImages.length = Math.floor(storedImages.length * 0.7); // Remove 30% of images
-        localStorage.setItem("ui-reference-images", JSON.stringify(storedImages));
-      } else {
-        localStorage.setItem("ui-reference-images", serializedData);
-      }
+      // Limit the number of stored images to prevent quota issues
+      const limitedImages = updatedImages.slice(0, 20); // Store only the 20 most recent images
+      localStorage.setItem("ui-reference-images", JSON.stringify(limitedImages));
     } catch (error) {
       console.error("Error saving to localStorage:", error);
-      // Show a toast notification when storage fails
-      toast.error("Failed to save images to local storage due to quota limits. Images will be lost on refresh.", {
-        duration: 6000,
-      });
+      // If we hit quota issues, show a warning to the user (in a real app)
     }
   }, []);
 
@@ -121,7 +60,7 @@ export function useImageStore() {
         const newImage: ImageItem = {
           id: crypto.randomUUID(),
           type: "image",
-          url: e.target?.result as string, // Original URL for display
+          url: e.target?.result as string,
           width: img.width,
           height: img.height,
           createdAt: new Date(),
