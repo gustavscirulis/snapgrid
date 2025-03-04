@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -65,31 +66,14 @@
     @apply bg-muted-foreground/30;
   }
 
-  .masonry-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    grid-gap: 16px;
-  }
-  
-  .masonry-item {
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .masonry-item:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
-  }
-  
-  .drag-active {
-    @apply bg-primary/5 border-primary/30;
-  }
-
   .url-card {
     @apply bg-card border border-border rounded-lg;
     display: flex;
     flex-direction: column;
     height: 100%; /* Ensure full height */
+  }
+  
+  .drag-active {
+    @apply bg-primary/5 border-primary/30;
   }
 }

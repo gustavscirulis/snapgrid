@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -15,10 +15,21 @@ import { setOpenAIApiKey, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
 
 export function ApiKeyInput() {
-  const [isOpen, setIsOpen] = useState(!hasApiKey());
+  const [isOpen, setIsOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Check for stored API key on component mount
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem("openai-api-key");
+    if (savedApiKey) {
+      setOpenAIApiKey(savedApiKey);
+    } else {
+      // Only show dialog on first load if no API key exists
+      setIsOpen(!hasApiKey());
+    }
+  }, []);
 
   const handleSubmit = async () => {
     if (!apiKey.trim().startsWith("sk-")) {

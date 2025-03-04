@@ -129,11 +129,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-auto">
           {images.map((image) => (
             <div
               key={image.id}
-              className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group"
+              className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group h-full"
               onClick={() => onImageClick(image)}
               onMouseEnter={() => setHoveredImageId(image.id)}
               onMouseLeave={() => setHoveredImageId(null)}
