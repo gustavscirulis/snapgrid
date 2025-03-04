@@ -9,6 +9,10 @@
     "dist/**/*",
     "electron/**/*"
   ],
+  "extraMetadata": {
+    "main": "electron/main.js",
+    "type": "module"
+  },
   "mac": {
     "category": "public.app-category.developer-tools",
     "target": [
