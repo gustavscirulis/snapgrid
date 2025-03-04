@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
 
@@ -20,33 +20,64 @@ export interface ImageItem {
   title?: string;
   thumbnailUrl?: string;
   sourceUrl?: string;
-  patterns?: PatternTag[]; // Added this field for UI pattern tags
+  patterns?: PatternTag[];
   isAnalyzing?: boolean;
   error?: string;
 }
 
-export function useImageStore() {
-  const [images, setImages] = useState<ImageItem[]>(() => {
-    // Load saved images from localStorage on initialization
-    try {
-      const savedImages = localStorage.getItem("ui-reference-images");
-      return savedImages ? JSON.parse(savedImages) : [];
-    } catch (error) {
-      console.error("Error loading images from localStorage:", error);
-      return [];
-    }
-  });
-  const [isUploading, setIsUploading] = useState(false);
+// Check if running in Electron
+const isElectron = () => {
+  return window.electron !== undefined;
+};
 
-  // Save to localStorage whenever images change
-  const saveToLocalStorage = useCallback((updatedImages: ImageItem[]) => {
-    try {
-      // Limit the number of stored images to prevent quota issues
-      const limitedImages = updatedImages.slice(0, 20); // Store only the 20 most recent images
-      localStorage.setItem("ui-reference-images", JSON.stringify(limitedImages));
-    } catch (error) {
-      console.error("Error saving to localStorage:", error);
-      // If we hit quota issues, show a warning to the user (in a real app)
+export function useImageStore() {
+  const [images, setImages] = useState<ImageItem[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load images on initialization
+  useEffect(() => {
+    const loadImages = async () => {
+      if (isElectron()) {
+        // Load from Electron filesystem
+        try {
+          const loadedImages = await window.electron.loadImages();
+          setImages(loadedImages);
+        } catch (error) {
+          console.error("Error loading images from filesystem:", error);
+          toast.error("Failed to load images from disk");
+        }
+      } else {
+        // Load from localStorage as fallback when running in browser
+        try {
+          const savedImages = localStorage.getItem("ui-reference-images");
+          if (savedImages) {
+            setImages(JSON.parse(savedImages));
+          }
+        } catch (error) {
+          console.error("Error loading images from localStorage:", error);
+        }
+      }
+      setIsLoading(false);
+    };
+
+    loadImages();
+  }, []);
+
+  // Save images
+  const saveImages = useCallback(async (updatedImages: ImageItem[]) => {
+    if (isElectron()) {
+      // No need to save all images at once when using filesystem
+      // Each image is saved individually when added
+    } else {
+      // Save to localStorage as fallback when running in browser
+      try {
+        const limitedImages = updatedImages.slice(0, 20);
+        localStorage.setItem("ui-reference-images", JSON.stringify(limitedImages));
+      } catch (error) {
+        console.error("Error saving to localStorage:", error);
+        toast.error("Failed to save images to local storage");
+      }
     }
   }, []);
 
@@ -55,6 +86,11 @@ export function useImageStore() {
     
     const reader = new FileReader();
     reader.onload = async (e) => {
+      if (!e.target?.result) {
+        setIsUploading(false);
+        return;
+      }
+
       const img = new Image();
       img.onload = async () => {
         const newImage: ImageItem = {
@@ -67,10 +103,34 @@ export function useImageStore() {
           isAnalyzing: hasApiKey(),
         };
         
-        // Add image right away
+        // Add image to state right away
         const updatedImages = [newImage, ...images];
         setImages(updatedImages);
-        saveToLocalStorage(updatedImages);
+        
+        // Save image to filesystem if in Electron
+        if (isElectron()) {
+          try {
+            await window.electron.saveImage({
+              id: newImage.id,
+              dataUrl: newImage.url,
+              metadata: {
+                id: newImage.id,
+                type: newImage.type,
+                width: newImage.width,
+                height: newImage.height,
+                createdAt: newImage.createdAt,
+                isAnalyzing: newImage.isAnalyzing
+              }
+            });
+          } catch (error) {
+            console.error("Failed to save image to filesystem:", error);
+            toast.error("Failed to save image to disk");
+          }
+        } else {
+          // Save to localStorage if in browser
+          saveImages(updatedImages);
+        }
+        
         setIsUploading(false);
         
         // Start pattern analysis if API key is set
@@ -90,18 +150,48 @@ export function useImageStore() {
               const updatedWithPatterns = prevImages.map(img => 
                 img.id === newImage.id ? imageWithPatterns : img
               );
-              saveToLocalStorage(updatedWithPatterns);
+              
+              // Save updated image
+              if (isElectron()) {
+                window.electron.saveImage({
+                  id: imageWithPatterns.id,
+                  dataUrl: imageWithPatterns.url,
+                  metadata: {
+                    ...imageWithPatterns,
+                    url: undefined // Don't duplicate image data in metadata
+                  }
+                });
+              } else {
+                saveImages(updatedWithPatterns);
+              }
+              
               return updatedWithPatterns;
             });
           } catch (error) {
             console.error("Failed to analyze image:", error);
+            
             // Update to remove analyzing state and set error
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
             setImages(prevImages => {
               const updated = prevImages.map(img => 
                 img.id === newImage.id ? { ...img, isAnalyzing: false, error: errorMessage } : img
               );
-              saveToLocalStorage(updated);
+              
+              if (isElectron()) {
+                window.electron.saveImage({
+                  id: newImage.id,
+                  dataUrl: newImage.url,
+                  metadata: {
+                    ...newImage,
+                    isAnalyzing: false,
+                    error: errorMessage,
+                    url: undefined
+                  }
+                });
+              } else {
+                saveImages(updated);
+              }
+              
               return updated;
             });
             
@@ -113,7 +203,7 @@ export function useImageStore() {
     };
     
     reader.readAsDataURL(file);
-  }, [images, saveToLocalStorage]);
+  }, [images, saveImages]);
 
   const addUrlCard = useCallback(async (url: string) => {
     setIsUploading(true);
@@ -134,16 +224,26 @@ export function useImageStore() {
       
       const updatedImages = [newCard, ...images];
       setImages(updatedImages);
-      saveToLocalStorage(updatedImages);
+      
+      // Save URL card
+      if (isElectron()) {
+        await window.electron.saveUrlCard({
+          id: newCard.id,
+          metadata: newCard
+        });
+      } else {
+        saveImages(updatedImages);
+      }
     } catch (error) {
       console.error("Error adding URL card:", error);
+      
       // Add fallback card if metadata fetching fails
       const fallbackCard: ImageItem = {
         id: crypto.randomUUID(),
         type: "url",
         url: url,
         width: 400,
-        height: 120, // Reduced height for URL cards to make them compact
+        height: 120,
         createdAt: new Date(),
         title: url,
         sourceUrl: url
@@ -151,21 +251,42 @@ export function useImageStore() {
       
       const updatedImages = [fallbackCard, ...images];
       setImages(updatedImages);
-      saveToLocalStorage(updatedImages);
+      
+      if (isElectron()) {
+        await window.electron.saveUrlCard({
+          id: fallbackCard.id,
+          metadata: fallbackCard
+        });
+      } else {
+        saveImages(updatedImages);
+      }
     } finally {
       setIsUploading(false);
     }
-  }, [images, saveToLocalStorage]);
+  }, [images, saveImages]);
 
-  const removeImage = useCallback((id: string) => {
+  const removeImage = useCallback(async (id: string) => {
+    if (isElectron()) {
+      try {
+        await window.electron.deleteImage(id);
+      } catch (error) {
+        console.error("Failed to delete image from filesystem:", error);
+        toast.error("Failed to delete image from disk");
+      }
+    }
+    
     const updatedImages = images.filter(img => img.id !== id);
     setImages(updatedImages);
-    saveToLocalStorage(updatedImages);
-  }, [images, saveToLocalStorage]);
+    
+    if (!isElectron()) {
+      saveImages(updatedImages);
+    }
+  }, [images, saveImages]);
 
   return {
     images,
     isUploading,
+    isLoading,
     addImage,
     addUrlCard,
     removeImage,

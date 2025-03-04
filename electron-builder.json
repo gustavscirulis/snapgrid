@@ -1,0 +1,18 @@
+
+{
+  "appId": "com.uireference.app",
+  "productName": "UI Reference",
+  "directories": {
+    "output": "release/"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*"
+  ],
+  "mac": {
+    "category": "public.app-category.developer-tools",
+    "target": [
+      "dmg"
+    ]
+  }
+}
