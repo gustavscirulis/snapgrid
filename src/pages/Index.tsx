@@ -4,7 +4,7 @@ import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
 import ImageModal from "@/components/ImageModal";
-import { ImagePlus, Link, Search, HardDrive } from "lucide-react";
+import { ImagePlus, Link, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { setOpenAIApiKey } from "@/services/aiAnalysisService";
@@ -17,7 +17,6 @@ const Index = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [urlModalOpen, setUrlModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [storageDir, setStorageDir] = useState<string | null>(null);
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
@@ -35,13 +34,6 @@ const Index = () => {
     
     if (isRunningInElectron) {
       console.log("Running in Electron mode");
-      window.electron.getAppStorageDir().then((dir: string) => {
-        setStorageDir(dir);
-        console.log("App storage directory:", dir);
-      }).catch(error => {
-        console.error("Failed to get storage directory:", error);
-        toast.error("Failed to get storage directory");
-      });
     } else {
       console.log("Running in browser mode. Electron APIs not available.");
       toast.warning("Running in browser mode. Local storage features are not available.");
@@ -89,20 +81,6 @@ const Index = () => {
     removeImage(id);
   };
 
-  const openStorageLocation = () => {
-    if (isElectron && window.electron?.openStorageDir) {
-      window.electron.openStorageDir()
-        .then(() => {
-          toast.success("Storage folder opened");
-        })
-        .catch((error: any) => {
-          toast.error("Failed to open storage folder: " + error);
-        });
-    } else {
-      toast.error("This feature is only available in the desktop app");
-    }
-  };
-
   return (
     <UploadZone 
       onImageUpload={addImage} 
@@ -127,16 +105,6 @@ const Index = () => {
                 />
               </div>
               <ApiKeyInput />
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1"
-                onClick={openStorageLocation}
-                disabled={!isElectron}
-              >
-                <HardDrive className="h-4 w-4" />
-                <span>Storage</span>
-              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -178,11 +146,7 @@ const Index = () => {
         />
 
         <footer className="py-6 text-center text-sm text-muted-foreground">
-          {isElectron ? (
-            <p>
-              Images are stored at: {storageDir || "Loading..."} (Click 'Storage' button to open)
-            </p>
-          ) : (
+          {!isElectron && (
             <p>
               Running in browser mode. Local storage features are not available.
             </p>
