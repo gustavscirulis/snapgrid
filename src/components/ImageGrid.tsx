@@ -129,31 +129,35 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-auto">
+        <div className="masonry-grid">
           {images.map((image) => (
             <div
               key={image.id}
-              className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group h-full"
-              onClick={() => onImageClick(image)}
-              onMouseEnter={() => setHoveredImageId(image.id)}
-              onMouseLeave={() => setHoveredImageId(null)}
+              className="masonry-item"
             >
-              {renderItem(image)}
-              
-              {/* Delete Button */}
-              {onImageDelete && (
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onImageDelete(image.id);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
+              <div 
+                className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full"
+                onClick={() => onImageClick(image)}
+                onMouseEnter={() => setHoveredImageId(image.id)}
+                onMouseLeave={() => setHoveredImageId(null)}
+              >
+                {renderItem(image)}
+                
+                {/* Delete Button */}
+                {onImageDelete && (
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onImageDelete(image.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -66,6 +66,38 @@
     @apply bg-muted-foreground/30;
   }
 
+  /* Masonry Grid Styles */
+  .masonry-grid {
+    column-count: 1;
+    column-gap: 1rem;
+    width: 100%;
+  }
+
+  @media (min-width: 640px) {
+    .masonry-grid {
+      column-count: 2;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .masonry-grid {
+      column-count: 3;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .masonry-grid {
+      column-count: 4;
+    }
+  }
+
+  .masonry-item {
+    break-inside: avoid;
+    margin-bottom: 1rem;
+    display: inline-block;
+    width: 100%;
+  }
+
   .url-card {
     @apply bg-card border border-border rounded-lg;
     display: flex;
