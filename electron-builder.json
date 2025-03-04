@@ -18,5 +18,7 @@
     "target": [
       "dmg"
     ]
-  }
+  },
+  "electronDependenciesUsedInApp": ["electron", "electron-builder"],
+  "npmRebuild": false
 }
