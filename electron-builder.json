@@ -9,6 +9,12 @@
     "dist/**/*",
     "electron/**/*"
   ],
+  "extraResources": [
+    {
+      "from": "node_modules/fs-extra",
+      "to": "node_modules/fs-extra"
+    }
+  ],
   "extraMetadata": {
     "main": "electron/main.js",
     "type": "module"

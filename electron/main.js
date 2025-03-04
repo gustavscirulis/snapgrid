@@ -3,12 +3,14 @@ import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs-extra';
-import isDev from 'electron-is-dev';
 import os from 'os';
 
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Detect development mode without using electron-is-dev
+const isDev = process.env.NODE_ENV === 'development' || !/[\\/]app\.asar[\\/]/.test(__dirname);
 
 // Global storage path that will be exposed to the renderer
 let appStorageDir;
@@ -76,8 +78,6 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
-  
-  // Removed the storage location alert dialog that was here
 }
 
 app.whenReady().then(createWindow);
