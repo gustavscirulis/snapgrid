@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -100,6 +101,7 @@ export function useImageStore() {
         
         if (isElectron()) {
           try {
+            console.log("Saving image to filesystem:", newImage.id);
             const result = await window.electron.saveImage({
               id: newImage.id,
               dataUrl: newImage.url,
@@ -114,8 +116,15 @@ export function useImageStore() {
             });
             
             if (result.success && result.path) {
+              console.log("Image saved successfully at:", result.path);
               newImage.actualFilePath = result.path;
               setImages([newImage, ...images.filter(img => img.id !== newImage.id)]);
+              
+              // Display the file path in a toast to help the user find the file
+              toast.success(`Image saved to: ${result.path}`);
+            } else {
+              console.error("Failed to save image:", result.error);
+              toast.error(`Failed to save image: ${result.error || "Unknown error"}`);
             }
           } catch (error) {
             console.error("Failed to save image to filesystem:", error);

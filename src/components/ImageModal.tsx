@@ -33,7 +33,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
   };
   
   const openFileLocation = () => {
-    if (window.electron) {
+    if (window.electron && window.electron.openStorageDir) {
       window.electron.openStorageDir()
         .then(() => {
           toast.success("Storage folder opened");
@@ -41,6 +41,8 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
         .catch((error: any) => {
           toast.error("Failed to open storage folder: " + error);
         });
+    } else {
+      toast.error("This feature is only available in the desktop app");
     }
   };
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
@@ -21,18 +20,15 @@ const Index = () => {
   const [storageDir, setStorageDir] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if running in Electron
     const electronAvailable = window.electron !== undefined;
     setIsElectron(electronAvailable);
     
-    // Get storage directory if in Electron
     if (electronAvailable) {
       window.electron.getAppStorageDir().then((dir: string) => {
         setStorageDir(dir);
       });
     }
     
-    // Load API key from localStorage
     const savedApiKey = localStorage.getItem("openai-api-key");
     if (savedApiKey) {
       setOpenAIApiKey(savedApiKey);
@@ -76,7 +72,7 @@ const Index = () => {
   };
 
   const openStorageLocation = () => {
-    if (window.electron) {
+    if (window.electron && window.electron.openStorageDir) {
       window.electron.openStorageDir()
         .then(() => {
           toast.success("Storage folder opened");
@@ -84,6 +80,8 @@ const Index = () => {
         .catch((error: any) => {
           toast.error("Failed to open storage folder: " + error);
         });
+    } else {
+      toast.error("This feature is only available in the desktop app");
     }
   };
 
