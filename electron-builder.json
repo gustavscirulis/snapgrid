@@ -18,10 +18,5 @@
     "target": [
       "dmg"
     ]
-  },
-  "npmRebuild": false,
-  "electronVersion": "35.0.0",
-  "forceCodeSigning": false,
-  "buildDependenciesFromSource": true,
-  "nodeGypRebuild": false
+  }
 }
