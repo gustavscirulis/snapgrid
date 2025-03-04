@@ -33,7 +33,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
   };
   
   const openFileLocation = () => {
-    if (window.electron && image.actualFilePath) {
+    if (window.electron) {
       window.electron.openStorageDir()
         .then(() => {
           toast.success("Storage folder opened");
@@ -157,10 +157,10 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                     </p>
                   </div>
                   
-                  {isElectron && image.actualFilePath && (
+                  {isElectron && (
                     <div className="mt-2 flex items-center justify-between">
-                      <p className="text-xs text-white/70 truncate max-w-[80%]" title={image.actualFilePath}>
-                        File: {image.actualFilePath}
+                      <p className="text-xs text-white/70 truncate max-w-[80%]" title={image.actualFilePath || "File path not available"}>
+                        {image.actualFilePath ? `File: ${image.actualFilePath}` : "File path not available"}
                       </p>
                       <Button 
                         variant="ghost" 
