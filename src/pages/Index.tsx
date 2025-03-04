@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
@@ -16,18 +17,16 @@ const Index = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [urlModalOpen, setUrlModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isElectron, setIsElectron] = useState(false);
   const [storageDir, setStorageDir] = useState<string | null>(null);
 
   useEffect(() => {
-    const electronAvailable = window.electron !== undefined;
-    setIsElectron(electronAvailable);
-    
-    if (electronAvailable) {
-      window.electron.getAppStorageDir().then((dir: string) => {
-        setStorageDir(dir);
-      });
-    }
+    window.electron.getAppStorageDir().then((dir: string) => {
+      setStorageDir(dir);
+      console.log("App storage directory:", dir);
+    }).catch(error => {
+      console.error("Failed to get storage directory:", error);
+      toast.error("Failed to get storage directory");
+    });
     
     const savedApiKey = localStorage.getItem("openai-api-key");
     if (savedApiKey) {
@@ -97,7 +96,6 @@ const Index = () => {
           <div className="max-w-screen-xl mx-auto flex justify-between items-center">
             <h1 className="text-xl font-medium">
               UI Reference
-              {isElectron && <span className="ml-2 text-xs bg-green-100 text-green-800 rounded-full px-2 py-1">Desktop</span>}
             </h1>
             <div className="flex gap-2">
               <div className="relative w-64">
@@ -110,17 +108,15 @@ const Index = () => {
                 />
               </div>
               <ApiKeyInput />
-              {isElectron && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-1"
-                  onClick={openStorageLocation}
-                >
-                  <HardDrive className="h-4 w-4" />
-                  <span>Storage</span>
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1"
+                onClick={openStorageLocation}
+              >
+                <HardDrive className="h-4 w-4" />
+                <span>Storage</span>
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -163,9 +159,7 @@ const Index = () => {
 
         <footer className="py-6 text-center text-sm text-muted-foreground">
           <p>
-            {isElectron 
-              ? `Images are stored at: ${storageDir || "Loading..."} (Click 'Storage' button to open)` 
-              : "Drag and drop images or paste URLs anywhere to add"}
+            Images are stored at: {storageDir || "Loading..."} (Click 'Storage' button to open)
           </p>
         </footer>
       </div>
