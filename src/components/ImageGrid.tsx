@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,28 @@ interface ImageGridProps {
 
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
+  const [columns, setColumns] = useState(3);
+
+  useEffect(() => {
+    const updateColumns = () => {
+      const width = window.innerWidth;
+      if (width >= 1536) {
+        setColumns(5); // 2xl breakpoint
+      } else if (width >= 1280) {
+        setColumns(4); // xl breakpoint
+      } else if (width >= 1024) {
+        setColumns(3); // lg breakpoint
+      } else if (width >= 640) {
+        setColumns(2); // sm breakpoint
+      } else {
+        setColumns(1); // xs/mobile
+      }
+    };
+
+    updateColumns();
+    window.addEventListener('resize', updateColumns);
+    return () => window.removeEventListener('resize', updateColumns);
+  }, []);
 
   const renderPatternTags = (item: ImageItem) => {
     if (!item.patterns || item.patterns.length === 0) {
@@ -95,6 +116,22 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     }
   };
 
+  const distributeImages = () => {
+    const columnArrays: ImageItem[][] = Array.from({ length: columns }, () => []);
+    
+    images.forEach((image, index) => {
+      const shortestColumnIndex = columnArrays
+        .map((column, i) => ({ height: column.length, index: i }))
+        .sort((a, b) => a.height - b.height)[0].index;
+      
+      columnArrays[shortestColumnIndex].push(image);
+    });
+    
+    return columnArrays;
+  };
+
+  const columnData = distributeImages();
+
   return (
     <div className="px-4 py-6 w-full">
       {images.length === 0 ? (
@@ -130,34 +167,38 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         </div>
       ) : (
         <div className="masonry-grid">
-          {images.map((image) => (
-            <div
-              key={image.id}
-              className="masonry-item"
+          {columnData.map((column, columnIndex) => (
+            <div 
+              key={columnIndex} 
+              className="masonry-column"
+              style={{ width: `${100 / columns}%` }}
             >
-              <div 
-                className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full"
-                onClick={() => onImageClick(image)}
-                onMouseEnter={() => setHoveredImageId(image.id)}
-                onMouseLeave={() => setHoveredImageId(null)}
-              >
-                {renderItem(image)}
-                
-                {/* Delete Button */}
-                {onImageDelete && (
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onImageDelete(image.id);
-                    }}
+              {column.map((image) => (
+                <div key={image.id} className="masonry-item">
+                  <div 
+                    className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full"
+                    onClick={() => onImageClick(image)}
+                    onMouseEnter={() => setHoveredImageId(image.id)}
+                    onMouseLeave={() => setHoveredImageId(null)}
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+                    {renderItem(image)}
+                    
+                    {onImageDelete && (
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onImageDelete(image.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </div>
