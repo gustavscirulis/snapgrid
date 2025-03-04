@@ -71,6 +71,8 @@ function createWindow() {
     ? 'http://localhost:8080' 
     : `file://${path.join(__dirname, '../dist/index.html')}`;
     
+  console.log('Loading application from:', startUrl);
+  
   mainWindow.loadURL(startUrl);
 
   // Open DevTools ONLY in development mode
