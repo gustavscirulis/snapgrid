@@ -77,22 +77,7 @@ function createWindow() {
     mainWindow = null;
   });
   
-  // Show storage location info on startup
-  setTimeout(() => {
-    if (mainWindow) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Storage Location',
-        message: 'App files are stored at:',
-        detail: appStorageDir + '\n\nClick "Open Folder" to view your files.',
-        buttons: ['OK', 'Open Folder']
-      }).then(result => {
-        if (result.response === 1) {
-          shell.openPath(appStorageDir);
-        }
-      });
-    }
-  }, 1000);
+  // Removed the storage location alert dialog that was here
 }
 
 app.whenReady().then(createWindow);
