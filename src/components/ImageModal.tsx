@@ -2,8 +2,9 @@
 import React, { useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
-import { X, ExternalLink, Scan, AlertCircle } from "lucide-react";
+import { X, ExternalLink, Scan, AlertCircle, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface ImageModalProps {
   isOpen: boolean;
@@ -30,6 +31,20 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
       window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
     }
   };
+  
+  const openFileLocation = () => {
+    if (window.electron && image.actualFilePath) {
+      window.electron.openStorageDir()
+        .then(() => {
+          toast.success("Storage folder opened");
+        })
+        .catch((error: any) => {
+          toast.error("Failed to open storage folder: " + error);
+        });
+    }
+  };
+
+  const isElectron = window.electron !== undefined;
 
   const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean, error?: string) => {
     if (!patterns || patterns.length === 0) {
@@ -141,6 +156,23 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                       {new Date(image.createdAt).toLocaleDateString()}
                     </p>
                   </div>
+                  
+                  {isElectron && image.actualFilePath && (
+                    <div className="mt-2 flex items-center justify-between">
+                      <p className="text-xs text-white/70 truncate max-w-[80%]" title={image.actualFilePath}>
+                        File: {image.actualFilePath}
+                      </p>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="h-8 text-white/80 hover:text-white"
+                        onClick={openFileLocation}
+                      >
+                        <FolderOpen className="h-3.5 w-3.5 mr-1" />
+                        <span className="text-xs">Open folder</span>
+                      </Button>
+                    </div>
+                  )}
                   
                   {renderPatternTags(image.patterns, image.isAnalyzing, image.error)}
                 </div>

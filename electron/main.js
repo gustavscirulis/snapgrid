@@ -1,5 +1,5 @@
 
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs-extra';
@@ -10,51 +10,48 @@ import os from 'os';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Global storage path that will be exposed to the renderer
+let appStorageDir;
+
 // Determine app storage directory in iCloud or local folder
 const getAppStorageDir = () => {
   const platform = process.platform;
-  let appStorageDir;
+  let storageDir;
   
   if (platform === 'darwin') {
-    // On macOS, try to use iCloud Drive if available
+    // On macOS, try to use Documents folder first for visibility
     const homeDir = os.homedir();
-    const iCloudDrive = path.join(homeDir, 'Library', 'Mobile Documents', 'com~apple~CloudDocs');
+    storageDir = path.join(homeDir, 'Documents', 'UIReferenceApp');
+    console.log('Using Documents folder path:', storageDir);
     
-    if (fs.existsSync(iCloudDrive)) {
-      appStorageDir = path.join(iCloudDrive, 'UIReferenceApp');
-      console.log('Using iCloud storage path:', appStorageDir);
-    } else {
-      // Fallback to Documents folder
-      appStorageDir = path.join(homeDir, 'Documents', 'UIReferenceApp');
-      console.log('Using Documents folder path:', appStorageDir);
+    // Create a README file to help users find the folder
+    const readmePath = path.join(storageDir, 'README.txt');
+    if (!fs.existsSync(readmePath)) {
+      fs.ensureDirSync(storageDir);
+      fs.writeFileSync(
+        readmePath, 
+        'This folder contains your UI Reference app images and data.\n' +
+        'Files are stored as PNG images with accompanying JSON metadata.\n\n' +
+        'Storage location: ' + storageDir
+      );
     }
   } else {
     // For other platforms, use app.getPath('userData')
-    appStorageDir = path.join(app.getPath('userData'), 'images');
-    console.log('Using userData path:', appStorageDir);
+    storageDir = path.join(app.getPath('userData'), 'images');
+    console.log('Using userData path:', storageDir);
   }
   
   // Ensure directory exists
-  fs.ensureDirSync(appStorageDir);
+  fs.ensureDirSync(storageDir);
   
-  return appStorageDir;
+  return storageDir;
 };
 
 let mainWindow;
-let appStorageDir;
 
 function createWindow() {
   appStorageDir = getAppStorageDir();
   console.log('App storage directory:', appStorageDir);
-  
-  // Create dialog to show storage path to user
-  dialog.showMessageBox({
-    type: 'info',
-    title: 'Storage Location',
-    message: 'App files are stored at:',
-    detail: appStorageDir,
-    buttons: ['OK']
-  });
   
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -79,6 +76,23 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+  
+  // Show storage location info on startup
+  setTimeout(() => {
+    if (mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Storage Location',
+        message: 'App files are stored at:',
+        detail: appStorageDir + '\n\nClick "Open Folder" to view your files.',
+        buttons: ['OK', 'Open Folder']
+      }).then(result => {
+        if (result.response === 1) {
+          shell.openPath(appStorageDir);
+        }
+      });
+    }
+  }, 1000);
 }
 
 app.whenReady().then(createWindow);
@@ -100,16 +114,28 @@ ipcMain.handle('get-app-storage-dir', () => {
   return appStorageDir;
 });
 
+ipcMain.handle('open-storage-dir', () => {
+  return shell.openPath(appStorageDir);
+});
+
 ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
   try {
+    // Strip data URL prefix to get base64 data
     const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
+    
+    // Save image file
     const imagePath = path.join(appStorageDir, `${id}.png`);
-    const metadataPath = path.join(appStorageDir, `${id}.json`);
-    
     await fs.writeFile(imagePath, buffer);
-    await fs.writeJson(metadataPath, metadata);
     
+    // Save metadata as separate JSON file
+    const metadataPath = path.join(appStorageDir, `${id}.json`);
+    await fs.writeJson(metadataPath, {
+      ...metadata,
+      filePath: imagePath // Include actual file path in metadata
+    });
+    
+    console.log(`Image saved to: ${imagePath}`);
     return { success: true, path: imagePath };
   } catch (error) {
     console.error('Error saving image:', error);
@@ -120,10 +146,10 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
 ipcMain.handle('load-images', async () => {
   try {
     const files = await fs.readdir(appStorageDir);
-    const imageFiles = files.filter(file => file.endsWith('.json'));
+    const jsonFiles = files.filter(file => file.endsWith('.json'));
     
     const images = await Promise.all(
-      imageFiles.map(async (file) => {
+      jsonFiles.map(async (file) => {
         const id = path.basename(file, '.json');
         const metadataPath = path.join(appStorageDir, file);
         const imagePath = path.join(appStorageDir, `${id}.png`);
@@ -131,17 +157,22 @@ ipcMain.handle('load-images', async () => {
         try {
           // Check if both metadata and image exist
           if (!(await fs.pathExists(imagePath))) {
+            console.warn(`Image file not found: ${imagePath}`);
             return null;
           }
           
+          // Load metadata
           const metadata = await fs.readJson(metadataPath);
+          
+          // Read the image file and convert to base64 for display
           const imageData = await fs.readFile(imagePath);
           const base64Image = `data:image/png;base64,${imageData.toString('base64')}`;
           
           return {
             ...metadata,
             id,
-            url: base64Image
+            url: base64Image,
+            actualFilePath: imagePath
           };
         } catch (err) {
           console.error(`Error loading image ${id}:`, err);
@@ -150,6 +181,7 @@ ipcMain.handle('load-images', async () => {
       })
     );
     
+    // Filter out any null entries (failed loads)
     return images.filter(Boolean);
   } catch (error) {
     console.error('Error loading images:', error);
@@ -165,6 +197,7 @@ ipcMain.handle('delete-image', async (event, id) => {
     await fs.remove(imagePath);
     await fs.remove(metadataPath);
     
+    console.log(`Deleted image: ${imagePath}`);
     return { success: true };
   } catch (error) {
     console.error('Error deleting image:', error);
@@ -176,6 +209,7 @@ ipcMain.handle('save-url-card', async (event, { id, metadata }) => {
   try {
     const metadataPath = path.join(appStorageDir, `${id}.json`);
     await fs.writeJson(metadataPath, metadata);
+    console.log(`Saved URL card: ${metadataPath}`);
     return { success: true };
   } catch (error) {
     console.error('Error saving URL card:', error);

@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
 import ImageModal from "@/components/ImageModal";
-import { ImagePlus, Link, Search, Folder } from "lucide-react";
+import { ImagePlus, Link, Search, Folder, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { setOpenAIApiKey } from "@/services/aiAnalysisService";
@@ -17,10 +18,21 @@ const Index = () => {
   const [urlModalOpen, setUrlModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isElectron, setIsElectron] = useState(false);
+  const [storageDir, setStorageDir] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsElectron(window.electron !== undefined);
+    // Check if running in Electron
+    const electronAvailable = window.electron !== undefined;
+    setIsElectron(electronAvailable);
     
+    // Get storage directory if in Electron
+    if (electronAvailable) {
+      window.electron.getAppStorageDir().then((dir: string) => {
+        setStorageDir(dir);
+      });
+    }
+    
+    // Load API key from localStorage
     const savedApiKey = localStorage.getItem("openai-api-key");
     if (savedApiKey) {
       setOpenAIApiKey(savedApiKey);
@@ -63,6 +75,18 @@ const Index = () => {
     removeImage(id);
   };
 
+  const openStorageLocation = () => {
+    if (window.electron) {
+      window.electron.openStorageDir()
+        .then(() => {
+          toast.success("Storage folder opened");
+        })
+        .catch((error: any) => {
+          toast.error("Failed to open storage folder: " + error);
+        });
+    }
+  };
+
   return (
     <UploadZone 
       onImageUpload={addImage} 
@@ -88,6 +112,17 @@ const Index = () => {
                 />
               </div>
               <ApiKeyInput />
+              {isElectron && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-1"
+                  onClick={openStorageLocation}
+                >
+                  <HardDrive className="h-4 w-4" />
+                  <span>Storage</span>
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -131,7 +166,7 @@ const Index = () => {
         <footer className="py-6 text-center text-sm text-muted-foreground">
           <p>
             {isElectron 
-              ? "Images are stored on your Mac and sync with iCloud" 
+              ? `Images are stored at: ${storageDir || "Loading..."} (Click 'Storage' button to open)` 
               : "Drag and drop images or paste URLs anywhere to add"}
           </p>
         </footer>
