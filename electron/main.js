@@ -1,14 +1,16 @@
 
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs-extra';
-import isDev from 'electron-is-dev';
 import os from 'os';
 
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Simple way to detect if running in development
+const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === undefined;
 
 // Global storage path that will be exposed to the renderer
 let appStorageDir;
@@ -63,12 +65,14 @@ function createWindow() {
     },
   });
 
+  // Load the app - either from the dev server or from the built files
   const startUrl = isDev 
     ? 'http://localhost:8080' 
     : `file://${path.join(__dirname, '../dist/index.html')}`;
     
   mainWindow.loadURL(startUrl);
 
+  // Open DevTools in development mode
   if (isDev) {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
@@ -76,8 +80,6 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
-  
-  // Removed the storage location alert dialog that was here
 }
 
 app.whenReady().then(createWindow);
