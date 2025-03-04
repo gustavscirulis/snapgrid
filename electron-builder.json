@@ -19,7 +19,6 @@
       "dmg"
     ]
   },
-  "electronDependenciesUsedInApp": ["electron", "electron-builder"],
   "npmRebuild": false,
   "electronVersion": "35.0.0",
   "forceCodeSigning": false,

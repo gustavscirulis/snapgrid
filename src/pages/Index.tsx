@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
@@ -20,7 +19,6 @@ const Index = () => {
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    // Check if running in Electron - more reliable detection
     const isRunningInElectron = window && 
       typeof window.electron !== 'undefined' && 
       window.electron !== null;
@@ -35,8 +33,7 @@ const Index = () => {
     if (isRunningInElectron) {
       console.log("Running in Electron mode");
     } else {
-      console.log("Running in browser mode. Electron APIs not available.");
-      toast.warning("Running in browser mode. Local storage features are not available.");
+      console.log("Running in browser mode. Local storage features are not available.");
     }
     
     const savedApiKey = localStorage.getItem("openai-api-key");
