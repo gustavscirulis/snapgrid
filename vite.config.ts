@@ -20,6 +20,5 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Ensure base path is set properly for both development and production
-  base: mode === 'development' ? '/' : './',
+  base: mode === 'production' ? './' : '/',
 }));

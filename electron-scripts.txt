@@ -1,7 +1,7 @@
 
 {
   "scripts": {
-    "electron:dev": "cross-env NODE_ENV=development concurrently \"npm run dev\" \"wait-on http://localhost:8080 && electron electron/main.js\"",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:8080 && electron electron/main.js\"",
     "electron:build": "cross-env NODE_ENV=production npm run build && electron-builder build --config electron-builder.json --skip-dependency-check"
   }
 }
