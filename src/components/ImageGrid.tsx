@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { MediaItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [columns, setColumns] = useState(3);
   const [videoErrors, setVideoErrors] = useState<Record<string, boolean>>({});
+  const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
 
   useEffect(() => {
     const updateColumns = () => {
@@ -52,6 +53,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       });
     }
     setVideoErrors(prev => ({...prev, [id]: true}));
+  };
+
+  const setVideoRef = (id: string, element: HTMLVideoElement | null) => {
+    videoRefs.current[id] = element;
   };
 
   const renderPatternTags = (item: MediaItem) => {
@@ -127,6 +132,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
             </div>
           ) : (
             <video 
+              ref={(el) => setVideoRef(item.id, el)}
               className="w-full rounded-t-lg object-cover"
               poster=""
               preload="metadata"
@@ -134,7 +140,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               muted
               controls={hoveredImageId === item.id}
               onError={() => handleVideoError(item.id)}
-              key={item.id}
+              key={`${item.id}-${item.url}`}
             >
               <source 
                 src={item.url} 

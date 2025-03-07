@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { MediaItem, PatternTag } from "@/hooks/useImageStore";
 import { X, ExternalLink, Scan, AlertCircle, Play, Video } from "lucide-react";
@@ -13,6 +13,7 @@ interface ImageModalProps {
 
 const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
   const [videoError, setVideoError] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -154,6 +155,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                     </div>
                   ) : (
                     <video
+                      ref={videoRef}
                       className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
                       style={{ 
                         maxWidth: Math.min(image.width, window.innerWidth * 0.9),
@@ -163,7 +165,8 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                       autoPlay
                       playsInline
                       onError={handleVideoError}
-                      key={image.url} // Add key to force re-render when URL changes
+                      // Using a key based on both id and url to force re-render when url changes
+                      key={`${image.id}-${image.url}`}
                     >
                       <source 
                         src={image.url} 
