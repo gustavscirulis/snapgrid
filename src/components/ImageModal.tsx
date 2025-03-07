@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
@@ -19,6 +20,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image, sourceE
   
   useEffect(() => {
     if (isOpen && sourceElement) {
+      // Get the position of the thumbnail that was clicked
       const pos = getThumbnailPosition(sourceElement);
       setStartPosition(pos);
       setAnimationState("initial");

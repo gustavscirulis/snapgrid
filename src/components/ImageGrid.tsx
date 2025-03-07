@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
@@ -193,7 +194,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 <div key={image.id} className="masonry-item">
                   <div 
                     ref={(el) => setItemRef(image.id, el)}
-                    className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full"
+                    className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full cursor-pointer"
                     onClick={() => handleImageClick(image)}
                     onMouseEnter={() => setHoveredImageId(image.id)}
                     onMouseLeave={() => setHoveredImageId(null)}
