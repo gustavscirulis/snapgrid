@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
 import { X, ExternalLink, Scan, AlertCircle } from "lucide-react";
@@ -13,6 +13,7 @@ interface ImageModalProps {
 
 const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const isElectron = Boolean(window?.electron);
 
   useEffect(() => {
@@ -27,16 +28,39 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
   }, [isOpen, onClose]);
 
   useEffect(() => {
+    if (!isOpen || !image) {
+      setImageUrl(null);
+      return;
+    }
+    
+    const loadMedia = async () => {
+      if (isElectron && image.filePath) {
+        // In Electron, use the file protocol to load the media
+        if (image.type === "image") {
+          setImageUrl(`file://${image.filePath}`);
+        } else if (image.type === "video") {
+          setImageUrl(`file://${image.filePath}`);
+        }
+      } else {
+        // In browser mode, use the data URL directly
+        setImageUrl(image.url);
+      }
+    };
+    
+    loadMedia();
+  }, [isOpen, image, isElectron]);
+
+  useEffect(() => {
     if (!isOpen && videoRef.current) {
       videoRef.current.pause();
     }
 
-    if (isOpen && image?.type === 'video' && videoRef.current) {
+    if (isOpen && image?.type === 'video' && videoRef.current && imageUrl) {
       videoRef.current.play().catch(err => {
         console.error("Error playing video:", err);
       });
     }
-  }, [isOpen, image]);
+  }, [isOpen, image, imageUrl]);
 
   if (!image) return null;
 
@@ -44,28 +68,6 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     if (image.type === "url" && image.sourceUrl) {
       window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
     }
-  };
-
-  const getVideoSource = () => {
-    if (isElectron && image.actualFilePath) {
-      // Get the actual path from the filesystem
-      let filePath = image.actualFilePath;
-      
-      // Check if the file path has the correct extension
-      const pathExtension = filePath.split('.').pop();
-      if (image.fileExtension && pathExtension !== image.fileExtension) {
-        console.warn(`Path extension (${pathExtension}) doesn't match file type (${image.fileExtension})`);
-        // Replace the extension with the correct one
-        filePath = filePath.replace(`.${pathExtension}`, `.${image.fileExtension}`);
-        console.log("Corrected video file path:", filePath);
-      }
-      
-      console.log("Using actual file path for video:", filePath);
-      console.log("File extension:", image.fileExtension);
-      return `file://${filePath}`;
-    }
-    console.log("Using data URL for video (browser mode or missing path)");
-    return image.url;
   };
 
   const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean, error?: string) => {
@@ -147,17 +149,23 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
       return (
         <>
           <div className="relative">
-            <video
-              ref={videoRef}
-              src={getVideoSource()}
-              controls
-              autoPlay
-              className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
-              style={{ 
-                maxWidth: Math.min(image.width, window.innerWidth * 0.9),
-                maxHeight: Math.min(image.height, window.innerHeight * 0.85)
-              }}
-            />
+            {imageUrl ? (
+              <video
+                ref={videoRef}
+                src={imageUrl}
+                controls
+                autoPlay
+                className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
+                style={{ 
+                  maxWidth: Math.min(image.width, window.innerWidth * 0.9),
+                  maxHeight: Math.min(image.height, window.innerHeight * 0.85)
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-64 w-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              </div>
+            )}
           </div>
           
           {image.duration && (
@@ -172,15 +180,21 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     } else {
       return (
         <>
-          <img
-            src={image.url}
-            alt="Enlarged screenshot"
-            className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
-            style={{ 
-              maxWidth: Math.min(image.width, window.innerWidth * 0.9),
-              maxHeight: Math.min(image.height, window.innerHeight * 0.85)
-            }}
-          />
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt="Enlarged screenshot"
+              className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
+              style={{ 
+                maxWidth: Math.min(image.width, window.innerWidth * 0.9),
+                maxHeight: Math.min(image.height, window.innerHeight * 0.85)
+              }}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-64 w-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          )}
           
           <div className="mt-4 px-2">
             {renderPatternTags(image.patterns, image.isAnalyzing, image.error)}

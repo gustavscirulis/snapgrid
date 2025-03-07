@@ -1,9 +1,8 @@
 
 import React, { useCallback, useState, useEffect } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { validateMediaFile } from "@/lib/imageUtils";
 import { ImagePlus, VideoIcon } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface UploadZoneProps {
   onImageUpload: (file: File) => void;
@@ -18,7 +17,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({
   isUploading,
   children,
 }) => {
-  const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -44,18 +42,19 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     
     // Process the dropped files
     files.forEach((file) => {
+      console.log("Dropped file:", file.name, "Type:", file.type);
       const validation = validateMediaFile(file);
       if (validation.valid) {
         onImageUpload(file);
       } else {
         toast({
           title: "Invalid file",
-          description: "Please upload images (max 10MB) or videos (max 50MB)",
+          description: validation.message || "Please upload images (max 10MB) or videos (max 50MB)",
           variant: "destructive",
         });
       }
     });
-  }, [isUploading, onImageUpload, toast]);
+  }, [isUploading, onImageUpload]);
 
   // Add paste event listener to capture pasted URLs
   useEffect(() => {
@@ -82,7 +81,30 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     return () => {
       document.removeEventListener('paste', handlePaste);
     };
-  }, [onUrlAdd, toast]);
+  }, [onUrlAdd]);
+
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isUploading) return;
+
+    const files = Array.from(e.target.files || []);
+    
+    files.forEach((file) => {
+      console.log("Selected file:", file.name, "Type:", file.type);
+      const validation = validateMediaFile(file);
+      if (validation.valid) {
+        onImageUpload(file);
+      } else {
+        toast({
+          title: "Invalid file",
+          description: validation.message || "Please upload images (max 10MB) or videos (max 50MB)",
+          variant: "destructive",
+        });
+      }
+    });
+    
+    // Reset the input so the same file can be selected again
+    e.target.value = '';
+  }, [isUploading, onImageUpload]);
 
   return (
     <>
@@ -124,6 +146,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           className="hidden"
           accept="image/*,video/*"
           multiple
+          onChange={handleFileInputChange}
         />
       </div>
     </>
@@ -131,4 +154,3 @@ const UploadZone: React.FC<UploadZoneProps> = ({
 };
 
 export default UploadZone;
-

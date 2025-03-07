@@ -1,10 +1,10 @@
+
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
 import { 
   getVideoDimensions, 
-  generateVideoThumbnail, 
-  getMediaSourceUrl, 
+  generateVideoThumbnail,
   getFileExtensionFromMimeType,
   getMimeTypeFromDataUrl
 } from "@/lib/imageUtils";
@@ -19,7 +19,7 @@ export interface PatternTag {
 export interface ImageItem {
   id: string;
   type: ImageItemType;
-  url: string;
+  url: string; // In browser mode: data URL; In Electron mode: placeholder URL
   width: number;
   height: number;
   createdAt: Date;
@@ -29,9 +29,9 @@ export interface ImageItem {
   patterns?: PatternTag[];
   isAnalyzing?: boolean;
   error?: string;
-  actualFilePath?: string;
+  filePath?: string; // Actual file path in the filesystem (Electron only)
   duration?: number;
-  fileExtension?: string;
+  mimeType?: string;
 }
 
 export function useImageStore() {
@@ -41,9 +41,7 @@ export function useImageStore() {
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    const isRunningInElectron = window && 
-      typeof window.electron !== 'undefined' && 
-      window.electron !== null;
+    const isRunningInElectron = Boolean(window?.electron);
     
     console.log("useImageStore - Electron detection:", {
       electronExists: typeof window.electron !== 'undefined',
@@ -60,7 +58,7 @@ export function useImageStore() {
           console.log("Loaded images:", loadedImages.length);
           
           loadedImages.forEach(img => {
-            console.log(`Loaded media item ${img.id}, type: ${img.type}, path: ${img.actualFilePath}`);
+            console.log(`Loaded media item ${img.id}, type: ${img.type}, path: ${img.filePath}`);
           });
           
           setImages(loadedImages);
@@ -81,235 +79,243 @@ export function useImageStore() {
   const addImage = useCallback(async (file: File) => {
     setIsUploading(true);
     
-    const fileType = file.type.startsWith('image/') ? 'image' : 'video';
-    const fileExtension = getFileExtensionFromMimeType(file.type);
-    console.log("File type:", file.type, "Extension:", fileExtension);
-    
-    const reader = new FileReader();
-    
-    reader.onload = async (e) => {
-      if (!e.target?.result) {
+    try {
+      const id = crypto.randomUUID();
+      const isVideo = file.type.startsWith('video/');
+      const isImage = file.type.startsWith('image/');
+      
+      if (!isVideo && !isImage) {
+        toast.error("Unsupported file type");
         setIsUploading(false);
         return;
       }
       
-      try {
-        let newItem: ImageItem;
+      console.log(`Processing ${isVideo ? 'video' : 'image'}: ${file.name}`);
+      console.log(`File type: ${file.type}`);
+      
+      let newItem: ImageItem;
+      
+      if (isElectron) {
+        // In Electron mode, save the file directly to disk first
+        console.log(`Saving ${isVideo ? 'video' : 'image'} to filesystem...`);
         
-        if (fileType === 'image') {
+        // Create a temporary URL for the file
+        const tempUrl = URL.createObjectURL(file);
+        
+        if (isImage) {
+          // For images, get dimensions
           const img = new Image();
-          img.onload = async () => {
-            const newImage: ImageItem = {
-              id: crypto.randomUUID(),
-              type: "image",
-              url: e.target?.result as string,
-              width: img.width,
-              height: img.height,
-              createdAt: new Date(),
-              isAnalyzing: hasApiKey(),
-              fileExtension: fileExtension
-            };
-            
-            handleNewItem(newImage, file);
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = tempUrl;
+          });
+          
+          // Save the image to disk using Electron API
+          const result = await window.electron.saveImage({
+            id,
+            file,
+            mimeType: file.type,
+          });
+          
+          if (!result.success) {
+            throw new Error(result.error || "Failed to save image");
+          }
+          
+          newItem = {
+            id,
+            type: "image",
+            url: `media://${id}`, // Use a custom protocol as a placeholder
+            width: img.width,
+            height: img.height,
+            createdAt: new Date(),
+            isAnalyzing: hasApiKey(),
+            filePath: result.path,
+            mimeType: file.type
           };
-          img.src = e.target?.result as string;
+          
+          URL.revokeObjectURL(tempUrl);
         } else {
+          // For videos, get dimensions and generate thumbnail
+          const { width, height } = await getVideoDimensions(file);
+          const thumbnailBlob = await generateVideoThumbnail(file);
+          
+          // Get video duration
+          const video = document.createElement('video');
+          video.preload = 'metadata';
+          await new Promise((resolve) => {
+            video.onloadedmetadata = resolve;
+            video.src = tempUrl;
+          });
+          const duration = video.duration;
+          URL.revokeObjectURL(video.src);
+          
+          // Save the video and thumbnail to disk using Electron API
+          const result = await window.electron.saveImage({
+            id,
+            file,
+            mimeType: file.type,
+            thumbnailBlob: thumbnailBlob || undefined
+          });
+          
+          if (!result.success) {
+            throw new Error(result.error || "Failed to save video");
+          }
+          
+          newItem = {
+            id,
+            type: "video",
+            url: `media://${id}`, // Use a custom protocol as a placeholder
+            width,
+            height,
+            createdAt: new Date(),
+            duration,
+            filePath: result.path,
+            thumbnailUrl: result.thumbnailPath ? `thumbnail://${id}` : undefined,
+            mimeType: file.type
+          };
+        }
+        
+        console.log(`${isVideo ? 'Video' : 'Image'} saved at: ${newItem.filePath}`);
+      } else {
+        // In browser mode, use data URLs as before
+        if (isImage) {
+          const dataUrl = await readFileAsDataURL(file);
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = dataUrl;
+          });
+          
+          newItem = {
+            id,
+            type: "image",
+            url: dataUrl,
+            width: img.width,
+            height: img.height,
+            createdAt: new Date(),
+            isAnalyzing: hasApiKey(),
+            mimeType: file.type
+          };
+        } else {
+          const dataUrl = await readFileAsDataURL(file);
           const { width, height } = await getVideoDimensions(file);
           const thumbnail = await generateVideoThumbnail(file);
           
           const video = document.createElement('video');
           video.preload = 'metadata';
-          video.onloadedmetadata = () => {
-            const newVideo: ImageItem = {
-              id: crypto.randomUUID(),
-              type: "video",
-              url: e.target?.result as string,
-              thumbnailUrl: thumbnail,
-              width: width,
-              height: height,
-              createdAt: new Date(),
-              duration: video.duration,
-              fileExtension: fileExtension
-            };
-            
-            handleNewItem(newVideo, file);
-            URL.revokeObjectURL(video.src);
-          };
+          await new Promise((resolve) => {
+            video.onloadedmetadata = resolve;
+            video.src = dataUrl;
+          });
+          const duration = video.duration;
           
-          video.onerror = () => {
-            toast.error("Error processing video");
-            setIsUploading(false);
-            URL.revokeObjectURL(video.src);
+          newItem = {
+            id,
+            type: "video",
+            url: dataUrl,
+            width,
+            height,
+            createdAt: new Date(),
+            duration,
+            thumbnailUrl: thumbnail,
+            mimeType: file.type
           };
-          
-          video.src = URL.createObjectURL(file);
         }
-      } catch (error) {
-        console.error("Error processing file:", error);
-        toast.error("Error processing file");
-        setIsUploading(false);
       }
-    };
-    
-    reader.readAsDataURL(file);
-  }, [images, isElectron]);
-  
-  const handleNewItem = useCallback(async (newItem: ImageItem, originalFile?: File) => {
-    const updatedImages = [newItem, ...images];
-    setImages(updatedImages);
-    
-    if (isElectron) {
-      try {
-        console.log(`Saving ${newItem.type} to filesystem:`, newItem.id);
-        
-        let fileExtension = newItem.fileExtension;
-        
-        if (!fileExtension && originalFile) {
-          fileExtension = getFileExtensionFromMimeType(originalFile.type);
-        } else if (!fileExtension) {
-          const mimeType = getMimeTypeFromDataUrl(newItem.url);
-          fileExtension = getFileExtensionFromMimeType(mimeType);
-        }
-        
-        console.log(`Using file extension: ${fileExtension} for ${newItem.type} with ID ${newItem.id}`);
-        
-        const result = await window.electron.saveImage({
-          id: newItem.id,
-          dataUrl: newItem.url,
-          fileExtension: fileExtension,
-          forceFilename: `${newItem.id}.${fileExtension}`,
-          metadata: {
-            id: newItem.id,
-            type: newItem.type,
-            width: newItem.width,
-            height: newItem.height,
-            createdAt: newItem.createdAt,
-            isAnalyzing: newItem.isAnalyzing,
-            thumbnailUrl: newItem.thumbnailUrl,
-            duration: newItem.duration,
-            fileExtension: fileExtension
-          }
-        });
-        
-        if (result.success && result.path) {
-          console.log(`${newItem.type} saved successfully at:`, result.path);
-          console.log(`File extension used: ${fileExtension}`);
+      
+      // Add the new item to the state
+      setImages(prevImages => [newItem, ...prevImages]);
+      
+      // If it's an image and we have an API key, analyze it
+      if (newItem.type === "image" && hasApiKey() && newItem.isAnalyzing) {
+        try {
+          // For analysis, we need to get a data URL of the image, even in Electron mode
+          let imageDataUrl: string;
           
-          const savedExtension = result.path.split('.').pop();
-          if (savedExtension !== fileExtension) {
-            console.warn(`Extension mismatch: expected ${fileExtension} but got ${savedExtension}`);
-            const correctPath = result.path.replace(`.${savedExtension}`, `.${fileExtension}`);
-            console.log(`Corrected path should be: ${correctPath}`);
-            
-            const updatedItem = {
-              ...newItem,
-              actualFilePath: correctPath
-            };
-            
-            setImages([updatedItem, ...images.filter(img => img.id !== newItem.id)]);
-            
-            toast.success(`${newItem.type.charAt(0).toUpperCase() + newItem.type.slice(1)} saved with correct extension.`);
+          if (isElectron && newItem.filePath) {
+            // In Electron mode, we need to get the image data from the saved file
+            const imageBuffer = await window.electron.getImageData(newItem.id);
+            imageDataUrl = `data:${file.type};base64,${imageBuffer}`;
           } else {
-            const updatedItem = {
-              ...newItem,
-              actualFilePath: result.path
-            };
-            
-            setImages([updatedItem, ...images.filter(img => img.id !== newItem.id)]);
-            
-            toast.success(`${newItem.type.charAt(0).toUpperCase() + newItem.type.slice(1)} saved to disk.`);
+            imageDataUrl = newItem.url;
           }
-        } else {
-          console.error(`Failed to save ${newItem.type}:`, result.error);
-          toast.error(`Failed to save ${newItem.type}: ${result.error || "Unknown error"}`);
-        }
-      } catch (error) {
-        console.error(`Failed to save ${newItem.type} to filesystem:`, error);
-        toast.error(`Failed to save ${newItem.type} to disk`);
-      }
-    } else {
-      toast.info(`Running in browser mode. ${newItem.type.charAt(0).toUpperCase() + newItem.type.slice(1)} is only stored in memory.`);
-    }
-    
-    setIsUploading(false);
-    
-    if (newItem.type === "image" && hasApiKey() && newItem.isAnalyzing) {
-      try {
-        const patterns = await analyzeImage(newItem.url);
-        
-        const imageWithPatterns = {
-          ...newItem,
-          patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
-          isAnalyzing: false
-        };
-        
-        setImages(prevImages => {
-          const updatedWithPatterns = prevImages.map(img => 
-            img.id === newItem.id ? imageWithPatterns : img
-          );
           
-          if (isElectron) {
-            try {
-              window.electron.saveImage({
-                id: imageWithPatterns.id,
-                dataUrl: imageWithPatterns.url,
-                fileExtension: imageWithPatterns.fileExtension,
-                metadata: {
-                  ...imageWithPatterns,
-                  url: undefined
-                }
-              });
-            } catch (error) {
-              console.error("Failed to update image metadata after analysis:", error);
+          const patterns = await analyzeImage(imageDataUrl);
+          
+          const imageWithPatterns = {
+            ...newItem,
+            patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
+            isAnalyzing: false
+          };
+          
+          setImages(prevImages => {
+            const updatedWithPatterns = prevImages.map(img => 
+              img.id === newItem.id ? imageWithPatterns : img
+            );
+            
+            if (isElectron) {
+              try {
+                // Update metadata in the filesystem
+                window.electron.updateImageMetadata(imageWithPatterns.id, {
+                  patterns: imageWithPatterns.patterns,
+                  isAnalyzing: false
+                });
+              } catch (error) {
+                console.error("Failed to update image metadata after analysis:", error);
+              }
             }
-          }
+            
+            return updatedWithPatterns;
+          });
+        } catch (error) {
+          console.error("Failed to analyze image:", error);
           
-          return updatedWithPatterns;
-        });
-      } catch (error) {
-        console.error("Failed to analyze image:", error);
-        
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        setImages(prevImages => {
-          const updated = prevImages.map(img => 
-            img.id === newItem.id ? { ...img, isAnalyzing: false, error: errorMessage } : img
-          );
-          
-          if (isElectron) {
-            try {
-              window.electron.saveImage({
-                id: newItem.id,
-                dataUrl: newItem.url,
-                fileExtension: newItem.fileExtension,
-                metadata: {
-                  ...newItem,
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+          setImages(prevImages => {
+            const updated = prevImages.map(img => 
+              img.id === newItem.id ? { ...img, isAnalyzing: false, error: errorMessage } : img
+            );
+            
+            if (isElectron) {
+              try {
+                // Update metadata in the filesystem
+                window.electron.updateImageMetadata(newItem.id, {
                   isAnalyzing: false,
-                  error: errorMessage,
-                  url: undefined
-                }
-              });
-            } catch (saveError) {
-              console.error("Failed to update image metadata after analysis error:", saveError);
+                  error: errorMessage
+                });
+              } catch (saveError) {
+                console.error("Failed to update image metadata after analysis error:", saveError);
+              }
             }
-          }
+            
+            return updated;
+          });
           
-          return updated;
-        });
-        
-        toast.error("Failed to analyze image: " + errorMessage);
+          toast.error("Failed to analyze image: " + errorMessage);
+        }
       }
+      
+      toast.success(`${newItem.type.charAt(0).toUpperCase() + newItem.type.slice(1)} added to collection`);
+    } catch (error) {
+      console.error("Error processing file:", error);
+      toast.error("Failed to process file");
+    } finally {
+      setIsUploading(false);
     }
-  }, [images, isElectron]);
+  }, [isElectron]);
 
   const addUrlCard = useCallback(async (url: string) => {
     setIsUploading(true);
     try {
+      const id = crypto.randomUUID();
       const metadata = await fetchUrlMetadata(url);
       
       const newCard: ImageItem = {
-        id: crypto.randomUUID(),
+        id,
         type: "url",
-        url: url,
+        url,
         width: 400,
         height: 120,
         createdAt: new Date(),
@@ -318,70 +324,41 @@ export function useImageStore() {
         sourceUrl: url
       };
       
-      const updatedImages = [newCard, ...images];
-      setImages(updatedImages);
-      
       if (isElectron) {
         try {
           await window.electron.saveUrlCard({
             id: newCard.id,
             metadata: newCard
           });
-          toast.success(`URL card saved to disk`);
         } catch (error) {
           console.error("Failed to save URL card:", error);
           toast.error("Failed to save URL card to disk");
         }
-      } else {
-        toast.info("Running in browser mode. URL card is only stored in memory.");
       }
+      
+      setImages(prevImages => [newCard, ...prevImages]);
+      toast.success("URL card added to collection");
     } catch (error) {
       console.error("Error adding URL card:", error);
-      
-      const fallbackCard: ImageItem = {
-        id: crypto.randomUUID(),
-        type: "url",
-        url: url,
-        width: 400,
-        height: 120,
-        createdAt: new Date(),
-        title: url,
-        sourceUrl: url
-      };
-      
-      const updatedImages = [fallbackCard, ...images];
-      setImages(updatedImages);
-      
-      if (isElectron) {
-        try {
-          await window.electron.saveUrlCard({
-            id: fallbackCard.id,
-            metadata: fallbackCard
-          });
-        } catch (saveError) {
-          console.error("Failed to save fallback URL card:", saveError);
-          toast.error("Failed to save URL card to disk");
-        }
-      }
+      toast.error("Failed to add URL card");
     } finally {
       setIsUploading(false);
     }
-  }, [images, isElectron]);
+  }, [isElectron]);
 
   const removeImage = useCallback(async (id: string) => {
     if (isElectron) {
       try {
         await window.electron.deleteImage(id);
-        toast.success("Image deleted from disk");
+        toast.success("Media deleted from disk");
       } catch (error) {
-        console.error("Failed to delete image from filesystem:", error);
-        toast.error("Failed to delete image from disk");
+        console.error("Failed to delete media from filesystem:", error);
+        toast.error("Failed to delete media from disk");
       }
     }
     
-    const updatedImages = images.filter(img => img.id !== id);
-    setImages(updatedImages);
-  }, [images, isElectron]);
+    setImages(prevImages => prevImages.filter(img => img.id !== id));
+  }, [isElectron]);
 
   return {
     images,
@@ -391,6 +368,16 @@ export function useImageStore() {
     addUrlCard,
     removeImage,
   };
+}
+
+// Helper function to read a file as a data URL
+async function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 async function fetchUrlMetadata(url: string): Promise<{ title?: string; thumbnailUrl?: string }> {
@@ -409,3 +396,4 @@ async function fetchUrlMetadata(url: string): Promise<{ title?: string; thumbnai
     return {};
   }
 }
+
