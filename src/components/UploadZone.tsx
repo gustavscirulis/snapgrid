@@ -1,22 +1,25 @@
 
 import React, { useCallback, useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { validateImageFile } from "@/lib/imageUtils";
+import { validateImageFile, validateVideoFile } from "@/lib/imageUtils";
 import { ImagePlus } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface UploadZoneProps {
   onImageUpload: (file: File) => void;
+  onVideoUpload?: (file: File) => void;
   onUrlAdd: (url: string) => void;
   isUploading: boolean;
   children: React.ReactNode;
+  isElectronAvailable: boolean;
 }
 
 const UploadZone: React.FC<UploadZoneProps> = ({
   onImageUpload,
+  onVideoUpload,
   onUrlAdd,
   isUploading,
   children,
+  isElectronAvailable,
 }) => {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
@@ -38,6 +41,15 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     e.stopPropagation();
     setIsDragging(false);
 
+    if (!isElectronAvailable) {
+      toast({
+        title: "Electron mode required",
+        description: "This app can only run in electron mode.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (isUploading) return;
 
     const files = Array.from(e.dataTransfer.files);
@@ -46,19 +58,23 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     files.forEach((file) => {
       if (validateImageFile(file)) {
         onImageUpload(file);
+      } else if (validateVideoFile(file) && onVideoUpload) {
+        onVideoUpload(file);
       } else {
         toast({
           title: "Invalid file",
-          description: "Please upload images less than 10MB in size.",
+          description: "Please upload supported media files (images up to 10MB, videos up to 100MB).",
           variant: "destructive",
         });
       }
     });
-  }, [isUploading, onImageUpload, toast]);
+  }, [isElectronAvailable, isUploading, onImageUpload, onVideoUpload, toast]);
 
   // Add paste event listener to capture pasted URLs
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
+      if (!isElectronAvailable) return;
+      
       const pastedText = e.clipboardData?.getData('text');
       if (pastedText) {
         try {
@@ -81,7 +97,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     return () => {
       document.removeEventListener('paste', handlePaste);
     };
-  }, [onUrlAdd, toast]);
+  }, [isElectronAvailable, onUrlAdd, toast]);
 
   return (
     <>
@@ -99,7 +115,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 pointer-events-none">
             <div className="bg-card p-8 rounded-lg shadow-lg flex flex-col items-center animate-float">
               <ImagePlus className="w-12 h-12 text-primary mb-4" />
-              <p className="text-xl font-medium">Drop images to add</p>
+              <p className="text-xl font-medium">Drop media to add</p>
             </div>
           </div>
         )}
@@ -117,8 +133,9 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           type="file"
           id="file-upload"
           className="hidden"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
+          disabled={!isElectronAvailable}
         />
       </div>
     </>
