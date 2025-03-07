@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -58,7 +57,21 @@ export function useImageStore() {
           console.log("Loading images from filesystem...");
           const loadedImages = await window.electron.loadImages();
           console.log("Loaded images:", loadedImages.length);
-          setImages(loadedImages);
+          
+          // For each loaded image, ensure we have the correct file path
+          const processedImages = loadedImages.map(img => {
+            if (img.type === "image" || img.type === "video") {
+              return {
+                ...img,
+                // For Electron mode, we use the actualFilePath directly
+                // url will be used for display purposes and should be a file path
+                url: img.actualFilePath || img.url
+              };
+            }
+            return img;
+          });
+          
+          setImages(processedImages);
         } else {
           console.log("Running in browser mode, no filesystem access");
           setImages([]);
@@ -94,7 +107,7 @@ export function useImageStore() {
           if (updatedImage.type === "image" || updatedImage.type === "video") {
             window.electron.saveImage({
               id: updatedImage.id,
-              dataUrl: updatedImage.url,
+              dataUrl: updatedImage.url.startsWith('data:') ? updatedImage.url : null,
               metadata: {
                 ...updatedImage,
                 url: undefined
@@ -130,7 +143,7 @@ export function useImageStore() {
         const newVideo: ImageItem = {
           id: crypto.randomUUID(),
           type: "video",
-          url: URL.createObjectURL(file),
+          url: URL.createObjectURL(file), // Temporary URL
           thumbnailUrl: thumbnailUrl,
           width: videoElement.videoWidth,
           height: videoElement.videoHeight,
@@ -147,7 +160,8 @@ export function useImageStore() {
             return;
           }
           
-          newVideo.url = e.target.result as string;
+          // Temporary data URL for saving to disk
+          const dataUrl = e.target.result as string;
           
           // Update UI first for better responsiveness
           const updatedVideos = [newVideo, ...images];
@@ -158,7 +172,7 @@ export function useImageStore() {
               console.log("Saving video to filesystem:", newVideo.id);
               const result = await window.electron.saveImage({
                 id: newVideo.id,
-                dataUrl: newVideo.url,
+                dataUrl: dataUrl,
                 metadata: {
                   ...newVideo,
                   url: undefined
@@ -167,8 +181,15 @@ export function useImageStore() {
               
               if (result.success && result.path) {
                 console.log("Video saved successfully at:", result.path);
-                newVideo.actualFilePath = result.path;
-                setImages([newVideo, ...images.filter(img => img.id !== newVideo.id)]);
+                
+                // Update with actual file path
+                const updatedVideo = {
+                  ...newVideo,
+                  actualFilePath: result.path,
+                  url: result.path, // Use file path directly
+                };
+                
+                setImages([updatedVideo, ...images.filter(img => img.id !== newVideo.id)]);
                 toast.success("Video saved successfully");
               } else {
                 console.error("Failed to save video:", result.error);
@@ -196,7 +217,7 @@ export function useImageStore() {
             const newImage: ImageItem = {
               id: crypto.randomUUID(),
               type: "image",
-              url: e.target?.result as string,
+              url: e.target?.result as string, // Temporary data URL
               width: img.width,
               height: img.height,
               createdAt: new Date(),
@@ -225,10 +246,45 @@ export function useImageStore() {
                 
                 if (result.success && result.path) {
                   console.log("Image saved successfully at:", result.path);
-                  newImage.actualFilePath = result.path;
-                  setImages([newImage, ...images.filter(img => img.id !== newImage.id)]);
+                  
+                  // Update with actual file path
+                  const updatedImage = {
+                    ...newImage,
+                    actualFilePath: result.path,
+                    url: result.path, // Use file path directly for display
+                  };
+                  
+                  setImages([updatedImage, ...images.filter(img => img.id !== newImage.id)]);
                   
                   toast.success("Image saved successfully");
+                  
+                  if (hasApiKey()) {
+                    try {
+                      // Analyze using the data URL (not the file path)
+                      const patterns = await analyzeImage(e.target?.result as string);
+                      
+                      const imageWithPatterns = {
+                        ...updatedImage,
+                        patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
+                        isAnalyzing: false
+                      };
+                      
+                      updateImageItem(imageWithPatterns);
+                    } catch (error) {
+                      console.error("Failed to analyze image:", error);
+                      
+                      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+                      
+                      const imageWithError = {
+                        ...updatedImage,
+                        isAnalyzing: false,
+                        error: errorMessage
+                      };
+                      
+                      updateImageItem(imageWithError);
+                      toast.error("Failed to analyze image: " + errorMessage);
+                    }
+                  }
                 } else {
                   console.error("Failed to save image:", result.error);
                   toast.error("Failed to save image");
@@ -239,32 +295,32 @@ export function useImageStore() {
               }
             } else {
               toast.info("Running in browser mode. Image is only stored in memory.");
-            }
-            
-            if (hasApiKey()) {
-              try {
-                const patterns = await analyzeImage(newImage.url);
-                
-                const imageWithPatterns = {
-                  ...newImage,
-                  patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
-                  isAnalyzing: false
-                };
-                
-                updateImageItem(imageWithPatterns);
-              } catch (error) {
-                console.error("Failed to analyze image:", error);
-                
-                const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-                
-                const imageWithError = {
-                  ...newImage,
-                  isAnalyzing: false,
-                  error: errorMessage
-                };
-                
-                updateImageItem(imageWithError);
-                toast.error("Failed to analyze image: " + errorMessage);
+              
+              if (hasApiKey()) {
+                try {
+                  const patterns = await analyzeImage(newImage.url);
+                  
+                  const imageWithPatterns = {
+                    ...newImage,
+                    patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
+                    isAnalyzing: false
+                  };
+                  
+                  updateImageItem(imageWithPatterns);
+                } catch (error) {
+                  console.error("Failed to analyze image:", error);
+                  
+                  const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+                  
+                  const imageWithError = {
+                    ...newImage,
+                    isAnalyzing: false,
+                    error: errorMessage
+                  };
+                  
+                  updateImageItem(imageWithError);
+                  toast.error("Failed to analyze image: " + errorMessage);
+                }
               }
             }
           };

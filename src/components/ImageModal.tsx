@@ -1,247 +1,183 @@
 
-import React, { useEffect, useRef } from "react";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import React, { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
-import { X, ExternalLink, Scan, AlertCircle, RefreshCw } from "lucide-react";
+import { Cross2Icon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
-import { analyzeImage } from "@/services/aiAnalysisService";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
 
 interface ImageModalProps {
   isOpen: boolean;
   onClose: () => void;
   image: ImageItem | null;
-  onImageUpdate?: (updatedImage: ImageItem) => void;
+  onImageUpdate?: (image: ImageItem) => void;
 }
 
-const ImageModal: React.FC<ImageModalProps> = ({ 
-  isOpen, 
-  onClose, 
+const ImageModal: React.FC<ImageModalProps> = ({
+  isOpen,
+  onClose,
   image,
-  onImageUpdate
+  onImageUpdate,
 }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const currentTimeRef = useRef<number>(0);
+  const [title, setTitle] = useState("");
+  const [patterns, setPatterns] = useState<PatternTag[]>([]);
+  const [newPattern, setNewPattern] = useState("");
 
+  // Reset state when image changes
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
-    };
+    if (image) {
+      setTitle(image.title || "");
+      setPatterns(image.patterns || []);
+    } else {
+      setTitle("");
+      setPatterns([]);
+    }
+  }, [image]);
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  const handleSave = () => {
+    if (image && onImageUpdate) {
+      onImageUpdate({
+        ...image,
+        title,
+        patterns,
+      });
+    }
+    onClose();
+  };
 
-  // Save current time when video is played in modal
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      currentTimeRef.current = videoRef.current.currentTime;
+  const addPattern = () => {
+    if (newPattern.trim() && !patterns.some(p => p.name.toLowerCase() === newPattern.toLowerCase())) {
+      setPatterns([...patterns, { name: newPattern.trim(), confidence: 1 }]);
+      setNewPattern("");
     }
   };
 
-  // Set current time when modal is opened
-  useEffect(() => {
-    if (isOpen && image?.type === "video" && videoRef.current) {
-      // Small timeout to ensure the video element is fully loaded
-      const timer = setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.currentTime = currentTimeRef.current;
-          videoRef.current.play().catch(error => {
-            console.error("Failed to play video in modal:", error);
-          });
-        }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, image]);
+  const removePattern = (index: number) => {
+    setPatterns(patterns.filter((_, i) => i !== index));
+  };
 
+  // If no image, return null 
   if (!image) return null;
 
-  const openExternalUrl = () => {
-    if (image.type === "url" && image.sourceUrl) {
-      window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
-    }
-  };
-
-  const handleRetryAnalysis = async () => {
-    if (!image || image.type !== "image" || !onImageUpdate) return;
-    
-    // Update image to analyzing state
-    const updatingImage = {
-      ...image,
-      isAnalyzing: true,
-      error: undefined
-    };
-    onImageUpdate(updatingImage);
-    
-    try {
-      const patterns = await analyzeImage(image.url);
-      
-      const updatedImage = {
-        ...image,
-        patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
-        isAnalyzing: false,
-        error: undefined
-      };
-      
-      onImageUpdate(updatedImage);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      
-      const failedImage = {
-        ...image,
-        isAnalyzing: false,
-        error: errorMessage
-      };
-      
-      onImageUpdate(failedImage);
-      toast.error("Failed to analyze image: " + errorMessage);
-    }
-  };
-
-  const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean, error?: string) => {
-    // Don't show pattern UI for videos
-    if (image.type === "video") {
-      return null;
-    }
-    
-    if (!patterns || patterns.length === 0) {
-      if (isAnalyzing) {
-        return (
-          <div className="flex items-center gap-2 text-sm bg-primary/10 px-3 py-2 rounded-md">
-            <Scan className="w-4 h-4 animate-pulse text-primary" />
-            <span>Analyzing UI patterns...</span>
-          </div>
-        );
-      }
-
-      if (error) {
-        return (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-sm bg-destructive/10 px-3 py-2 rounded-md">
-              <AlertCircle className="w-4 h-4 text-destructive" />
-              <span>Analysis failed: {error}</span>
-            </div>
-            {onImageUpdate && (
-              <Button 
-                size="sm" 
-                className="mt-2"
-                onClick={handleRetryAnalysis}
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Retry Analysis
-              </Button>
-            )}
-          </div>
-        );
-      }
-
-      return (
-        <div className="flex items-center gap-2 text-sm bg-muted/50 px-3 py-2 rounded-md">
-          <span>No UI patterns detected. Set an OpenAI API key to enable analysis.</span>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex flex-wrap gap-2">
-        {patterns.map((pattern, index) => (
-          <div 
-            key={index} 
-            className="text-sm bg-primary/20 text-primary px-3 py-1.5 rounded-md"
-          >
-            {pattern.name}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
+  const isVideo = image.type === "video";
+  const hasLocalFile = image.actualFilePath && image.actualFilePath.length > 0;
+  
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-7xl w-[95vw] p-0 overflow-hidden bg-transparent border-none shadow-none max-h-[95vh]">
-        <DialogTitle className="sr-only">
-          {image?.type === "url" ? "URL Preview" : image?.type === "video" ? "Video Preview" : "Image Preview"}
-        </DialogTitle>
-        <DialogDescription className="sr-only">
-          {image?.type === "url" 
-            ? "View details about this URL" 
-            : image?.type === "video" 
-              ? "View this video in full screen" 
-              : "View this image in full screen and check detected UI patterns"}
-        </DialogDescription>
-        
-        <div className="relative h-full w-full flex items-center justify-center">
-          <button
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+        <DialogTitle className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">
+            {image.title || (isVideo ? "Video" : "Image")} Details
+          </h2>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={onClose}
-            className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 backdrop-blur-sm transition-all z-10"
-            aria-label="Close"
+            className="h-8 w-8"
           >
-            <X className="h-5 w-5" />
-          </button>
-          
-          <div className="bg-white/5 backdrop-blur-lg p-4 rounded-lg overflow-hidden shadow-2xl max-h-[95vh] max-w-full">
-            {image.type === "url" ? (
-              <div className="bg-card p-8 rounded-md shadow-md animate-scale-in max-w-lg">
-                <div className="flex items-start mb-6">
-                  {image.thumbnailUrl && (
-                    <div className="w-16 h-16 bg-muted rounded-md mr-4 overflow-hidden flex items-center justify-center">
-                      <img 
-                        src={image.thumbnailUrl} 
-                        alt={image.title || "Website"} 
-                        className="max-w-full max-h-full object-contain" 
-                      />
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="font-medium text-xl mb-2">{image.title || "Website"}</h3>
-                    <p className="text-sm text-muted-foreground break-all">{image.url}</p>
-                  </div>
-                </div>
-                <Button 
-                  className="w-full" 
-                  onClick={openExternalUrl}
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open URL
-                </Button>
-              </div>
-            ) : image.type === "video" ? (
-              <div className="flex flex-col">
+            <Cross2Icon className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </Button>
+        </DialogTitle>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+          <div className="space-y-4">
+            {isVideo ? (
+              <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
                 <video
-                  ref={videoRef}
-                  src={image.url}
+                  src={hasLocalFile ? `file://${image.actualFilePath}` : image.url}
                   controls
-                  onTimeUpdate={handleTimeUpdate}
-                  className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
-                  style={{ 
-                    maxWidth: Math.min(image.width, window.innerWidth * 0.9),
-                    maxHeight: Math.min(image.height, window.innerHeight * 0.85)
-                  }}
-                  autoPlay
-                >
-                  Your browser does not support the video tag.
-                </video>
+                  autoPlay={false}
+                  className="w-full h-full object-contain"
+                />
               </div>
             ) : (
-              <div className="flex flex-col">
+              <div className="relative bg-muted rounded-md overflow-hidden">
                 <img
-                  src={image.url}
-                  alt="Enlarged screenshot"
-                  className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
-                  style={{ 
-                    maxWidth: Math.min(image.width, window.innerWidth * 0.9),
-                    maxHeight: Math.min(image.height, window.innerHeight * 0.85)
-                  }}
+                  src={hasLocalFile ? `file://${image.actualFilePath}` : image.url}
+                  alt={image.title || "Image"}
+                  className="w-full max-h-[500px] object-contain"
                 />
-                
-                <div className="mt-4 px-2 max-w-full overflow-x-auto">
-                  {renderPatternTags(image.patterns, image.isAnalyzing, image.error)}
+              </div>
+            )}
+
+            {image.type !== "url" && (
+              <div className="text-sm text-muted-foreground">
+                {image.width} × {image.height} pixels
+                {isVideo && image.duration && (
+                  <span> • {Math.floor(image.duration)} seconds</span>
+                )}
+                {image.actualFilePath && (
+                  <div className="mt-1 break-all">
+                    Path: {image.actualFilePath}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter a title for this image"
+              />
+            </div>
+
+            <Separator />
+
+            {image.type !== "url" && (
+              <div className="space-y-2">
+                <Label>Pattern Tags</Label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {patterns.map((pattern, index) => (
+                    <Badge key={index} variant="secondary" className="gap-1">
+                      {pattern.name}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 ml-1 p-0"
+                        onClick={() => removePattern(index)}
+                      >
+                        <X className="h-3 w-3" />
+                        <span className="sr-only">Remove tag</span>
+                      </Button>
+                    </Badge>
+                  ))}
+                  {patterns.length === 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      No pattern tags added yet
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add a new pattern tag"
+                    value={newPattern}
+                    onChange={(e) => setNewPattern(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addPattern()}
+                  />
+                  <Button onClick={addPattern} disabled={!newPattern.trim()}>
+                    Add
+                  </Button>
                 </div>
               </div>
             )}
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave}>Save Changes</Button>
+            </div>
           </div>
         </div>
       </DialogContent>

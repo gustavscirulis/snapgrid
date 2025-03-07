@@ -109,22 +109,28 @@ ipcMain.handle('open-storage-dir', () => {
 
 ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
   try {
-    // Strip data URL prefix to get base64 data
-    const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
-    
-    // Save image file
+    // Create image file path
     const imagePath = path.join(appStorageDir, `${id}.png`);
-    await fs.writeFile(imagePath, buffer);
+    
+    // If dataUrl is provided, save the image
+    if (dataUrl) {
+      // Strip data URL prefix to get base64 data
+      const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      // Save image file
+      await fs.writeFile(imagePath, buffer);
+      console.log(`Image file saved to: ${imagePath}`);
+    }
     
     // Save metadata as separate JSON file
     const metadataPath = path.join(appStorageDir, `${id}.json`);
     await fs.writeJson(metadataPath, {
       ...metadata,
-      filePath: imagePath // Include actual file path in metadata
+      actualFilePath: imagePath // Include actual file path in metadata
     });
     
-    console.log(`Image saved to: ${imagePath}`);
+    console.log(`Metadata saved to: ${metadataPath}`);
     return { success: true, path: imagePath };
   } catch (error) {
     console.error('Error saving image:', error);
@@ -134,8 +140,11 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
 
 ipcMain.handle('load-images', async () => {
   try {
+    console.log("Loading images from:", appStorageDir);
     const files = await fs.readdir(appStorageDir);
     const jsonFiles = files.filter(file => file.endsWith('.json'));
+    
+    console.log(`Found ${jsonFiles.length} JSON files`);
     
     const images = await Promise.all(
       jsonFiles.map(async (file) => {
@@ -145,7 +154,7 @@ ipcMain.handle('load-images', async () => {
         
         try {
           // Check if both metadata and image exist
-          if (!(await fs.pathExists(imagePath))) {
+          if (!(await fs.pathExists(imagePath)) && !(metadata?.type === "url")) {
             console.warn(`Image file not found: ${imagePath}`);
             return null;
           }
@@ -153,15 +162,21 @@ ipcMain.handle('load-images', async () => {
           // Load metadata
           const metadata = await fs.readJson(metadataPath);
           
-          // Read the image file and convert to base64 for display
-          const imageData = await fs.readFile(imagePath);
-          const base64Image = `data:image/png;base64,${imageData.toString('base64')}`;
+          // For URL cards, just return the metadata
+          if (metadata.type === "url") {
+            return {
+              ...metadata,
+              id
+            };
+          }
           
+          // For images/videos, return with the actual file path
           return {
             ...metadata,
             id,
-            url: base64Image,
-            actualFilePath: imagePath
+            actualFilePath: imagePath,
+            // Use the actual file path for rendering
+            url: imagePath
           };
         } catch (err) {
           console.error(`Error loading image ${id}:`, err);
@@ -183,10 +198,17 @@ ipcMain.handle('delete-image', async (event, id) => {
     const imagePath = path.join(appStorageDir, `${id}.png`);
     const metadataPath = path.join(appStorageDir, `${id}.json`);
     
-    await fs.remove(imagePath);
-    await fs.remove(metadataPath);
+    // Delete the image file if it exists
+    if (await fs.pathExists(imagePath)) {
+      await fs.remove(imagePath);
+    }
     
-    console.log(`Deleted image: ${imagePath}`);
+    // Delete the metadata file
+    if (await fs.pathExists(metadataPath)) {
+      await fs.remove(metadataPath);
+    }
+    
+    console.log(`Deleted image: ${id}`);
     return { success: true };
   } catch (error) {
     console.error('Error deleting image:', error);
