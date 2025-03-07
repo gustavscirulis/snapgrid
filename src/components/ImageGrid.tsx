@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle, Link, Globe } from "lucide-react";
@@ -69,6 +70,43 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     setTimeout(() => {
       setSelectedImage(null);
     }, 300);
+  };
+
+  // Add back the renderPatternTags function
+  const renderPatternTags = (item: ImageItem) => {
+    if (!item.patterns || item.patterns.length === 0) {
+      if (item.isAnalyzing) {
+        return (
+          <div className="flex items-center gap-1 text-xs text-primary-foreground bg-primary/80 px-2 py-1 rounded-md">
+            <Scan className="w-3 h-3 animate-pulse" />
+            <span>Analyzing...</span>
+          </div>
+        );
+      }
+      if (item.error) {
+        return (
+          <div className="flex items-center gap-1 text-xs text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-md">
+            <AlertCircle className="w-3 h-3" />
+            <span>Analysis failed</span>
+          </div>
+        );
+      }
+      return null;
+    }
+
+    return (
+      <div className="flex flex-wrap gap-1 mt-2">
+        {item.patterns.map((pattern, index) => (
+          <span 
+            key={index} 
+            className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md"
+            title={`Confidence: ${Math.round(pattern.confidence * 100)}%`}
+          >
+            {pattern.name}
+          </span>
+        ))}
+      </div>
+    );
   };
 
   const renderItem = (item: ImageItem) => {
