@@ -1,8 +1,8 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
-import { X, ExternalLink, Scan, AlertCircle } from "lucide-react";
+import { X, ExternalLink, Scan, AlertCircle, Play, Pause, FullscreenIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageModalProps {
@@ -12,16 +12,77 @@ interface ImageModalProps {
 }
 
 const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
         onClose();
+      } else if (e.key === " " && image?.type === "video") {
+        // Space bar toggles play/pause
+        togglePlayPause();
+        e.preventDefault();
+      } else if (e.key === "f" && image?.type === "video") {
+        // F key toggles fullscreen
+        toggleFullscreen();
+        e.preventDefault();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, image]);
+
+  useEffect(() => {
+    // When modal opens and it's a video, start playing from where it was
+    if (isOpen && image?.type === "video" && videoRef.current) {
+      videoRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch(error => {
+        console.error("Error playing video:", error);
+      });
+    }
+    
+    // When modal closes, reset state
+    if (!isOpen) {
+      setIsPlaying(false);
+      setIsFullscreen(false);
+    }
+    
+    // Check fullscreen status
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [isOpen, image]);
+
+  const togglePlayPause = () => {
+    if (!videoRef.current) return;
+    
+    if (isPlaying) {
+      videoRef.current.pause();
+    } else {
+      videoRef.current.play();
+    }
+    
+    setIsPlaying(!isPlaying);
+  };
+
+  const toggleFullscreen = () => {
+    if (!videoRef.current) return;
+    
+    if (!document.fullscreenElement) {
+      videoRef.current.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  };
 
   if (!image) return null;
 
@@ -78,11 +139,41 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     );
   };
 
+  const renderVideoControls = () => {
+    if (image.type !== 'video') return null;
+    
+    return (
+      <div className="absolute bottom-4 left-0 right-0 mx-auto w-full max-w-md px-4 bg-black/50 backdrop-blur-sm rounded-full py-2 flex items-center justify-between">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-white hover:bg-white/20"
+          onClick={togglePlayPause}
+        >
+          {isPlaying ? (
+            <Pause className="h-5 w-5" />
+          ) : (
+            <Play className="h-5 w-5" />
+          )}
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-white hover:bg-white/20"
+          onClick={toggleFullscreen}
+        >
+          <FullscreenIcon className="h-5 w-5" />
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-7xl w-[95vw] p-0 overflow-hidden bg-transparent border-none shadow-none max-h-[95vh]">
         <DialogTitle className="sr-only">
-          {image.type === "url" ? "URL Preview" : "Image Preview"}
+          {image.type === "url" ? "URL Preview" : image.type === "video" ? "Video Preview" : "Image Preview"}
         </DialogTitle>
         
         <div className="relative h-full w-full flex items-center justify-center">
@@ -108,7 +199,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                     </div>
                   )}
                   <div>
-                    <h3 className="font-medium text-xl mb-2">{image.title || "Website"}</h3>
+                    <span className="font-medium text-xl mb-2 block">{image.title || "Website"}</span>
                     <p className="text-sm text-muted-foreground break-all">{image.url}</p>
                   </div>
                 </div>
@@ -119,6 +210,24 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Open URL
                 </Button>
+              </div>
+            ) : image.type === "video" ? (
+              <div className="relative">
+                <video
+                  ref={videoRef}
+                  src={image.url}
+                  className="max-h-[85vh] max-w-full rounded-md animate-scale-in shadow-md"
+                  style={{ 
+                    maxWidth: Math.min(image.width, window.innerWidth * 0.9),
+                    maxHeight: Math.min(image.height, window.innerHeight * 0.85)
+                  }}
+                  controls={false}
+                  playsInline
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                />
+                
+                {renderVideoControls()}
               </div>
             ) : (
               <>

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
+import { ExternalLink, Scan, Trash2, AlertCircle, Play, Pause, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageGridProps {
@@ -12,6 +13,7 @@ interface ImageGridProps {
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [columns, setColumns] = useState(3);
+  const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
 
   useEffect(() => {
     const updateColumns = () => {
@@ -33,6 +35,25 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     window.addEventListener('resize', updateColumns);
     return () => window.removeEventListener('resize', updateColumns);
   }, []);
+
+  useEffect(() => {
+    // Handle video play/pause when hovering
+    if (hoveredImageId) {
+      const videoElement = videoRefs.current[hoveredImageId];
+      if (videoElement) {
+        videoElement.play().catch(error => {
+          console.error("Error playing video:", error);
+        });
+      }
+    } else {
+      // Pause all videos when not hovering
+      Object.values(videoRefs.current).forEach(video => {
+        if (video) {
+          video.pause();
+        }
+      });
+    }
+  }, [hoveredImageId]);
 
   const renderPatternTags = (item: ImageItem) => {
     if (!item.patterns || item.patterns.length === 0) {
@@ -70,6 +91,13 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     );
   };
 
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return "";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
   const renderItem = (item: ImageItem) => {
     if (item.type === "url") {
       return (
@@ -95,6 +123,44 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               <span>Open URL</span>
             </div>
           </div>
+        </div>
+      );
+    } else if (item.type === "video") {
+      return (
+        <div className="relative">
+          <video
+            ref={el => videoRefs.current[item.id] = el}
+            src={item.url}
+            className="w-full h-auto object-cover rounded-t-lg"
+            playsInline
+            muted
+            loop
+            poster={item.thumbnailUrl}
+          />
+          
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-60 group-hover:opacity-0 transition-opacity">
+            <Video className="w-12 h-12 text-white" />
+          </div>
+          
+          {!hoveredImageId && (
+            <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-md">
+              {formatDuration(item.duration)}
+            </div>
+          )}
+          
+          {hoveredImageId === item.id && (
+            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+              <div className="flex items-center justify-between">
+                <div className="text-white text-xs">
+                  {formatDuration(item.duration)}
+                </div>
+                <div className="flex items-center text-white text-xs">
+                  <Play className="w-3 h-3 mr-1" />
+                  <span>Playing</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     } else {
@@ -154,14 +220,14 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
           <h3 className="text-2xl font-medium mb-2">No items yet</h3>
           <p className="text-muted-foreground max-w-md">
-            Drag and drop images anywhere, paste URLs, or use the upload buttons to add your first item.
+            Drag and drop images or videos anywhere, paste URLs, or use the upload buttons to add your first item.
           </p>
           <div className="mt-6 flex gap-3">
             <label 
               htmlFor="file-upload"
               className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors cursor-pointer"
             >
-              Upload image
+              Upload media
             </label>
           </div>
         </div>

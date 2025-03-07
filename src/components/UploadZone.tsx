@@ -1,8 +1,7 @@
-
 import React, { useCallback, useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { validateImageFile } from "@/lib/imageUtils";
-import { ImagePlus } from "lucide-react";
+import { validateMediaFile } from "@/lib/imageUtils";
+import { ImagePlus, VideoIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface UploadZoneProps {
@@ -44,12 +43,13 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     
     // Process the dropped files
     files.forEach((file) => {
-      if (validateImageFile(file)) {
+      const validationResult = validateMediaFile(file);
+      if (validationResult.valid) {
         onImageUpload(file);
       } else {
         toast({
           title: "Invalid file",
-          description: "Please upload images less than 10MB in size.",
+          description: "Please upload images or videos in supported formats with appropriate file sizes.",
           variant: "destructive",
         });
       }
@@ -83,6 +83,38 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     };
   }, [onUrlAdd, toast]);
 
+  // Add file input change handler
+  useEffect(() => {
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        const files = (e.target as HTMLInputElement).files;
+        if (files && files.length > 0) {
+          Array.from(files).forEach(file => {
+            const validationResult = validateMediaFile(file);
+            if (validationResult.valid) {
+              onImageUpload(file);
+            } else {
+              toast({
+                title: "Invalid file",
+                description: "Please upload images or videos in supported formats with appropriate file sizes.",
+                variant: "destructive",
+              });
+            }
+          });
+          // Reset the input value to allow uploading the same file again
+          fileInput.value = '';
+        }
+      });
+    }
+    
+    return () => {
+      if (fileInput) {
+        fileInput.removeEventListener('change', () => {});
+      }
+    };
+  }, [onImageUpload, toast]);
+
   return (
     <>
       <div
@@ -98,8 +130,11 @@ const UploadZone: React.FC<UploadZoneProps> = ({
         {isDragging && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 pointer-events-none">
             <div className="bg-card p-8 rounded-lg shadow-lg flex flex-col items-center animate-float">
-              <ImagePlus className="w-12 h-12 text-primary mb-4" />
-              <p className="text-xl font-medium">Drop images to add</p>
+              <div className="flex space-x-3">
+                <ImagePlus className="w-12 h-12 text-primary mb-4" />
+                <VideoIcon className="w-12 h-12 text-primary mb-4" />
+              </div>
+              <p className="text-xl font-medium">Drop images or videos to add</p>
             </div>
           </div>
         )}
@@ -117,7 +152,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           type="file"
           id="file-upload"
           className="hidden"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
         />
       </div>
