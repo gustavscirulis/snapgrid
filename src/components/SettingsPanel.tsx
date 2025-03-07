@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -58,6 +57,11 @@ const ApiKeySection = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleUpdateApiKey = () => {
+    if (!apiKey.trim()) {
+      toast.error("Please enter an API key");
+      return;
+    }
+    
     if (!apiKey.trim().startsWith("sk-")) {
       toast.error("Invalid API key format. OpenAI API keys start with 'sk-'");
       return;
@@ -94,9 +98,13 @@ const ApiKeySection = () => {
             placeholder="sk-..."
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleUpdateApiKey();
+              }
+            }}
           />
           <Button 
-            size="sm" 
             onClick={handleUpdateApiKey}
             disabled={isSubmitting || !apiKey.trim()}
           >

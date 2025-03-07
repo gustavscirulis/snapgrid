@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
@@ -21,7 +20,6 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    // Check if running in Electron - more reliable detection
     const isRunningInElectron = window && 
       typeof window.electron !== 'undefined' && 
       window.electron !== null;
