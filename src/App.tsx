@@ -17,20 +17,14 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Create router with future flags enabled
+// Create router with compatible future flags
 const router = createHashRouter(
   createRoutesFromElements(
     <>
       <Route path="/" element={<Index />} />
       <Route path="*" element={<NotFound />} />
     </>
-  ),
-  {
-    future: {
-      v7_startTransition: true,
-      v7_relativeSplatPath: true
-    }
-  }
+  )
 );
 
 // Use HashRouter for Electron compatibility
