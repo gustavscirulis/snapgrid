@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
-import { Cross2Icon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,7 +78,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
             onClick={onClose}
             className="h-8 w-8"
           >
-            <Cross2Icon className="h-4 w-4" />
+            <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </Button>
         </DialogTitle>
