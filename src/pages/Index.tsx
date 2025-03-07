@@ -11,6 +11,16 @@ import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Toaster, toast } from "sonner";
 import SettingsPanel from "@/components/SettingsPanel";
 
+// Add CSP meta tag to document head
+const addCSPMetaTag = () => {
+  if (typeof document !== 'undefined') {
+    const meta = document.createElement('meta');
+    meta.httpEquiv = 'Content-Security-Policy';
+    meta.content = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';";
+    document.head.appendChild(meta);
+  }
+};
+
 const Index = () => {
   const { images, isUploading, isLoading, addImage, addUrlCard, removeImage, updateImageItem } = useImageStore();
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
@@ -20,6 +30,11 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
+    // Add CSP meta tag on component mount
+    if (window && typeof window.electron !== 'undefined') {
+      addCSPMetaTag();
+    }
+    
     // Check if running in Electron - more reliable detection
     const isRunningInElectron = window && 
       typeof window.electron !== 'undefined' && 

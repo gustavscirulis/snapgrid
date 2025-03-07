@@ -1,17 +1,10 @@
 
-interface ElectronAPI {
-  getAppStorageDir: () => Promise<string>;
-  saveImage: (data: { id: string; dataUrl: string; metadata: any }) => Promise<{ success: boolean; path?: string; error?: string }>;
-  loadImages: () => Promise<any[]>;
-  deleteImage: (id: string) => Promise<{ success: boolean; error?: string }>;
-  saveUrlCard: (data: { id: string; metadata: any }) => Promise<{ success: boolean; error?: string }>;
-  openStorageDir: () => Promise<{ success: boolean; error?: string }>;
+// Make sure we have 'electron' declared as an optional property
+interface Window {
+  electron?: {
+    loadImages: () => Promise<any[]>;
+    saveImage: (data: { id: string; dataUrl: string; metadata: any }) => Promise<{ success: boolean; path?: string; error?: string }>;
+    saveUrlCard: (data: { id: string; metadata: any }) => Promise<{ success: boolean }>;
+    deleteImage: (id: string) => Promise<{ success: boolean }>;
+  };
 }
-
-declare global {
-  interface Window {
-    electron: ElectronAPI;
-  }
-}
-
-export {};

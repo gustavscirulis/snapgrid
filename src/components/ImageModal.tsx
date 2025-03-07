@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef } from "react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
 import { X, ExternalLink, Scan, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -165,6 +165,9 @@ const ImageModal: React.FC<ImageModalProps> = ({
         <DialogTitle className="sr-only">
           {image.type === "url" ? "URL Preview" : image.type === "video" ? "Video Preview" : "Image Preview"}
         </DialogTitle>
+        <DialogDescription className="sr-only">
+          View your {image.type} in full screen mode
+        </DialogDescription>
         
         <div className="relative h-full w-full flex items-center justify-center">
           <button

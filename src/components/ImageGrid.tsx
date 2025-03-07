@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle, Play } from "lucide-react";
@@ -38,13 +37,25 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
   const handleMouseEnter = (item: ImageItem) => {
     setHoveredImageId(item.id);
+    
     if (item.type === "video") {
       const videoElement = videoRefs.current.get(item.id);
       if (videoElement) {
-        videoElement.muted = true;
-        videoElement.play().catch(error => {
-          console.error("Failed to play video:", error);
-        });
+        if (videoElement.readyState >= 2) {
+          videoElement.muted = true;
+          videoElement.play().catch(error => {
+            console.error("Failed to play video:", error);
+          });
+        } else {
+          const onCanPlay = () => {
+            videoElement.muted = true;
+            videoElement.play().catch(error => {
+              console.error("Failed to play video on canplay event:", error);
+            });
+            videoElement.removeEventListener('canplay', onCanPlay);
+          };
+          videoElement.addEventListener('canplay', onCanPlay);
+        }
       }
     }
   };
@@ -142,6 +153,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               loop
               muted
               playsInline
+              preload="metadata"
             />
             {!hoveredImageId || hoveredImageId !== item.id ? (
               <div className="absolute inset-0 flex items-center justify-center">
