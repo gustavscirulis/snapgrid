@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -53,13 +54,16 @@ export function useImageStore() {
           console.log("Loaded media items:", loadedItems.length);
           
           const processedItems = loadedItems.map(item => {
+            // For videos, use a special API for serving video content
             if (item.type === "video" && item.actualFilePath) {
-              const fileUrl = `file://${item.actualFilePath}`;
-              console.log("Processing video item:", { id: item.id, path: item.actualFilePath, url: fileUrl, fileExtension: item.fileExtension });
+              // Instead of using file:// URL, we'll create a URL that the Electron app can handle
+              const videoId = item.id;
+              const videoUrl = `app://video/${videoId}`;
+              console.log("Processing video item:", { id: item.id, path: item.actualFilePath, url: videoUrl, fileExtension: item.fileExtension });
               
               return {
                 ...item,
-                url: fileUrl,
+                url: videoUrl,
                 createdAt: new Date(item.createdAt)
               };
             }
@@ -109,6 +113,7 @@ export function useImageStore() {
         const newMediaItem: MediaItem = {
           id: crypto.randomUUID(),
           type: isVideo ? "video" : "image",
+          // For videos in Electron, we'll generate a proper URL after saving
           url: e.target?.result as string,
           width: dimensions.width,
           height: dimensions.height,
@@ -159,15 +164,17 @@ export function useImageStore() {
                   if (saveResult.success && saveResult.path) {
                     console.log("Video saved successfully at:", saveResult.path);
                     
-                    const videoFileUrl = `file://${saveResult.path}`;
-                    console.log("Setting video URL to:", videoFileUrl);
+                    // Instead of using file:// URL, use app:// protocol
+                    const videoUrl = `app://video/${newMediaItem.id}`;
+                    console.log("Setting video URL to:", videoUrl);
                     
+                    // Use setTimeout to avoid React warnings about updates during rendering
                     setTimeout(() => {
                       setMediaItems(prevItems => 
                         prevItems.map(item => item.id === newMediaItem.id ? {
                           ...item,
                           actualFilePath: saveResult.path,
-                          url: videoFileUrl
+                          url: videoUrl
                         } : item)
                       );
                     }, 0);

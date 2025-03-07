@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { MediaItem, PatternTag } from "@/hooks/useImageStore";
@@ -50,6 +51,25 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     if (image.type === "url" && image.sourceUrl) {
       window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
     }
+  };
+
+  // Function to get the correct video URL
+  const getVideoStreamUrl = (item: MediaItem): string => {
+    // If we're running in Electron and have access to the stream endpoint
+    if (typeof window.electron !== 'undefined' && item.id) {
+      if (item.url.startsWith('app://video/')) {
+        // For electron, try to use the stream endpoint
+        try {
+          if (typeof window.electron.getVideoStreamUrl === 'function') {
+            return window.electron.getVideoStreamUrl(item.id);
+          }
+        } catch (error) {
+          console.warn('Failed to get video stream URL:', error);
+        }
+      }
+    }
+    // Fallback to the original URL
+    return item.url;
   };
 
   const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean, error?: string) => {
@@ -169,7 +189,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                       key={videoKey}
                     >
                       <source 
-                        src={image.url} 
+                        src={getVideoStreamUrl(image)} 
                         type={`video/${image.fileExtension || 'mp4'}`} 
                       />
                       Your browser does not support the video tag.

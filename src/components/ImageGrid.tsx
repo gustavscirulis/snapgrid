@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { MediaItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle, Video } from "lucide-react";
@@ -57,6 +58,25 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
   const setVideoRef = (id: string, element: HTMLVideoElement | null) => {
     videoRefs.current[id] = element;
+  };
+
+  // Function to get the correct video URL
+  const getVideoStreamUrl = (item: MediaItem): string => {
+    // If we're running in Electron and have access to the stream endpoint
+    if (typeof window.electron !== 'undefined' && item.id) {
+      if (item.url.startsWith('app://video/')) {
+        // For electron, try to use the stream endpoint
+        try {
+          if (typeof window.electron.getVideoStreamUrl === 'function') {
+            return window.electron.getVideoStreamUrl(item.id);
+          }
+        } catch (error) {
+          console.warn('Failed to get video stream URL:', error);
+        }
+      }
+    }
+    // Fallback to the original URL
+    return item.url;
   };
 
   const renderPatternTags = (item: MediaItem) => {
@@ -143,7 +163,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               key={`${item.id}-${item.url}`}
             >
               <source 
-                src={item.url} 
+                src={getVideoStreamUrl(item)}
                 type={`video/${item.fileExtension || 'mp4'}`} 
               />
             </video>
