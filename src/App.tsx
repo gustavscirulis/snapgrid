@@ -17,7 +17,7 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Create router with compatible future flags
+// Create router without future flags to avoid compatibility issues
 const router = createHashRouter(
   createRoutesFromElements(
     <>
