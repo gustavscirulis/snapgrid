@@ -81,10 +81,12 @@
   /* Electron window draggable regions */
   .draggable {
     -webkit-app-region: drag;
+    app-region: drag;
   }
 
   .non-draggable {
     -webkit-app-region: no-drag;
+    app-region: no-drag;
   }
 
   ::-webkit-scrollbar {
