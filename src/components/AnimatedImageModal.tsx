@@ -64,7 +64,6 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
   if (!selectedImage || !initialPosition) return null;
 
-  // Fix: Move the position: "fixed" out of the variants and into the component style
   const modalVariants = {
     initial: {
       top: initialPosition.top,
