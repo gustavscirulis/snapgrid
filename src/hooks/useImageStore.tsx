@@ -34,7 +34,6 @@ export function useImageStore() {
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    // More reliable detection for Electron
     const isRunningInElectron = window && 
       typeof window.electron !== 'undefined' && 
       window.electron !== null;
@@ -54,8 +53,6 @@ export function useImageStore() {
           console.log("Loaded images:", loadedImages.length);
           setImages(loadedImages);
         } else {
-          // When running in browser, start with empty state
-          console.log("Browser mode - starting with empty images array");
           setImages([]);
           toast.warning("Running in browser mode. Images will not be saved permanently.");
         }
@@ -102,12 +99,10 @@ export function useImageStore() {
     const isVideo = file.type.startsWith('video/');
     
     try {
-      // For videos, generate a thumbnail
       if (isVideo) {
         const thumbnailUrl = await generateVideoThumbnail(file);
         const videoElement = document.createElement('video');
         
-        // Load video metadata
         await new Promise<void>((resolve, reject) => {
           videoElement.onloadedmetadata = () => resolve();
           videoElement.onerror = () => reject(new Error("Failed to load video metadata"));
@@ -133,7 +128,6 @@ export function useImageStore() {
             return;
           }
           
-          // Update with the data URL for storage
           newVideo.url = e.target.result as string;
           
           const updatedVideos = [newVideo, ...images];
@@ -159,7 +153,6 @@ export function useImageStore() {
         
         reader.readAsDataURL(file);
       } else {
-        // Process image files (existing code)
         const reader = new FileReader();
         reader.onload = async (e) => {
           if (!e.target?.result) {
@@ -203,10 +196,10 @@ export function useImageStore() {
                   newImage.actualFilePath = result.path;
                   setImages([newImage, ...images.filter(img => img.id !== newImage.id)]);
                   
-                  toast.success(`Image saved to: ${result.path}`);
+                  toast.success("Image saved successfully");
                 } else {
                   console.error("Failed to save image:", result.error);
-                  toast.error(`Failed to save image: ${result.error || "Unknown error"}`);
+                  toast.error("Failed to save image");
                 }
               } catch (error) {
                 console.error("Failed to save image to filesystem:", error);

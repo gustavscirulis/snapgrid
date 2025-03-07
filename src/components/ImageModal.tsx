@@ -76,6 +76,11 @@ const ImageModal: React.FC<ImageModalProps> = ({
   };
 
   const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean, error?: string) => {
+    // Don't show pattern UI for videos
+    if (image.type === "video") {
+      return null;
+    }
+    
     if (!patterns || patterns.length === 0) {
       if (isAnalyzing) {
         return (
@@ -115,21 +120,15 @@ const ImageModal: React.FC<ImageModalProps> = ({
     }
 
     return (
-      <div>
-        <h4 className="text-sm font-medium mb-2 text-white/80">Detected UI Patterns</h4>
-        <div className="flex flex-wrap gap-2">
-          {patterns.map((pattern, index) => (
-            <div 
-              key={index} 
-              className="text-sm bg-primary/20 text-white px-3 py-1.5 rounded-md flex items-center gap-1"
-            >
-              <span>{pattern.name}</span>
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
-                {Math.round(pattern.confidence * 100)}%
-              </span>
-            </div>
-          ))}
-        </div>
+      <div className="flex flex-wrap gap-2">
+        {patterns.map((pattern, index) => (
+          <div 
+            key={index} 
+            className="text-sm bg-primary/20 text-white px-3 py-1.5 rounded-md"
+          >
+            {pattern.name}
+          </div>
+        ))}
       </div>
     );
   };
@@ -138,7 +137,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-7xl w-[95vw] p-0 overflow-hidden bg-transparent border-none shadow-none max-h-[95vh]">
         <DialogTitle className="sr-only">
-          {image.type === "url" ? "URL Preview" : "Image Preview"}
+          {image.type === "url" ? "URL Preview" : image.type === "video" ? "Video Preview" : "Image Preview"}
         </DialogTitle>
         
         <div className="relative h-full w-full flex items-center justify-center">
@@ -175,6 +174,20 @@ const ImageModal: React.FC<ImageModalProps> = ({
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Open URL
                 </Button>
+              </div>
+            ) : image.type === "video" ? (
+              <div className="flex flex-col">
+                <video
+                  src={image.url}
+                  controls
+                  className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
+                  style={{ 
+                    maxWidth: Math.min(image.width, window.innerWidth * 0.9),
+                    maxHeight: Math.min(image.height, window.innerHeight * 0.85)
+                  }}
+                >
+                  Your browser does not support the video tag.
+                </video>
               </div>
             ) : (
               <div className="flex flex-col">
