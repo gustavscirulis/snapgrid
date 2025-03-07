@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { ExternalLink, Scan, Trash2, AlertCircle, Link, Globe } from "lucide-react";
+import { ExternalLink, Scan, X, AlertCircle, Link, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import AnimatedImageModal from "./AnimatedImageModal";
@@ -280,7 +280,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               >
                 {column.map((image) => {
                   const ref = imageRefs.current.get(image.id) || React.createRef<HTMLDivElement>();
-                  const isSelected = modalOpen && selectedImage?.id === image.id;
+                  const isSelected = clickedImageId === image.id;
                   return (
                     <div key={image.id} className="masonry-item">
                       <motion.div 
@@ -290,7 +290,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                         onMouseEnter={() => setHoveredImageId(image.id)}
                         onMouseLeave={() => setHoveredImageId(null)}
                         animate={{ 
-                          opacity: modalOpen && (clickedImageId === image.id) ? 0 : 1
+                          opacity: modalOpen && isSelected ? 0 : 1
                         }}
                         transition={{ 
                           opacity: { duration: 0.1 }
@@ -302,13 +302,13 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                           <Button
                             variant="destructive"
                             size="icon"
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5"
+                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full h-8 w-8"
                             onClick={(e) => {
                               e.stopPropagation();
                               onImageDelete(image.id);
                             }}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <X className="h-4 w-4" />
                           </Button>
                         )}
                       </motion.div>

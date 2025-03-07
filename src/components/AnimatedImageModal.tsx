@@ -112,7 +112,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
           {/* Image container - fixed position applied directly to the element */}
           <motion.div
-            className="fixed z-50 overflow-hidden"
+            className="fixed z-50 overflow-hidden rounded-lg"
             style={{ position: "fixed" }}
             variants={modalVariants}
             initial="initial"
@@ -123,7 +123,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             <motion.img
               src={selectedImage.url}
               alt="Selected image"
-              className="w-full h-full object-contain rounded-md"
+              className="w-full h-full object-contain rounded-lg"
               initial={{ opacity: 0.8 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0.8 }}
