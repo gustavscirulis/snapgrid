@@ -9,6 +9,7 @@ interface AnimatedImageModalProps {
   selectedImage: ImageItem | null;
   selectedImageRef: React.RefObject<HTMLDivElement> | null;
   patternElements: React.ReactNode | null;
+  onAnimationComplete?: (definition: string) => void;
 }
 
 const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
@@ -16,6 +17,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   onClose,
   selectedImage,
   selectedImageRef,
+  onAnimationComplete,
 }) => {
   const [initialPosition, setInitialPosition] = useState<{
     top: number;
@@ -99,7 +101,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   };
 
   return (
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={() => onAnimationComplete && onAnimationComplete("exit-complete")}>
       {isOpen && (
         <>
           {/* Backdrop */}
@@ -120,6 +122,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             animate="open"
             exit="exit"
             onClick={onClose}
+            onAnimationComplete={(definition) => onAnimationComplete && onAnimationComplete(definition)}
           >
             <motion.img
               src={selectedImage.url}

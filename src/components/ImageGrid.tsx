@@ -19,6 +19,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImageRef, setSelectedImageRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
   const [clickedImageId, setClickedImageId] = useState<string | null>(null);
+  const [exitAnimationComplete, setExitAnimationComplete] = useState(false);
 
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
 
@@ -235,6 +236,16 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     }
   });
 
+  const handleAnimationComplete = (definition: string) => {
+    if (definition === "exit") {
+      setExitAnimationComplete(true);
+    } else if (definition === "exit-complete") {
+      setTimeout(() => {
+        setExitAnimationComplete(false);
+      }, 100);
+    }
+  };
+
   return (
     <div className="px-4 py-6 w-full">
       {images.length === 0 ? (
@@ -290,7 +301,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                         onMouseEnter={() => setHoveredImageId(image.id)}
                         onMouseLeave={() => setHoveredImageId(null)}
                         animate={{ 
-                          opacity: isSelected && (modalOpen || clickedImageId) ? 0 : 1
+                          opacity: isSelected && modalOpen && !exitAnimationComplete ? 0 : 1
                         }}
                         transition={{ 
                           opacity: { duration: 0.1 }
@@ -325,6 +336,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
             selectedImage={selectedImage}
             selectedImageRef={selectedImageRef}
             patternElements={null}
+            onAnimationComplete={handleAnimationComplete}
           />
         </>
       )}
