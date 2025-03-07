@@ -1,4 +1,3 @@
-
 import React from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { Trash2 } from "lucide-react";
@@ -57,11 +56,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
     
     // For images with actual file paths in Electron
     if (isElectron && image.actualFilePath) {
-      // In development mode with Electron, we need to strip the file:// prefix
-      // because the web security is disabled in dev mode
-      return window.location.protocol === 'http:' 
-        ? image.actualFilePath 
-        : `file://${image.actualFilePath}`;
+      return image.url; // Use the url property which should be set correctly in useImageStore
     }
     
     // Fallback to data URL

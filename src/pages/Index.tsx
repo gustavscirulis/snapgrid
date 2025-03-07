@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
@@ -10,12 +11,12 @@ import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Toaster, toast } from "sonner";
 import SettingsPanel from "@/components/SettingsPanel";
 
-// Add CSP meta tag to document head with expanded permissions
+// Add CSP meta tag to document head with expanded permissions for file:// protocol
 const addCSPMetaTag = () => {
   if (typeof document !== 'undefined') {
     const meta = document.createElement('meta');
     meta.httpEquiv = 'Content-Security-Policy';
-    meta.content = "default-src 'self'; img-src 'self' data: blob: https: file:; media-src 'self' data: blob: https: file:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.openai.com;";
+    meta.content = "default-src 'self' file:; img-src 'self' data: blob: https: file:; media-src 'self' data: blob: https: file:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.openai.com;";
     document.head.appendChild(meta);
   }
 };

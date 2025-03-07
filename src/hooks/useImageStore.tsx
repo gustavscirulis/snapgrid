@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -214,10 +215,11 @@ export function useImageStore() {
 
           const img = new Image();
           img.onload = async () => {
+            const dataUrl = e.target?.result as string;
             const newImage: ImageItem = {
               id: crypto.randomUUID(),
               type: "image",
-              url: e.target?.result as string, // Temporary data URL
+              url: dataUrl, // Initially set to data URL
               width: img.width,
               height: img.height,
               createdAt: new Date(),
@@ -233,7 +235,7 @@ export function useImageStore() {
                 console.log("Saving image to filesystem:", newImage.id);
                 const result = await window.electron.saveImage({
                   id: newImage.id,
-                  dataUrl: newImage.url,
+                  dataUrl: dataUrl,
                   metadata: {
                     id: newImage.id,
                     type: newImage.type,
@@ -244,24 +246,33 @@ export function useImageStore() {
                   }
                 });
                 
-                if (result.success && result.path) {
+                if (result?.success && result.path) {
                   console.log("Image saved successfully at:", result.path);
+                  
+                  // Create the appropriate file URL format
+                  let fileUrl = result.path;
+                  if (!fileUrl.startsWith('file://')) {
+                    fileUrl = `file://${fileUrl}`;
+                  }
                   
                   // Update with actual file path
                   const updatedImage = {
                     ...newImage,
                     actualFilePath: result.path,
-                    url: result.path, // Use file path directly for display
+                    url: fileUrl, // Use file:// URL for display
                   };
                   
-                  setImages([updatedImage, ...images.filter(img => img.id !== newImage.id)]);
+                  setImages(prevImages => [
+                    updatedImage, 
+                    ...prevImages.filter(img => img.id !== newImage.id)
+                  ]);
                   
                   toast.success("Image saved successfully");
                   
                   if (hasApiKey()) {
                     try {
                       // Analyze using the data URL (not the file path)
-                      const patterns = await analyzeImage(e.target?.result as string);
+                      const patterns = await analyzeImage(dataUrl);
                       
                       const imageWithPatterns = {
                         ...updatedImage,
@@ -286,7 +297,7 @@ export function useImageStore() {
                     }
                   }
                 } else {
-                  console.error("Failed to save image:", result.error);
+                  console.error("Failed to save image:", result?.error);
                   toast.error("Failed to save image");
                 }
               } catch (error) {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
@@ -59,30 +58,14 @@ const ImageModal: React.FC<ImageModalProps> = ({
     setPatterns(patterns.filter((_, i) => i !== index));
   };
 
-  // Helper function to get correct source URL for files
-  const getFileSrc = (filePath: string): string => {
-    const isElectron = window && typeof window.electron !== 'undefined';
-    
-    if (isElectron) {
-      // In development mode with Electron, we need to strip the file:// prefix
-      // because the web security is disabled in dev mode
-      return window.location.protocol === 'http:' 
-        ? filePath 
-        : `file://${filePath}`;
-    }
-    
-    return filePath;
-  };
-
   // If no image, return null 
   if (!image) return null;
 
   const isVideo = image.type === "video";
   const hasLocalFile = image.actualFilePath && image.actualFilePath.length > 0;
   
-  const mediaSrc = hasLocalFile 
-    ? getFileSrc(image.actualFilePath) 
-    : image.url;
+  // Use the image URL directly as it should already be formatted correctly by useImageStore
+  const mediaSrc = image.url;
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
