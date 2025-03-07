@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
@@ -154,7 +155,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
           <h3 className="text-2xl font-medium mb-2">No items yet</h3>
           <p className="text-muted-foreground max-w-md">
-            Drag and drop images anywhere, paste URLs, or use the upload buttons to add your first item.
+            Drag and drop images anywhere or paste URLs to add to your collection.
           </p>
           <div className="mt-6 flex gap-3">
             <label 

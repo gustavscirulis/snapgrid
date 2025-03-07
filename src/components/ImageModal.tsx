@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
@@ -60,7 +59,6 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
 
     return (
       <div className="mt-4">
-        <h4 className="text-sm font-medium mb-2 text-white/80">Detected UI Patterns</h4>
         <div className="flex flex-wrap gap-2">
           {patterns.map((pattern, index) => (
             <div 
@@ -68,9 +66,6 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
               className="text-sm bg-primary/20 text-white px-3 py-1.5 rounded-md flex items-center gap-1"
             >
               <span>{pattern.name}</span>
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
-                {Math.round(pattern.confidence * 100)}%
-              </span>
             </div>
           ))}
         </div>
