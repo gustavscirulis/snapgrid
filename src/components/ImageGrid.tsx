@@ -35,6 +35,20 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     return () => window.removeEventListener('resize', updateColumns);
   }, []);
 
+  const handleUrlClick = (url: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // Open URL in default browser
+    if (window.electron) {
+      // In Electron, use shell.openExternal
+      window.electron.openExternal(url);
+    } else {
+      // In browser, open in new tab
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   const renderPatternTags = (item: ImageItem) => {
     if (!item.patterns || item.patterns.length === 0) {
       if (item.isAnalyzing) {
@@ -78,7 +92,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           <div className="p-4 flex flex-col h-full">
             <div className="flex items-start gap-3">
               {item.thumbnailUrl && (
-                <div className="w-12 h-12 bg-muted rounded-md overflow-hidden flex items-center justify-center flex-shrink-0">
+                <div className="w-14 h-14 bg-muted rounded-md overflow-hidden flex items-center justify-center flex-shrink-0">
                   <img 
                     src={item.thumbnailUrl} 
                     alt={item.title || "Website"} 
@@ -89,11 +103,17 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               <div className="flex-1 min-w-0">
                 <h3 className="font-medium text-base mb-1 line-clamp-2">{item.title || item.url}</h3>
                 <p className="text-xs text-muted-foreground truncate">{item.url}</p>
+                {item.description && (
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
+                )}
               </div>
             </div>
-            <div className="mt-auto pt-3 flex items-center text-xs text-primary font-medium">
+            <div 
+              className="mt-auto pt-3 flex items-center text-xs text-primary font-medium cursor-pointer"
+              onClick={(e) => handleUrlClick(item.sourceUrl || item.url, e)}
+            >
               <ExternalLink className="w-3 h-3 mr-1" />
-              <span>Open URL</span>
+              <span>Open in browser</span>
             </div>
           </div>
         </div>
@@ -154,9 +174,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
             </svg>
           </div>
           <h3 className="text-2xl font-medium mb-2">No items yet</h3>
-          <p className="text-muted-foreground max-w-md">
-            Drag and drop images anywhere or paste URLs to add to your collection.
-          </p>
           <div className="mt-6 flex gap-3">
             <label 
               htmlFor="file-upload"
@@ -178,7 +195,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 <div key={image.id} className="masonry-item">
                   <div 
                     className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full"
-                    onClick={() => onImageClick(image)}
+                    onClick={() => image.type !== "url" && onImageClick(image)}
                     onMouseEnter={() => setHoveredImageId(image.id)}
                     onMouseLeave={() => setHoveredImageId(null)}
                   >

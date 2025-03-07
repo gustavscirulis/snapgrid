@@ -63,8 +63,8 @@ const Index = () => {
   });
 
   const handleImageClick = (image: ImageItem) => {
-    if (image.type === "url" && image.sourceUrl) {
-      window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
+    if (image.type === "url") {
+      return;
     } else {
       setSelectedImage(image);
       setModalOpen(true);
@@ -122,9 +122,6 @@ const Index = () => {
             <>
               {images.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                  <p className="text-center max-w-md mb-4">
-                    Drag and drop images here or paste a URL to add to your collection
-                  </p>
                   <input
                     type="file"
                     id="file-upload"

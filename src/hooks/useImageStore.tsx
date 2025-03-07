@@ -1,7 +1,7 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
+import { fetchUrlMetadata } from "@/lib/metadataUtils";
 
 export type ImageItemType = "image" | "url";
 
@@ -18,6 +18,7 @@ export interface ImageItem {
   height: number;
   createdAt: Date;
   title?: string;
+  description?: string;
   thumbnailUrl?: string;
   sourceUrl?: string;
   patterns?: PatternTag[];
@@ -33,7 +34,6 @@ export function useImageStore() {
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    // More reliable detection for Electron
     const isRunningInElectron = window && 
       typeof window.electron !== 'undefined' && 
       window.electron !== null;
@@ -53,8 +53,6 @@ export function useImageStore() {
           console.log("Loaded images:", loadedImages.length);
           setImages(loadedImages);
         } else {
-          // When running in browser, start with empty state
-          console.log("Browser mode - starting with empty images array");
           setImages([]);
           toast.warning("Running in browser mode. Images will not be saved permanently.");
         }
@@ -213,7 +211,8 @@ export function useImageStore() {
         height: 120,
         createdAt: new Date(),
         title: metadata.title || url,
-        thumbnailUrl: metadata.thumbnailUrl,
+        description: metadata.description,
+        thumbnailUrl: metadata.imageUrl || metadata.faviconUrl,
         sourceUrl: url
       };
       
@@ -292,7 +291,7 @@ export function useImageStore() {
   };
 }
 
-async function fetchUrlMetadata(url: string): Promise<{ title?: string; thumbnailUrl?: string }> {
+async function fetchUrlMetadata(url: string): Promise<{ title?: string; description?: string; imageUrl?: string; faviconUrl?: string }> {
   try {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
