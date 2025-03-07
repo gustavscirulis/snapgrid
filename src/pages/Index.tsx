@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Toaster, toast } from "sonner";
 import SettingsPanel from "@/components/SettingsPanel";
+import WindowControls from "@/components/WindowControls";
 
 const Index = () => {
   const { images, isUploading, isLoading, addImage, addUrlCard, removeImage } = useImageStore();
@@ -89,7 +90,8 @@ const Index = () => {
     >
       <div className="min-h-screen">
         <Toaster />
-        <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border py-4 px-6">
+        <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border py-4 px-6 relative">
+          <WindowControls />
           <div className="max-w-screen-xl mx-auto flex justify-between items-center">
             <div className="w-8"></div> {/* Empty div for centering */}
             <div className="relative w-64">
