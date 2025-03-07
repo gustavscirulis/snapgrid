@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -35,7 +34,6 @@ export function useImageStore() {
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    // More reliable detection for Electron
     const isRunningInElectron = window && 
       typeof window.electron !== 'undefined' && 
       window.electron !== null;
@@ -54,11 +52,8 @@ export function useImageStore() {
           const loadedItems = await window.electron.loadImages();
           console.log("Loaded media items:", loadedItems.length);
           
-          // Process loaded items to ensure video files have proper URL and type
           const processedItems = loadedItems.map(item => {
-            // If it's a video file
             if (item.type === "video" && item.actualFilePath) {
-              // For videos, create file URL with the correct extension
               const fileUrl = `file://${item.actualFilePath}`;
               console.log("Processing video item:", { id: item.id, path: item.actualFilePath, url: fileUrl, fileExtension: item.fileExtension });
               
@@ -69,7 +64,6 @@ export function useImageStore() {
               };
             }
             
-            // For other types, ensure dates are Date objects
             return {
               ...item,
               createdAt: new Date(item.createdAt)
@@ -78,8 +72,6 @@ export function useImageStore() {
           
           setMediaItems(processedItems);
         } else {
-          // When running in browser, start with empty state
-          console.log("Browser mode - starting with empty media items array");
           setMediaItems([]);
           toast.warning("Running in browser mode. Media items will not be saved permanently.");
         }
@@ -102,7 +94,6 @@ export function useImageStore() {
       }
 
       try {
-        // Determine if it's a video file
         const isVideo = isVideoFile(file);
         const fileExtension = getFileExtension(file);
         console.log(`${isVideo ? 'Video' : 'Image'} file extension:`, fileExtension);
@@ -122,24 +113,21 @@ export function useImageStore() {
           width: dimensions.width,
           height: dimensions.height,
           createdAt: new Date(),
-          isAnalyzing: !isVideo && hasApiKey(), // Only analyze images
+          isAnalyzing: !isVideo && hasApiKey(),
           fileExtension: fileExtension
         };
         
-        // First add to state to show immediate feedback
         setMediaItems(prevItems => [newMediaItem, ...prevItems]);
         
         if (isElectron) {
           try {
             if (isVideo) {
-              // Check if saveVideoFile exists before using it
-              if (!window.electron.saveVideoFile) {
-                throw new Error('saveVideoFile is not available in this version of Electron. Please update your app.');
+              if (typeof window.electron.saveVideoFile !== 'function') {
+                throw new Error('saveVideoFile function is not available in this version of Electron. Please update your app.');
               }
-            
+              
               console.log(`Saving video to filesystem with extension .${fileExtension}`);
               
-              // Read the file as ArrayBuffer to send to Electron
               const fileReader = new FileReader();
               fileReader.onload = async (event) => {
                 if (!event.target?.result) {
@@ -150,7 +138,8 @@ export function useImageStore() {
                   const arrayBuf = event.target.result as ArrayBuffer;
                   const uint8Array = new Uint8Array(arrayBuf);
                   
-                  // Send to Electron
+                  console.log(`Sending video to Electron with id ${newMediaItem.id} and extension ${fileExtension}`);
+                  
                   const saveResult = await window.electron.saveVideoFile({
                     id: newMediaItem.id,
                     buffer: Array.from(uint8Array),
@@ -165,41 +154,23 @@ export function useImageStore() {
                     }
                   });
                   
+                  console.log("Save video result:", saveResult);
+                  
                   if (saveResult.success && saveResult.path) {
                     console.log("Video saved successfully at:", saveResult.path);
                     
-                    // Ensure the path has the correct extension
-                    if (!saveResult.path.endsWith(`.${fileExtension}`)) {
-                      console.error(`Expected path to end with .${fileExtension}, but got ${saveResult.path}`);
-                      
-                      // Try to fix the path
-                      const correctPath = saveResult.path.replace(/\.[^.]+$/, `.${fileExtension}`);
-                      console.log("Attempting to use correct path:", correctPath);
-                      
-                      // Update item with corrected path
-                      const updatedItem = {
-                        ...newMediaItem,
-                        actualFilePath: correctPath,
-                        url: `file://${correctPath}`
-                      };
-                      
-                      console.log("Updated video URL:", updatedItem.url);
-                      
+                    const videoFileUrl = `file://${saveResult.path}`;
+                    console.log("Setting video URL to:", videoFileUrl);
+                    
+                    setTimeout(() => {
                       setMediaItems(prevItems => 
-                        prevItems.map(item => item.id === newMediaItem.id ? updatedItem : item)
+                        prevItems.map(item => item.id === newMediaItem.id ? {
+                          ...item,
+                          actualFilePath: saveResult.path,
+                          url: videoFileUrl
+                        } : item)
                       );
-                    } else {
-                      // Path is correct
-                      const updatedItem = {
-                        ...newMediaItem,
-                        actualFilePath: saveResult.path,
-                        url: `file://${saveResult.path}`
-                      };
-                      
-                      setMediaItems(prevItems => 
-                        prevItems.map(item => item.id === newMediaItem.id ? updatedItem : item)
-                      );
-                    }
+                    }, 0);
                     
                     toast.success("Video saved to disk");
                   } else {
@@ -208,19 +179,17 @@ export function useImageStore() {
                   }
                 } catch (innerError) {
                   console.error("Failed to save video to filesystem:", innerError);
-                  toast.error("Failed to save video to disk. Make sure you're using the latest version of the app.");
+                  toast.error(`Failed to save video: ${innerError instanceof Error ? innerError.message : "Unknown error"}`);
                 }
               };
               
-              fileReader.onerror = () => {
-                console.error("Error reading video file as ArrayBuffer");
+              fileReader.onerror = (error) => {
+                console.error("Error reading video file as ArrayBuffer:", error);
                 toast.error("Failed to process video file");
               };
               
               fileReader.readAsArrayBuffer(file);
             } else {
-              // Regular image saving (unchanged)
-              console.log("Saving image to filesystem:", newMediaItem.id);
               const saveResult = await window.electron.saveImage({
                 id: newMediaItem.id,
                 dataUrl: newMediaItem.url,
@@ -254,13 +223,12 @@ export function useImageStore() {
             }
           } catch (error) {
             console.error(`Failed to save ${isVideo ? 'video' : 'image'} to filesystem:`, error);
-            toast.error(`Failed to save ${isVideo ? 'video' : 'image'} to disk`);
+            toast.error(`Failed to save ${isVideo ? 'video' : 'image'} to disk: ${error instanceof Error ? error.message : "Unknown error"}`);
           }
         } else {
           toast.info(`Running in browser mode. ${isVideo ? 'Video' : 'Image'} is only stored in memory.`);
         }
         
-        // Only analyze images, not videos
         if (!isVideo && hasApiKey()) {
           try {
             const patterns = await analyzeImage(newMediaItem.url);

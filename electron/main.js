@@ -1,4 +1,3 @@
-
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -202,6 +201,37 @@ ipcMain.handle('save-url-card', async (event, { id, metadata }) => {
     return { success: true };
   } catch (error) {
     console.error('Error saving URL card:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Add new handler for saving video files
+ipcMain.handle('save-video-file', async (event, { id, buffer, extension, metadata }) => {
+  try {
+    // Ensure extension starts with a dot
+    const fileExt = extension.startsWith('.') ? extension : `.${extension}`;
+    
+    // Create the file path with the correct extension
+    const videoPath = path.join(appStorageDir, `${id}${fileExt}`);
+    
+    // Convert array back to Uint8Array buffer
+    const uint8Array = new Uint8Array(buffer);
+    
+    // Write the buffer to file
+    await fs.writeFile(videoPath, Buffer.from(uint8Array));
+    
+    // Save metadata as separate JSON file
+    const metadataPath = path.join(appStorageDir, `${id}.json`);
+    await fs.writeJson(metadataPath, {
+      ...metadata,
+      filePath: videoPath, // Include actual file path in metadata
+      fileExtension: extension.replace(/^\./, '') // Store extension without leading dot
+    });
+    
+    console.log(`Video saved to: ${videoPath}`);
+    return { success: true, path: videoPath };
+  } catch (error) {
+    console.error('Error saving video file:', error);
     return { success: false, error: error.message };
   }
 });
