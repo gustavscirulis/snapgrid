@@ -176,7 +176,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 exit={{ opacity: 0.8 }}
               />
 
-              {/* Pattern tags - we'll animate them the same way as in the thumbnail */}
+              {/* Pattern tags - render the actual patterns instead of using innerHTML */}
               <motion.div 
                 className="absolute bottom-0 left-0 right-0 px-4 py-2 bg-background/80 backdrop-blur-sm"
                 initial={{ opacity: 0, y: 10 }}
@@ -184,7 +184,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 transition={{ delay: 0.2 }}
                 exit={{ opacity: 0, y: 10 }}
               >
-                {patternElements || renderPatternTags(selectedImage.patterns, selectedImage.isAnalyzing, selectedImage.error)}
+                {renderPatternTags(selectedImage.patterns, selectedImage.isAnalyzing, selectedImage.error)}
               </motion.div>
             </div>
           </motion.div>
