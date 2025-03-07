@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { useTheme } from "@/components/ThemeProvider";
-import { Moon, Sun, SunMoon, Key } from "lucide-react";
+import { Moon, Sun, SunMoon } from "lucide-react";
 import { setOpenAIApiKey, hasApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -55,12 +55,6 @@ const ThemeToggle = () => {
 const ApiKeySection = () => {
   const [apiKey, setApiKey] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasKey, setHasKey] = useState(false);
-  
-  useEffect(() => {
-    // Check if API key exists on mount
-    setHasKey(hasApiKey());
-  }, []);
 
   const handleUpdateApiKey = () => {
     if (!apiKey.trim()) {
@@ -81,8 +75,7 @@ const ApiKeySection = () => {
       // Store in localStorage for persistence
       localStorage.setItem("openai-api-key", apiKey.trim());
       
-      setHasKey(true);
-      toast.success(hasKey ? "API key updated successfully" : "API key added successfully");
+      toast.success("API key updated successfully");
       setApiKey("");
     } catch (err) {
       console.error("Error saving API key:", err);
@@ -102,7 +95,7 @@ const ApiKeySection = () => {
         <div className="flex gap-2">
           <Input
             type="password"
-            placeholder={hasKey ? "••••••••••••••••••••" : "sk-..."}
+            placeholder="sk-..."
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             onKeyDown={(e) => {
@@ -110,25 +103,17 @@ const ApiKeySection = () => {
                 handleUpdateApiKey();
               }
             }}
-            className={hasKey ? "border-green-500/30 bg-green-500/5" : ""}
           />
           <Button 
             onClick={handleUpdateApiKey}
             disabled={isSubmitting || !apiKey.trim()}
           >
-            {isSubmitting ? "Updating..." : hasKey ? "Update" : "Add Key"}
+            {isSubmitting ? "Updating..." : "Update"}
           </Button>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {hasKey ? (
-            <>
-              <Key className="h-3 w-3 text-green-500" />
-              <span className="text-green-500">API key is currently set</span>
-            </>
-          ) : (
-            "No API key set"
-          )}
-        </div>
+        <p className="text-xs text-muted-foreground">
+          {hasApiKey() ? "API key is currently set" : "No API key set"}
+        </p>
       </div>
     </div>
   );
