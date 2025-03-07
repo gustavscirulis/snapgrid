@@ -25,6 +25,9 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     width: number;
     height: number;
   } | null>(null);
+  
+  // Add state to control pattern visibility
+  const [showPatterns, setShowPatterns] = useState(false);
 
   useEffect(() => {
     if (isOpen && selectedImageRef?.current) {
@@ -35,8 +38,13 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         width: rect.width,
         height: rect.height,
       });
+      // Show patterns after a short delay when opening
+      const timer = setTimeout(() => setShowPatterns(true), 300);
+      return () => clearTimeout(timer);
     } else if (!isOpen) {
-      // Reset when closed
+      // Hide patterns immediately when closing
+      setShowPatterns(false);
+      // Reset position with delay
       setTimeout(() => setInitialPosition(null), 300);
     }
   }, [isOpen, selectedImageRef]);
@@ -106,6 +114,42 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     );
   };
 
+  // Ensure modal always matches the exact dimensions of the thumbnail
+  const modalVariants = {
+    initial: {
+      position: "fixed",
+      top: initialPosition.top,
+      left: initialPosition.left,
+      width: initialPosition.width,
+      height: initialPosition.height,
+      borderRadius: "0.5rem",
+      zIndex: 50
+    },
+    open: {
+      top: window.innerHeight / 2 - Math.min(selectedImage.height || 600, window.innerHeight * 0.8) / 2,
+      left: window.innerWidth / 2 - Math.min(selectedImage.width || 800, window.innerWidth * 0.85) / 2,
+      width: Math.min(selectedImage.width || 800, window.innerWidth * 0.85),
+      height: Math.min(selectedImage.height || 600, window.innerHeight * 0.8),
+      transition: {
+        type: "spring",
+        damping: 30,
+        stiffness: 300
+      }
+    },
+    exit: {
+      top: initialPosition.top,
+      left: initialPosition.left,
+      width: initialPosition.width,
+      height: initialPosition.height,
+      borderRadius: "0.5rem",
+      transition: {
+        type: "spring",
+        damping: 30,
+        stiffness: 300
+      }
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -122,37 +166,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           {/* Image container */}
           <motion.div
             className="fixed z-50 overflow-hidden"
-            initial={{
-              position: "fixed",
-              top: initialPosition.top,
-              left: initialPosition.left,
-              width: initialPosition.width,
-              height: initialPosition.height,
-              borderRadius: "0.5rem",
-            }}
-            animate={{
-              top: window.innerHeight / 2 - Math.min(selectedImage.height || 600, window.innerHeight * 0.8) / 2,
-              left: window.innerWidth / 2 - Math.min(selectedImage.width || 800, window.innerWidth * 0.85) / 2,
-              width: Math.min(selectedImage.width || 800, window.innerWidth * 0.85),
-              height: Math.min(selectedImage.height || 600, window.innerHeight * 0.8),
-              transition: {
-                type: "spring",
-                damping: 30,
-                stiffness: 300
-              }
-            }}
-            exit={{
-              top: initialPosition.top,
-              left: initialPosition.left,
-              width: initialPosition.width,
-              height: initialPosition.height,
-              borderRadius: "0.5rem",
-              transition: {
-                type: "spring",
-                damping: 30,
-                stiffness: 300
-              }
-            }}
+            variants={modalVariants}
+            initial="initial"
+            animate="open"
+            exit="exit"
           >
             <div className="relative w-full h-full bg-background/5 backdrop-blur-lg p-4 rounded-lg overflow-hidden shadow-2xl">
               <motion.button
@@ -176,16 +193,19 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 exit={{ opacity: 0.8 }}
               />
 
-              {/* Pattern tags - render the actual patterns instead of using innerHTML */}
-              <motion.div 
-                className="absolute bottom-0 left-0 right-0 px-4 py-2 bg-background/80 backdrop-blur-sm"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                exit={{ opacity: 0, y: 10 }}
-              >
-                {renderPatternTags(selectedImage.patterns, selectedImage.isAnalyzing, selectedImage.error)}
-              </motion.div>
+              {/* Pattern tags - conditionally rendered based on showPatterns state */}
+              <AnimatePresence>
+                {showPatterns && (
+                  <motion.div 
+                    className="absolute bottom-0 left-0 right-0 px-4 py-2 bg-background/80 backdrop-blur-sm"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                  >
+                    {renderPatternTags(selectedImage.patterns, selectedImage.isAnalyzing, selectedImage.error)}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         </>
