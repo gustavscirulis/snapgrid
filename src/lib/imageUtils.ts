@@ -28,16 +28,44 @@ export function validateVideoFile(file: File): boolean {
   return true;
 }
 
-export function validateMediaFile(file: File): { valid: boolean; type: 'image' | 'video' | null } {
-  if (validateImageFile(file)) {
+export interface MediaValidationResult {
+  valid: boolean;
+  type: 'image' | 'video' | null;
+  message?: string;
+}
+
+export function validateMediaFile(file: File): MediaValidationResult {
+  if (!file.type.match('image.*') && !file.type.match('video.*')) {
+    return { 
+      valid: false, 
+      type: null,
+      message: "File must be an image or video"
+    };
+  }
+  
+  if (file.type.match('image.*')) {
+    if (file.size > 10 * 1024 * 1024) {
+      return { 
+        valid: false, 
+        type: 'image',
+        message: "Image size must be less than 10MB"
+      };
+    }
     return { valid: true, type: 'image' };
   }
   
-  if (validateVideoFile(file)) {
+  if (file.type.match('video.*')) {
+    if (file.size > 50 * 1024 * 1024) {
+      return { 
+        valid: false, 
+        type: 'video',
+        message: "Video size must be less than 50MB"
+      };
+    }
     return { valid: true, type: 'video' };
   }
   
-  return { valid: false, type: null };
+  return { valid: false, type: null, message: "Invalid file type" };
 }
 
 export function getImageDimensions(file: File): Promise<{ width: number; height: number }> {

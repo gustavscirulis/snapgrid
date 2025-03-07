@@ -47,11 +47,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
       if (validation.valid) {
         onImageUpload(file);
       } else {
-        toast({
-          title: "Invalid file",
-          description: validation.message || "Please upload images (max 10MB) or videos (max 50MB)",
-          variant: "destructive",
-        });
+        toast.error(validation.message || "Please upload images (max 10MB) or videos (max 50MB)");
       }
     });
   }, [isUploading, onImageUpload]);
@@ -66,10 +62,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           if (url.protocol === 'http:' || url.protocol === 'https:') {
             e.preventDefault();
             onUrlAdd(pastedText);
-            toast({
-              title: "URL added",
-              description: "The URL card has been added to your collection.",
-            });
+            toast.success("URL card has been added to your collection.");
           }
         } catch (error) {
           // Not a valid URL, ignore
@@ -94,11 +87,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
       if (validation.valid) {
         onImageUpload(file);
       } else {
-        toast({
-          title: "Invalid file",
-          description: validation.message || "Please upload images (max 10MB) or videos (max 50MB)",
-          variant: "destructive",
-        });
+        toast.error(validation.message || "Please upload images (max 10MB) or videos (max 50MB)");
       }
     });
     

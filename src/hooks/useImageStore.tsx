@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -155,7 +154,7 @@ export function useImageStore() {
             id,
             file,
             mimeType: file.type,
-            thumbnailBlob: thumbnailBlob || undefined
+            thumbnailBlob
           });
           
           if (!result.success) {
@@ -396,4 +395,3 @@ async function fetchUrlMetadata(url: string): Promise<{ title?: string; thumbnai
     return {};
   }
 }
-
