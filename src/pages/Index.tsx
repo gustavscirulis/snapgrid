@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
@@ -50,8 +49,8 @@ const Index = () => {
     if (isRunningInElectron) {
       console.log("Running in Electron mode");
       
-      // Request filesystem access path from Electron
-      window.electron.getStoragePath().then((path) => {
+      // Request filesystem access path from Electron - using the correct function name
+      window.electron.getAppStorageDir().then((path) => {
         console.log("Storage path:", path);
       }).catch(err => {
         console.error("Failed to get storage path:", err);

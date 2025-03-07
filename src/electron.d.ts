@@ -21,7 +21,8 @@ interface ElectronAPI {
     success: boolean; 
     error?: string; 
   }>;
-  getStoragePath: () => Promise<string>;
+  getAppStorageDir: () => Promise<string>;
+  openStorageDir: () => Promise<void>;
 }
 
 declare global {
