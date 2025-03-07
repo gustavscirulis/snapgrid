@@ -41,20 +41,23 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     if (item.type === "video") {
       const videoElement = videoRefs.current.get(item.id);
       if (videoElement) {
-        if (videoElement.readyState >= 2) {
-          videoElement.muted = true;
+        videoElement.muted = true;
+        
+        const playVideo = () => {
           videoElement.play().catch(error => {
             console.error("Failed to play video:", error);
           });
+        };
+        
+        if (videoElement.readyState >= 2) {
+          playVideo();
         } else {
-          const onCanPlay = () => {
-            videoElement.muted = true;
-            videoElement.play().catch(error => {
-              console.error("Failed to play video on canplay event:", error);
-            });
-            videoElement.removeEventListener('canplay', onCanPlay);
-          };
-          videoElement.addEventListener('canplay', onCanPlay);
+          videoElement.addEventListener('canplay', playVideo, { once: true });
+          
+          if (videoElement.src !== item.url) {
+            videoElement.src = item.url;
+            videoElement.load();
+          }
         }
       }
     }

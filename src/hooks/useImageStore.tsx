@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -59,6 +60,7 @@ export function useImageStore() {
           console.log("Loaded images:", loadedImages.length);
           setImages(loadedImages);
         } else {
+          console.log("Running in browser mode, no filesystem access");
           setImages([]);
           toast.warning("Running in browser mode. Images will not be saved permanently.");
         }
@@ -115,6 +117,7 @@ export function useImageStore() {
     
     try {
       if (isVideo) {
+        // Handle video upload
         const thumbnailUrl = await generateVideoThumbnail(file);
         const videoElement = document.createElement('video');
         
@@ -136,6 +139,7 @@ export function useImageStore() {
           duration: videoElement.duration
         };
         
+        // Read the file as data URL for storage
         const reader = new FileReader();
         reader.onload = async (e) => {
           if (!e.target?.result) {
@@ -145,12 +149,14 @@ export function useImageStore() {
           
           newVideo.url = e.target.result as string;
           
+          // Update UI first for better responsiveness
           const updatedVideos = [newVideo, ...images];
           setImages(updatedVideos);
           
           if (isElectron) {
             try {
-              await window.electron.saveImage({
+              console.log("Saving video to filesystem:", newVideo.id);
+              const result = await window.electron.saveImage({
                 id: newVideo.id,
                 dataUrl: newVideo.url,
                 metadata: {
@@ -158,7 +164,16 @@ export function useImageStore() {
                   url: undefined
                 }
               });
-              toast.success("Video saved successfully");
+              
+              if (result.success && result.path) {
+                console.log("Video saved successfully at:", result.path);
+                newVideo.actualFilePath = result.path;
+                setImages([newVideo, ...images.filter(img => img.id !== newVideo.id)]);
+                toast.success("Video saved successfully");
+              } else {
+                console.error("Failed to save video:", result.error);
+                toast.error("Failed to save video");
+              }
             } catch (error) {
               console.error("Failed to save video:", error);
               toast.error("Failed to save video");
@@ -168,6 +183,7 @@ export function useImageStore() {
         
         reader.readAsDataURL(file);
       } else {
+        // Handle image upload
         const reader = new FileReader();
         reader.onload = async (e) => {
           if (!e.target?.result) {
@@ -187,6 +203,7 @@ export function useImageStore() {
               isAnalyzing: hasApiKey(),
             };
             
+            // Update UI first for better responsiveness
             const updatedImages = [newImage, ...images];
             setImages(updatedImages);
             
@@ -286,11 +303,19 @@ export function useImageStore() {
       
       if (isElectron) {
         try {
-          await window.electron.saveUrlCard({
+          console.log("Saving URL card:", newCard.id);
+          const result = await window.electron.saveUrlCard({
             id: newCard.id,
             metadata: newCard
           });
-          toast.success(`URL card saved to disk`);
+          
+          if (result && result.success) {
+            console.log("URL card saved successfully");
+            toast.success(`URL card saved to disk`);
+          } else {
+            console.error("Failed to save URL card:", result?.error);
+            toast.error("Failed to save URL card to disk");
+          }
         } catch (error) {
           console.error("Failed to save URL card:", error);
           toast.error("Failed to save URL card to disk");
@@ -317,10 +342,16 @@ export function useImageStore() {
       
       if (isElectron) {
         try {
-          await window.electron.saveUrlCard({
+          const result = await window.electron.saveUrlCard({
             id: fallbackCard.id,
             metadata: fallbackCard
           });
+          
+          if (result && result.success) {
+            console.log("Fallback URL card saved successfully");
+          } else {
+            console.error("Failed to save fallback URL card:", result?.error);
+          }
         } catch (saveError) {
           console.error("Failed to save fallback URL card:", saveError);
           toast.error("Failed to save URL card to disk");
@@ -341,7 +372,7 @@ export function useImageStore() {
       
       if (isElectron && (deletedItem.type === "image" || deletedItem.type === "video")) {
         try {
-          await window.electron.saveImage({
+          const result = await window.electron.saveImage({
             id: deletedItem.id,
             dataUrl: deletedItem.url,
             metadata: {
@@ -349,16 +380,26 @@ export function useImageStore() {
               url: undefined
             }
           });
+          
+          if (!result || !result.success) {
+            console.error("Failed to restore image to filesystem:", result?.error);
+            toast.error("Failed to restore image to disk");
+          }
         } catch (error) {
           console.error("Failed to restore image to filesystem:", error);
           toast.error("Failed to restore image to disk");
         }
       } else if (isElectron && deletedItem.type === "url") {
         try {
-          await window.electron.saveUrlCard({
+          const result = await window.electron.saveUrlCard({
             id: deletedItem.id,
             metadata: deletedItem
           });
+          
+          if (!result || !result.success) {
+            console.error("Failed to restore URL card:", result?.error);
+            toast.error("Failed to restore URL card to disk");
+          }
         } catch (error) {
           console.error("Failed to restore URL card:", error);
           toast.error("Failed to restore URL card to disk");
@@ -385,7 +426,12 @@ export function useImageStore() {
     
     if (isElectron) {
       try {
-        await window.electron.deleteImage(id);
+        const result = await window.electron.deleteImage(id);
+        if (!result || !result.success) {
+          console.error("Failed to delete image from filesystem:", result?.error);
+        } else {
+          console.log("Successfully deleted image from filesystem:", id);
+        }
       } catch (error) {
         console.error("Failed to delete image from filesystem:", error);
       }

@@ -163,10 +163,14 @@ const ImageModal: React.FC<ImageModalProps> = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-7xl w-[95vw] p-0 overflow-hidden bg-transparent border-none shadow-none max-h-[95vh]">
         <DialogTitle className="sr-only">
-          {image.type === "url" ? "URL Preview" : image.type === "video" ? "Video Preview" : "Image Preview"}
+          {image?.type === "url" ? "URL Preview" : image?.type === "video" ? "Video Preview" : "Image Preview"}
         </DialogTitle>
         <DialogDescription className="sr-only">
-          View your {image.type} in full screen mode
+          {image?.type === "url" 
+            ? "View details about this URL" 
+            : image?.type === "video" 
+              ? "View this video in full screen" 
+              : "View this image in full screen and check detected UI patterns"}
         </DialogDescription>
         
         <div className="relative h-full w-full flex items-center justify-center">

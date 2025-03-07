@@ -49,6 +49,13 @@ const Index = () => {
     
     if (isRunningInElectron) {
       console.log("Running in Electron mode");
+      
+      // Request filesystem access path from Electron
+      window.electron.getStoragePath().then((path) => {
+        console.log("Storage path:", path);
+      }).catch(err => {
+        console.error("Failed to get storage path:", err);
+      });
     } else {
       console.log("Running in browser mode. Electron APIs not available.");
       toast.warning("Running in browser mode. Local storage features are not available.");
