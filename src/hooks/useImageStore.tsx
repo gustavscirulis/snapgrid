@@ -82,7 +82,6 @@ export function useImageStore() {
     setIsUploading(true);
     
     const fileType = file.type.startsWith('image/') ? 'image' : 'video';
-    // Store original file extension directly from the file
     const fileExtension = getFileExtensionFromMimeType(file.type);
     console.log("File type:", file.type, "Extension:", fileExtension);
     
@@ -108,7 +107,6 @@ export function useImageStore() {
               height: img.height,
               createdAt: new Date(),
               isAnalyzing: hasApiKey(),
-              // Store file extension with the image item
               fileExtension: fileExtension
             };
             
@@ -131,7 +129,6 @@ export function useImageStore() {
               height: height,
               createdAt: new Date(),
               duration: video.duration,
-              // Store file extension with the video item
               fileExtension: fileExtension
             };
             
@@ -165,10 +162,8 @@ export function useImageStore() {
       try {
         console.log(`Saving ${newItem.type} to filesystem:`, newItem.id);
         
-        // Use the stored file extension from the item rather than trying to detect it
         let fileExtension = newItem.fileExtension;
         
-        // Fallback only if extension is missing
         if (!fileExtension && originalFile) {
           fileExtension = getFileExtensionFromMimeType(originalFile.type);
         } else if (!fileExtension) {
@@ -176,7 +171,7 @@ export function useImageStore() {
           fileExtension = getFileExtensionFromMimeType(mimeType);
         }
         
-        console.log(`Using file extension: ${fileExtension} for ${newItem.type}`);
+        console.log(`Using file extension: ${fileExtension} for ${newItem.type} with ID ${newItem.id}`);
         
         const result = await window.electron.saveImage({
           id: newItem.id,
@@ -197,6 +192,8 @@ export function useImageStore() {
         
         if (result.success && result.path) {
           console.log(`${newItem.type} saved successfully at:`, result.path);
+          console.log(`File extension used: ${fileExtension}`);
+          
           const updatedItem = {
             ...newItem,
             actualFilePath: result.path
@@ -236,7 +233,6 @@ export function useImageStore() {
           
           if (isElectron) {
             try {
-              // Use the stored file extension instead of trying to detect it again
               window.electron.saveImage({
                 id: imageWithPatterns.id,
                 dataUrl: imageWithPatterns.url,
@@ -264,7 +260,6 @@ export function useImageStore() {
           
           if (isElectron) {
             try {
-              // Use the stored file extension
               window.electron.saveImage({
                 id: newItem.id,
                 dataUrl: newItem.url,

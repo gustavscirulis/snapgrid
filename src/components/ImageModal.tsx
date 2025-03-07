@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
@@ -46,14 +45,13 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     }
   };
 
-  // Get the appropriate video source URL based on environment and availability
   const getVideoSource = () => {
     if (isElectron && image.actualFilePath) {
-      // In Electron, use the actual file path from the filesystem when available
-      // Use the file:// protocol to access local files
+      console.log("Using actual file path for video:", image.actualFilePath);
+      console.log("File extension:", image.fileExtension);
       return `file://${image.actualFilePath}`;
     }
-    // Fall back to data URL in browser mode or if file path is not available
+    console.log("Using data URL for video (browser mode or missing path)");
     return image.url;
   };
 
