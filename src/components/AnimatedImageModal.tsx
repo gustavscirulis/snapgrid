@@ -114,10 +114,9 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     );
   };
 
-  // Ensure modal always matches the exact dimensions of the thumbnail
+  // Fix: Move the position: "fixed" out of the variants and into the component style
   const modalVariants = {
     initial: {
-      position: "fixed",
       top: initialPosition.top,
       left: initialPosition.left,
       width: initialPosition.width,
@@ -163,9 +162,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             onClick={onClose}
           />
 
-          {/* Image container */}
+          {/* Image container - fixed position applied directly to the element */}
           <motion.div
             className="fixed z-50 overflow-hidden"
+            style={{ position: "fixed" }}
             variants={modalVariants}
             initial="initial"
             animate="open"
