@@ -35,8 +35,8 @@ export function calculateGridRowSpan(height: number, width: number, gridRowHeigh
   return Math.ceil(imageHeight / gridRowHeight) + 1; // +1 for some padding
 }
 
-// Animation utilities for smooth image transitions
-export function getThumbnailPosition(element: HTMLElement | null): {
+// Simplified position tracking for animations
+export function getElementPosition(element: HTMLElement | null): {
   left: number;
   top: number;
   width: number;
@@ -53,24 +53,4 @@ export function getThumbnailPosition(element: HTMLElement | null): {
     width: rect.width,
     height: rect.height,
   };
-}
-
-export function getScaleTransform(startPos: { 
-  left: number; 
-  top: number; 
-  width: number; 
-  height: number;
-}, targetElement: HTMLElement | null): string {
-  if (!targetElement) {
-    return 'scale(1)';
-  }
-  
-  const targetRect = targetElement.getBoundingClientRect();
-  const scaleX = startPos.width / targetRect.width;
-  const scaleY = startPos.height / targetRect.height;
-  
-  const translateX = startPos.left - targetRect.left;
-  const translateY = startPos.top - targetRect.top;
-  
-  return `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`;
 }

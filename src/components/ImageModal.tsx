@@ -1,10 +1,10 @@
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
 import { X, ExternalLink, Scan, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getThumbnailPosition, getScaleTransform } from "@/lib/imageUtils";
+import { getElementPosition } from "@/lib/imageUtils";
 
 interface ImageModalProps {
   isOpen: boolean;
@@ -14,31 +14,17 @@ interface ImageModalProps {
 }
 
 const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image, sourceElement }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [animationState, setAnimationState] = useState<"initial" | "animating-in" | "in" | "animating-out">("initial");
-  const [startPosition, setStartPosition] = useState({ left: 0, top: 0, width: 0, height: 0 });
+  const [isAnimating, setIsAnimating] = useState(false);
   
   useEffect(() => {
-    if (isOpen && sourceElement) {
-      // Get the position of the thumbnail that was clicked
-      const pos = getThumbnailPosition(sourceElement);
-      setStartPosition(pos);
-      setAnimationState("initial");
-      
-      // Force a reflow before starting the animation
-      setTimeout(() => {
-        setAnimationState("animating-in");
-        setTimeout(() => {
-          setAnimationState("in");
-        }, 300);
-      }, 10);
-    } else if (!isOpen && animationState === "in") {
-      setAnimationState("animating-out");
-      setTimeout(() => {
-        setAnimationState("initial");
+    if (isOpen) {
+      setIsAnimating(true);
+      const timer = setTimeout(() => {
+        setIsAnimating(false);
       }, 300);
+      return () => clearTimeout(timer);
     }
-  }, [isOpen, sourceElement, animationState]);
+  }, [isOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -106,30 +92,6 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image, sourceE
     );
   };
 
-  const getAnimationStyles = () => {
-    if (contentRef.current && (animationState === "initial" || animationState === "animating-in")) {
-      const transform = animationState === "initial" 
-        ? getScaleTransform(startPosition, contentRef.current)
-        : "translate(0,0) scale(1)";
-      
-      return {
-        transform,
-        opacity: animationState === "initial" ? 0 : 1,
-        transition: animationState === "animating-in" ? "transform 0.3s ease-out, opacity 0.3s ease-out" : "none",
-      };
-    }
-    
-    if (animationState === "animating-out") {
-      return {
-        transform: getScaleTransform(startPosition, contentRef.current),
-        opacity: 0,
-        transition: "transform 0.3s ease-in, opacity 0.3s ease-in",
-      };
-    }
-    
-    return {};
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-7xl w-[95vw] p-0 overflow-hidden bg-transparent border-none shadow-none max-h-[95vh]">
@@ -147,9 +109,8 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image, sourceE
           </button>
           
           <div 
-            ref={contentRef}
-            className="bg-white/5 backdrop-blur-lg p-4 rounded-lg overflow-hidden shadow-2xl max-h-[95vh] max-w-full"
-            style={getAnimationStyles()}
+            className={`bg-white/5 backdrop-blur-lg p-4 rounded-lg overflow-hidden shadow-2xl max-h-[95vh] max-w-full
+              ${isAnimating ? 'animate-scale-in' : ''}`}
           >
             {image.type === "url" ? (
               <div className="bg-card p-8 rounded-md shadow-md max-w-lg">
