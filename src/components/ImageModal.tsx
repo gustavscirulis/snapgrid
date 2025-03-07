@@ -38,6 +38,11 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
   useEffect(() => {
     // When modal opens and it's a video, start playing from where it was
     if (isOpen && image?.type === "video" && videoRef.current) {
+      // Set the current time if it exists in the image object
+      if ('currentTime' in image && typeof image.currentTime === 'number') {
+        videoRef.current.currentTime = image.currentTime;
+      }
+      
       videoRef.current.play().then(() => {
         setIsPlaying(true);
       }).catch(error => {

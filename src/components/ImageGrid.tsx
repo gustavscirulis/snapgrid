@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle, Play, Pause, Video } from "lucide-react";
@@ -14,6 +13,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [columns, setColumns] = useState(3);
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
+  const videoCurrentTimes = useRef<{ [key: string]: number }>({});
 
   useEffect(() => {
     const updateColumns = () => {
@@ -37,7 +37,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   }, []);
 
   useEffect(() => {
-    // Handle video play/pause when hovering
     if (hoveredImageId) {
       const videoElement = videoRefs.current[hoveredImageId];
       if (videoElement) {
@@ -46,9 +45,14 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         });
       }
     } else {
-      // Pause all videos when not hovering
       Object.values(videoRefs.current).forEach(video => {
         if (video) {
+          const id = Object.keys(videoRefs.current).find(
+            key => videoRefs.current[key] === video
+          );
+          if (id) {
+            videoCurrentTimes.current[id] = video.currentTime;
+          }
           video.pause();
         }
       });
@@ -98,6 +102,18 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const handleImageClick = (image: ImageItem) => {
+    if (image.type === "video") {
+      const updatedImage = {
+        ...image,
+        currentTime: videoCurrentTimes.current[image.id] || 0
+      };
+      onImageClick(updatedImage);
+    } else {
+      onImageClick(image);
+    }
+  };
+
   const renderItem = (item: ImageItem) => {
     if (item.type === "url") {
       return (
@@ -136,6 +152,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
             muted
             loop
             poster={item.thumbnailUrl}
+            onTimeUpdate={() => {
+              if (videoRefs.current[item.id]) {
+                videoCurrentTimes.current[item.id] = videoRefs.current[item.id]!.currentTime;
+              }
+            }}
           />
           
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-60 group-hover:opacity-0 transition-opacity">
@@ -243,7 +264,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 <div key={image.id} className="masonry-item">
                   <div 
                     className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full"
-                    onClick={() => onImageClick(image)}
+                    onClick={() => handleImageClick(image)}
                     onMouseEnter={() => setHoveredImageId(image.id)}
                     onMouseLeave={() => setHoveredImageId(null)}
                   >

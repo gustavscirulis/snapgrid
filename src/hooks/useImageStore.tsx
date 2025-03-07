@@ -25,6 +25,7 @@ export interface ImageItem {
   error?: string;
   actualFilePath?: string;
   duration?: number; // Video duration in seconds
+  currentTime?: number; // Current playback position
 }
 
 export function useImageStore() {
@@ -34,7 +35,6 @@ export function useImageStore() {
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    // More reliable detection for Electron
     const isRunningInElectron = window && 
       typeof window.electron !== 'undefined' && 
       window.electron !== null;
@@ -54,8 +54,6 @@ export function useImageStore() {
           console.log("Loaded images:", loadedImages.length);
           setImages(loadedImages);
         } else {
-          // When running in browser, start with empty state
-          console.log("Browser mode - starting with empty images array");
           setImages([]);
           toast.warning("Running in browser mode. Images will not be saved permanently.");
         }
