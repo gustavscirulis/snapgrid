@@ -2,7 +2,7 @@
 import React, { useCallback, useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { validateImageFile } from "@/lib/imageUtils";
-import { ImagePlus, Video } from "lucide-react";
+import { ImagePlus } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface UploadZoneProps {
@@ -20,40 +20,23 @@ const UploadZone: React.FC<UploadZoneProps> = ({
 }) => {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
-  const [fileType, setFileType] = useState<'image' | 'video' | null>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
-    
-    // Try to determine file type from dragged items
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-      const item = e.dataTransfer.items[0];
-      if (item.kind === 'file') {
-        if (item.type.startsWith('image/')) {
-          setFileType('image');
-        } else if (item.type.startsWith('video/')) {
-          setFileType('video');
-        } else {
-          setFileType(null);
-        }
-      }
-    }
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    setFileType(null);
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    setFileType(null);
 
     if (isUploading) return;
 
@@ -66,9 +49,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
       } else {
         toast({
           title: "Invalid file",
-          description: file.type.startsWith('video/') 
-            ? "Please upload videos less than 50MB in size." 
-            : "Please upload images less than 10MB in size.",
+          description: "Please upload images less than 10MB in size.",
           variant: "destructive",
         });
       }
@@ -117,14 +98,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
         {isDragging && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 pointer-events-none">
             <div className="bg-card p-8 rounded-lg shadow-lg flex flex-col items-center animate-float">
-              {fileType === 'video' ? (
-                <Video className="w-12 h-12 text-primary mb-4" />
-              ) : (
-                <ImagePlus className="w-12 h-12 text-primary mb-4" />
-              )}
-              <p className="text-xl font-medium">
-                Drop {fileType === 'video' ? 'video' : 'image'} to add
-              </p>
+              <ImagePlus className="w-12 h-12 text-primary mb-4" />
+              <p className="text-xl font-medium">Drop images to add</p>
             </div>
           </div>
         )}
@@ -142,7 +117,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           type="file"
           id="file-upload"
           className="hidden"
-          accept="image/*,video/*"
+          accept="image/*"
           multiple
         />
       </div>

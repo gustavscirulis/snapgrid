@@ -23,21 +23,16 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
   const [apiKey, setApiKey] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasKey, setHasKey] = useState(false);
 
   // Check for stored API key on component mount
   useEffect(() => {
     const savedApiKey = localStorage.getItem("openai-api-key");
     if (savedApiKey) {
       setOpenAIApiKey(savedApiKey);
-      setHasKey(true);
     } else if (!inSettingsPanel) {
       // Only show dialog on first load if no API key exists and not in settings panel
       setIsOpen(!hasApiKey());
     }
-    
-    // Update state based on if we have a key
-    setHasKey(hasApiKey());
   }, [inSettingsPanel]);
 
   const handleSubmit = async () => {
@@ -56,7 +51,6 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
       // Store in localStorage for persistence
       localStorage.setItem("openai-api-key", apiKey.trim());
       
-      setHasKey(true);
       setIsOpen(false);
       toast.success("API key saved successfully. New images will now be analyzed with OpenAI Vision.");
     } catch (err) {
@@ -69,8 +63,25 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
   };
 
   const handleOpenChange = (open: boolean) => {
-    setIsOpen(open);
+    // Only allow closing if we have a key or user is forcing close
+    if (!open && hasApiKey()) {
+      setIsOpen(false);
+    } else {
+      setIsOpen(open);
+    }
   };
+
+  if (inSettingsPanel) {
+    return (
+      <Button 
+        variant="outline" 
+        size="sm" 
+        onClick={() => setIsOpen(true)}
+      >
+        {hasApiKey() ? "Update API Key" : "Set API Key"}
+      </Button>
+    );
+  }
 
   return (
     <>
@@ -81,7 +92,7 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
         className="flex items-center gap-1"
       >
         <Key className="h-4 w-4" />
-        <span>{hasKey ? "Update API Key" : "Set API Key"}</span>
+        <span>{hasApiKey() ? "Update API Key" : "Set API Key"}</span>
       </Button>
 
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>

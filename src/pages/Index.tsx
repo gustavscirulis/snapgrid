@@ -11,18 +11,8 @@ import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Toaster, toast } from "sonner";
 import SettingsPanel from "@/components/SettingsPanel";
 
-// Add CSP meta tag to document head with expanded permissions for file:// protocol
-const addCSPMetaTag = () => {
-  if (typeof document !== 'undefined') {
-    const meta = document.createElement('meta');
-    meta.httpEquiv = 'Content-Security-Policy';
-    meta.content = "default-src 'self' file:; img-src 'self' data: blob: https: file:; media-src 'self' data: blob: https: file:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.openai.com;";
-    document.head.appendChild(meta);
-  }
-};
-
 const Index = () => {
-  const { images, isUploading, isLoading, addImage, addUrlCard, removeImage, updateImageItem } = useImageStore();
+  const { images, isUploading, isLoading, addImage, addUrlCard, removeImage } = useImageStore();
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,9 +20,6 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    // Add CSP meta tag on component mount - with expanded permissions for file:// protocol
-    addCSPMetaTag();
-    
     // Check if running in Electron - more reliable detection
     const isRunningInElectron = window && 
       typeof window.electron !== 'undefined' && 
@@ -47,13 +34,6 @@ const Index = () => {
     
     if (isRunningInElectron) {
       console.log("Running in Electron mode");
-      
-      // Request filesystem access path from Electron - using the correct function name
-      window.electron.getAppStorageDir().then((path) => {
-        console.log("Storage path:", path);
-      }).catch(err => {
-        console.error("Failed to get storage path:", err);
-      });
     } else {
       console.log("Running in browser mode. Electron APIs not available.");
       toast.warning("Running in browser mode. Local storage features are not available.");
@@ -74,10 +54,6 @@ const Index = () => {
         (image.url?.toLowerCase().includes(query)) ||
         (image.title?.toLowerCase().includes(query))
       );
-    }
-    
-    if (image.type === "video" && image.title) {
-      return image.title.toLowerCase().includes(query);
     }
     
     if (image.patterns && image.patterns.length > 0) {
@@ -103,10 +79,6 @@ const Index = () => {
 
   const handleDeleteImage = (id: string) => {
     removeImage(id);
-  };
-
-  const handleImageUpdate = (updatedImage: ImageItem) => {
-    updateImageItem(updatedImage);
   };
 
   return (
@@ -147,11 +119,27 @@ const Index = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           ) : (
-            <ImageGrid 
-              images={filteredImages} 
-              onImageClick={handleImageClick} 
-              onImageDelete={handleDeleteImage}
-            />
+            <>
+              {images.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                  <p className="text-center max-w-md mb-4">
+                    Drag and drop images here or paste a URL to add to your collection
+                  </p>
+                  <input
+                    type="file"
+                    id="file-upload"
+                    className="hidden"
+                    accept="image/*"
+                    multiple
+                  />
+                </div>
+              )}
+              <ImageGrid 
+                images={filteredImages} 
+                onImageClick={handleImageClick} 
+                onImageDelete={handleDeleteImage}
+              />
+            </>
           )}
         </main>
 
@@ -159,7 +147,6 @@ const Index = () => {
           isOpen={modalOpen}
           onClose={closeModal}
           image={selectedImage}
-          onImageUpdate={handleImageUpdate}
         />
 
         <SettingsPanel
