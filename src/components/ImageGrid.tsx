@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
+import { ExternalLink, Scan, Trash2, AlertCircle, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageGridProps {
@@ -97,6 +97,30 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
         </div>
       );
+    } else if (item.type === "video") {
+      return (
+        <div className="relative rounded-t-lg overflow-hidden">
+          <img
+            src={item.thumbnailUrl || item.url}
+            alt="Video Thumbnail"
+            className="w-full h-auto object-cover rounded-t-lg"
+            loading="lazy"
+          />
+          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+            <PlayCircle className="w-12 h-12 text-white opacity-80" />
+          </div>
+          {item.duration && (
+            <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+              {formatDuration(item.duration)}
+            </div>
+          )}
+          {hoveredImageId === item.id && (
+            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+              {renderPatternTags(item)}
+            </div>
+          )}
+        </div>
+      );
     } else {
       return (
         <div className="relative">
@@ -114,6 +138,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         </div>
       );
     }
+  };
+
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const distributeImages = () => {
@@ -154,14 +184,14 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
           <h3 className="text-2xl font-medium mb-2">No items yet</h3>
           <p className="text-muted-foreground max-w-md">
-            Drag and drop images anywhere, paste URLs, or use the upload buttons to add your first item.
+            Drag and drop images or videos anywhere, paste URLs, or use the upload buttons to add your first item.
           </p>
           <div className="mt-6 flex gap-3">
             <label 
               htmlFor="file-upload"
               className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors cursor-pointer"
             >
-              Upload image
+              Upload media
             </label>
           </div>
         </div>

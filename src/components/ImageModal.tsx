@@ -1,5 +1,4 @@
-
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
 import { X, ExternalLink, Scan, AlertCircle } from "lucide-react";
@@ -12,6 +11,8 @@ interface ImageModalProps {
 }
 
 const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -22,6 +23,18 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen && videoRef.current) {
+      videoRef.current.pause();
+    }
+
+    if (isOpen && image?.type === 'video' && videoRef.current) {
+      videoRef.current.play().catch(err => {
+        console.error("Error playing video:", err);
+      });
+    }
+  }, [isOpen, image]);
 
   if (!image) return null;
 
@@ -78,11 +91,92 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     );
   };
 
+  const renderContent = () => {
+    if (image.type === "url") {
+      return (
+        <div className="bg-card p-8 rounded-md shadow-md animate-scale-in max-w-lg">
+          <div className="flex items-start mb-6">
+            {image.thumbnailUrl && (
+              <div className="w-16 h-16 bg-muted rounded-md mr-4 overflow-hidden flex items-center justify-center">
+                <img 
+                  src={image.thumbnailUrl} 
+                  alt={image.title || "Website"} 
+                  className="max-w-full max-h-full object-contain" 
+                />
+              </div>
+            )}
+            <div>
+              <h3 className="font-medium text-xl mb-2">{image.title || "Website"}</h3>
+              <p className="text-sm text-muted-foreground break-all">{image.url}</p>
+            </div>
+          </div>
+          <Button 
+            className="w-full" 
+            onClick={openExternalUrl}
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Open URL
+          </Button>
+        </div>
+      );
+    } else if (image.type === "video") {
+      return (
+        <>
+          <div className="relative">
+            <video
+              ref={videoRef}
+              src={image.url}
+              controls
+              autoPlay
+              className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
+              style={{ 
+                maxWidth: Math.min(image.width, window.innerWidth * 0.9),
+                maxHeight: Math.min(image.height, window.innerHeight * 0.85)
+              }}
+            />
+          </div>
+          
+          {image.duration && (
+            <div className="mt-4 px-2">
+              <div className="flex items-center gap-2 text-sm bg-muted/50 px-3 py-2 rounded-md">
+                <span>Duration: {formatDuration(image.duration)}</span>
+              </div>
+            </div>
+          )}
+        </>
+      );
+    } else {
+      return (
+        <>
+          <img
+            src={image.url}
+            alt="Enlarged screenshot"
+            className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
+            style={{ 
+              maxWidth: Math.min(image.width, window.innerWidth * 0.9),
+              maxHeight: Math.min(image.height, window.innerHeight * 0.85)
+            }}
+          />
+          
+          <div className="mt-4 px-2">
+            {renderPatternTags(image.patterns, image.isAnalyzing, image.error)}
+          </div>
+        </>
+      );
+    }
+  };
+
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-7xl w-[95vw] p-0 overflow-hidden bg-transparent border-none shadow-none max-h-[95vh]">
         <DialogTitle className="sr-only">
-          {image.type === "url" ? "URL Preview" : "Image Preview"}
+          {image.type === "url" ? "URL Preview" : (image.type === "video" ? "Video Player" : "Image Preview")}
         </DialogTitle>
         
         <div className="relative h-full w-full flex items-center justify-center">
@@ -95,48 +189,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
           </button>
           
           <div className="bg-white/5 backdrop-blur-lg p-4 rounded-lg overflow-hidden shadow-2xl max-h-[95vh] max-w-full">
-            {image.type === "url" ? (
-              <div className="bg-card p-8 rounded-md shadow-md animate-scale-in max-w-lg">
-                <div className="flex items-start mb-6">
-                  {image.thumbnailUrl && (
-                    <div className="w-16 h-16 bg-muted rounded-md mr-4 overflow-hidden flex items-center justify-center">
-                      <img 
-                        src={image.thumbnailUrl} 
-                        alt={image.title || "Website"} 
-                        className="max-w-full max-h-full object-contain" 
-                      />
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="font-medium text-xl mb-2">{image.title || "Website"}</h3>
-                    <p className="text-sm text-muted-foreground break-all">{image.url}</p>
-                  </div>
-                </div>
-                <Button 
-                  className="w-full" 
-                  onClick={openExternalUrl}
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open URL
-                </Button>
-              </div>
-            ) : (
-              <>
-                <img
-                  src={image.url}
-                  alt="Enlarged screenshot"
-                  className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
-                  style={{ 
-                    maxWidth: Math.min(image.width, window.innerWidth * 0.9),
-                    maxHeight: Math.min(image.height, window.innerHeight * 0.85)
-                  }}
-                />
-                
-                <div className="mt-4 px-2">
-                  {renderPatternTags(image.patterns, image.isAnalyzing, image.error)}
-                </div>
-              </>
-            )}
+            {renderContent()}
           </div>
         </div>
       </DialogContent>
