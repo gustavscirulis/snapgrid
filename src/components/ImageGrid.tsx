@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle, Link, Globe } from "lucide-react";
@@ -21,7 +20,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [selectedImageRef, setSelectedImageRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
   const [currentPatternElements, setCurrentPatternElements] = useState<React.ReactNode | null>(null);
   
-  // Create a map to store refs for each image
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
 
   useEffect(() => {
@@ -49,12 +47,9 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     e.stopPropagation();
     e.preventDefault();
     
-    // Open URL in default browser
     if (window.electron && window.electron.openUrl) {
-      // In Electron, use shell.openExternal via the electron API
       window.electron.openUrl(url);
     } else {
-      // In browser, open in new tab
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
@@ -64,11 +59,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       return;
     }
     
-    // Capture the current pattern elements if they're being shown for this image
     if (hoveredImageId === image.id) {
       const patternEl = document.getElementById(`pattern-tags-${image.id}`);
       if (patternEl) {
-        setCurrentPatternElements(patternEl.cloneNode(true).innerHTML);
+        if (patternEl instanceof Element) {
+          setCurrentPatternElements(patternEl.innerHTML);
+        }
       }
     } else {
       setCurrentPatternElements(null);
@@ -131,16 +127,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       
       return (
         <div className="url-card h-full flex flex-col relative group">
-          {/* Link indicator badge */}
           <div className="absolute top-2 left-2 z-10 bg-primary/80 text-white p-1 rounded-full">
             <Link className="h-4 w-4" />
           </div>
           
-          {/* Card content */}
           <div className="flex flex-col justify-between h-full">
-            {/* Main content area */}
             <div className="p-4 flex flex-col h-full relative">
-              {/* Background thumbnail/placeholder */}
               <div className="absolute inset-0 overflow-hidden bg-secondary/20">
                 {item.thumbnailUrl ? (
                   <img 
@@ -155,7 +147,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 )}
               </div>
               
-              {/* Content overlay */}
               <div className="relative z-10 flex flex-col h-full">
                 {isLoading && (
                   <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
@@ -183,7 +174,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                   </div>
                 )}
                 
-                {/* Content */}
                 <div className="mt-12 bg-background/80 p-4 rounded-md flex-grow">
                   <h3 className="font-medium text-base mb-2 line-clamp-2">{item.title || item.url}</h3>
                   
@@ -196,7 +186,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               </div>
             </div>
             
-            {/* Footer */}
             <div 
               className="p-3 bg-primary text-primary-foreground text-sm font-medium cursor-pointer flex items-center justify-center"
               onClick={(e) => handleUrlClick(item.sourceUrl || item.url, e)}
@@ -208,7 +197,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         </div>
       );
     } else {
-      // Regular image rendering logic
       return (
         <div className="relative">
           <img
@@ -251,7 +239,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
   const columnData = distributeImages();
 
-  // Make sure we have refs for all images
   images.forEach(image => {
     if (!imageRefs.current.has(image.id)) {
       imageRefs.current.set(image.id, React.createRef<HTMLDivElement>());
