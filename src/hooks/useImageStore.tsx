@@ -221,9 +221,13 @@ export function useImageStore() {
           
           if (isElectron) {
             try {
+              const mimeType = getMimeTypeFromDataUrl(imageWithPatterns.url);
+              const fileExtension = getFileExtensionFromMimeType(mimeType);
+              
               window.electron.saveImage({
                 id: imageWithPatterns.id,
                 dataUrl: imageWithPatterns.url,
+                fileExtension: fileExtension,
                 metadata: {
                   ...imageWithPatterns,
                   url: undefined
@@ -247,9 +251,13 @@ export function useImageStore() {
           
           if (isElectron) {
             try {
+              const mimeType = getMimeTypeFromDataUrl(newItem.url);
+              const fileExtension = getFileExtensionFromMimeType(mimeType);
+              
               window.electron.saveImage({
                 id: newItem.id,
                 dataUrl: newItem.url,
+                fileExtension: fileExtension,
                 metadata: {
                   ...newItem,
                   isAnalyzing: false,
