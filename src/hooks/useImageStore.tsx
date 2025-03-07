@@ -26,6 +26,7 @@ export interface ImageItem {
   actualFilePath?: string;
   duration?: number; // Video duration in seconds
   currentTime?: number; // Current playback position
+  fileExtension?: string; // Store the file extension
 }
 
 export function useImageStore() {
@@ -52,7 +53,18 @@ export function useImageStore() {
           console.log("Loading images from filesystem...");
           const loadedImages = await window.electron.loadImages();
           console.log("Loaded images:", loadedImages.length);
-          setImages(loadedImages);
+          
+          const processedImages = loadedImages.map(img => {
+            if (img.type === 'video' && img.actualFilePath) {
+              return {
+                ...img,
+                url: `file://${img.actualFilePath}`
+              };
+            }
+            return img;
+          });
+          
+          setImages(processedImages);
         } else {
           setImages([]);
           toast.warning("Running in browser mode. Images will not be saved permanently.");
@@ -80,6 +92,8 @@ export function useImageStore() {
     const fileType = validateResult.type;
     const reader = new FileReader();
     
+    const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
+    
     reader.onload = async (e) => {
       if (!e.target?.result) {
         setIsUploading(false);
@@ -93,7 +107,7 @@ export function useImageStore() {
         const img = new Image();
         img.onload = async () => {
           dimensions = { width: img.width, height: img.height };
-          processMedia(fileType, e.target?.result as string, dimensions, undefined);
+          processMedia(fileType, e.target?.result as string, dimensions, undefined, fileExtension);
         };
         img.src = e.target?.result as string;
       } else if (fileType === 'video') {
@@ -104,7 +118,7 @@ export function useImageStore() {
           dimensions = { width: video.videoWidth, height: video.videoHeight };
           duration = video.duration;
           URL.revokeObjectURL(video.src);
-          processMedia(fileType, e.target?.result as string, dimensions, duration);
+          processMedia(fileType, e.target?.result as string, dimensions, duration, fileExtension);
         };
         
         video.src = e.target?.result as string;
@@ -114,7 +128,13 @@ export function useImageStore() {
     reader.readAsDataURL(file);
   }, [images, isElectron]);
 
-  const processMedia = async (type: 'image' | 'video', dataUrl: string, dimensions: { width: number; height: number }, duration?: number) => {
+  const processMedia = async (
+    type: 'image' | 'video', 
+    dataUrl: string, 
+    dimensions: { width: number; height: number }, 
+    duration?: number,
+    fileExtension?: string
+  ) => {
     const newItem: ImageItem = {
       id: crypto.randomUUID(),
       type: type,
@@ -123,7 +143,8 @@ export function useImageStore() {
       height: dimensions.height,
       createdAt: new Date(),
       isAnalyzing: type === 'image' ? hasApiKey() : false,
-      duration: duration
+      duration: duration,
+      fileExtension: fileExtension
     };
     
     const updatedImages = [newItem, ...images];
@@ -132,24 +153,34 @@ export function useImageStore() {
     if (isElectron) {
       try {
         console.log(`Saving ${type} to filesystem:`, newItem.id);
-        const result = await window.electron.saveImage({
+        
+        const saveOptions = {
           id: newItem.id,
           dataUrl: newItem.url,
           metadata: {
-            id: newItem.id,
-            type: newItem.type,
-            width: newItem.width,
-            height: newItem.height,
-            createdAt: newItem.createdAt,
-            isAnalyzing: newItem.isAnalyzing,
-            duration: newItem.duration
-          }
-        });
+            ...newItem,
+            url: undefined
+          },
+          fileExtension: type === 'video' ? fileExtension : undefined
+        };
+        
+        const result = await window.electron.saveImage(saveOptions);
         
         if (result.success && result.path) {
           console.log(`${type} saved successfully at:`, result.path);
-          newItem.actualFilePath = result.path;
-          setImages([newItem, ...images.filter(img => img.id !== newItem.id)]);
+          
+          if (type === 'video') {
+            const updatedItem = {
+              ...newItem,
+              actualFilePath: result.path,
+              url: `file://${result.path}`
+            };
+            
+            setImages([updatedItem, ...images.filter(img => img.id !== newItem.id)]);
+          } else {
+            newItem.actualFilePath = result.path;
+            setImages([newItem, ...images.filter(img => img.id !== newItem.id)]);
+          }
           
           toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} saved to: ${result.path}`);
         } else {

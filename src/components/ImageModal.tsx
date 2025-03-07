@@ -1,8 +1,7 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
-import { X, ExternalLink, Scan, AlertCircle, Play, Pause, FullscreenIcon } from "lucide-react";
+import { X, ExternalLink, Scan, AlertCircle, Play, Pause, FullscreenIcon, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageModalProps {
@@ -15,17 +14,16 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
         onClose();
       } else if (e.key === " " && image?.type === "video") {
-        // Space bar toggles play/pause
         togglePlayPause();
         e.preventDefault();
       } else if (e.key === "f" && image?.type === "video") {
-        // F key toggles fullscreen
         toggleFullscreen();
         e.preventDefault();
       }
@@ -36,9 +34,9 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
   }, [isOpen, onClose, image]);
 
   useEffect(() => {
-    // When modal opens and it's a video, start playing from where it was
     if (isOpen && image?.type === "video" && videoRef.current) {
-      // Set the current time if it exists in the image object
+      setVideoError(false);
+      
       if ('currentTime' in image && typeof image.currentTime === 'number') {
         videoRef.current.currentTime = image.currentTime;
       }
@@ -47,16 +45,16 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
         setIsPlaying(true);
       }).catch(error => {
         console.error("Error playing video:", error);
+        setVideoError(true);
+        setIsPlaying(false);
       });
     }
     
-    // When modal closes, reset state
     if (!isOpen) {
       setIsPlaying(false);
       setIsFullscreen(false);
     }
     
-    // Check fullscreen status
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
@@ -68,12 +66,15 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
   }, [isOpen, image]);
 
   const togglePlayPause = () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || videoError) return;
     
     if (isPlaying) {
       videoRef.current.pause();
     } else {
-      videoRef.current.play();
+      videoRef.current.play().catch(error => {
+        console.error("Error playing video:", error);
+        setVideoError(true);
+      });
     }
     
     setIsPlaying(!isPlaying);
@@ -87,6 +88,12 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     } else {
       document.exitFullscreen();
     }
+  };
+
+  const handleVideoError = () => {
+    console.error("Video failed to load in modal");
+    setVideoError(true);
+    setIsPlaying(false);
   };
 
   if (!image) return null;
@@ -145,7 +152,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
   };
 
   const renderVideoControls = () => {
-    if (image.type !== 'video') return null;
+    if (image.type !== 'video' || videoError) return null;
     
     return (
       <div className="absolute bottom-4 left-0 right-0 mx-auto w-full max-w-md px-4 bg-black/50 backdrop-blur-sm rounded-full py-2 flex items-center justify-between">
@@ -218,19 +225,32 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
               </div>
             ) : image.type === "video" ? (
               <div className="relative">
-                <video
-                  ref={videoRef}
-                  src={image.url}
-                  className="max-h-[85vh] max-w-full rounded-md animate-scale-in shadow-md"
-                  style={{ 
-                    maxWidth: Math.min(image.width, window.innerWidth * 0.9),
-                    maxHeight: Math.min(image.height, window.innerHeight * 0.85)
-                  }}
-                  controls={false}
-                  playsInline
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                />
+                {videoError ? (
+                  <div className="flex flex-col items-center justify-center bg-black/80 p-8 rounded-lg">
+                    <VideoOff className="w-16 h-16 text-muted-foreground mb-4" />
+                    <p className="text-white/80 text-center">
+                      This video format is not supported by your browser or the file couldn't be loaded.
+                    </p>
+                    <p className="text-white/60 text-sm mt-2">
+                      Try reopening the app or converting the video to a different format.
+                    </p>
+                  </div>
+                ) : (
+                  <video
+                    ref={videoRef}
+                    src={image.url}
+                    className="max-h-[85vh] max-w-full rounded-md animate-scale-in shadow-md"
+                    style={{ 
+                      maxWidth: Math.min(image.width, window.innerWidth * 0.9),
+                      maxHeight: Math.min(image.height, window.innerHeight * 0.85)
+                    }}
+                    controls={false}
+                    playsInline
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onError={handleVideoError}
+                  />
+                )}
                 
                 {renderVideoControls()}
               </div>

@@ -14,6 +14,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [columns, setColumns] = useState(3);
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
   const videoCurrentTimes = useRef<{ [key: string]: number }>({});
+  const [videoLoadErrors, setVideoLoadErrors] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     const updateColumns = () => {
@@ -39,9 +40,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   useEffect(() => {
     if (hoveredImageId) {
       const videoElement = videoRefs.current[hoveredImageId];
-      if (videoElement) {
-        videoElement.play().catch(error => {
+      if (videoElement && !videoLoadErrors[hoveredImageId]) {
+        videoElement.play().then(() => {
+          // Playing successfully
+        }).catch(error => {
           console.error("Error playing video:", error);
+          setVideoLoadErrors(prev => ({...prev, [hoveredImageId]: true}));
         });
       }
     } else {
@@ -57,7 +61,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         }
       });
     }
-  }, [hoveredImageId]);
+  }, [hoveredImageId, videoLoadErrors]);
 
   const renderPatternTags = (item: ImageItem) => {
     if (!item.patterns || item.patterns.length === 0) {
@@ -114,6 +118,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     }
   };
 
+  const handleVideoError = (id: string) => {
+    console.error(`Failed to load video: ${id}`);
+    setVideoLoadErrors(prev => ({...prev, [id]: true}));
+  };
+
   const renderItem = (item: ImageItem) => {
     if (item.type === "url") {
       return (
@@ -144,20 +153,30 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     } else if (item.type === "video") {
       return (
         <div className="relative">
-          <video
-            ref={el => videoRefs.current[item.id] = el}
-            src={item.url}
-            className="w-full h-auto object-cover rounded-t-lg"
-            playsInline
-            muted
-            loop
-            poster={item.thumbnailUrl}
-            onTimeUpdate={() => {
-              if (videoRefs.current[item.id]) {
-                videoCurrentTimes.current[item.id] = videoRefs.current[item.id]!.currentTime;
-              }
-            }}
-          />
+          {videoLoadErrors[item.id] ? (
+            <div className="w-full h-32 bg-muted flex items-center justify-center">
+              <div className="flex flex-col items-center text-muted-foreground">
+                <Video className="w-12 h-12 mb-2 opacity-40" />
+                <span className="text-xs">Video format not supported</span>
+              </div>
+            </div>
+          ) : (
+            <video
+              ref={el => videoRefs.current[item.id] = el}
+              src={item.url}
+              className="w-full h-auto object-cover rounded-t-lg"
+              playsInline
+              muted
+              loop
+              poster={item.thumbnailUrl}
+              onError={() => handleVideoError(item.id)}
+              onTimeUpdate={() => {
+                if (videoRefs.current[item.id]) {
+                  videoCurrentTimes.current[item.id] = videoRefs.current[item.id]!.currentTime;
+                }
+              }}
+            />
+          )}
           
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-60 group-hover:opacity-0 transition-opacity">
             <Video className="w-12 h-12 text-white" />
@@ -169,7 +188,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
             </div>
           )}
           
-          {hoveredImageId === item.id && (
+          {hoveredImageId === item.id && !videoLoadErrors[item.id] && (
             <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
               <div className="flex items-center justify-between">
                 <div className="text-white text-xs">
