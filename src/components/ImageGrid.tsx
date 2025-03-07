@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { ExternalLink, Scan, X, AlertCircle, Link, Globe } from "lucide-react";
+import { ExternalLink, Scan, X, AlertCircle, Link, Globe, Play, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import AnimatedImageModal from "./AnimatedImageModal";
@@ -73,6 +73,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       setSelectedImage(null);
       setClickedImageId(null);
     }, 300);
+  };
+
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   const renderPatternTags = (item: ImageItem) => {
@@ -185,6 +191,42 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               <span>Open URL</span>
             </div>
           </div>
+        </div>
+      );
+    } else if (item.type === "video") {
+      return (
+        <div className="relative group">
+          <div className="relative">
+            <video
+              src={item.url}
+              className="w-full h-auto object-cover rounded-t-lg"
+              preload="metadata"
+            />
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <Play className="w-12 h-12 text-white" />
+            </div>
+            {item.duration && (
+              <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                {formatDuration(item.duration)}
+              </div>
+            )}
+            <div className="absolute top-2 left-2 bg-primary/80 text-white p-1 rounded-full">
+              <Video className="h-4 w-4" />
+            </div>
+          </div>
+          <AnimatePresence>
+            {hoveredImageId === item.id && (
+              <motion.div 
+                id={`pattern-tags-${item.id}`}
+                className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+              >
+                {/* We don't show pattern tags for videos */}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       );
     } else {
@@ -345,3 +387,4 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 };
 
 export default ImageGrid;
+
