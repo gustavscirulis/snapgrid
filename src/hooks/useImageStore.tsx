@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -32,6 +31,7 @@ export interface ImageItem {
   error?: string;
   actualFilePath?: string;
   duration?: number; // For videos only
+  fileExtension?: string; // Add the file extension property
 }
 
 export function useImageStore() {
