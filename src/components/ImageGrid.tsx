@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle, Link, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import AnimatedImageModal from "./AnimatedImageModal";
+import { motion } from "framer-motion";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -14,6 +16,12 @@ interface ImageGridProps {
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [columns, setColumns] = useState(3);
+  const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedImageRef, setSelectedImageRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
+  
+  // Create a map to store refs for each image
+  const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
 
   useEffect(() => {
     const updateColumns = () => {
@@ -48,6 +56,22 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       // In browser, open in new tab
       window.open(url, '_blank', 'noopener,noreferrer');
     }
+  };
+
+  const handleImageClick = (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
+    if (image.type === "url") {
+      return;
+    }
+    
+    setSelectedImage(image);
+    setSelectedImageRef(ref);
+    setModalOpen(true);
+    onImageClick(image);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setTimeout(() => setSelectedImage(null), 300);
   };
 
   const renderPatternTags = (item: ImageItem) => {
@@ -205,6 +229,13 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
   const columnData = distributeImages();
 
+  // Make sure we have refs for all images
+  images.forEach(image => {
+    if (!imageRefs.current.has(image.id)) {
+      imageRefs.current.set(image.id, React.createRef<HTMLDivElement>());
+    }
+  });
+
   return (
     <div className="px-4 py-6 w-full">
       {images.length === 0 ? (
@@ -236,42 +267,61 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
         </div>
       ) : (
-        <div className="masonry-grid">
-          {columnData.map((column, columnIndex) => (
-            <div 
-              key={columnIndex} 
-              className="masonry-column"
-              style={{ width: `${100 / columns}%` }}
-            >
-              {column.map((image) => (
-                <div key={image.id} className="masonry-item">
-                  <div 
-                    className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full"
-                    onClick={() => image.type !== "url" && onImageClick(image)}
-                    onMouseEnter={() => setHoveredImageId(image.id)}
-                    onMouseLeave={() => setHoveredImageId(null)}
-                  >
-                    {renderItem(image)}
-                    
-                    {onImageDelete && (
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onImageDelete(image.id);
-                        }}
+        <>
+          <motion.div 
+            className="masonry-grid"
+            animate={modalOpen ? { opacity: 0.3 } : { opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            {columnData.map((column, columnIndex) => (
+              <div 
+                key={columnIndex} 
+                className="masonry-column"
+                style={{ width: `${100 / columns}%` }}
+              >
+                {column.map((image) => {
+                  const ref = imageRefs.current.get(image.id) || React.createRef<HTMLDivElement>();
+                  return (
+                    <div key={image.id} className="masonry-item">
+                      <div 
+                        ref={ref}
+                        className={`rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full ${
+                          selectedImage?.id === image.id && modalOpen ? 'opacity-0' : 'opacity-100'
+                        }`}
+                        onClick={() => image.type !== "url" && handleImageClick(image, ref)}
+                        onMouseEnter={() => setHoveredImageId(image.id)}
+                        onMouseLeave={() => setHoveredImageId(null)}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+                        {renderItem(image)}
+                        
+                        {onImageDelete && (
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onImageDelete(image.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </motion.div>
+
+          <AnimatedImageModal
+            isOpen={modalOpen}
+            onClose={closeModal}
+            selectedImage={selectedImage}
+            selectedImageRef={selectedImageRef}
+          />
+        </>
       )}
     </div>
   );

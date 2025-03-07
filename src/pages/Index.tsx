@@ -1,8 +1,8 @@
+
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
-import ImageModal from "@/components/ImageModal";
 import { Search, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,6 @@ import WindowControls from "@/components/WindowControls";
 
 const Index = () => {
   const { images, isUploading, isLoading, addImage, addUrlCard, removeImage } = useImageStore();
-  const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isElectron, setIsElectron] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -63,17 +61,9 @@ const Index = () => {
   });
 
   const handleImageClick = (image: ImageItem) => {
-    if (image.type === "url") {
-      return;
-    } else {
-      setSelectedImage(image);
-      setModalOpen(true);
-    }
-  };
-
-  const closeModal = () => {
-    setModalOpen(false);
-    setTimeout(() => setSelectedImage(null), 300);
+    // This function is just a placeholder now since the actual handling
+    // is done inside the ImageGrid component with the new modal approach
+    console.log("Image clicked:", image.id);
   };
 
   const handleDeleteImage = (id: string) => {
@@ -139,12 +129,6 @@ const Index = () => {
             </>
           )}
         </main>
-
-        <ImageModal
-          isOpen={modalOpen}
-          onClose={closeModal}
-          image={selectedImage}
-        />
 
         <SettingsPanel
           open={settingsOpen}
