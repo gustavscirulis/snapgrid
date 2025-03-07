@@ -2,16 +2,24 @@
 import React, { useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
-import { X, ExternalLink, Scan, AlertCircle } from "lucide-react";
+import { X, ExternalLink, Scan, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { analyzeImage } from "@/services/aiAnalysisService";
+import { toast } from "sonner";
 
 interface ImageModalProps {
   isOpen: boolean;
   onClose: () => void;
   image: ImageItem | null;
+  onImageUpdate?: (updatedImage: ImageItem) => void;
 }
 
-const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
+const ImageModal: React.FC<ImageModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  image,
+  onImageUpdate
+}) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -31,11 +39,47 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     }
   };
 
+  const handleRetryAnalysis = async () => {
+    if (!image || image.type !== "image" || !onImageUpdate) return;
+    
+    // Update image to analyzing state
+    const updatingImage = {
+      ...image,
+      isAnalyzing: true,
+      error: undefined
+    };
+    onImageUpdate(updatingImage);
+    
+    try {
+      const patterns = await analyzeImage(image.url);
+      
+      const updatedImage = {
+        ...image,
+        patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
+        isAnalyzing: false,
+        error: undefined
+      };
+      
+      onImageUpdate(updatedImage);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      const failedImage = {
+        ...image,
+        isAnalyzing: false,
+        error: errorMessage
+      };
+      
+      onImageUpdate(failedImage);
+      toast.error("Failed to analyze image: " + errorMessage);
+    }
+  };
+
   const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean, error?: string) => {
     if (!patterns || patterns.length === 0) {
       if (isAnalyzing) {
         return (
-          <div className="flex items-center gap-2 text-sm bg-primary/10 px-3 py-2 rounded-md mt-4">
+          <div className="flex items-center gap-2 text-sm bg-primary/10 px-3 py-2 rounded-md">
             <Scan className="w-4 h-4 animate-pulse text-primary" />
             <span>Analyzing UI patterns...</span>
           </div>
@@ -44,22 +88,34 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
 
       if (error) {
         return (
-          <div className="flex items-center gap-2 text-sm bg-destructive/10 px-3 py-2 rounded-md mt-4">
-            <AlertCircle className="w-4 h-4 text-destructive" />
-            <span>Analysis failed: {error}</span>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-sm bg-destructive/10 px-3 py-2 rounded-md">
+              <AlertCircle className="w-4 h-4 text-destructive" />
+              <span>Analysis failed: {error}</span>
+            </div>
+            {onImageUpdate && (
+              <Button 
+                size="sm" 
+                className="mt-2"
+                onClick={handleRetryAnalysis}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry Analysis
+              </Button>
+            )}
           </div>
         );
       }
 
       return (
-        <div className="flex items-center gap-2 text-sm bg-muted/50 px-3 py-2 rounded-md mt-4">
+        <div className="flex items-center gap-2 text-sm bg-muted/50 px-3 py-2 rounded-md">
           <span>No UI patterns detected. Set an OpenAI API key to enable analysis.</span>
         </div>
       );
     }
 
     return (
-      <div className="mt-4">
+      <div>
         <h4 className="text-sm font-medium mb-2 text-white/80">Detected UI Patterns</h4>
         <div className="flex flex-wrap gap-2">
           {patterns.map((pattern, index) => (
@@ -121,7 +177,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                 </Button>
               </div>
             ) : (
-              <>
+              <div className="flex flex-col">
                 <img
                   src={image.url}
                   alt="Enlarged screenshot"
@@ -132,10 +188,10 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                   }}
                 />
                 
-                <div className="mt-4 px-2">
+                <div className="mt-4 px-2 max-w-full overflow-x-auto">
                   {renderPatternTags(image.patterns, image.isAnalyzing, image.error)}
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>

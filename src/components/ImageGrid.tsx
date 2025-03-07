@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
+import { ExternalLink, Scan, Trash2, AlertCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageGridProps {
@@ -97,6 +98,32 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
         </div>
       );
+    } else if (item.type === "video") {
+      return (
+        <div className="relative">
+          <div className="relative">
+            <img
+              src={item.thumbnailUrl || item.url}
+              alt="Video thumbnail"
+              className="w-full h-auto object-cover rounded-t-lg"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-black/50 rounded-full p-3">
+                <Play className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </div>
+          {hoveredImageId === item.id && (
+            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+              <div className="text-sm text-white">{item.title}</div>
+              {item.duration && (
+                <div className="text-xs text-white/80">{formatDuration(item.duration)}</div>
+              )}
+            </div>
+          )}
+        </div>
+      );
     } else {
       return (
         <div className="relative">
@@ -114,6 +141,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         </div>
       );
     }
+  };
+
+  const formatDuration = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   const distributeImages = () => {
@@ -154,16 +187,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
           <h3 className="text-2xl font-medium mb-2">No items yet</h3>
           <p className="text-muted-foreground max-w-md">
-            Drag and drop images anywhere, paste URLs, or use the upload buttons to add your first item.
+            Drag and drop images or videos anywhere, or paste a URL to add your first item.
           </p>
-          <div className="mt-6 flex gap-3">
-            <label 
-              htmlFor="file-upload"
-              className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors cursor-pointer"
-            >
-              Upload image
-            </label>
-          </div>
         </div>
       ) : (
         <div className="masonry-grid">

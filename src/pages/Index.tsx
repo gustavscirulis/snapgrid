@@ -12,7 +12,7 @@ import { Toaster, toast } from "sonner";
 import SettingsPanel from "@/components/SettingsPanel";
 
 const Index = () => {
-  const { images, isUploading, isLoading, addImage, addUrlCard, removeImage } = useImageStore();
+  const { images, isUploading, isLoading, addImage, addUrlCard, removeImage, updateImageItem } = useImageStore();
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -56,6 +56,10 @@ const Index = () => {
       );
     }
     
+    if (image.type === "video" && image.title) {
+      return image.title.toLowerCase().includes(query);
+    }
+    
     if (image.patterns && image.patterns.length > 0) {
       return image.patterns.some(pattern => pattern.name.toLowerCase().includes(query));
     }
@@ -79,6 +83,10 @@ const Index = () => {
 
   const handleDeleteImage = (id: string) => {
     removeImage(id);
+  };
+
+  const handleImageUpdate = (updatedImage: ImageItem) => {
+    updateImageItem(updatedImage);
   };
 
   return (
@@ -119,27 +127,11 @@ const Index = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           ) : (
-            <>
-              {images.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                  <p className="text-center max-w-md mb-4">
-                    Drag and drop images here or paste a URL to add to your collection
-                  </p>
-                  <input
-                    type="file"
-                    id="file-upload"
-                    className="hidden"
-                    accept="image/*"
-                    multiple
-                  />
-                </div>
-              )}
-              <ImageGrid 
-                images={filteredImages} 
-                onImageClick={handleImageClick} 
-                onImageDelete={handleDeleteImage}
-              />
-            </>
+            <ImageGrid 
+              images={filteredImages} 
+              onImageClick={handleImageClick} 
+              onImageDelete={handleDeleteImage}
+            />
           )}
         </main>
 
@@ -147,6 +139,7 @@ const Index = () => {
           isOpen={modalOpen}
           onClose={closeModal}
           image={selectedImage}
+          onImageUpdate={handleImageUpdate}
         />
 
         <SettingsPanel
