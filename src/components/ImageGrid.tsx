@@ -290,10 +290,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                         onMouseEnter={() => setHoveredImageId(image.id)}
                         onMouseLeave={() => setHoveredImageId(null)}
                         animate={{ 
-                          opacity: isSelected ? 0 : 1
+                          opacity: modalOpen && (clickedImageId === image.id) ? 0 : 1
                         }}
                         transition={{ 
-                          opacity: { duration: isSelected ? 0.1 : 0.3 }
+                          opacity: { duration: 0.1 }
                         }}
                       >
                         {renderItem(image)}

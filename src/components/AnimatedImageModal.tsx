@@ -73,10 +73,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
       zIndex: 50
     },
     open: {
-      top: window.innerHeight / 2 - Math.min(selectedImage.height || 600, window.innerHeight * 0.8) / 2,
-      left: window.innerWidth / 2 - Math.min(selectedImage.width || 800, window.innerWidth * 0.85) / 2,
-      width: Math.min(selectedImage.width || 800, window.innerWidth * 0.85),
-      height: Math.min(selectedImage.height || 600, window.innerHeight * 0.8),
+      top: window.innerHeight / 2 - Math.min(selectedImage.height || 600, window.innerHeight * 0.9) / 2,
+      left: window.innerWidth / 2 - Math.min(selectedImage.width || 800, window.innerWidth * 0.95) / 2,
+      width: Math.min(selectedImage.width || 800, window.innerWidth * 0.95),
+      height: Math.min(selectedImage.height || 600, window.innerHeight * 0.9),
       transition: {
         type: "spring",
         damping: 30,
