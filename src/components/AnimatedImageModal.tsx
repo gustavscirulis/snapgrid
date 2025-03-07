@@ -34,7 +34,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         height: rect.height,
       });
     } else if (!isOpen) {
-      // Reset position with delay
+      // Don't reset position immediately to maintain the animation target
       setTimeout(() => setInitialPosition(null), 300);
     }
   }, [isOpen, selectedImageRef]);

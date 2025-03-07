@@ -68,7 +68,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
   const closeModal = () => {
     setModalOpen(false);
-    // Don't reset clickedImageId immediately to maintain the hidden state during animation
     setTimeout(() => {
       setSelectedImage(null);
       setClickedImageId(null);
@@ -281,6 +280,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               >
                 {column.map((image) => {
                   const ref = imageRefs.current.get(image.id) || React.createRef<HTMLDivElement>();
+                  const isSelected = modalOpen && selectedImage?.id === image.id;
                   return (
                     <div key={image.id} className="masonry-item">
                       <motion.div 
@@ -289,12 +289,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                         onClick={() => image.type !== "url" && handleImageClick(image, ref)}
                         onMouseEnter={() => setHoveredImageId(image.id)}
                         onMouseLeave={() => setHoveredImageId(null)}
-                        animate={{
-                          opacity: (clickedImageId === image.id || (selectedImage?.id === image.id && modalOpen)) ? 0 : 1
+                        animate={{ 
+                          opacity: isSelected ? 0 : 1
                         }}
-                        // Use the same duration for both modal animation and thumbnail fade in/out
                         transition={{ 
-                          opacity: { duration: 0.1 }
+                          opacity: { duration: isSelected ? 0.1 : 0.3 }
                         }}
                       >
                         {renderItem(image)}
