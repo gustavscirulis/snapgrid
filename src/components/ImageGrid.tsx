@@ -5,7 +5,7 @@ import { ExternalLink, Scan, Trash2, AlertCircle, Link, Globe } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import AnimatedImageModal from "./AnimatedImageModal";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -19,6 +19,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImageRef, setSelectedImageRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
+  const [currentPatternElements, setCurrentPatternElements] = useState<React.ReactNode | null>(null);
   
   // Create a map to store refs for each image
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
@@ -63,6 +64,16 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       return;
     }
     
+    // Capture the current pattern elements if they're being shown for this image
+    if (hoveredImageId === image.id) {
+      const patternEl = document.getElementById(`pattern-tags-${image.id}`);
+      if (patternEl) {
+        setCurrentPatternElements(patternEl.cloneNode(true).innerHTML);
+      }
+    } else {
+      setCurrentPatternElements(null);
+    }
+    
     setSelectedImage(image);
     setSelectedImageRef(ref);
     setModalOpen(true);
@@ -71,7 +82,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
   const closeModal = () => {
     setModalOpen(false);
-    setTimeout(() => setSelectedImage(null), 300);
+    setTimeout(() => {
+      setSelectedImage(null);
+      setCurrentPatternElements(null);
+    }, 300);
   };
 
   const renderPatternTags = (item: ImageItem) => {
@@ -203,11 +217,19 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
             className="w-full h-auto object-cover rounded-t-lg"
             loading="lazy"
           />
-          {hoveredImageId === item.id && (
-            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-              {renderPatternTags(item)}
-            </div>
-          )}
+          <AnimatePresence>
+            {hoveredImageId === item.id && (
+              <motion.div 
+                id={`pattern-tags-${item.id}`}
+                className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+              >
+                {renderPatternTags(item)}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       );
     }
@@ -283,14 +305,18 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                   const ref = imageRefs.current.get(image.id) || React.createRef<HTMLDivElement>();
                   return (
                     <div key={image.id} className="masonry-item">
-                      <div 
+                      <motion.div 
                         ref={ref}
-                        className={`rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full ${
-                          selectedImage?.id === image.id && modalOpen ? 'opacity-0' : 'opacity-100'
-                        }`}
+                        className={`rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full`}
                         onClick={() => image.type !== "url" && handleImageClick(image, ref)}
                         onMouseEnter={() => setHoveredImageId(image.id)}
                         onMouseLeave={() => setHoveredImageId(null)}
+                        animate={{
+                          opacity: selectedImage?.id === image.id && modalOpen ? 0 : 1
+                        }}
+                        transition={{ 
+                          opacity: { duration: 0.2 }
+                        }}
                       >
                         {renderItem(image)}
                         
@@ -307,7 +333,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
-                      </div>
+                      </motion.div>
                     </div>
                   );
                 })}
@@ -320,6 +346,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
             onClose={closeModal}
             selectedImage={selectedImage}
             selectedImageRef={selectedImageRef}
+            patternElements={currentPatternElements}
           />
         </>
       )}

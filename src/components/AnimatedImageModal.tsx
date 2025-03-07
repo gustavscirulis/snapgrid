@@ -9,6 +9,7 @@ interface AnimatedImageModalProps {
   onClose: () => void;
   selectedImage: ImageItem | null;
   selectedImageRef: React.RefObject<HTMLDivElement> | null;
+  patternElements: React.ReactNode | null;
 }
 
 const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
@@ -16,6 +17,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   onClose,
   selectedImage,
   selectedImageRef,
+  patternElements,
 }) => {
   const [initialPosition, setInitialPosition] = useState<{
     top: number;
@@ -174,17 +176,16 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 exit={{ opacity: 0.8 }}
               />
 
-              {selectedImage.patterns && (
-                <motion.div 
-                  className="absolute bottom-0 left-0 right-0 mt-4 px-4 py-2 bg-background/80 backdrop-blur-sm"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  exit={{ opacity: 0, y: 10 }}
-                >
-                  {renderPatternTags(selectedImage.patterns, selectedImage.isAnalyzing, selectedImage.error)}
-                </motion.div>
-              )}
+              {/* Pattern tags - we'll animate them the same way as in the thumbnail */}
+              <motion.div 
+                className="absolute bottom-0 left-0 right-0 px-4 py-2 bg-background/80 backdrop-blur-sm"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                exit={{ opacity: 0, y: 10 }}
+              >
+                {patternElements || renderPatternTags(selectedImage.patterns, selectedImage.isAnalyzing, selectedImage.error)}
+              </motion.div>
             </div>
           </motion.div>
         </>
