@@ -56,16 +56,16 @@ export function useImageStore() {
           
           // Process loaded items to ensure video files have proper URL and type
           const processedItems = loadedItems.map(item => {
-            // If it's a video file and has an actualFilePath
+            // If it's a video file
             if (item.type === "video" && item.actualFilePath) {
-              // For videos, we need to create a proper file URL
+              // For videos, create file URL with the correct extension
               const fileUrl = `file://${item.actualFilePath}`;
-              console.log("Processing video item:", { id: item.id, path: item.actualFilePath, url: fileUrl });
+              console.log("Processing video item:", { id: item.id, path: item.actualFilePath, url: fileUrl, fileExtension: item.fileExtension });
               
               return {
                 ...item,
-                url: fileUrl, // Use file:// protocol for local files
-                createdAt: new Date(item.createdAt) // Ensure date is a Date object
+                url: fileUrl,
+                createdAt: new Date(item.createdAt)
               };
             }
             
@@ -133,7 +133,7 @@ export function useImageStore() {
           try {
             console.log(`Saving ${isVideo ? 'video' : 'image'} to filesystem:`, newMediaItem.id);
             
-            // Make sure to save with the correct extension for videos
+            // Make sure we explicitly specify the file extension for videos
             const saveResult = await window.electron.saveImage({
               id: newMediaItem.id,
               dataUrl: newMediaItem.url,
@@ -146,16 +146,33 @@ export function useImageStore() {
                 isAnalyzing: newMediaItem.isAnalyzing,
                 fileExtension: fileExtension
               },
+              isVideo: isVideo,  // Explicitly tell Electron this is a video
               extension: isVideo ? fileExtension : null // Pass extension explicitly for videos
             });
             
             if (saveResult.success && saveResult.path) {
               console.log(`${isVideo ? 'Video' : 'Image'} saved successfully at:`, saveResult.path);
               
-              // For videos, update the URL to use the file:// protocol
+              // For videos, check if the path has the correct extension
+              if (isVideo) {
+                const correctExtension = `.${fileExtension}`;
+                if (!saveResult.path.endsWith(correctExtension)) {
+                  console.error(`Expected path to end with ${correctExtension}, but got ${saveResult.path}`);
+                  
+                  // Try to fix this by using the correct file path with extension
+                  const correctPath = saveResult.path.replace(/\.[^.]+$/, correctExtension);
+                  console.log("Attempting to use correct path:", correctPath);
+                  
+                  // Update the file path and URL
+                  saveResult.path = correctPath;
+                }
+              }
+              
+              // For videos, update the URL to use the file:// protocol with the correct path
               let updatedUrl = newMediaItem.url;
               if (isVideo) {
                 updatedUrl = `file://${saveResult.path}`;
+                console.log("Updated video URL:", updatedUrl);
               }
               
               const updatedItem = {

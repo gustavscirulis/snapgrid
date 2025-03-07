@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { MediaItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle, Video } from "lucide-react";
@@ -36,7 +35,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     return () => window.removeEventListener('resize', updateColumns);
   }, []);
 
-  // Reset video errors when images change
   useEffect(() => {
     setVideoErrors({});
   }, [images]);
@@ -136,13 +134,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               muted
               controls={hoveredImageId === item.id}
               onError={() => handleVideoError(item.id)}
-              key={item.url} // Add key to force re-render when URL changes
+              key={item.id}
             >
               <source 
                 src={item.url} 
                 type={`video/${item.fileExtension || 'mp4'}`} 
               />
-              Your browser does not support the video tag.
             </video>
           )}
           {hoveredImageId === item.id && (

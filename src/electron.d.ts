@@ -2,18 +2,31 @@
 declare global {
   interface Window {
     electron: {
-      loadImages: () => Promise<any[]>;
-      saveImage: (params: {
+      saveImage: (data: {
         id: string;
         dataUrl: string;
-        metadata: any;
+        metadata: Record<string, any>;
         extension?: string | null;
-      }) => Promise<{ success: boolean; path?: string; error?: string }>;
-      saveUrlCard: (params: {
+        isVideo?: boolean;  // Add isVideo flag
+      }) => Promise<{
+        success: boolean;
+        path?: string;
+        error?: string;
+      }>;
+      saveUrlCard: (data: {
         id: string;
-        metadata: any;
-      }) => Promise<{ success: boolean; path?: string; error?: string }>;
-      deleteImage: (id: string) => Promise<{ success: boolean; error?: string }>;
+        metadata: Record<string, any>;
+      }) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      loadImages: () => Promise<any[]>;
+      deleteImage: (id: string) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      setApiKey: (key: string) => Promise<void>;
+      getApiKey: () => Promise<string | null>;
     };
   }
 }
