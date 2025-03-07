@@ -90,9 +90,9 @@ const Index = () => {
     >
       <div className="min-h-screen">
         <Toaster />
-        <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border py-4 px-6 relative">
+        <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border py-4 px-6 relative draggable">
           <WindowControls />
-          <div className="max-w-screen-xl mx-auto flex justify-between items-center">
+          <div className="max-w-screen-xl mx-auto flex justify-between items-center non-draggable">
             <div className="w-8"></div> {/* Empty div for centering */}
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -1,4 +1,3 @@
-
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -14,6 +13,7 @@ const isDev = process.env.NODE_ENV === 'development' || !/[\\/]app\.asar[\\/]/.t
 
 // Global storage path that will be exposed to the renderer
 let appStorageDir;
+let mainWindow;
 
 // Determine app storage directory in iCloud or local folder
 const getAppStorageDir = () => {
@@ -49,8 +49,6 @@ const getAppStorageDir = () => {
   return storageDir;
 };
 
-let mainWindow;
-
 function createWindow() {
   appStorageDir = getAppStorageDir();
   console.log('App storage directory:', appStorageDir);
@@ -58,6 +56,9 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    frame: false, // Hides the default title bar
+    titleBarStyle: "hidden", // Hides default macOS traffic light buttons
+    titleBarOverlay: false, // Ensure no default overlay
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -96,6 +97,25 @@ app.on('activate', () => {
   if (mainWindow === null) {
     createWindow();
   }
+});
+
+// Handle window control events
+ipcMain.on('window-minimize', () => {
+  if (mainWindow) mainWindow.minimize();
+});
+
+ipcMain.on('window-maximize', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on('window-close', () => {
+  if (mainWindow) mainWindow.close();
 });
 
 // IPC handlers for file system operations

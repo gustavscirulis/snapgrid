@@ -6,6 +6,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld(
   'electron',
   {
+    // Window control methods
+    minimize: () => ipcRenderer.send('window-minimize'),
+    maximize: () => ipcRenderer.send('window-maximize'),
+    close: () => ipcRenderer.send('window-close'),
+    
     // File storage operations
     loadImages: () => ipcRenderer.invoke('load-images'),
     saveImage: (data) => ipcRenderer.invoke('save-image', data),

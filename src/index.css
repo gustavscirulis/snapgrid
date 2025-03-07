@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -77,6 +76,15 @@
     font-feature-settings: "ss01", "ss03", "cv01", "cv02", "cv03";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Electron window draggable regions */
+  .draggable {
+    -webkit-app-region: drag;
+  }
+
+  .non-draggable {
+    -webkit-app-region: no-drag;
   }
 
   ::-webkit-scrollbar {

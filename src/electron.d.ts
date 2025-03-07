@@ -1,8 +1,17 @@
+
 interface IElectronAPI {
   // Window control methods
-  closeWindow?: () => void;
-  minimizeWindow?: () => void;
-  maximizeWindow?: () => void;
+  minimize?: () => void;
+  maximize?: () => void;
+  close?: () => void;
+  
+  // File storage operations
+  loadImages?: () => Promise<any[]>;
+  saveImage?: (data: { id: string; dataUrl: string; metadata: any }) => Promise<{ success: boolean; path?: string; error?: string }>;
+  deleteImage?: (id: string) => Promise<{ success: boolean; error?: string }>;
+  saveUrlCard?: (data: { id: string; metadata: any }) => Promise<{ success: boolean; error?: string }>;
+  getAppStorageDir?: () => Promise<string>;
+  openStorageDir?: () => Promise<{ success: boolean; error?: string }>;
 }
 
 declare global {
