@@ -12,7 +12,7 @@ import SettingsPanel from "@/components/SettingsPanel";
 import WindowControls from "@/components/WindowControls";
 
 const Index = () => {
-  const { images, isUploading, isLoading, addImage, addUrlCard, removeImage } = useImageStore();
+  const { images, isUploading, isLoading, addImage, removeImage } = useImageStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [isElectron, setIsElectron] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -46,13 +46,6 @@ const Index = () => {
     const query = searchQuery.toLowerCase();
     if (query === "") return true;
     
-    if (image.type === "url") {
-      return (
-        (image.url?.toLowerCase().includes(query)) ||
-        (image.title?.toLowerCase().includes(query))
-      );
-    }
-    
     if (image.patterns && image.patterns.length > 0) {
       return image.patterns.some(pattern => pattern.name.toLowerCase().includes(query));
     }
@@ -61,8 +54,6 @@ const Index = () => {
   });
 
   const handleImageClick = (image: ImageItem) => {
-    // This function is just a placeholder now since the actual handling
-    // is done inside the ImageGrid component with the new modal approach
     console.log("Image clicked:", image.id);
   };
 
@@ -73,7 +64,6 @@ const Index = () => {
   return (
     <UploadZone 
       onImageUpload={addImage} 
-      onUrlAdd={addUrlCard} 
       isUploading={isUploading}
     >
       <div className="min-h-screen">
@@ -85,7 +75,7 @@ const Index = () => {
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by pattern or URL..."
+                placeholder="Search..."
                 className="pl-9"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -110,17 +100,6 @@ const Index = () => {
             </div>
           ) : (
             <>
-              {images.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                  <input
-                    type="file"
-                    id="file-upload"
-                    className="hidden"
-                    accept="image/*"
-                    multiple
-                  />
-                </div>
-              )}
               <ImageGrid 
                 images={filteredImages} 
                 onImageClick={handleImageClick} 
@@ -135,7 +114,7 @@ const Index = () => {
           onOpenChange={setSettingsOpen}
         />
 
-        <footer className="py-6 text-center text-sm text-muted-foreground">
+        <footer className="py-4 text-center text-sm text-muted-foreground">
           {!isElectron && (
             <p>
               Running in browser mode. Local storage features are not available.

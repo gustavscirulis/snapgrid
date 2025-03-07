@@ -75,11 +75,11 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
       zIndex: 50
     },
     open: {
-      // Increase image size by reducing the margin from window edges
       top: window.innerHeight / 2 - Math.min(selectedImage.height || 600, window.innerHeight * 0.95) / 2,
       left: window.innerWidth / 2 - Math.min(selectedImage.width || 800, window.innerWidth * 0.98) / 2,
       width: Math.min(selectedImage.width || 800, window.innerWidth * 0.98),
       height: Math.min(selectedImage.height || 600, window.innerHeight * 0.95),
+      borderRadius: "1rem",
       transition: {
         type: "spring",
         damping: 30,
