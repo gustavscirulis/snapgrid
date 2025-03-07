@@ -14,7 +14,6 @@ import SettingsPanel from "@/components/SettingsPanel";
 const Index = () => {
   const { images, isUploading, isLoading, addImage, addUrlCard, removeImage } = useImageStore();
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
-  const [sourceElement, setSourceElement] = useState<HTMLElement | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isElectron, setIsElectron] = useState(false);
@@ -64,24 +63,18 @@ const Index = () => {
     return false;
   });
 
-  const handleImageClick = (image: ImageItem, element: HTMLElement) => {
+  const handleImageClick = (image: ImageItem) => {
     if (image.type === "url" && image.sourceUrl) {
       window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
     } else {
       setSelectedImage(image);
-      setSourceElement(element);
       setModalOpen(true);
     }
   };
 
   const closeModal = () => {
     setModalOpen(false);
-    // We don't immediately clear the selected image and source element
-    // to allow for exit animations to complete
-    setTimeout(() => {
-      setSelectedImage(null);
-      setSourceElement(null);
-    }, 300);
+    setTimeout(() => setSelectedImage(null), 300);
   };
 
   const handleDeleteImage = (id: string) => {
@@ -154,7 +147,6 @@ const Index = () => {
           isOpen={modalOpen}
           onClose={closeModal}
           image={selectedImage}
-          sourceElement={sourceElement}
         />
 
         <SettingsPanel
