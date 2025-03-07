@@ -119,40 +119,48 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
           {/* Image container */}
           <motion.div
-            className="fixed z-50 flex items-center justify-center"
+            className="fixed z-50 overflow-hidden"
             initial={{
+              position: "fixed",
               top: initialPosition.top,
               left: initialPosition.left,
               width: initialPosition.width,
               height: initialPosition.height,
-              scale: 1,
+              borderRadius: "0.5rem",
             }}
             animate={{
-              top: "50%",
-              left: "50%",
-              width: "auto",
-              height: "auto",
-              scale: 1,
-              y: "-50%",
-              x: "-50%",
+              top: window.innerHeight / 2 - Math.min(selectedImage.height || 600, window.innerHeight * 0.8) / 2,
+              left: window.innerWidth / 2 - Math.min(selectedImage.width || 800, window.innerWidth * 0.85) / 2,
+              width: Math.min(selectedImage.width || 800, window.innerWidth * 0.85),
+              height: Math.min(selectedImage.height || 600, window.innerHeight * 0.8),
+              transition: {
+                type: "spring",
+                damping: 30,
+                stiffness: 300
+              }
             }}
             exit={{
               top: initialPosition.top,
               left: initialPosition.left,
               width: initialPosition.width,
               height: initialPosition.height,
-              scale: 1,
-              y: 0,
-              x: 0,
+              borderRadius: "0.5rem",
+              transition: {
+                type: "spring",
+                damping: 30,
+                stiffness: 300
+              }
             }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
           >
-            <div className="relative max-h-[85vh] max-w-[85vw] bg-background/5 backdrop-blur-lg p-4 rounded-lg overflow-hidden shadow-2xl">
+            <div className="relative w-full h-full bg-background/5 backdrop-blur-lg p-4 rounded-lg overflow-hidden shadow-2xl">
               <motion.button
                 className="absolute top-2 right-2 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 z-10"
                 onClick={onClose}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: { delay: 0.2 } }}
+                exit={{ opacity: 0 }}
               >
                 <X className="h-5 w-5" />
               </motion.button>
@@ -160,22 +168,19 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               <motion.img
                 src={selectedImage.url}
                 alt="Selected image"
-                className="max-h-[80vh] max-w-full object-contain rounded-md shadow-md"
-                initial={{ opacity: 0.5 }}
+                className="w-full h-full object-contain rounded-md"
+                initial={{ opacity: 0.8 }}
                 animate={{ opacity: 1 }}
-                exit={{ opacity: 0.5 }}
-                style={{ 
-                  maxWidth: Math.min(selectedImage.width, window.innerWidth * 0.85),
-                  maxHeight: Math.min(selectedImage.height, window.innerHeight * 0.8)
-                }}
+                exit={{ opacity: 0.8 }}
               />
 
               {selectedImage.patterns && (
                 <motion.div 
-                  className="mt-4 px-2"
+                  className="absolute bottom-0 left-0 right-0 mt-4 px-4 py-2 bg-background/80 backdrop-blur-sm"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
+                  exit={{ opacity: 0, y: 10 }}
                 >
                   {renderPatternTags(selectedImage.patterns, selectedImage.isAnalyzing, selectedImage.error)}
                 </motion.div>
