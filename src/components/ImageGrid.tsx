@@ -47,6 +47,27 @@ const ImageGrid: React.FC<ImageGridProps> = ({
     );
   }
 
+  // Helper function to get correct display source for images
+  const getImageSrc = (image: ImageItem): string => {
+    const isElectron = window && typeof window.electron !== 'undefined';
+    
+    if (image.type === "url") {
+      return image.url;
+    }
+    
+    // For images with actual file paths in Electron
+    if (isElectron && image.actualFilePath) {
+      // In development mode with Electron, we need to strip the file:// prefix
+      // because the web security is disabled in dev mode
+      return window.location.protocol === 'http:' 
+        ? image.actualFilePath 
+        : `file://${image.actualFilePath}`;
+    }
+    
+    // Fallback to data URL
+    return image.url;
+  };
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
       {images.map((image) => {
@@ -91,11 +112,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({
           );
         } else {
           const isVideo = image.type === "video";
-          const displaySrc = isVideo ? (image.thumbnailUrl || "") : image.url;
-          const hasLocalFile = image.actualFilePath && image.actualFilePath.length > 0;
+          const displaySrc = isVideo 
+            ? (image.thumbnailUrl || "") 
+            : getImageSrc(image);
           
-          // If we have the actual file path, use it for videos
-          const videoSrc = isVideo && hasLocalFile ? image.actualFilePath : image.url;
+          // Video source is handled slightly differently
+          const videoSrc = isVideo ? getImageSrc(image) : "";
           
           return (
             <Card
@@ -124,6 +146,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                       onError={(e) => {
                         // Fallback for video thumbnails
                         e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+                        console.error("Failed to load video thumbnail:", displaySrc);
                       }}
                     />
                     <div className="absolute top-2 right-2 bg-background/50 backdrop-blur-sm p-1 rounded-md">

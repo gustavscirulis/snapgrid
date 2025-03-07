@@ -59,19 +59,38 @@ const ImageModal: React.FC<ImageModalProps> = ({
     setPatterns(patterns.filter((_, i) => i !== index));
   };
 
+  // Helper function to get correct source URL for files
+  const getFileSrc = (filePath: string): string => {
+    const isElectron = window && typeof window.electron !== 'undefined';
+    
+    if (isElectron) {
+      // In development mode with Electron, we need to strip the file:// prefix
+      // because the web security is disabled in dev mode
+      return window.location.protocol === 'http:' 
+        ? filePath 
+        : `file://${filePath}`;
+    }
+    
+    return filePath;
+  };
+
   // If no image, return null 
   if (!image) return null;
 
   const isVideo = image.type === "video";
   const hasLocalFile = image.actualFilePath && image.actualFilePath.length > 0;
   
+  const mediaSrc = hasLocalFile 
+    ? getFileSrc(image.actualFilePath) 
+    : image.url;
+  
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
         <DialogTitle className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">
+          <span className="text-xl font-semibold">
             {image.title || (isVideo ? "Video" : "Image")} Details
-          </h2>
+          </span>
           <Button
             variant="ghost"
             size="icon"
@@ -88,7 +107,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
             {isVideo ? (
               <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
                 <video
-                  src={hasLocalFile ? `file://${image.actualFilePath}` : image.url}
+                  src={mediaSrc}
                   controls
                   autoPlay={false}
                   className="w-full h-full object-contain"
@@ -97,7 +116,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
             ) : (
               <div className="relative bg-muted rounded-md overflow-hidden">
                 <img
-                  src={hasLocalFile ? `file://${image.actualFilePath}` : image.url}
+                  src={mediaSrc}
                   alt={image.title || "Image"}
                   className="w-full max-h-[500px] object-contain"
                 />

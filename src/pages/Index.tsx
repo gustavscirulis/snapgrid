@@ -15,7 +15,7 @@ const addCSPMetaTag = () => {
   if (typeof document !== 'undefined') {
     const meta = document.createElement('meta');
     meta.httpEquiv = 'Content-Security-Policy';
-    meta.content = "default-src 'self'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; script-src 'self'; style-src 'self' 'unsafe-inline';";
+    meta.content = "default-src 'self'; img-src 'self' data: blob: https: file:; media-src 'self' data: blob: https: file:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.openai.com;";
     document.head.appendChild(meta);
   }
 };
@@ -29,10 +29,8 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    // Add CSP meta tag on component mount
-    if (window && typeof window.electron !== 'undefined') {
-      addCSPMetaTag();
-    }
+    // Add CSP meta tag on component mount - with expanded permissions for file:// protocol
+    addCSPMetaTag();
     
     // Check if running in Electron - more reliable detection
     const isRunningInElectron = window && 
