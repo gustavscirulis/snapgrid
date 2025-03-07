@@ -49,7 +49,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
       } else {
         toast({
           title: "Invalid file",
-          description: "Please upload images or videos less than 50MB in size.",
+          description: "Please upload images less than 10MB in size.",
           variant: "destructive",
         });
       }
@@ -99,7 +99,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 pointer-events-none">
             <div className="bg-card p-8 rounded-lg shadow-lg flex flex-col items-center animate-float">
               <ImagePlus className="w-12 h-12 text-primary mb-4" />
-              <p className="text-xl font-medium">Drop images or videos to add</p>
+              <p className="text-xl font-medium">Drop images to add</p>
             </div>
           </div>
         )}
@@ -117,7 +117,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           type="file"
           id="file-upload"
           className="hidden"
-          accept="image/*,video/*"
+          accept="image/*"
           multiple
         />
       </div>

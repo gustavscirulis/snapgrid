@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { useImageStore, MediaItem } from "@/hooks/useImageStore";
+import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
 import ImageModal from "@/components/ImageModal";
@@ -13,7 +13,7 @@ import SettingsPanel from "@/components/SettingsPanel";
 
 const Index = () => {
   const { images, isUploading, isLoading, addImage, addUrlCard, removeImage } = useImageStore();
-  const [selectedImage, setSelectedImage] = useState<MediaItem | null>(null);
+  const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isElectron, setIsElectron] = useState(false);
@@ -63,7 +63,7 @@ const Index = () => {
     return false;
   });
 
-  const handleImageClick = (image: MediaItem) => {
+  const handleImageClick = (image: ImageItem) => {
     if (image.type === "url" && image.sourceUrl) {
       window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
     } else {
@@ -123,13 +123,13 @@ const Index = () => {
               {images.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                   <p className="text-center max-w-md mb-4">
-                    Drag and drop images or videos here or paste a URL to add to your collection
+                    Drag and drop images here or paste a URL to add to your collection
                   </p>
                   <input
                     type="file"
                     id="file-upload"
                     className="hidden"
-                    accept="image/*,video/*"
+                    accept="image/*"
                     multiple
                   />
                 </div>

@@ -1,20 +1,17 @@
-
-import React, { useState, useEffect, useRef } from "react";
-import { MediaItem } from "@/hooks/useImageStore";
-import { ExternalLink, Scan, Trash2, AlertCircle, Video } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ImageItem } from "@/hooks/useImageStore";
+import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageGridProps {
-  images: MediaItem[];
-  onImageClick: (image: MediaItem) => void;
+  images: ImageItem[];
+  onImageClick: (image: ImageItem) => void;
   onImageDelete?: (id: string) => void;
 }
 
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [columns, setColumns] = useState(3);
-  const [videoErrors, setVideoErrors] = useState<Record<string, boolean>>({});
-  const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
 
   useEffect(() => {
     const updateColumns = () => {
@@ -37,49 +34,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     return () => window.removeEventListener('resize', updateColumns);
   }, []);
 
-  useEffect(() => {
-    setVideoErrors({});
-  }, [images]);
-
-  const handleVideoError = (id: string) => {
-    console.error("Failed to load video:", id);
-    const item = images.find(img => img.id === id);
-    if (item) {
-      console.log("Video details:", {
-        id: item.id,
-        type: item.type,
-        url: item.url,
-        actualFilePath: item.actualFilePath,
-        fileExtension: item.fileExtension
-      });
-    }
-    setVideoErrors(prev => ({...prev, [id]: true}));
-  };
-
-  const setVideoRef = (id: string, element: HTMLVideoElement | null) => {
-    videoRefs.current[id] = element;
-  };
-
-  // Function to get the correct video URL
-  const getVideoStreamUrl = (item: MediaItem): string => {
-    // If we're running in Electron and have access to the stream endpoint
-    if (typeof window.electron !== 'undefined' && item.id) {
-      if (item.url.startsWith('app://video/')) {
-        // For electron, try to use the stream endpoint
-        try {
-          if (typeof window.electron.getVideoStreamUrl === 'function') {
-            return window.electron.getVideoStreamUrl(item.id);
-          }
-        } catch (error) {
-          console.warn('Failed to get video stream URL:', error);
-        }
-      }
-    }
-    // Fallback to the original URL
-    return item.url;
-  };
-
-  const renderPatternTags = (item: MediaItem) => {
+  const renderPatternTags = (item: ImageItem) => {
     if (!item.patterns || item.patterns.length === 0) {
       if (item.isAnalyzing) {
         return (
@@ -115,7 +70,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     );
   };
 
-  const renderItem = (item: MediaItem) => {
+  const renderItem = (item: ImageItem) => {
     if (item.type === "url") {
       return (
         <div className="url-card h-full flex flex-col">
@@ -142,42 +97,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
         </div>
       );
-    } else if (item.type === "video") {
-      return (
-        <div className="relative">
-          {videoErrors[item.id] ? (
-            <div className="w-full aspect-video bg-muted flex flex-col items-center justify-center rounded-t-lg">
-              <Video className="w-8 h-8 text-muted-foreground mb-2" />
-              <span className="text-xs text-muted-foreground">Video preview unavailable</span>
-            </div>
-          ) : (
-            <video 
-              ref={(el) => setVideoRef(item.id, el)}
-              className="w-full rounded-t-lg object-cover"
-              poster=""
-              preload="metadata"
-              playsInline
-              muted
-              controls={hoveredImageId === item.id}
-              onError={() => handleVideoError(item.id)}
-              key={`${item.id}-${item.url}`}
-            >
-              <source 
-                src={getVideoStreamUrl(item)}
-                type={`video/${item.fileExtension || 'mp4'}`} 
-              />
-            </video>
-          )}
-          {hoveredImageId === item.id && (
-            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-              <div className="flex items-center gap-1 text-xs text-primary-foreground">
-                <Video className="w-3 h-3" />
-                <span>Video</span>
-              </div>
-            </div>
-          )}
-        </div>
-      );
     } else {
       return (
         <div className="relative">
@@ -198,7 +117,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   };
 
   const distributeImages = () => {
-    const columnArrays: MediaItem[][] = Array.from({ length: columns }, () => []);
+    const columnArrays: ImageItem[][] = Array.from({ length: columns }, () => []);
     
     images.forEach((image, index) => {
       const shortestColumnIndex = columnArrays
@@ -235,14 +154,14 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
           <h3 className="text-2xl font-medium mb-2">No items yet</h3>
           <p className="text-muted-foreground max-w-md">
-            Drag and drop images or videos anywhere, paste URLs, or use the upload buttons to add your first item.
+            Drag and drop images anywhere, paste URLs, or use the upload buttons to add your first item.
           </p>
           <div className="mt-6 flex gap-3">
             <label 
               htmlFor="file-upload"
               className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors cursor-pointer"
             >
-              Upload media
+              Upload image
             </label>
           </div>
         </div>

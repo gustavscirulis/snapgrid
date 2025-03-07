@@ -1,20 +1,17 @@
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { MediaItem, PatternTag } from "@/hooks/useImageStore";
-import { X, ExternalLink, Scan, AlertCircle, Play, Video } from "lucide-react";
+import { ImageItem, PatternTag } from "@/hooks/useImageStore";
+import { X, ExternalLink, Scan, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageModalProps {
   isOpen: boolean;
   onClose: () => void;
-  image: MediaItem | null;
+  image: ImageItem | null;
 }
 
 const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
-  const [videoError, setVideoError] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -26,50 +23,12 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Reset video error when image changes
-  useEffect(() => {
-    setVideoError(false);
-  }, [image]);
-
   if (!image) return null;
-
-  const handleVideoError = () => {
-    console.error("Failed to load video in modal:", image.id);
-    if (image) {
-      console.log("Video details in modal:", {
-        id: image.id,
-        type: image.type,
-        url: image.url,
-        actualFilePath: image.actualFilePath,
-        fileExtension: image.fileExtension
-      });
-    }
-    setVideoError(true);
-  };
 
   const openExternalUrl = () => {
     if (image.type === "url" && image.sourceUrl) {
       window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
     }
-  };
-
-  // Function to get the correct video URL
-  const getVideoStreamUrl = (item: MediaItem): string => {
-    // If we're running in Electron and have access to the stream endpoint
-    if (typeof window.electron !== 'undefined' && item.id) {
-      if (item.url.startsWith('app://video/')) {
-        // For electron, try to use the stream endpoint
-        try {
-          if (typeof window.electron.getVideoStreamUrl === 'function') {
-            return window.electron.getVideoStreamUrl(item.id);
-          }
-        } catch (error) {
-          console.warn('Failed to get video stream URL:', error);
-        }
-      }
-    }
-    // Fallback to the original URL
-    return item.url;
   };
 
   const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean, error?: string) => {
@@ -119,13 +78,11 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     );
   };
 
-  const videoKey = image.type === "video" ? `video-${image.id}-${Date.now()}` : undefined;
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-7xl w-[95vw] p-0 overflow-hidden bg-transparent border-none shadow-none max-h-[95vh]">
         <DialogTitle className="sr-only">
-          {image.type === "url" ? "URL Preview" : image.type === "video" ? "Video Preview" : "Image Preview"}
+          {image.type === "url" ? "URL Preview" : "Image Preview"}
         </DialogTitle>
         
         <div className="relative h-full w-full flex items-center justify-center">
@@ -163,40 +120,6 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                   Open URL
                 </Button>
               </div>
-            ) : image.type === "video" ? (
-              <>
-                <div className="relative">
-                  {videoError ? (
-                    <div className="w-full min-w-[480px] min-h-[320px] bg-muted flex flex-col items-center justify-center rounded-md">
-                      <Video className="w-12 h-12 text-muted-foreground mb-3" />
-                      <p className="text-muted-foreground">Video playback failed</p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {image.actualFilePath || image.url}
-                      </p>
-                    </div>
-                  ) : (
-                    <video
-                      ref={videoRef}
-                      className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
-                      style={{ 
-                        maxWidth: Math.min(image.width, window.innerWidth * 0.9),
-                        maxHeight: Math.min(image.height, window.innerHeight * 0.85)
-                      }}
-                      controls
-                      autoPlay
-                      playsInline
-                      onError={handleVideoError}
-                      key={videoKey}
-                    >
-                      <source 
-                        src={getVideoStreamUrl(image)} 
-                        type={`video/${image.fileExtension || 'mp4'}`} 
-                      />
-                      Your browser does not support the video tag.
-                    </video>
-                  )}
-                </div>
-              </>
             ) : (
               <>
                 <img
