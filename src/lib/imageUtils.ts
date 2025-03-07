@@ -125,7 +125,7 @@ export function generateVideoThumbnail(file: File): Promise<string> {
 }
 
 // New helper function to get the appropriate media source URL
-export function getMediaSourceUrl(item: { url: string; actualFilePath?: string; type: string }): string {
+export function getMediaSourceUrl(item: { url: string; actualFilePath?: string; type: string; fileExtension?: string }): string {
   const isElectron = Boolean(window?.electron);
   
   if (isElectron && item.actualFilePath) {

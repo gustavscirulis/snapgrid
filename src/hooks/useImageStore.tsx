@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -81,6 +82,10 @@ export function useImageStore() {
     setIsUploading(true);
     
     const fileType = file.type.startsWith('image/') ? 'image' : 'video';
+    // Store original file extension directly from the file
+    const fileExtension = getFileExtensionFromMimeType(file.type);
+    console.log("File type:", file.type, "Extension:", fileExtension);
+    
     const reader = new FileReader();
     
     reader.onload = async (e) => {
@@ -103,6 +108,8 @@ export function useImageStore() {
               height: img.height,
               createdAt: new Date(),
               isAnalyzing: hasApiKey(),
+              // Store file extension with the image item
+              fileExtension: fileExtension
             };
             
             handleNewItem(newImage, file);
@@ -124,6 +131,8 @@ export function useImageStore() {
               height: height,
               createdAt: new Date(),
               duration: video.duration,
+              // Store file extension with the video item
+              fileExtension: fileExtension
             };
             
             handleNewItem(newVideo, file);
@@ -156,13 +165,18 @@ export function useImageStore() {
       try {
         console.log(`Saving ${newItem.type} to filesystem:`, newItem.id);
         
-        let fileExtension: string;
-        if (originalFile) {
+        // Use the stored file extension from the item rather than trying to detect it
+        let fileExtension = newItem.fileExtension;
+        
+        // Fallback only if extension is missing
+        if (!fileExtension && originalFile) {
           fileExtension = getFileExtensionFromMimeType(originalFile.type);
-        } else {
+        } else if (!fileExtension) {
           const mimeType = getMimeTypeFromDataUrl(newItem.url);
           fileExtension = getFileExtensionFromMimeType(mimeType);
         }
+        
+        console.log(`Using file extension: ${fileExtension} for ${newItem.type}`);
         
         const result = await window.electron.saveImage({
           id: newItem.id,
@@ -176,7 +190,8 @@ export function useImageStore() {
             createdAt: newItem.createdAt,
             isAnalyzing: newItem.isAnalyzing,
             thumbnailUrl: newItem.thumbnailUrl,
-            duration: newItem.duration
+            duration: newItem.duration,
+            fileExtension: fileExtension
           }
         });
         
@@ -221,13 +236,11 @@ export function useImageStore() {
           
           if (isElectron) {
             try {
-              const mimeType = getMimeTypeFromDataUrl(imageWithPatterns.url);
-              const fileExtension = getFileExtensionFromMimeType(mimeType);
-              
+              // Use the stored file extension instead of trying to detect it again
               window.electron.saveImage({
                 id: imageWithPatterns.id,
                 dataUrl: imageWithPatterns.url,
-                fileExtension: fileExtension,
+                fileExtension: imageWithPatterns.fileExtension,
                 metadata: {
                   ...imageWithPatterns,
                   url: undefined
@@ -251,13 +264,11 @@ export function useImageStore() {
           
           if (isElectron) {
             try {
-              const mimeType = getMimeTypeFromDataUrl(newItem.url);
-              const fileExtension = getFileExtensionFromMimeType(mimeType);
-              
+              // Use the stored file extension
               window.electron.saveImage({
                 id: newItem.id,
                 dataUrl: newItem.url,
-                fileExtension: fileExtension,
+                fileExtension: newItem.fileExtension,
                 metadata: {
                   ...newItem,
                   isAnalyzing: false,
