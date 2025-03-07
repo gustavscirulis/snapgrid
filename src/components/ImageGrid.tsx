@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { MediaItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle, Video } from "lucide-react";
@@ -35,8 +36,23 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     return () => window.removeEventListener('resize', updateColumns);
   }, []);
 
+  // Reset video errors when images change
+  useEffect(() => {
+    setVideoErrors({});
+  }, [images]);
+
   const handleVideoError = (id: string) => {
     console.error("Failed to load video:", id);
+    const item = images.find(img => img.id === id);
+    if (item) {
+      console.log("Video details:", {
+        id: item.id,
+        type: item.type,
+        url: item.url,
+        actualFilePath: item.actualFilePath,
+        fileExtension: item.fileExtension
+      });
+    }
     setVideoErrors(prev => ({...prev, [id]: true}));
   };
 
@@ -120,8 +136,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               muted
               controls={hoveredImageId === item.id}
               onError={() => handleVideoError(item.id)}
+              key={item.url} // Add key to force re-render when URL changes
             >
-              <source src={item.url} type={`video/${item.fileExtension || 'mp4'}`} />
+              <source 
+                src={item.url} 
+                type={`video/${item.fileExtension || 'mp4'}`} 
+              />
               Your browser does not support the video tag.
             </video>
           )}

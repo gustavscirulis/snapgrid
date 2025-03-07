@@ -1,8 +1,8 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { MediaItem, PatternTag } from "@/hooks/useImageStore";
-import { X, ExternalLink, Scan, AlertCircle, Play } from "lucide-react";
+import { X, ExternalLink, Scan, AlertCircle, Play, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageModalProps {
@@ -12,6 +12,8 @@ interface ImageModalProps {
 }
 
 const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
+  const [videoError, setVideoError] = useState(false);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -23,7 +25,26 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Reset video error when image changes
+  useEffect(() => {
+    setVideoError(false);
+  }, [image]);
+
   if (!image) return null;
+
+  const handleVideoError = () => {
+    console.error("Failed to load video in modal:", image.id);
+    if (image) {
+      console.log("Video details in modal:", {
+        id: image.id,
+        type: image.type,
+        url: image.url,
+        actualFilePath: image.actualFilePath,
+        fileExtension: image.fileExtension
+      });
+    }
+    setVideoError(true);
+  };
 
   const openExternalUrl = () => {
     if (image.type === "url" && image.sourceUrl) {
@@ -123,19 +144,34 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
             ) : image.type === "video" ? (
               <>
                 <div className="relative">
-                  <video
-                    className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
-                    style={{ 
-                      maxWidth: Math.min(image.width, window.innerWidth * 0.9),
-                      maxHeight: Math.min(image.height, window.innerHeight * 0.85)
-                    }}
-                    controls
-                    autoPlay
-                    playsInline
-                  >
-                    <source src={image.url} type={`video/${image.fileExtension || 'mp4'}`} />
-                    Your browser does not support the video tag.
-                  </video>
+                  {videoError ? (
+                    <div className="w-full min-w-[480px] min-h-[320px] bg-muted flex flex-col items-center justify-center rounded-md">
+                      <Video className="w-12 h-12 text-muted-foreground mb-3" />
+                      <p className="text-muted-foreground">Video playback failed</p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {image.actualFilePath || image.url}
+                      </p>
+                    </div>
+                  ) : (
+                    <video
+                      className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
+                      style={{ 
+                        maxWidth: Math.min(image.width, window.innerWidth * 0.9),
+                        maxHeight: Math.min(image.height, window.innerHeight * 0.85)
+                      }}
+                      controls
+                      autoPlay
+                      playsInline
+                      onError={handleVideoError}
+                      key={image.url} // Add key to force re-render when URL changes
+                    >
+                      <source 
+                        src={image.url} 
+                        type={`video/${image.fileExtension || 'mp4'}`} 
+                      />
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
                 </div>
               </>
             ) : (
