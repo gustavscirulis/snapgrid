@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
@@ -13,7 +12,7 @@ interface ImageGridProps {
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [columns, setColumns] = useState(3);
-  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const itemRefs = useRef<Map<string, HTMLImageElement | HTMLDivElement>>(new Map());
 
   useEffect(() => {
     const updateColumns = () => {
@@ -101,11 +100,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       );
     } else {
       return (
-        <div className="relative">
+        <div className="relative w-full h-full">
           <img
+            ref={(el) => el && itemRefs.current.set(item.id, el)}
             src={item.url}
             alt="UI Screenshot"
-            className="w-full h-auto object-cover rounded-t-lg"
+            className="w-full h-auto object-cover rounded-t-lg cursor-pointer transition-transform hover:scale-[1.02] duration-200"
             loading="lazy"
           />
           {hoveredImageId === item.id && (
@@ -135,15 +135,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const handleImageClick = (image: ImageItem) => {
     const element = itemRefs.current.get(image.id);
     if (element) {
-      onImageClick(image, element);
-    }
-  };
-
-  const setItemRef = (id: string, el: HTMLDivElement | null) => {
-    if (el) {
-      itemRefs.current.set(id, el);
-    } else {
-      itemRefs.current.delete(id);
+      onImageClick(image, element as HTMLElement);
     }
   };
 
@@ -193,7 +185,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               {column.map((image) => (
                 <div key={image.id} className="masonry-item">
                   <div 
-                    ref={(el) => setItemRef(image.id, el)}
                     className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full cursor-pointer"
                     onClick={() => handleImageClick(image)}
                     onMouseEnter={() => setHoveredImageId(image.id)}

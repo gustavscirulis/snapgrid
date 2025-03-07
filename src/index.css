@@ -116,6 +116,7 @@
     margin-bottom: 1rem;
     width: 100%;
     break-inside: avoid;
+    transform: translateZ(0); /* Force GPU acceleration */
   }
 
   .url-card {
@@ -153,10 +154,32 @@
   }
 
   .animate-scale-in {
-    animation: scale-in 0.3s ease-out forwards;
+    animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    will-change: transform, opacity;
   }
 
   .animate-scale-out {
-    animation: scale-out 0.3s ease-in forwards;
+    animation: scale-out 0.2s ease-in forwards;
+    will-change: transform, opacity;
+  }
+  
+  /* Thumbnail hover effect */
+  .thumbnail-hover {
+    transition: transform 0.2s ease-out;
+    transform-origin: center;
+  }
+  
+  .thumbnail-hover:hover {
+    transform: scale(1.05);
+  }
+  
+  /* Better dialog animations */
+  .animate-dialog-in {
+    animation: fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  
+  .animate-dialog-out {
+    animation: fade-out 0.2s ease-in forwards;
   }
 }
+

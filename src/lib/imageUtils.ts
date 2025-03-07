@@ -35,7 +35,7 @@ export function calculateGridRowSpan(height: number, width: number, gridRowHeigh
   return Math.ceil(imageHeight / gridRowHeight) + 1; // +1 for some padding
 }
 
-// Simplified position tracking for animations
+// Get position and dimensions of an element
 export function getElementPosition(element: HTMLElement | null): {
   left: number;
   top: number;
@@ -48,9 +48,35 @@ export function getElementPosition(element: HTMLElement | null): {
   
   const rect = element.getBoundingClientRect();
   return {
-    left: rect.left,
-    top: rect.top,
+    left: rect.left + window.scrollX,
+    top: rect.top + window.scrollY,
     width: rect.width,
     height: rect.height,
+  };
+}
+
+// Calculate the transform values for thumbnail-to-fullscreen animation
+export function calculateAnimationStyles(
+  sourceElement: HTMLElement | null,
+  targetElement: HTMLElement | null
+): { transform: string; opacity: number } {
+  if (!sourceElement || !targetElement) {
+    return { transform: 'none', opacity: 1 };
+  }
+
+  const sourceRect = sourceElement.getBoundingClientRect();
+  const targetRect = targetElement.getBoundingClientRect();
+  
+  // Calculate scale
+  const scaleX = sourceRect.width / targetRect.width;
+  const scaleY = sourceRect.height / targetRect.height;
+  
+  // Calculate translation
+  const translateX = (sourceRect.left - targetRect.left) + (sourceRect.width - targetRect.width * scaleX) / 2;
+  const translateY = (sourceRect.top - targetRect.top) + (sourceRect.height - targetRect.height * scaleY) / 2;
+  
+  return {
+    transform: `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`,
+    opacity: 1
   };
 }

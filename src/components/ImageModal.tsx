@@ -1,10 +1,10 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
 import { X, ExternalLink, Scan, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getElementPosition } from "@/lib/imageUtils";
+import { calculateAnimationStyles } from "@/lib/imageUtils";
 
 interface ImageModalProps {
   isOpen: boolean;
@@ -14,18 +14,26 @@ interface ImageModalProps {
 }
 
 const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image, sourceElement }) => {
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [animating, setAnimating] = useState(false);
+  const [showContent, setShowContent] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
   
+  // Reset animation states when modal opens or closes
   useEffect(() => {
     if (isOpen) {
-      setIsAnimating(true);
+      setAnimating(true);
+      setShowContent(false);
+      
+      // After a short delay, start showing content
       const timer = setTimeout(() => {
-        setIsAnimating(false);
+        setAnimating(false);
+        setShowContent(true);
       }, 300);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
-
+  
+  // Handle keyboard events
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -39,10 +47,29 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image, sourceE
 
   if (!image) return null;
 
+  // For URL cards, just open the external URL
   const openExternalUrl = () => {
     if (image.type === "url" && image.sourceUrl) {
       window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
     }
+  };
+
+  // Get animation styles based on source and target elements
+  const getAnimationStyle = () => {
+    if (animating && sourceElement && imageRef.current) {
+      const styles = calculateAnimationStyles(sourceElement, imageRef.current);
+      return {
+        transform: styles.transform,
+        opacity: styles.opacity,
+        transition: 'none'
+      };
+    }
+    
+    return {
+      transform: 'none',
+      opacity: 1,
+      transition: 'transform 300ms ease-out, opacity 300ms ease-out'
+    };
   };
 
   const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean, error?: string) => {
@@ -102,15 +129,19 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image, sourceE
         <div className="relative h-full w-full flex items-center justify-center">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 backdrop-blur-sm transition-all z-10"
+            className={`absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 backdrop-blur-sm transition-all z-10 ${showContent ? 'opacity-100' : 'opacity-0'}`}
             aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
           
           <div 
-            className={`bg-white/5 backdrop-blur-lg p-4 rounded-lg overflow-hidden shadow-2xl max-h-[95vh] max-w-full
-              ${isAnimating ? 'animate-scale-in' : ''}`}
+            className="bg-white/5 backdrop-blur-lg p-4 rounded-lg overflow-hidden shadow-2xl max-h-[95vh] max-w-full"
+            style={{
+              opacity: showContent ? 1 : 0,
+              transition: 'opacity 300ms ease-out',
+              transitionDelay: '200ms'
+            }}
           >
             {image.type === "url" ? (
               <div className="bg-card p-8 rounded-md shadow-md max-w-lg">
@@ -139,17 +170,28 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image, sourceE
               </div>
             ) : (
               <>
-                <img
-                  src={image.url}
-                  alt="Enlarged screenshot"
-                  className="max-h-[85vh] max-w-full object-contain rounded-md shadow-md"
-                  style={{ 
-                    maxWidth: Math.min(image.width || 1200, window.innerWidth * 0.9),
-                    maxHeight: Math.min(image.height || 900, window.innerHeight * 0.85)
-                  }}
-                />
+                <div className="relative">
+                  <img
+                    ref={imageRef}
+                    src={image.url}
+                    alt="Enlarged screenshot"
+                    className="max-h-[85vh] max-w-full object-contain rounded-md shadow-md"
+                    style={{ 
+                      maxWidth: Math.min(image.width || 1200, window.innerWidth * 0.9),
+                      maxHeight: Math.min(image.height || 900, window.innerHeight * 0.85),
+                      ...getAnimationStyle()
+                    }}
+                  />
+                </div>
                 
-                <div className="mt-4 px-2">
+                <div 
+                  className="mt-4 px-2"
+                  style={{
+                    opacity: showContent ? 1 : 0,
+                    transition: 'opacity 300ms ease',
+                    transitionDelay: '200ms'
+                  }}
+                >
                   {renderPatternTags(image.patterns, image.isAnalyzing, image.error)}
                 </div>
               </>
