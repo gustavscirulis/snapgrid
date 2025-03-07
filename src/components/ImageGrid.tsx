@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle, Link, Globe } from "lucide-react";
@@ -19,6 +18,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImageRef, setSelectedImageRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
+  const [clickedImageId, setClickedImageId] = useState<string | null>(null);
 
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
 
@@ -62,6 +62,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     setSelectedImage(image);
     setSelectedImageRef(ref);
     setModalOpen(true);
+    setClickedImageId(image.id);
     onImageClick(image);
   };
 
@@ -69,10 +70,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     setModalOpen(false);
     setTimeout(() => {
       setSelectedImage(null);
+      setClickedImageId(null);
     }, 300);
   };
 
-  // Add back the renderPatternTags function
   const renderPatternTags = (item: ImageItem) => {
     if (!item.patterns || item.patterns.length === 0) {
       if (item.isAnalyzing) {
@@ -288,10 +289,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                         onMouseEnter={() => setHoveredImageId(image.id)}
                         onMouseLeave={() => setHoveredImageId(null)}
                         animate={{
-                          opacity: selectedImage?.id === image.id && modalOpen ? 0 : 1
+                          opacity: (clickedImageId === image.id || (selectedImage?.id === image.id && modalOpen)) ? 0 : 1
                         }}
                         transition={{ 
-                          opacity: { duration: 0.2 }
+                          opacity: { duration: 0.1 }
                         }}
                       >
                         {renderItem(image)}
