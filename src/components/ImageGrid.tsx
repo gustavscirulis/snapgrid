@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { ExternalLink, Scan, Trash2, AlertCircle, Play, Pause, Video } from "lucide-react";
+import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageGridProps {
@@ -12,9 +12,6 @@ interface ImageGridProps {
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [columns, setColumns] = useState(3);
-  const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
-  const videoCurrentTimes = useRef<{ [key: string]: number }>({});
-  const [videoLoadErrors, setVideoLoadErrors] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     const updateColumns = () => {
@@ -36,32 +33,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     window.addEventListener('resize', updateColumns);
     return () => window.removeEventListener('resize', updateColumns);
   }, []);
-
-  useEffect(() => {
-    if (hoveredImageId) {
-      const videoElement = videoRefs.current[hoveredImageId];
-      if (videoElement && !videoLoadErrors[hoveredImageId]) {
-        videoElement.play().then(() => {
-          // Playing successfully
-        }).catch(error => {
-          console.error("Error playing video:", error);
-          setVideoLoadErrors(prev => ({...prev, [hoveredImageId]: true}));
-        });
-      }
-    } else {
-      Object.values(videoRefs.current).forEach(video => {
-        if (video) {
-          const id = Object.keys(videoRefs.current).find(
-            key => videoRefs.current[key] === video
-          );
-          if (id) {
-            videoCurrentTimes.current[id] = video.currentTime;
-          }
-          video.pause();
-        }
-      });
-    }
-  }, [hoveredImageId, videoLoadErrors]);
 
   const renderPatternTags = (item: ImageItem) => {
     if (!item.patterns || item.patterns.length === 0) {
@@ -99,30 +70,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     );
   };
 
-  const formatDuration = (seconds?: number): string => {
-    if (!seconds) return "";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-
-  const handleImageClick = (image: ImageItem) => {
-    if (image.type === "video") {
-      const updatedImage = {
-        ...image,
-        currentTime: videoCurrentTimes.current[image.id] || 0
-      };
-      onImageClick(updatedImage);
-    } else {
-      onImageClick(image);
-    }
-  };
-
-  const handleVideoError = (id: string) => {
-    console.error(`Failed to load video: ${id}`);
-    setVideoLoadErrors(prev => ({...prev, [id]: true}));
-  };
-
   const renderItem = (item: ImageItem) => {
     if (item.type === "url") {
       return (
@@ -148,59 +95,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               <span>Open URL</span>
             </div>
           </div>
-        </div>
-      );
-    } else if (item.type === "video") {
-      return (
-        <div className="relative">
-          {videoLoadErrors[item.id] ? (
-            <div className="w-full h-32 bg-muted flex items-center justify-center">
-              <div className="flex flex-col items-center text-muted-foreground">
-                <Video className="w-12 h-12 mb-2 opacity-40" />
-                <span className="text-xs">Video format not supported</span>
-              </div>
-            </div>
-          ) : (
-            <video
-              ref={el => videoRefs.current[item.id] = el}
-              src={item.url}
-              className="w-full h-auto object-cover rounded-t-lg"
-              playsInline
-              muted
-              loop
-              poster={item.thumbnailUrl}
-              onError={() => handleVideoError(item.id)}
-              onTimeUpdate={() => {
-                if (videoRefs.current[item.id]) {
-                  videoCurrentTimes.current[item.id] = videoRefs.current[item.id]!.currentTime;
-                }
-              }}
-            />
-          )}
-          
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-60 group-hover:opacity-0 transition-opacity">
-            <Video className="w-12 h-12 text-white" />
-          </div>
-          
-          {!hoveredImageId && (
-            <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-md">
-              {formatDuration(item.duration)}
-            </div>
-          )}
-          
-          {hoveredImageId === item.id && !videoLoadErrors[item.id] && (
-            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-              <div className="flex items-center justify-between">
-                <div className="text-white text-xs">
-                  {formatDuration(item.duration)}
-                </div>
-                <div className="flex items-center text-white text-xs">
-                  <Play className="w-3 h-3 mr-1" />
-                  <span>Playing</span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       );
     } else {
@@ -260,14 +154,14 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           </div>
           <h3 className="text-2xl font-medium mb-2">No items yet</h3>
           <p className="text-muted-foreground max-w-md">
-            Drag and drop images or videos anywhere, paste URLs, or use the upload buttons to add your first item.
+            Drag and drop images anywhere, paste URLs, or use the upload buttons to add your first item.
           </p>
           <div className="mt-6 flex gap-3">
             <label 
               htmlFor="file-upload"
               className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors cursor-pointer"
             >
-              Upload media
+              Upload image
             </label>
           </div>
         </div>
@@ -283,7 +177,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 <div key={image.id} className="masonry-item">
                   <div 
                     className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full"
-                    onClick={() => handleImageClick(image)}
+                    onClick={() => onImageClick(image)}
                     onMouseEnter={() => setHoveredImageId(image.id)}
                     onMouseLeave={() => setHoveredImageId(null)}
                   >
