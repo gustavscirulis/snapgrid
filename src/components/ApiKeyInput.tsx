@@ -14,7 +14,11 @@ import { Key } from "lucide-react";
 import { setOpenAIApiKey, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
 
-export function ApiKeyInput() {
+interface ApiKeyInputProps {
+  inSettingsPanel?: boolean;
+}
+
+export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,11 +29,11 @@ export function ApiKeyInput() {
     const savedApiKey = localStorage.getItem("openai-api-key");
     if (savedApiKey) {
       setOpenAIApiKey(savedApiKey);
-    } else {
-      // Only show dialog on first load if no API key exists
+    } else if (!inSettingsPanel) {
+      // Only show dialog on first load if no API key exists and not in settings panel
       setIsOpen(!hasApiKey());
     }
-  }, []);
+  }, [inSettingsPanel]);
 
   const handleSubmit = async () => {
     if (!apiKey.trim().startsWith("sk-")) {
@@ -66,6 +70,18 @@ export function ApiKeyInput() {
       setIsOpen(open);
     }
   };
+
+  if (inSettingsPanel) {
+    return (
+      <Button 
+        variant="outline" 
+        size="sm" 
+        onClick={() => setIsOpen(true)}
+      >
+        {hasApiKey() ? "Update API Key" : "Set API Key"}
+      </Button>
+    );
+  }
 
   return (
     <>
@@ -111,7 +127,7 @@ export function ApiKeyInput() {
                 Get an API key
               </a>
             </p>
-            <div className="text-sm bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-md">
+            <div className="text-sm bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 p-3 rounded-md">
               <strong>Note:</strong> Image analysis requires the gpt-4o model access. Make sure your API key has access to the latest GPT-4o model.
             </div>
           </div>

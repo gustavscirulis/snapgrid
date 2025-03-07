@@ -4,20 +4,20 @@ import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
 import ImageModal from "@/components/ImageModal";
-import { ImagePlus, Link, Search } from "lucide-react";
+import { Search, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ApiKeyInput } from "@/components/ApiKeyInput";
-import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
+import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Toaster, toast } from "sonner";
+import SettingsPanel from "@/components/SettingsPanel";
 
 const Index = () => {
   const { images, isUploading, isLoading, addImage, addUrlCard, removeImage } = useImageStore();
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [urlModalOpen, setUrlModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isElectron, setIsElectron] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     // Check if running in Electron - more reliable detection
@@ -91,37 +91,25 @@ const Index = () => {
         <Toaster />
         <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border py-4 px-6">
           <div className="max-w-screen-xl mx-auto flex justify-between items-center">
-            <h1 className="text-xl font-medium">
-              UI Reference
-            </h1>
-            <div className="flex gap-2">
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by pattern or URL..."
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <ApiKeyInput />
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1"
-                onClick={() => setUrlModalOpen(true)}
-              >
-                <Link className="h-4 w-4" />
-                <span>Add URL</span>
-              </Button>
-              <label
-                htmlFor="file-upload"
-                className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer text-sm"
-              >
-                <ImagePlus className="h-4 w-4" />
-                <span>Upload</span>
-              </label>
+            <div className="w-8"></div> {/* Empty div for centering */}
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by pattern or URL..."
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSettingsOpen(true)}
+              className="h-8 w-8"
+            >
+              <Settings className="h-5 w-5" />
+              <span className="sr-only">Settings</span>
+            </Button>
           </div>
         </header>
 
@@ -131,11 +119,27 @@ const Index = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           ) : (
-            <ImageGrid 
-              images={filteredImages} 
-              onImageClick={handleImageClick} 
-              onImageDelete={handleDeleteImage}
-            />
+            <>
+              {images.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                  <p className="text-center max-w-md mb-4">
+                    Drag and drop images here or paste a URL to add to your collection
+                  </p>
+                  <input
+                    type="file"
+                    id="file-upload"
+                    className="hidden"
+                    accept="image/*"
+                    multiple
+                  />
+                </div>
+              )}
+              <ImageGrid 
+                images={filteredImages} 
+                onImageClick={handleImageClick} 
+                onImageDelete={handleDeleteImage}
+              />
+            </>
           )}
         </main>
 
@@ -143,6 +147,11 @@ const Index = () => {
           isOpen={modalOpen}
           onClose={closeModal}
           image={selectedImage}
+        />
+
+        <SettingsPanel
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
         />
 
         <footer className="py-6 text-center text-sm text-muted-foreground">

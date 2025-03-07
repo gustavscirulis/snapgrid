@@ -132,16 +132,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                   }}
                 />
                 
-                <div className="mt-4 flex flex-col text-white/90 px-2">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm font-medium">
-                      {image.width} × {image.height}
-                    </p>
-                    <p className="text-sm">
-                      {new Date(image.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  
+                <div className="mt-4 px-2">
                   {renderPatternTags(image.patterns, image.isAnalyzing, image.error)}
                 </div>
               </>

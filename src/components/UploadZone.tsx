@@ -2,10 +2,8 @@
 import React, { useCallback, useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { validateImageFile } from "@/lib/imageUtils";
-import { ImagePlus, Link } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogHeader } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ImagePlus } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface UploadZoneProps {
   onImageUpload: (file: File) => void;
@@ -22,8 +20,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({
 }) => {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
-  const [urlModalOpen, setUrlModalOpen] = useState(false);
-  const [inputUrl, setInputUrl] = useState("");
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -60,63 +56,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     });
   }, [isUploading, onImageUpload, toast]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || isUploading) return;
-    
-    const files = Array.from(e.target.files);
-    
-    files.forEach((file) => {
-      if (validateImageFile(file)) {
-        onImageUpload(file);
-      } else {
-        toast({
-          title: "Invalid file",
-          description: "Please upload images less than 10MB in size.",
-          variant: "destructive",
-        });
-      }
-    });
-    
-    // Reset the input
-    e.target.value = "";
-  }, [isUploading, onImageUpload, toast]);
-
-  const handleUrlSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!inputUrl.trim()) {
-      toast({
-        title: "Invalid URL",
-        description: "Please enter a valid URL.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Simple URL validation
-    try {
-      const url = new URL(inputUrl);
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-        throw new Error("Invalid protocol");
-      }
-      
-      onUrlAdd(inputUrl);
-      setUrlModalOpen(false);
-      setInputUrl("");
-      
-      toast({
-        title: "URL added",
-        description: "The URL card has been added to your collection.",
-      });
-    } catch (error) {
-      toast({
-        title: "Invalid URL",
-        description: "Please enter a valid URL including http:// or https://.",
-        variant: "destructive",
-      });
-    }
-  }, [inputUrl, onUrlAdd, toast]);
-
   // Add paste event listener to capture pasted URLs
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -148,7 +87,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     <>
       <div
         className={`min-h-screen w-full transition-all duration-300 ${
-          isDragging ? "drag-active" : ""
+          isDragging ? "bg-primary/5 border-primary/30" : ""
         }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -180,40 +119,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           className="hidden"
           accept="image/*"
           multiple
-          onChange={handleChange}
         />
       </div>
-
-      <Dialog open={urlModalOpen} onOpenChange={setUrlModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add URL Card</DialogTitle>
-            <DialogDescription>
-              Enter a URL to add a website card to your collection.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <form onSubmit={handleUrlSubmit}>
-            <div className="py-4">
-              <Input
-                placeholder="https://example.com"
-                value={inputUrl}
-                onChange={(e) => setInputUrl(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setUrlModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isUploading}>
-                Add URL
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };
