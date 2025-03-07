@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
@@ -47,9 +48,21 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
 
   const getVideoSource = () => {
     if (isElectron && image.actualFilePath) {
-      console.log("Using actual file path for video:", image.actualFilePath);
+      // Get the actual path from the filesystem
+      let filePath = image.actualFilePath;
+      
+      // Check if the file path has the correct extension
+      const pathExtension = filePath.split('.').pop();
+      if (image.fileExtension && pathExtension !== image.fileExtension) {
+        console.warn(`Path extension (${pathExtension}) doesn't match file type (${image.fileExtension})`);
+        // Replace the extension with the correct one
+        filePath = filePath.replace(`.${pathExtension}`, `.${image.fileExtension}`);
+        console.log("Corrected video file path:", filePath);
+      }
+      
+      console.log("Using actual file path for video:", filePath);
       console.log("File extension:", image.fileExtension);
-      return `file://${image.actualFilePath}`;
+      return `file://${filePath}`;
     }
     console.log("Using data URL for video (browser mode or missing path)");
     return image.url;

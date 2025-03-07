@@ -30,8 +30,8 @@ export interface ImageItem {
   isAnalyzing?: boolean;
   error?: string;
   actualFilePath?: string;
-  duration?: number; // For videos only
-  fileExtension?: string; // Add the file extension property
+  duration?: number;
+  fileExtension?: string;
 }
 
 export function useImageStore() {
@@ -177,6 +177,7 @@ export function useImageStore() {
           id: newItem.id,
           dataUrl: newItem.url,
           fileExtension: fileExtension,
+          forceFilename: `${newItem.id}.${fileExtension}`,
           metadata: {
             id: newItem.id,
             type: newItem.type,
@@ -194,14 +195,30 @@ export function useImageStore() {
           console.log(`${newItem.type} saved successfully at:`, result.path);
           console.log(`File extension used: ${fileExtension}`);
           
-          const updatedItem = {
-            ...newItem,
-            actualFilePath: result.path
-          };
-          
-          setImages([updatedItem, ...images.filter(img => img.id !== newItem.id)]);
-          
-          toast.success(`${newItem.type.charAt(0).toUpperCase() + newItem.type.slice(1)} saved to: ${result.path}`);
+          const savedExtension = result.path.split('.').pop();
+          if (savedExtension !== fileExtension) {
+            console.warn(`Extension mismatch: expected ${fileExtension} but got ${savedExtension}`);
+            const correctPath = result.path.replace(`.${savedExtension}`, `.${fileExtension}`);
+            console.log(`Corrected path should be: ${correctPath}`);
+            
+            const updatedItem = {
+              ...newItem,
+              actualFilePath: correctPath
+            };
+            
+            setImages([updatedItem, ...images.filter(img => img.id !== newItem.id)]);
+            
+            toast.success(`${newItem.type.charAt(0).toUpperCase() + newItem.type.slice(1)} saved with correct extension.`);
+          } else {
+            const updatedItem = {
+              ...newItem,
+              actualFilePath: result.path
+            };
+            
+            setImages([updatedItem, ...images.filter(img => img.id !== newItem.id)]);
+            
+            toast.success(`${newItem.type.charAt(0).toUpperCase() + newItem.type.slice(1)} saved to disk.`);
+          }
         } else {
           console.error(`Failed to save ${newItem.type}:`, result.error);
           toast.error(`Failed to save ${newItem.type}: ${result.error || "Unknown error"}`);
