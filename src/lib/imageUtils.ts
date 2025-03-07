@@ -123,3 +123,16 @@ export function generateVideoThumbnail(file: File): Promise<string> {
     video.src = URL.createObjectURL(file);
   });
 }
+
+// New helper function to get the appropriate media source URL
+export function getMediaSourceUrl(item: { url: string; actualFilePath?: string; type: string }): string {
+  const isElectron = Boolean(window?.electron);
+  
+  if (isElectron && item.actualFilePath) {
+    // Use the actual file path in Electron mode
+    return `file://${item.actualFilePath}`;
+  }
+  
+  // Fall back to the data URL for browser mode or if file path is unavailable
+  return item.url;
+}

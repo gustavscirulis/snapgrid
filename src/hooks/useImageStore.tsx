@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
-import { getVideoDimensions, generateVideoThumbnail } from "@/lib/imageUtils";
+import { getVideoDimensions, generateVideoThumbnail, getMediaSourceUrl } from "@/lib/imageUtils";
 
 export type ImageItemType = "image" | "video" | "url";
 
@@ -51,6 +51,11 @@ export function useImageStore() {
           console.log("Loading images from filesystem...");
           const loadedImages = await window.electron.loadImages();
           console.log("Loaded images:", loadedImages.length);
+          
+          loadedImages.forEach(img => {
+            console.log(`Loaded media item ${img.id}, type: ${img.type}, path: ${img.actualFilePath}`);
+          });
+          
           setImages(loadedImages);
         } else {
           setImages([]);
@@ -161,8 +166,12 @@ export function useImageStore() {
         
         if (result.success && result.path) {
           console.log(`${newItem.type} saved successfully at:`, result.path);
-          newItem.actualFilePath = result.path;
-          setImages([newItem, ...images.filter(img => img.id !== newItem.id)]);
+          const updatedItem = {
+            ...newItem,
+            actualFilePath: result.path
+          };
+          
+          setImages([updatedItem, ...images.filter(img => img.id !== newItem.id)]);
           
           toast.success(`${newItem.type.charAt(0).toUpperCase() + newItem.type.slice(1)} saved to: ${result.path}`);
         } else {

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
@@ -12,6 +13,7 @@ interface ImageModalProps {
 
 const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const isElectron = Boolean(window?.electron);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -42,6 +44,17 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     if (image.type === "url" && image.sourceUrl) {
       window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
     }
+  };
+
+  // Get the appropriate video source URL based on environment and availability
+  const getVideoSource = () => {
+    if (isElectron && image.actualFilePath) {
+      // In Electron, use the actual file path from the filesystem when available
+      // Use the file:// protocol to access local files
+      return `file://${image.actualFilePath}`;
+    }
+    // Fall back to data URL in browser mode or if file path is not available
+    return image.url;
   };
 
   const renderPatternTags = (patterns?: PatternTag[], isAnalyzing?: boolean, error?: string) => {
@@ -125,7 +138,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
           <div className="relative">
             <video
               ref={videoRef}
-              src={image.url}
+              src={getVideoSource()}
               controls
               autoPlay
               className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
