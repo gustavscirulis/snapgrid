@@ -137,7 +137,15 @@ export function useImageStore() {
         } else {
           // For videos, get dimensions and generate thumbnail
           const { width, height } = await getVideoDimensions(file);
-          const thumbnailBlob = await generateVideoThumbnail(file);
+          
+          // Generate thumbnail and handle it properly
+          let thumbnailBlob = null;
+          try {
+            thumbnailBlob = await generateVideoThumbnail(file);
+          } catch (thumbnailError) {
+            console.error("Error generating thumbnail:", thumbnailError);
+            // Continue without a thumbnail
+          }
           
           // Get video duration
           const video = document.createElement('video');
@@ -150,12 +158,18 @@ export function useImageStore() {
           URL.revokeObjectURL(video.src);
           
           // Save the video and thumbnail to disk using Electron API
-          const result = await window.electron.saveImage({
+          const saveParams: any = {
             id,
             file,
             mimeType: file.type,
-            thumbnailBlob
-          });
+          };
+          
+          // Only add thumbnailBlob if it exists
+          if (thumbnailBlob) {
+            saveParams.thumbnailBlob = thumbnailBlob;
+          }
+          
+          const result = await window.electron.saveImage(saveParams);
           
           if (!result.success) {
             throw new Error(result.error || "Failed to save video");
@@ -369,7 +383,6 @@ export function useImageStore() {
   };
 }
 
-// Helper function to read a file as a data URL
 async function readFileAsDataURL(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
