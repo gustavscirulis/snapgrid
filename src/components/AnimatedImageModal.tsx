@@ -122,7 +122,11 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             animate="open"
             exit="exit"
             onClick={onClose}
-            onAnimationComplete={(definition) => onAnimationComplete && onAnimationComplete(definition)}
+            onAnimationComplete={(definition) => {
+              if (definition === "exit") {
+                onAnimationComplete && onAnimationComplete("exit");
+              }
+            }}
           >
             <motion.img
               src={selectedImage.url}
