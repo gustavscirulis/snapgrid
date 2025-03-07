@@ -136,3 +136,35 @@ export function getMediaSourceUrl(item: { url: string; actualFilePath?: string; 
   // Fall back to the data URL for browser mode or if file path is unavailable
   return item.url;
 }
+
+// Get file extension from mime type
+export function getFileExtensionFromMimeType(mimeType: string): string {
+  const mimeToExt: Record<string, string> = {
+    // Image types
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/svg+xml': 'svg',
+    'image/bmp': 'bmp',
+    'image/tiff': 'tiff',
+    
+    // Video types
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'video/ogg': 'ogv',
+    'video/quicktime': 'mov',
+    'video/x-msvideo': 'avi',
+    'video/x-matroska': 'mkv',
+    'video/mpeg': 'mpg'
+  };
+  
+  return mimeToExt[mimeType] || 'bin'; // Default to binary if unknown
+}
+
+// Extract mime type from a data URL
+export function getMimeTypeFromDataUrl(dataUrl: string): string {
+  const match = dataUrl.match(/^data:([^;]+);base64,/);
+  return match ? match[1] : 'application/octet-stream';
+}

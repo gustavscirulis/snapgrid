@@ -1,7 +1,13 @@
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
-import { getVideoDimensions, generateVideoThumbnail, getMediaSourceUrl } from "@/lib/imageUtils";
+import { 
+  getVideoDimensions, 
+  generateVideoThumbnail, 
+  getMediaSourceUrl, 
+  getFileExtensionFromMimeType,
+  getMimeTypeFromDataUrl
+} from "@/lib/imageUtils";
 
 export type ImageItemType = "image" | "video" | "url";
 
@@ -149,9 +155,19 @@ export function useImageStore() {
     if (isElectron) {
       try {
         console.log(`Saving ${newItem.type} to filesystem:`, newItem.id);
+        
+        let fileExtension: string;
+        if (originalFile) {
+          fileExtension = getFileExtensionFromMimeType(originalFile.type);
+        } else {
+          const mimeType = getMimeTypeFromDataUrl(newItem.url);
+          fileExtension = getFileExtensionFromMimeType(mimeType);
+        }
+        
         const result = await window.electron.saveImage({
           id: newItem.id,
           dataUrl: newItem.url,
+          fileExtension: fileExtension,
           metadata: {
             id: newItem.id,
             type: newItem.type,
