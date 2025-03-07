@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
@@ -12,20 +12,30 @@ import SettingsPanel from "@/components/SettingsPanel";
 import WindowControls from "@/components/WindowControls";
 
 const Index = () => {
-  const { 
-    images, 
-    isUploading, 
-    isLoading,
-    addImage, 
-    addVideo,
-    addUrlCard, 
-    removeImage 
-  } = useImageStore();
+  const { images, isUploading, isLoading, addImage, addUrlCard, removeImage } = useImageStore();
   const [searchQuery, setSearchQuery] = useState("");
+  const [isElectron, setIsElectron] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // Load saved API key on startup
-  React.useEffect(() => {
+  useEffect(() => {
+    const isRunningInElectron = window && 
+      typeof window.electron !== 'undefined' && 
+      window.electron !== null;
+      
+    console.log("Electron detection:", {
+      electronExists: typeof window.electron !== 'undefined',
+      electronValue: window.electron
+    });
+    
+    setIsElectron(isRunningInElectron);
+    
+    if (isRunningInElectron) {
+      console.log("Running in Electron mode");
+    } else {
+      console.log("Running in browser mode. Electron APIs not available.");
+      toast.warning("Running in browser mode. Local storage features are not available.");
+    }
+    
     const savedApiKey = localStorage.getItem("openai-api-key");
     if (savedApiKey) {
       setOpenAIApiKey(savedApiKey);
@@ -62,8 +72,7 @@ const Index = () => {
 
   return (
     <UploadZone 
-      onImageUpload={addImage}
-      onVideoUpload={addVideo}
+      onImageUpload={addImage} 
       onUrlAdd={addUrlCard} 
       isUploading={isUploading}
     >
@@ -107,16 +116,9 @@ const Index = () => {
                     type="file"
                     id="file-upload"
                     className="hidden"
-                    accept="image/*,video/*"
+                    accept="image/*"
                     multiple
                   />
-                  <p className="text-lg mb-4">No items yet</p>
-                  <label
-                    htmlFor="file-upload"
-                    className="bg-primary text-primary-foreground px-4 py-2 rounded cursor-pointer hover:bg-primary/90 transition-colors"
-                  >
-                    Upload media
-                  </label>
                 </div>
               )}
               <ImageGrid 
@@ -132,6 +134,14 @@ const Index = () => {
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
         />
+
+        <footer className="py-6 text-center text-sm text-muted-foreground">
+          {!isElectron && (
+            <p>
+              Running in browser mode. Local storage features are not available.
+            </p>
+          )}
+        </footer>
       </div>
     </UploadZone>
   );

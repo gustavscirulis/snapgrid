@@ -7,9 +7,7 @@ interface IElectronAPI {
   
   // File storage operations
   loadImages?: () => Promise<any[]>;
-  saveImage?: (data: { id: string; file: File; metadata: any }) => Promise<{ success: boolean; path?: string; error?: string }>;
-  saveVideo?: (data: { id: string; file: File; metadata: any }) => Promise<{ success: boolean; path?: string; error?: string }>;
-  updateMetadata?: (data: { id: string; metadata: any }) => Promise<{ success: boolean; error?: string }>;
+  saveImage?: (data: { id: string; dataUrl: string; metadata: any }) => Promise<{ success: boolean; path?: string; error?: string }>;
   deleteImage?: (id: string) => Promise<{ success: boolean; error?: string }>;
   saveUrlCard?: (data: { id: string; metadata: any }) => Promise<{ success: boolean; error?: string }>;
   getAppStorageDir?: () => Promise<string>;

@@ -54,37 +54,9 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
   }
 
   try {
-    // For file:// URLs, we need to handle them differently
-    let imageContent;
+    // For base64 images (data URLs)
+    const isBase64 = imageUrl.startsWith('data:');
     
-    if (imageUrl.startsWith('file://')) {
-      // For Electron environments, we can use the actual file path
-      // The imageUrl will be like file:///path/to/file.png
-      // We'll rely on Electron's main process to read the file
-      if (!window.electron) {
-        throw new Error("Cannot process local files without Electron API");
-      }
-      
-      // Strip the file:// prefix to get the actual file path
-      const filePath = imageUrl.replace('file://', '');
-      
-      // Use direct file path instead of base64 encoding
-      imageContent = {
-        type: "image_url",
-        image_url: {
-          url: imageUrl,
-        }
-      };
-    } else {
-      // For regular URLs, just use the URL directly
-      imageContent = {
-        type: "image_url",
-        image_url: {
-          url: imageUrl,
-        }
-      };
-    }
-
     // Prepare the API request to OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -106,7 +78,12 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
                 type: "text",
                 text: "Analyze this UI design image and identify the UI patterns present. Return only the top 5 patterns you can identify with a confidence score from 0 to 1. Format your response as a strict valid JSON array with 'pattern' and 'confidence' fields only, no markdown formatting, no code block symbols."
               },
-              imageContent
+              {
+                type: "image_url",
+                image_url: {
+                  url: isBase64 ? imageUrl : imageUrl,
+                }
+              }
             ]
           }
         ],

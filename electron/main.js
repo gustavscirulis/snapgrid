@@ -1,4 +1,3 @@
-
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -128,11 +127,15 @@ ipcMain.handle('open-storage-dir', () => {
   return shell.openPath(appStorageDir);
 });
 
-ipcMain.handle('save-image', async (event, { id, file, metadata }) => {
+ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
   try {
+    // Strip data URL prefix to get base64 data
+    const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    
     // Save image file
     const imagePath = path.join(appStorageDir, `${id}.png`);
-    await fs.writeFile(imagePath, file);
+    await fs.writeFile(imagePath, buffer);
     
     // Save metadata as separate JSON file
     const metadataPath = path.join(appStorageDir, `${id}.json`);
@@ -170,11 +173,15 @@ ipcMain.handle('load-images', async () => {
           // Load metadata
           const metadata = await fs.readJson(metadataPath);
           
+          // Read the image file and convert to base64 for display
+          const imageData = await fs.readFile(imagePath);
+          const base64Image = `data:image/png;base64,${imageData.toString('base64')}`;
+          
           return {
             ...metadata,
             id,
-            url: `file://${imagePath}`,
-            filePath: imagePath
+            url: base64Image,
+            actualFilePath: imagePath
           };
         } catch (err) {
           console.error(`Error loading image ${id}:`, err);
@@ -215,27 +222,6 @@ ipcMain.handle('save-url-card', async (event, { id, metadata }) => {
     return { success: true };
   } catch (error) {
     console.error('Error saving URL card:', error);
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('save-video', async (event, { id, file, metadata }) => {
-  try {
-    // Save video file
-    const videoPath = path.join(appStorageDir, `${id}.mp4`);
-    await fs.writeFile(videoPath, file);
-    
-    // Save metadata as separate JSON file
-    const metadataPath = path.join(appStorageDir, `${id}.json`);
-    await fs.writeJson(metadataPath, {
-      ...metadata,
-      filePath: videoPath // Include actual file path in metadata
-    });
-    
-    console.log(`Video saved to: ${videoPath}`);
-    return { success: true, path: videoPath };
-  } catch (error) {
-    console.error('Error saving video:', error);
     return { success: false, error: error.message };
   }
 });

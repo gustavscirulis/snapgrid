@@ -1,12 +1,12 @@
 
 import React, { useCallback, useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { validateImageFile, validateVideoFile } from "@/lib/imageUtils";
+import { validateImageFile } from "@/lib/imageUtils";
 import { ImagePlus } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface UploadZoneProps {
   onImageUpload: (file: File) => void;
-  onVideoUpload?: (file: File) => void;
   onUrlAdd: (url: string) => void;
   isUploading: boolean;
   children: React.ReactNode;
@@ -14,7 +14,6 @@ interface UploadZoneProps {
 
 const UploadZone: React.FC<UploadZoneProps> = ({
   onImageUpload,
-  onVideoUpload,
   onUrlAdd,
   isUploading,
   children,
@@ -47,17 +46,15 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     files.forEach((file) => {
       if (validateImageFile(file)) {
         onImageUpload(file);
-      } else if (validateVideoFile(file) && onVideoUpload) {
-        onVideoUpload(file);
       } else {
         toast({
           title: "Invalid file",
-          description: "Please upload supported media files (images up to 10MB, videos up to 100MB).",
+          description: "Please upload images less than 10MB in size.",
           variant: "destructive",
         });
       }
     });
-  }, [isUploading, onImageUpload, onVideoUpload, toast]);
+  }, [isUploading, onImageUpload, toast]);
 
   // Add paste event listener to capture pasted URLs
   useEffect(() => {
@@ -102,7 +99,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 pointer-events-none">
             <div className="bg-card p-8 rounded-lg shadow-lg flex flex-col items-center animate-float">
               <ImagePlus className="w-12 h-12 text-primary mb-4" />
-              <p className="text-xl font-medium">Drop media to add</p>
+              <p className="text-xl font-medium">Drop images to add</p>
             </div>
           </div>
         )}
@@ -120,7 +117,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           type="file"
           id="file-upload"
           className="hidden"
-          accept="image/*,video/*"
+          accept="image/*"
           multiple
         />
       </div>
