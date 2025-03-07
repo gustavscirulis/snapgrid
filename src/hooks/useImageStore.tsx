@@ -290,20 +290,3 @@ export function useImageStore() {
     removeImage,
   };
 }
-
-async function fetchUrlMetadata(url: string): Promise<{ title?: string; description?: string; imageUrl?: string; faviconUrl?: string }> {
-  try {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const domain = new URL(url).hostname;
-    const thumbnailUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-    
-    return {
-      title: domain,
-      thumbnailUrl
-    };
-  } catch (error) {
-    console.error("Error fetching URL metadata:", error);
-    return {};
-  }
-}

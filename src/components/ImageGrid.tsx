@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
@@ -41,8 +40,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     
     // Open URL in default browser
     if (window.electron) {
-      // In Electron, use shell.openExternal
-      window.electron.openExternal(url);
+      // In Electron, use shell.openExternal via the electron API
+      window.electron.openUrl(url);
     } else {
       // In browser, open in new tab
       window.open(url, '_blank', 'noopener,noreferrer');
