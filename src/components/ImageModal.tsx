@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageItem, PatternTag } from "@/hooks/useImageStore";
 import { X, ExternalLink, Scan, AlertCircle, RefreshCw } from "lucide-react";
@@ -20,6 +20,9 @@ const ImageModal: React.FC<ImageModalProps> = ({
   image,
   onImageUpdate
 }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const currentTimeRef = useRef<number>(0);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -30,6 +33,29 @@ const ImageModal: React.FC<ImageModalProps> = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
+
+  // Save current time when video is played in modal
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      currentTimeRef.current = videoRef.current.currentTime;
+    }
+  };
+
+  // Set current time when modal is opened
+  useEffect(() => {
+    if (isOpen && image?.type === "video" && videoRef.current) {
+      // Small timeout to ensure the video element is fully loaded
+      const timer = setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.currentTime = currentTimeRef.current;
+          videoRef.current.play().catch(error => {
+            console.error("Failed to play video in modal:", error);
+          });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, image]);
 
   if (!image) return null;
 
@@ -124,7 +150,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
         {patterns.map((pattern, index) => (
           <div 
             key={index} 
-            className="text-sm bg-primary/20 text-white px-3 py-1.5 rounded-md"
+            className="text-sm bg-primary/20 text-primary px-3 py-1.5 rounded-md"
           >
             {pattern.name}
           </div>
@@ -178,13 +204,16 @@ const ImageModal: React.FC<ImageModalProps> = ({
             ) : image.type === "video" ? (
               <div className="flex flex-col">
                 <video
+                  ref={videoRef}
                   src={image.url}
                   controls
+                  onTimeUpdate={handleTimeUpdate}
                   className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
                   style={{ 
                     maxWidth: Math.min(image.width, window.innerWidth * 0.9),
                     maxHeight: Math.min(image.height, window.innerHeight * 0.85)
                   }}
+                  autoPlay
                 >
                   Your browser does not support the video tag.
                 </video>

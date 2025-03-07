@@ -27,11 +27,17 @@ export interface ImageItem {
   duration?: number; // For videos
 }
 
+interface DeletedImage {
+  item: ImageItem;
+  timestamp: number;
+}
+
 export function useImageStore() {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isElectron, setIsElectron] = useState(false);
+  const [lastDeletedImage, setLastDeletedImage] = useState<DeletedImage | null>(null);
 
   useEffect(() => {
     const isRunningInElectron = window && 
@@ -64,6 +70,15 @@ export function useImageStore() {
     };
 
     loadImages();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        undoLastDeletedImage();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const updateImageItem = useCallback((updatedImage: ImageItem) => {
@@ -316,20 +331,76 @@ export function useImageStore() {
     }
   }, [images, isElectron]);
 
+  const undoLastDeletedImage = useCallback(async () => {
+    if (!lastDeletedImage) return;
+    
+    try {
+      const deletedItem = lastDeletedImage.item;
+      
+      setImages(prev => [deletedItem, ...prev]);
+      
+      if (isElectron && (deletedItem.type === "image" || deletedItem.type === "video")) {
+        try {
+          await window.electron.saveImage({
+            id: deletedItem.id,
+            dataUrl: deletedItem.url,
+            metadata: {
+              ...deletedItem,
+              url: undefined
+            }
+          });
+        } catch (error) {
+          console.error("Failed to restore image to filesystem:", error);
+          toast.error("Failed to restore image to disk");
+        }
+      } else if (isElectron && deletedItem.type === "url") {
+        try {
+          await window.electron.saveUrlCard({
+            id: deletedItem.id,
+            metadata: deletedItem
+          });
+        } catch (error) {
+          console.error("Failed to restore URL card:", error);
+          toast.error("Failed to restore URL card to disk");
+        }
+      }
+      
+      setLastDeletedImage(null);
+      
+      toast.success("Successfully restored item");
+    } catch (error) {
+      console.error("Failed to undo delete:", error);
+      toast.error("Failed to restore deleted item");
+    }
+  }, [lastDeletedImage, isElectron]);
+
   const removeImage = useCallback(async (id: string) => {
+    const imageToDelete = images.find(img => img.id === id);
+    if (!imageToDelete) return;
+    
+    setLastDeletedImage({
+      item: imageToDelete,
+      timestamp: Date.now()
+    });
+    
     if (isElectron) {
       try {
         await window.electron.deleteImage(id);
-        toast.success("Image deleted from disk");
       } catch (error) {
         console.error("Failed to delete image from filesystem:", error);
-        toast.error("Failed to delete image from disk");
       }
     }
     
     const updatedImages = images.filter(img => img.id !== id);
     setImages(updatedImages);
-  }, [images, isElectron]);
+    
+    toast.success("Item deleted", {
+      action: {
+        label: "Undo",
+        onClick: undoLastDeletedImage
+      }
+    });
+  }, [images, isElectron, undoLastDeletedImage]);
 
   return {
     images,
@@ -338,7 +409,8 @@ export function useImageStore() {
     addImage,
     addUrlCard,
     removeImage,
-    updateImageItem
+    updateImageItem,
+    undoLastDeletedImage
   };
 }
 

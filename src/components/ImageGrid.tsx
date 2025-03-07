@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ interface ImageGridProps {
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [columns, setColumns] = useState(3);
+  const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
   useEffect(() => {
     const updateColumns = () => {
@@ -34,6 +35,37 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     window.addEventListener('resize', updateColumns);
     return () => window.removeEventListener('resize', updateColumns);
   }, []);
+
+  const handleMouseEnter = (item: ImageItem) => {
+    setHoveredImageId(item.id);
+    if (item.type === "video") {
+      const videoElement = videoRefs.current.get(item.id);
+      if (videoElement) {
+        videoElement.muted = true;
+        videoElement.play().catch(error => {
+          console.error("Failed to play video:", error);
+        });
+      }
+    }
+  };
+
+  const handleMouseLeave = (item: ImageItem) => {
+    setHoveredImageId(null);
+    if (item.type === "video") {
+      const videoElement = videoRefs.current.get(item.id);
+      if (videoElement) {
+        videoElement.pause();
+      }
+    }
+  };
+
+  const setVideoRef = (id: string, element: HTMLVideoElement | null) => {
+    if (element) {
+      videoRefs.current.set(id, element);
+    } else {
+      videoRefs.current.delete(id);
+    }
+  };
 
   const renderPatternTags = (item: ImageItem) => {
     if (!item.patterns || item.patterns.length === 0) {
@@ -102,26 +134,23 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       return (
         <div className="relative">
           <div className="relative">
-            <img
-              src={item.thumbnailUrl || item.url}
-              alt="Video thumbnail"
+            <video
+              ref={(el) => setVideoRef(item.id, el)}
+              src={item.url}
+              poster={item.thumbnailUrl}
               className="w-full h-auto object-cover rounded-t-lg"
-              loading="lazy"
+              loop
+              muted
+              playsInline
             />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-black/50 rounded-full p-3">
-                <Play className="w-6 h-6 text-white" />
+            {!hoveredImageId || hoveredImageId !== item.id ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="bg-black/50 rounded-full p-3">
+                  <Play className="w-6 h-6 text-white" />
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
-          {hoveredImageId === item.id && (
-            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-              <div className="text-sm text-white">{item.title}</div>
-              {item.duration && (
-                <div className="text-xs text-white/80">{formatDuration(item.duration)}</div>
-              )}
-            </div>
-          )}
         </div>
       );
     } else {
@@ -201,10 +230,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               {column.map((image) => (
                 <div key={image.id} className="masonry-item">
                   <div 
-                    className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full"
+                    className="rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-all relative group w-full"
                     onClick={() => onImageClick(image)}
-                    onMouseEnter={() => setHoveredImageId(image.id)}
-                    onMouseLeave={() => setHoveredImageId(null)}
+                    onMouseEnter={() => handleMouseEnter(image)}
+                    onMouseLeave={() => handleMouseLeave(image)}
                   >
                     {renderItem(image)}
                     
