@@ -65,7 +65,6 @@ export function useImageStore() {
 
   const addImage = useCallback(async (file: File) => {
     if (!window.electron) {
-      toast.error("This app can only run in electron mode");
       return;
     }
     
@@ -74,24 +73,27 @@ export function useImageStore() {
     try {
       const dimensions = await getImageDimensions(file);
       
+      // Create a temporary ID for the new image
+      const newImageId = crypto.randomUUID();
+      
+      // Create a temporary item with loading state
       const newImage: ImageItem = {
-        id: crypto.randomUUID(),
+        id: newImageId,
         type: "image",
-        url: URL.createObjectURL(file), // Temporary URL for preview
+        url: "",  // Will be set after file is saved
         width: dimensions.width,
         height: dimensions.height,
         createdAt: new Date(),
         isAnalyzing: hasApiKey(),
       };
       
-      setImages(prevImages => [newImage, ...prevImages]);
-      
       try {
+        // Save the file first to get the real file path
         const result = await window.electron.saveImage({
-          id: newImage.id,
+          id: newImageId,
           file: file,
           metadata: {
-            id: newImage.id,
+            id: newImageId,
             type: newImage.type,
             width: newImage.width,
             height: newImage.height,
@@ -102,16 +104,16 @@ export function useImageStore() {
         
         if (result.success && result.path) {
           console.log("Image saved successfully at:", result.path);
-          // Update with file URL from electron
-          const updatedImage = {
+          
+          // Create the final image object with the file path
+          const finalImage = {
             ...newImage,
             url: `file://${result.path}`,
             filePath: result.path
           };
           
-          setImages(prevImages => 
-            [updatedImage, ...prevImages.filter(img => img.id !== newImage.id)]
-          );
+          // Add the image to the state
+          setImages(prevImages => [finalImage, ...prevImages]);
           
           // If API key is available, analyze the image
           if (hasApiKey()) {
@@ -119,14 +121,14 @@ export function useImageStore() {
               const patterns = await analyzeImage(`file://${result.path}`);
               
               const imageWithPatterns = {
-                ...updatedImage,
+                ...finalImage,
                 patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
                 isAnalyzing: false
               };
               
               setImages(prevImages => {
                 return prevImages.map(img => 
-                  img.id === newImage.id ? imageWithPatterns : img
+                  img.id === newImageId ? imageWithPatterns : img
                 );
               });
               
@@ -134,7 +136,7 @@ export function useImageStore() {
                 id: imageWithPatterns.id,
                 metadata: {
                   ...imageWithPatterns,
-                  url: undefined
+                  url: `file://${result.path}`
                 }
               });
             } catch (error) {
@@ -143,14 +145,14 @@ export function useImageStore() {
               const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
               setImages(prevImages => {
                 return prevImages.map(img => 
-                  img.id === newImage.id ? { ...img, isAnalyzing: false, error: errorMessage } : img
+                  img.id === newImageId ? { ...img, isAnalyzing: false, error: errorMessage } : img
                 );
               });
               
               await window.electron.updateMetadata({
-                id: newImage.id,
+                id: newImageId,
                 metadata: {
-                  ...updatedImage,
+                  ...finalImage,
                   isAnalyzing: false,
                   error: errorMessage,
                 }
@@ -177,7 +179,6 @@ export function useImageStore() {
 
   const addVideo = useCallback(async (file: File) => {
     if (!window.electron) {
-      toast.error("This app can only run in electron mode");
       return;
     }
     
@@ -186,24 +187,27 @@ export function useImageStore() {
     try {
       const videoInfo = await getVideoDimensions(file);
       
+      // Create a temporary ID for the new video
+      const newVideoId = crypto.randomUUID();
+      
+      // Create a temporary video object
       const newVideo: ImageItem = {
-        id: crypto.randomUUID(),
+        id: newVideoId,
         type: "video",
-        url: URL.createObjectURL(file), // Temporary URL for preview
+        url: "",  // Will be set after file is saved
         width: videoInfo.width,
         height: videoInfo.height,
         duration: videoInfo.duration,
         createdAt: new Date(),
       };
       
-      setImages(prevImages => [newVideo, ...prevImages]);
-      
       try {
+        // Save the file first to get the real file path
         const result = await window.electron.saveVideo({
-          id: newVideo.id,
+          id: newVideoId,
           file: file,
           metadata: {
-            id: newVideo.id,
+            id: newVideoId,
             type: newVideo.type,
             width: newVideo.width,
             height: newVideo.height,
@@ -214,16 +218,24 @@ export function useImageStore() {
         
         if (result.success && result.path) {
           console.log("Video saved successfully at:", result.path);
-          // Update with file URL from electron
-          const updatedVideo = {
+          
+          // Create the final video object with the file path
+          const finalVideo = {
             ...newVideo,
             url: `file://${result.path}`,
             filePath: result.path
           };
           
-          setImages(prevImages => 
-            [updatedVideo, ...prevImages.filter(img => img.id !== newVideo.id)]
-          );
+          // Add the video to the state
+          setImages(prevImages => [finalVideo, ...prevImages]);
+          
+          await window.electron.updateMetadata({
+            id: finalVideo.id,
+            metadata: {
+              ...finalVideo,
+              url: `file://${result.path}`
+            }
+          });
         } else {
           console.error("Failed to save video:", result.error);
           toast.error(`Failed to save video: ${result.error || "Unknown error"}`);
@@ -242,7 +254,6 @@ export function useImageStore() {
 
   const addUrlCard = useCallback(async (url: string) => {
     if (!window.electron) {
-      toast.error("This app can only run in electron mode");
       return;
     }
     
@@ -318,7 +329,6 @@ export function useImageStore() {
 
   const removeImage = useCallback(async (id: string) => {
     if (!window.electron) {
-      toast.error("This app can only run in electron mode");
       return;
     }
     

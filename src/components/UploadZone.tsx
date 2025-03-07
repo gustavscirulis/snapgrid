@@ -42,11 +42,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     setIsDragging(false);
 
     if (!isElectronAvailable) {
-      toast({
-        title: "Electron mode required",
-        description: "This app can only run in electron mode.",
-        variant: "destructive",
-      });
       return;
     }
 

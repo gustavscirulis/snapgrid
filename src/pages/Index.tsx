@@ -35,13 +35,6 @@ const Index = () => {
     }
   }, [isElectronAvailable]);
 
-  // Show a warning if not running in Electron
-  React.useEffect(() => {
-    if (!isElectronAvailable) {
-      toast.error("This app can only run in electron mode");
-    }
-  }, [isElectronAvailable]);
-
   const filteredImages = images.filter(image => {
     const query = searchQuery.toLowerCase();
     if (query === "") return true;
