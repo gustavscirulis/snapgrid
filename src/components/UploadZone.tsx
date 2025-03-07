@@ -10,7 +10,6 @@ interface UploadZoneProps {
   onUrlAdd: (url: string) => void;
   isUploading: boolean;
   children: React.ReactNode;
-  isElectronAvailable: boolean;
 }
 
 const UploadZone: React.FC<UploadZoneProps> = ({
@@ -19,7 +18,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({
   onUrlAdd,
   isUploading,
   children,
-  isElectronAvailable,
 }) => {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
@@ -41,10 +39,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     e.stopPropagation();
     setIsDragging(false);
 
-    if (!isElectronAvailable) {
-      return;
-    }
-
     if (isUploading) return;
 
     const files = Array.from(e.dataTransfer.files);
@@ -63,13 +57,11 @@ const UploadZone: React.FC<UploadZoneProps> = ({
         });
       }
     });
-  }, [isElectronAvailable, isUploading, onImageUpload, onVideoUpload, toast]);
+  }, [isUploading, onImageUpload, onVideoUpload, toast]);
 
   // Add paste event listener to capture pasted URLs
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
-      if (!isElectronAvailable) return;
-      
       const pastedText = e.clipboardData?.getData('text');
       if (pastedText) {
         try {
@@ -92,7 +84,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     return () => {
       document.removeEventListener('paste', handlePaste);
     };
-  }, [isElectronAvailable, onUrlAdd, toast]);
+  }, [onUrlAdd, toast]);
 
   return (
     <>
@@ -130,7 +122,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           className="hidden"
           accept="image/*,video/*"
           multiple
-          disabled={!isElectronAvailable}
         />
       </div>
     </>

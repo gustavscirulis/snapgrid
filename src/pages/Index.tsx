@@ -15,8 +15,7 @@ const Index = () => {
   const { 
     images, 
     isUploading, 
-    isLoading, 
-    isElectronAvailable,
+    isLoading,
     addImage, 
     addVideo,
     addUrlCard, 
@@ -27,13 +26,11 @@ const Index = () => {
 
   // Load saved API key on startup
   React.useEffect(() => {
-    if (isElectronAvailable) {
-      const savedApiKey = localStorage.getItem("openai-api-key");
-      if (savedApiKey) {
-        setOpenAIApiKey(savedApiKey);
-      }
+    const savedApiKey = localStorage.getItem("openai-api-key");
+    if (savedApiKey) {
+      setOpenAIApiKey(savedApiKey);
     }
-  }, [isElectronAvailable]);
+  }, []);
 
   const filteredImages = images.filter(image => {
     const query = searchQuery.toLowerCase();
@@ -63,37 +60,12 @@ const Index = () => {
     removeImage(id);
   };
 
-  if (!isElectronAvailable) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Toaster />
-        <div className="bg-card p-8 rounded-lg shadow-lg max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-destructive/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <span className="text-destructive text-2xl">⚠️</span>
-          </div>
-          <h1 className="text-2xl font-bold mb-4">Electron Mode Required</h1>
-          <p className="text-muted-foreground mb-6">
-            This application requires Electron to run properly as it needs access to the local file system.
-            Please download and install the desktop version.
-          </p>
-          <Button
-            className="w-full"
-            onClick={() => window.location.href = "https://github.com/your-org/your-app-repo/releases"}
-          >
-            Download Desktop Version
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <UploadZone 
       onImageUpload={addImage}
       onVideoUpload={addVideo}
       onUrlAdd={addUrlCard} 
       isUploading={isUploading}
-      isElectronAvailable={isElectronAvailable}
     >
       <div className="min-h-screen">
         <Toaster />

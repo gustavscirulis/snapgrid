@@ -54,9 +54,6 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
   }
 
   try {
-    // For base64 images (data URLs)
-    const isBase64 = imageUrl.startsWith('data:');
-    
     // Prepare the API request to OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -81,7 +78,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
               {
                 type: "image_url",
                 image_url: {
-                  url: isBase64 ? imageUrl : imageUrl,
+                  url: imageUrl,
                 }
               }
             ]

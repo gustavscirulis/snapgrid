@@ -34,18 +34,11 @@ export function useImageStore() {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isElectronAvailable, setIsElectronAvailable] = useState(false);
 
   useEffect(() => {
-    const isElectronAvailable = window && 
-      typeof window.electron !== 'undefined' && 
-      window.electron !== null;
-    
-    setIsElectronAvailable(isElectronAvailable);
-    
     const loadImages = async () => {
       try {
-        if (isElectronAvailable) {
+        if (window.electron) {
           console.log("Loading images from filesystem...");
           const loadedImages = await window.electron.loadImages();
           console.log("Loaded images:", loadedImages.length);
@@ -346,7 +339,6 @@ export function useImageStore() {
     images,
     isUploading,
     isLoading,
-    isElectronAvailable,
     addImage,
     addVideo,
     addUrlCard,
