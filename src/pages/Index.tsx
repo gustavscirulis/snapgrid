@@ -56,13 +56,6 @@ const Index = () => {
       );
     }
     
-    if (image.type === "video") {
-      // For videos, just search in the file name part of the URL
-      const urlParts = image.url.split('/');
-      const fileName = urlParts[urlParts.length - 1].toLowerCase();
-      return fileName.includes(query);
-    }
-    
     if (image.patterns && image.patterns.length > 0) {
       return image.patterns.some(pattern => pattern.name.toLowerCase().includes(query));
     }
@@ -102,7 +95,7 @@ const Index = () => {
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by pattern, URL, or file..."
+                placeholder="Search by pattern or URL..."
                 className="pl-9"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -130,13 +123,13 @@ const Index = () => {
               {images.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                   <p className="text-center max-w-md mb-4">
-                    Drag and drop images or videos here, or paste a URL to add to your collection
+                    Drag and drop images here or paste a URL to add to your collection
                   </p>
                   <input
                     type="file"
                     id="file-upload"
                     className="hidden"
-                    accept="image/*,video/*"
+                    accept="image/*"
                     multiple
                   />
                 </div>

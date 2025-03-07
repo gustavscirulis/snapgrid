@@ -1,8 +1,9 @@
 
 import React, { useCallback, useState, useEffect } from "react";
-import { toast } from "sonner";
-import { validateMediaFile } from "@/lib/imageUtils";
-import { ImagePlus, VideoIcon } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { validateImageFile } from "@/lib/imageUtils";
+import { ImagePlus } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface UploadZoneProps {
   onImageUpload: (file: File) => void;
@@ -17,6 +18,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
   isUploading,
   children,
 }) => {
+  const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -42,15 +44,17 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     
     // Process the dropped files
     files.forEach((file) => {
-      console.log("Dropped file:", file.name, "Type:", file.type);
-      const validation = validateMediaFile(file);
-      if (validation.valid) {
+      if (validateImageFile(file)) {
         onImageUpload(file);
       } else {
-        toast.error(validation.message || "Please upload images (max 10MB) or videos (max 50MB)");
+        toast({
+          title: "Invalid file",
+          description: "Please upload images less than 10MB in size.",
+          variant: "destructive",
+        });
       }
     });
-  }, [isUploading, onImageUpload]);
+  }, [isUploading, onImageUpload, toast]);
 
   // Add paste event listener to capture pasted URLs
   useEffect(() => {
@@ -62,7 +66,10 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           if (url.protocol === 'http:' || url.protocol === 'https:') {
             e.preventDefault();
             onUrlAdd(pastedText);
-            toast.success("URL card has been added to your collection.");
+            toast({
+              title: "URL added",
+              description: "The URL card has been added to your collection.",
+            });
           }
         } catch (error) {
           // Not a valid URL, ignore
@@ -74,26 +81,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     return () => {
       document.removeEventListener('paste', handlePaste);
     };
-  }, [onUrlAdd]);
-
-  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isUploading) return;
-
-    const files = Array.from(e.target.files || []);
-    
-    files.forEach((file) => {
-      console.log("Selected file:", file.name, "Type:", file.type);
-      const validation = validateMediaFile(file);
-      if (validation.valid) {
-        onImageUpload(file);
-      } else {
-        toast.error(validation.message || "Please upload images (max 10MB) or videos (max 50MB)");
-      }
-    });
-    
-    // Reset the input so the same file can be selected again
-    e.target.value = '';
-  }, [isUploading, onImageUpload]);
+  }, [onUrlAdd, toast]);
 
   return (
     <>
@@ -110,12 +98,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
         {isDragging && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 pointer-events-none">
             <div className="bg-card p-8 rounded-lg shadow-lg flex flex-col items-center animate-float">
-              <div className="flex gap-2">
-                <ImagePlus className="w-10 h-10 text-primary" />
-                <VideoIcon className="w-10 h-10 text-primary" />
-              </div>
-              <p className="text-xl font-medium mt-4">Drop media to add</p>
-              <p className="text-sm text-muted-foreground mt-2">Images or videos</p>
+              <ImagePlus className="w-12 h-12 text-primary mb-4" />
+              <p className="text-xl font-medium">Drop images to add</p>
             </div>
           </div>
         )}
@@ -133,9 +117,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           type="file"
           id="file-upload"
           className="hidden"
-          accept="image/*,video/*"
+          accept="image/*"
           multiple
-          onChange={handleFileInputChange}
         />
       </div>
     </>
