@@ -1,18 +1,18 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
+import { getImageDimensions, getFileExtension, isVideoFile } from "@/lib/imageUtils";
 
-export type ImageItemType = "image" | "url";
+export type MediaItemType = "image" | "video" | "url";
 
 export interface PatternTag {
   name: string;
   confidence: number;
 }
 
-export interface ImageItem {
+export interface MediaItem {
   id: string;
-  type: ImageItemType;
+  type: MediaItemType;
   url: string;
   width: number;
   height: number;
@@ -24,10 +24,11 @@ export interface ImageItem {
   isAnalyzing?: boolean;
   error?: string;
   actualFilePath?: string;
+  fileExtension?: string;
 }
 
 export function useImageStore() {
-  const [images, setImages] = useState<ImageItem[]>([]);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isElectron, setIsElectron] = useState(false);
@@ -45,32 +46,30 @@ export function useImageStore() {
     
     setIsElectron(isRunningInElectron);
     
-    const loadImages = async () => {
+    const loadMediaItems = async () => {
       try {
         if (isRunningInElectron) {
-          console.log("Loading images from filesystem...");
-          const loadedImages = await window.electron.loadImages();
-          console.log("Loaded images:", loadedImages.length);
-          setImages(loadedImages);
+          console.log("Loading media items from filesystem...");
+          const loadedItems = await window.electron.loadImages();
+          console.log("Loaded media items:", loadedItems.length);
+          setMediaItems(loadedItems);
         } else {
           // When running in browser, start with empty state
-          console.log("Browser mode - starting with empty images array");
-          setImages([]);
-          toast.warning("Running in browser mode. Images will not be saved permanently.");
+          console.log("Browser mode - starting with empty media items array");
+          setMediaItems([]);
+          toast.warning("Running in browser mode. Media items will not be saved permanently.");
         }
       } catch (error) {
-        console.error("Error loading images:", error);
-        toast.error("Failed to load images");
+        console.error("Error loading media items:", error);
+        toast.error("Failed to load media items");
       }
       setIsLoading(false);
     };
 
-    loadImages();
+    loadMediaItems();
   }, []);
 
-  const addImage = useCallback(async (file: File) => {
-    setIsUploading(true);
-    
+  const processMedia = useCallback(async (file: File) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       if (!e.target?.result) {
@@ -78,84 +77,104 @@ export function useImageStore() {
         return;
       }
 
-      const img = new Image();
-      img.onload = async () => {
-        const newImage: ImageItem = {
+      try {
+        // Determine if it's a video file
+        const isVideo = isVideoFile(file);
+        const fileExtension = getFileExtension(file);
+        console.log(`${isVideo ? 'Video' : 'Image'} file extension:`, fileExtension);
+        
+        let dimensions;
+        try {
+          dimensions = await getImageDimensions(file);
+        } catch (error) {
+          console.error("Error getting dimensions:", error);
+          dimensions = isVideo ? { width: 640, height: 360 } : { width: 800, height: 600 };
+        }
+
+        const newMediaItem: MediaItem = {
           id: crypto.randomUUID(),
-          type: "image",
+          type: isVideo ? "video" : "image",
           url: e.target?.result as string,
-          width: img.width,
-          height: img.height,
+          width: dimensions.width,
+          height: dimensions.height,
           createdAt: new Date(),
-          isAnalyzing: hasApiKey(),
+          isAnalyzing: !isVideo && hasApiKey(), // Only analyze images
+          fileExtension: fileExtension
         };
         
-        const updatedImages = [newImage, ...images];
-        setImages(updatedImages);
+        const updatedItems = [newMediaItem, ...mediaItems];
+        setMediaItems(updatedItems);
         
         if (isElectron) {
           try {
-            console.log("Saving image to filesystem:", newImage.id);
+            console.log(`Saving ${isVideo ? 'video' : 'image'} to filesystem:`, newMediaItem.id);
             const result = await window.electron.saveImage({
-              id: newImage.id,
-              dataUrl: newImage.url,
+              id: newMediaItem.id,
+              dataUrl: newMediaItem.url,
               metadata: {
-                id: newImage.id,
-                type: newImage.type,
-                width: newImage.width,
-                height: newImage.height,
-                createdAt: newImage.createdAt,
-                isAnalyzing: newImage.isAnalyzing
+                id: newMediaItem.id,
+                type: newMediaItem.type,
+                width: newMediaItem.width,
+                height: newMediaItem.height,
+                createdAt: newMediaItem.createdAt,
+                isAnalyzing: newMediaItem.isAnalyzing,
+                fileExtension: fileExtension
               }
             });
             
             if (result.success && result.path) {
-              console.log("Image saved successfully at:", result.path);
-              newImage.actualFilePath = result.path;
-              setImages([newImage, ...images.filter(img => img.id !== newImage.id)]);
+              console.log(`${isVideo ? 'Video' : 'Image'} saved successfully at:`, result.path);
               
-              toast.success(`Image saved to: ${result.path}`);
+              // Ensure the file has the correct extension
+              const expectedExtension = `.${fileExtension}`;
+              if (!result.path.endsWith(expectedExtension)) {
+                console.warn(`Expected path to end with ${expectedExtension}, but got ${result.path}`);
+              }
+              
+              newMediaItem.actualFilePath = result.path;
+              setMediaItems([newMediaItem, ...mediaItems.filter(item => item.id !== newMediaItem.id)]);
+              
+              toast.success(`${isVideo ? 'Video' : 'Image'} saved to disk`);
             } else {
-              console.error("Failed to save image:", result.error);
-              toast.error(`Failed to save image: ${result.error || "Unknown error"}`);
+              console.error(`Failed to save ${isVideo ? 'video' : 'image'}:`, result.error);
+              toast.error(`Failed to save ${isVideo ? 'video' : 'image'}: ${result.error || "Unknown error"}`);
             }
           } catch (error) {
-            console.error("Failed to save image to filesystem:", error);
-            toast.error("Failed to save image to disk");
+            console.error(`Failed to save ${isVideo ? 'video' : 'image'} to filesystem:`, error);
+            toast.error(`Failed to save ${isVideo ? 'video' : 'image'} to disk`);
           }
         } else {
-          toast.info("Running in browser mode. Image is only stored in memory.");
+          toast.info(`Running in browser mode. ${isVideo ? 'Video' : 'Image'} is only stored in memory.`);
         }
         
-        setIsUploading(false);
-        
-        if (hasApiKey()) {
+        // Only analyze images, not videos
+        if (!isVideo && hasApiKey()) {
           try {
-            const patterns = await analyzeImage(newImage.url);
+            const patterns = await analyzeImage(newMediaItem.url);
             
-            const imageWithPatterns = {
-              ...newImage,
+            const itemWithPatterns = {
+              ...newMediaItem,
               patterns: patterns.map(p => ({ name: p.pattern, confidence: p.confidence })),
               isAnalyzing: false
             };
             
-            setImages(prevImages => {
-              const updatedWithPatterns = prevImages.map(img => 
-                img.id === newImage.id ? imageWithPatterns : img
+            setMediaItems(prevItems => {
+              const updatedWithPatterns = prevItems.map(item => 
+                item.id === newMediaItem.id ? itemWithPatterns : item
               );
               
               if (isElectron) {
                 try {
                   window.electron.saveImage({
-                    id: imageWithPatterns.id,
-                    dataUrl: imageWithPatterns.url,
+                    id: itemWithPatterns.id,
+                    dataUrl: itemWithPatterns.url,
                     metadata: {
-                      ...imageWithPatterns,
+                      ...itemWithPatterns,
                       url: undefined
                     }
                   });
                 } catch (error) {
-                  console.error("Failed to update image metadata after analysis:", error);
+                  console.error("Failed to update metadata after analysis:", error);
                 }
               }
               
@@ -165,25 +184,25 @@ export function useImageStore() {
             console.error("Failed to analyze image:", error);
             
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-            setImages(prevImages => {
-              const updated = prevImages.map(img => 
-                img.id === newImage.id ? { ...img, isAnalyzing: false, error: errorMessage } : img
+            setMediaItems(prevItems => {
+              const updated = prevItems.map(item => 
+                item.id === newMediaItem.id ? { ...item, isAnalyzing: false, error: errorMessage } : item
               );
               
               if (isElectron) {
                 try {
                   window.electron.saveImage({
-                    id: newImage.id,
-                    dataUrl: newImage.url,
+                    id: newMediaItem.id,
+                    dataUrl: newMediaItem.url,
                     metadata: {
-                      ...newImage,
+                      ...newMediaItem,
                       isAnalyzing: false,
                       error: errorMessage,
                       url: undefined
                     }
                   });
                 } catch (saveError) {
-                  console.error("Failed to update image metadata after analysis error:", saveError);
+                  console.error("Failed to update metadata after analysis error:", saveError);
                 }
               }
               
@@ -193,19 +212,28 @@ export function useImageStore() {
             toast.error("Failed to analyze image: " + errorMessage);
           }
         }
-      };
-      img.src = e.target?.result as string;
+      } catch (processError) {
+        console.error("Error processing media:", processError);
+        toast.error("Failed to process media: " + (processError instanceof Error ? processError.message : "Unknown error"));
+      } finally {
+        setIsUploading(false);
+      }
     };
     
     reader.readAsDataURL(file);
-  }, [images, isElectron]);
+  }, [mediaItems, isElectron]);
+
+  const addMedia = useCallback(async (file: File) => {
+    setIsUploading(true);
+    await processMedia(file);
+  }, [processMedia]);
 
   const addUrlCard = useCallback(async (url: string) => {
     setIsUploading(true);
     try {
       const metadata = await fetchUrlMetadata(url);
       
-      const newCard: ImageItem = {
+      const newCard: MediaItem = {
         id: crypto.randomUUID(),
         type: "url",
         url: url,
@@ -217,8 +245,8 @@ export function useImageStore() {
         sourceUrl: url
       };
       
-      const updatedImages = [newCard, ...images];
-      setImages(updatedImages);
+      const updatedItems = [newCard, ...mediaItems];
+      setMediaItems(updatedItems);
       
       if (isElectron) {
         try {
@@ -237,7 +265,7 @@ export function useImageStore() {
     } catch (error) {
       console.error("Error adding URL card:", error);
       
-      const fallbackCard: ImageItem = {
+      const fallbackCard: MediaItem = {
         id: crypto.randomUUID(),
         type: "url",
         url: url,
@@ -248,8 +276,8 @@ export function useImageStore() {
         sourceUrl: url
       };
       
-      const updatedImages = [fallbackCard, ...images];
-      setImages(updatedImages);
+      const updatedItems = [fallbackCard, ...mediaItems];
+      setMediaItems(updatedItems);
       
       if (isElectron) {
         try {
@@ -265,30 +293,30 @@ export function useImageStore() {
     } finally {
       setIsUploading(false);
     }
-  }, [images, isElectron]);
+  }, [mediaItems, isElectron]);
 
-  const removeImage = useCallback(async (id: string) => {
+  const removeMedia = useCallback(async (id: string) => {
     if (isElectron) {
       try {
         await window.electron.deleteImage(id);
-        toast.success("Image deleted from disk");
+        toast.success("Media deleted from disk");
       } catch (error) {
-        console.error("Failed to delete image from filesystem:", error);
-        toast.error("Failed to delete image from disk");
+        console.error("Failed to delete from filesystem:", error);
+        toast.error("Failed to delete from disk");
       }
     }
     
-    const updatedImages = images.filter(img => img.id !== id);
-    setImages(updatedImages);
-  }, [images, isElectron]);
+    const updatedItems = mediaItems.filter(item => item.id !== id);
+    setMediaItems(updatedItems);
+  }, [mediaItems, isElectron]);
 
   return {
-    images,
+    images: mediaItems,
     isUploading,
     isLoading,
-    addImage,
+    addImage: addMedia,
     addUrlCard,
-    removeImage,
+    removeImage: removeMedia,
   };
 }
 

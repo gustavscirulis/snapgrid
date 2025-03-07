@@ -1,14 +1,14 @@
 
 import React, { useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { ImageItem, PatternTag } from "@/hooks/useImageStore";
-import { X, ExternalLink, Scan, AlertCircle } from "lucide-react";
+import { MediaItem, PatternTag } from "@/hooks/useImageStore";
+import { X, ExternalLink, Scan, AlertCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageModalProps {
   isOpen: boolean;
   onClose: () => void;
-  image: ImageItem | null;
+  image: MediaItem | null;
 }
 
 const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
@@ -82,7 +82,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-7xl w-[95vw] p-0 overflow-hidden bg-transparent border-none shadow-none max-h-[95vh]">
         <DialogTitle className="sr-only">
-          {image.type === "url" ? "URL Preview" : "Image Preview"}
+          {image.type === "url" ? "URL Preview" : image.type === "video" ? "Video Preview" : "Image Preview"}
         </DialogTitle>
         
         <div className="relative h-full w-full flex items-center justify-center">
@@ -120,6 +120,24 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                   Open URL
                 </Button>
               </div>
+            ) : image.type === "video" ? (
+              <>
+                <div className="relative">
+                  <video
+                    className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
+                    style={{ 
+                      maxWidth: Math.min(image.width, window.innerWidth * 0.9),
+                      maxHeight: Math.min(image.height, window.innerHeight * 0.85)
+                    }}
+                    controls
+                    autoPlay
+                    playsInline
+                  >
+                    <source src={image.url} type={`video/${image.fileExtension || 'mp4'}`} />
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              </>
             ) : (
               <>
                 <img
