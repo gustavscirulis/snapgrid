@@ -12,6 +12,9 @@ interface IElectronAPI {
   saveUrlCard?: (data: { id: string; metadata: any }) => Promise<{ success: boolean; error?: string }>;
   getAppStorageDir?: () => Promise<string>;
   openStorageDir?: () => Promise<{ success: boolean; error?: string }>;
+  
+  // Browser functionality
+  openUrl?: (url: string) => void;
 }
 
 declare global {

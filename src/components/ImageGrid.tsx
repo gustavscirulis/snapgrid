@@ -39,7 +39,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     e.preventDefault();
     
     // Open URL in default browser
-    if (window.electron) {
+    if (window.electron && window.electron.openUrl) {
       // In Electron, use shell.openExternal via the electron API
       window.electron.openUrl(url);
     } else {

@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld(
     
     // Storage path info
     getAppStorageDir: () => ipcRenderer.invoke('get-app-storage-dir'),
-    openStorageDir: () => ipcRenderer.invoke('open-storage-dir')
+    openStorageDir: () => ipcRenderer.invoke('open-storage-dir'),
+    
+    // Browser functionality
+    openUrl: (url) => ipcRenderer.invoke('open-url', url)
   }
 );
