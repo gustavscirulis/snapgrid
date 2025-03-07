@@ -175,9 +175,9 @@ const ImageModal: React.FC<ImageModalProps> = ({
             <X className="h-5 w-5" />
           </button>
           
-          <div className="bg-white/5 backdrop-blur-lg p-4 rounded-lg overflow-hidden shadow-2xl max-h-[95vh] max-w-full animate-scale-in">
+          <div className="bg-white/5 backdrop-blur-lg p-4 rounded-lg overflow-hidden shadow-2xl max-h-[95vh] max-w-full">
             {image.type === "url" ? (
-              <div className="bg-card p-8 rounded-md shadow-md max-w-lg">
+              <div className="bg-card p-8 rounded-md shadow-md animate-scale-in max-w-lg">
                 <div className="flex items-start mb-6">
                   {image.thumbnailUrl && (
                     <div className="w-16 h-16 bg-muted rounded-md mr-4 overflow-hidden flex items-center justify-center">
@@ -208,7 +208,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                   src={image.url}
                   controls
                   onTimeUpdate={handleTimeUpdate}
-                  className="max-h-[85vh] max-w-full object-contain rounded-md shadow-md"
+                  className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
                   style={{ 
                     maxWidth: Math.min(image.width, window.innerWidth * 0.9),
                     maxHeight: Math.min(image.height, window.innerHeight * 0.85)
@@ -223,7 +223,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 <img
                   src={image.url}
                   alt="Enlarged screenshot"
-                  className="max-h-[85vh] max-w-full object-contain rounded-md shadow-md"
+                  className="max-h-[85vh] max-w-full object-contain rounded-md animate-scale-in shadow-md"
                   style={{ 
                     maxWidth: Math.min(image.width, window.innerWidth * 0.9),
                     maxHeight: Math.min(image.height, window.innerHeight * 0.85)

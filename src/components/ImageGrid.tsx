@@ -14,7 +14,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [columns, setColumns] = useState(3);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
-  const videoTimes = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     const updateColumns = () => {
@@ -55,38 +54,14 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     if (item.type === "video") {
       const videoElement = videoRefs.current.get(item.id);
       if (videoElement) {
-        // Save current time before pausing
-        videoTimes.current.set(item.id, videoElement.currentTime);
         videoElement.pause();
       }
     }
   };
 
-  const handleVideoTimeUpdate = (id: string) => {
-    const videoElement = videoRefs.current.get(id);
-    if (videoElement) {
-      videoTimes.current.set(id, videoElement.currentTime);
-    }
-  };
-
-  const handleItemClick = (item: ImageItem) => {
-    // If it's a video, pass the current time to the modal
-    if (item.type === "video") {
-      const currentTime = videoTimes.current.get(item.id) || 0;
-      // Update the currentTime value in window so the modal can access it
-      window.currentVideoTime = currentTime;
-    }
-    onImageClick(item);
-  };
-
   const setVideoRef = (id: string, element: HTMLVideoElement | null) => {
     if (element) {
       videoRefs.current.set(id, element);
-      // Restore saved time if available
-      const savedTime = videoTimes.current.get(id);
-      if (savedTime !== undefined) {
-        element.currentTime = savedTime;
-      }
     } else {
       videoRefs.current.delete(id);
     }
@@ -167,7 +142,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               loop
               muted
               playsInline
-              onTimeUpdate={() => handleVideoTimeUpdate(item.id)}
             />
             {!hoveredImageId || hoveredImageId !== item.id ? (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -257,7 +231,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 <div key={image.id} className="masonry-item">
                   <div 
                     className="rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-all relative group w-full"
-                    onClick={() => handleItemClick(image)}
+                    onClick={() => onImageClick(image)}
                     onMouseEnter={() => handleMouseEnter(image)}
                     onMouseLeave={() => handleMouseLeave(image)}
                   >

@@ -10,8 +10,7 @@ interface ElectronAPI {
 
 declare global {
   interface Window {
-    // Make sure this matches the declaration in Index.tsx
-    electron?: ElectronAPI;
+    electron: ElectronAPI;
   }
 }
 
