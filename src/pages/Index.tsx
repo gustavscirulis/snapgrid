@@ -11,6 +11,14 @@ import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Toaster, toast } from "sonner";
 import SettingsPanel from "@/components/SettingsPanel";
 
+// Declare the currentVideoTime property on window
+declare global {
+  interface Window {
+    currentVideoTime?: number;
+    electron?: any;
+  }
+}
+
 const Index = () => {
   const { images, isUploading, isLoading, addImage, addUrlCard, removeImage, updateImageItem } = useImageStore();
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
@@ -71,7 +79,15 @@ const Index = () => {
     if (image.type === "url" && image.sourceUrl) {
       window.open(image.sourceUrl, "_blank", "noopener,noreferrer");
     } else {
-      setSelectedImage(image);
+      // For videos, prepare the selected image with the current time from the thumbnail
+      if (image.type === "video" && window.currentVideoTime !== undefined) {
+        // Set the current time reference for the modal
+        setSelectedImage({
+          ...image
+        });
+      } else {
+        setSelectedImage(image);
+      }
       setModalOpen(true);
     }
   };
