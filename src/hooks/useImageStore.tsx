@@ -201,64 +201,72 @@ export function useImageStore() {
   const addUrlCard = useCallback(async (url: string) => {
     setIsUploading(true);
     try {
-      const metadata = await fetchUrlMetadata(url);
-      
-      const newCard: ImageItem = {
+      const initialCard: ImageItem = {
         id: crypto.randomUUID(),
         type: "url",
         url: url,
         width: 400,
-        height: 120,
-        createdAt: new Date(),
-        title: metadata.title || url,
-        description: metadata.description,
-        thumbnailUrl: metadata.imageUrl || metadata.faviconUrl,
-        sourceUrl: url
-      };
-      
-      const updatedImages = [newCard, ...images];
-      setImages(updatedImages);
-      
-      if (isElectron) {
-        try {
-          await window.electron.saveUrlCard({
-            id: newCard.id,
-            metadata: newCard
-          });
-          toast.success(`URL card saved to disk`);
-        } catch (error) {
-          console.error("Failed to save URL card:", error);
-          toast.error("Failed to save URL card to disk");
-        }
-      } else {
-        toast.info("Running in browser mode. URL card is only stored in memory.");
-      }
-    } catch (error) {
-      console.error("Error adding URL card:", error);
-      
-      const fallbackCard: ImageItem = {
-        id: crypto.randomUUID(),
-        type: "url",
-        url: url,
-        width: 400,
-        height: 120,
+        height: 400,
         createdAt: new Date(),
         title: url,
-        sourceUrl: url
+        sourceUrl: url,
+        isAnalyzing: true
       };
       
-      const updatedImages = [fallbackCard, ...images];
-      setImages(updatedImages);
+      setImages(prevImages => [initialCard, ...prevImages]);
       
-      if (isElectron) {
-        try {
-          await window.electron.saveUrlCard({
-            id: fallbackCard.id,
-            metadata: fallbackCard
-          });
-        } catch (saveError) {
-          console.error("Failed to save fallback URL card:", saveError);
-          toast.error("Failed to save URL card to disk");
+      try {
+        const metadata = await fetchUrlMetadata(url);
+        
+        const updatedCard: ImageItem = {
+          ...initialCard,
+          isAnalyzing: false,
+          title: metadata.title || url,
+          description: metadata.description,
+          thumbnailUrl: metadata.imageUrl || metadata.faviconUrl
+        };
+        
+        setImages(prevImages => 
+          prevImages.map(img => img.id === initialCard.id ? updatedCard : img)
+        );
+        
+        if (isElectron) {
+          try {
+            await window.electron.saveUrlCard({
+              id: updatedCard.id,
+              metadata: updatedCard
+            });
+            toast.success(`URL card saved to disk`);
+          } catch (error) {
+            console.error("Failed to save URL card:", error);
+            toast.error("Failed to save URL card to disk");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching URL metadata:", error);
+        
+        setImages(prevImages => 
+          prevImages.map(img => 
+            img.id === initialCard.id 
+              ? { ...img, isAnalyzing: false, error: "Failed to fetch metadata" } 
+              : img
+          )
+        );
+        
+        if (isElectron) {
+          try {
+            await window.electron.saveUrlCard({
+              id: initialCard.id,
+              metadata: {
+                ...initialCard,
+                isAnalyzing: false,
+                error: "Failed to fetch metadata"
+              }
+            });
+          } catch (saveError) {
+            console.error("Failed to save fallback URL card:", saveError);
+            toast.error("Failed to save URL card to disk");
+          }
         }
       }
     } finally {

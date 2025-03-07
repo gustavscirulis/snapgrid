@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
+import { ExternalLink, Scan, Trash2, AlertCircle, Link, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -86,38 +88,89 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
   const renderItem = (item: ImageItem) => {
     if (item.type === "url") {
+      const isLoading = item.isAnalyzing;
+      const hasError = item.error;
+      
       return (
-        <div className="url-card h-full flex flex-col">
-          <div className="p-4 flex flex-col h-full">
-            <div className="flex items-start gap-3">
-              {item.thumbnailUrl && (
-                <div className="w-14 h-14 bg-muted rounded-md overflow-hidden flex items-center justify-center flex-shrink-0">
+        <div className="url-card h-full flex flex-col relative group">
+          {/* Link indicator badge */}
+          <div className="absolute top-2 left-2 z-10 bg-primary/80 text-white p-1 rounded-full">
+            <Link className="h-4 w-4" />
+          </div>
+          
+          {/* Card content */}
+          <div className="flex flex-col justify-between h-full">
+            {/* Main content area */}
+            <div className="p-4 flex flex-col h-full relative">
+              {/* Background thumbnail/placeholder */}
+              <div className="absolute inset-0 overflow-hidden bg-secondary/20">
+                {item.thumbnailUrl ? (
                   <img 
                     src={item.thumbnailUrl} 
                     alt={item.title || "Website"} 
-                    className="max-w-full max-h-full object-contain" 
+                    className="w-full h-full object-cover opacity-20" 
                   />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-base mb-1 line-clamp-2">{item.title || item.url}</h3>
-                <p className="text-xs text-muted-foreground truncate">{item.url}</p>
-                {item.description && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <Globe className="h-20 w-20 text-muted-foreground/20" />
+                  </div>
                 )}
               </div>
+              
+              {/* Content overlay */}
+              <div className="relative z-10 flex flex-col h-full">
+                {isLoading && (
+                  <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
+                    <div className="flex items-center space-x-2">
+                      <Scan className="h-4 w-4 animate-pulse text-primary" />
+                      <span className="text-sm">Loading metadata...</span>
+                    </div>
+                  </div>
+                )}
+                
+                {hasError && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="text-destructive">
+                            <AlertCircle className="h-4 w-4" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Failed to load metadata</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                )}
+                
+                {/* Content */}
+                <div className="mt-12 bg-background/80 p-4 rounded-md flex-grow">
+                  <h3 className="font-medium text-base mb-2 line-clamp-2">{item.title || item.url}</h3>
+                  
+                  {item.description && (
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-3">{item.description}</p>
+                  )}
+                  
+                  <p className="text-xs text-muted-foreground mt-2 truncate">{item.url}</p>
+                </div>
+              </div>
             </div>
+            
+            {/* Footer */}
             <div 
-              className="mt-auto pt-3 flex items-center text-xs text-primary font-medium cursor-pointer"
+              className="p-3 bg-primary text-primary-foreground text-sm font-medium cursor-pointer flex items-center justify-center"
               onClick={(e) => handleUrlClick(item.sourceUrl || item.url, e)}
             >
-              <ExternalLink className="w-3 h-3 mr-1" />
-              <span>Open in browser</span>
+              <ExternalLink className="w-4 h-4 mr-2" />
+              <span>Open URL</span>
             </div>
           </div>
         </div>
       );
     } else {
+      // Regular image rendering logic
       return (
         <div className="relative">
           <img

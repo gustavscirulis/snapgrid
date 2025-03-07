@@ -3,7 +3,7 @@
  * Utility functions for fetching metadata from URLs
  */
 
-interface UrlMetadata {
+export interface UrlMetadata {
   title?: string;
   description?: string;
   imageUrl?: string;
