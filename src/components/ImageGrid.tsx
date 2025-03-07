@@ -1,17 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ExternalLink, Scan, Trash2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageGridProps {
   images: ImageItem[];
-  onImageClick: (image: ImageItem) => void;
+  onImageClick: (image: ImageItem, element: HTMLElement) => void;
   onImageDelete?: (id: string) => void;
 }
 
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [columns, setColumns] = useState(3);
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
     const updateColumns = () => {
@@ -130,6 +131,21 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     return columnArrays;
   };
 
+  const handleImageClick = (image: ImageItem) => {
+    const element = itemRefs.current.get(image.id);
+    if (element) {
+      onImageClick(image, element);
+    }
+  };
+
+  const setItemRef = (id: string, el: HTMLDivElement | null) => {
+    if (el) {
+      itemRefs.current.set(id, el);
+    } else {
+      itemRefs.current.delete(id);
+    }
+  };
+
   const columnData = distributeImages();
 
   return (
@@ -176,8 +192,9 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               {column.map((image) => (
                 <div key={image.id} className="masonry-item">
                   <div 
+                    ref={(el) => setItemRef(image.id, el)}
                     className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full"
-                    onClick={() => onImageClick(image)}
+                    onClick={() => handleImageClick(image)}
                     onMouseEnter={() => setHoveredImageId(image.id)}
                     onMouseLeave={() => setHoveredImageId(null)}
                   >
