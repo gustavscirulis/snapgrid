@@ -1,4 +1,3 @@
-
 export function validateImageFile(file: File): boolean {
   // Check if the file is an image
   if (!file.type.match('image.*')) {
@@ -77,4 +76,19 @@ export function calculateGridRowSpan(height: number, width: number, gridRowHeigh
   const baseWidth = 300; // This should match the minmax value in CSS
   const imageHeight = baseWidth * aspectRatio;
   return Math.ceil(imageHeight / gridRowHeight) + 1; // +1 for some padding
+}
+
+export function getExtensionFromMimeType(mimeType: string): string {
+  const mimeToExt: Record<string, string> = {
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'video/ogg': 'ogg',
+    'video/quicktime': 'mov',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp'
+  };
+  
+  return mimeToExt[mimeType] || '';
 }

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
-import { getImageDimensions, getVideoDimensions, validateMediaFile } from "@/lib/imageUtils";
+import { getImageDimensions, getVideoDimensions, validateMediaFile, getExtensionFromMimeType } from "@/lib/imageUtils";
 
 export type ImageItemType = "image" | "url" | "video";
 
@@ -92,7 +92,10 @@ export function useImageStore() {
     const fileType = validateResult.type;
     const reader = new FileReader();
     
-    const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
+    let fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
+    if (!fileExtension && file.type) {
+      fileExtension = getExtensionFromMimeType(file.type);
+    }
     
     reader.onload = async (e) => {
       if (!e.target?.result) {
@@ -154,6 +157,10 @@ export function useImageStore() {
       try {
         console.log(`Saving ${type} to filesystem:`, newItem.id);
         
+        if (type === 'video') {
+          console.log(`Video file extension: ${fileExtension || 'unknown'}`);
+        }
+        
         const saveOptions = {
           id: newItem.id,
           dataUrl: newItem.url,
@@ -170,6 +177,10 @@ export function useImageStore() {
           console.log(`${type} saved successfully at:`, result.path);
           
           if (type === 'video') {
+            if (!result.path.endsWith(`.${fileExtension}`)) {
+              console.warn(`Expected path to end with .${fileExtension}, but got ${result.path}`);
+            }
+            
             const updatedItem = {
               ...newItem,
               actualFilePath: result.path,
