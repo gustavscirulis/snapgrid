@@ -68,6 +68,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
   const closeModal = () => {
     setModalOpen(false);
+    // Don't reset clickedImageId immediately to maintain the hidden state during animation
     setTimeout(() => {
       setSelectedImage(null);
       setClickedImageId(null);
@@ -291,6 +292,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                         animate={{
                           opacity: (clickedImageId === image.id || (selectedImage?.id === image.id && modalOpen)) ? 0 : 1
                         }}
+                        // Use the same duration for both modal animation and thumbnail fade in/out
                         transition={{ 
                           opacity: { duration: 0.1 }
                         }}
