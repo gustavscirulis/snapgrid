@@ -23,6 +23,10 @@ interface ElectronAPI {
   loadImages: () => Promise<any[]>;
   
   deleteImage: (id: string) => Promise<{ success: boolean; error?: string }>;
+  
+  getAppStorageDir: () => Promise<string>;
+  
+  openStorageDir: () => Promise<void>;
 }
 
 declare global {

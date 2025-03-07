@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -131,47 +132,92 @@ export function useImageStore() {
         if (isElectron) {
           try {
             if (isVideo) {
-              // New approach: Save videos with direct file write instead of dataURL
+              // Check if saveVideoFile exists before using it
+              if (!window.electron.saveVideoFile) {
+                throw new Error('saveVideoFile is not available in this version of Electron. Please update your app.');
+              }
+            
               console.log(`Saving video to filesystem with extension .${fileExtension}`);
               
-              // Create a blob from the file to pass to electron
-              const videoBlob = file.slice(0, file.size, file.type);
-              const arrayBuf = await videoBlob.arrayBuffer();
-              
-              // Send the raw buffer to electron with explicit file extension
-              const saveResult = await window.electron.saveVideoFile({
-                id: newMediaItem.id,
-                buffer: Array.from(new Uint8Array(arrayBuf)),
-                extension: fileExtension,
-                metadata: {
-                  id: newMediaItem.id,
-                  type: "video",
-                  width: newMediaItem.width,
-                  height: newMediaItem.height,
-                  createdAt: newMediaItem.createdAt,
-                  fileExtension: fileExtension
+              // Read the file as ArrayBuffer to send to Electron
+              const fileReader = new FileReader();
+              fileReader.onload = async (event) => {
+                if (!event.target?.result) {
+                  throw new Error('Failed to read video file.');
                 }
-              });
+                
+                try {
+                  const arrayBuf = event.target.result as ArrayBuffer;
+                  const uint8Array = new Uint8Array(arrayBuf);
+                  
+                  // Send to Electron
+                  const saveResult = await window.electron.saveVideoFile({
+                    id: newMediaItem.id,
+                    buffer: Array.from(uint8Array),
+                    extension: fileExtension,
+                    metadata: {
+                      id: newMediaItem.id,
+                      type: "video",
+                      width: newMediaItem.width,
+                      height: newMediaItem.height,
+                      createdAt: newMediaItem.createdAt,
+                      fileExtension: fileExtension
+                    }
+                  });
+                  
+                  if (saveResult.success && saveResult.path) {
+                    console.log("Video saved successfully at:", saveResult.path);
+                    
+                    // Ensure the path has the correct extension
+                    if (!saveResult.path.endsWith(`.${fileExtension}`)) {
+                      console.error(`Expected path to end with .${fileExtension}, but got ${saveResult.path}`);
+                      
+                      // Try to fix the path
+                      const correctPath = saveResult.path.replace(/\.[^.]+$/, `.${fileExtension}`);
+                      console.log("Attempting to use correct path:", correctPath);
+                      
+                      // Update item with corrected path
+                      const updatedItem = {
+                        ...newMediaItem,
+                        actualFilePath: correctPath,
+                        url: `file://${correctPath}`
+                      };
+                      
+                      console.log("Updated video URL:", updatedItem.url);
+                      
+                      setMediaItems(prevItems => 
+                        prevItems.map(item => item.id === newMediaItem.id ? updatedItem : item)
+                      );
+                    } else {
+                      // Path is correct
+                      const updatedItem = {
+                        ...newMediaItem,
+                        actualFilePath: saveResult.path,
+                        url: `file://${saveResult.path}`
+                      };
+                      
+                      setMediaItems(prevItems => 
+                        prevItems.map(item => item.id === newMediaItem.id ? updatedItem : item)
+                      );
+                    }
+                    
+                    toast.success("Video saved to disk");
+                  } else {
+                    console.error("Failed to save video:", saveResult.error);
+                    toast.error(`Failed to save video: ${saveResult.error || "Unknown error"}`);
+                  }
+                } catch (innerError) {
+                  console.error("Failed to save video to filesystem:", innerError);
+                  toast.error("Failed to save video to disk. Make sure you're using the latest version of the app.");
+                }
+              };
               
-              if (saveResult.success && saveResult.path) {
-                console.log("Video saved successfully at:", saveResult.path);
-                
-                // Update item with correct file path and URL
-                const updatedItem = {
-                  ...newMediaItem,
-                  actualFilePath: saveResult.path,
-                  url: `file://${saveResult.path}`
-                };
-                
-                setMediaItems(prevItems => 
-                  prevItems.map(item => item.id === newMediaItem.id ? updatedItem : item)
-                );
-                
-                toast.success("Video saved to disk");
-              } else {
-                console.error("Failed to save video:", saveResult.error);
-                toast.error(`Failed to save video: ${saveResult.error || "Unknown error"}`);
-              }
+              fileReader.onerror = () => {
+                console.error("Error reading video file as ArrayBuffer");
+                toast.error("Failed to process video file");
+              };
+              
+              fileReader.readAsArrayBuffer(file);
             } else {
               // Regular image saving (unchanged)
               console.log("Saving image to filesystem:", newMediaItem.id);

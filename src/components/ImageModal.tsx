@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { MediaItem, PatternTag } from "@/hooks/useImageStore";
@@ -100,6 +99,8 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
     );
   };
 
+  const videoKey = image.type === "video" ? `video-${image.id}-${Date.now()}` : undefined;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-7xl w-[95vw] p-0 overflow-hidden bg-transparent border-none shadow-none max-h-[95vh]">
@@ -165,8 +166,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, image }) => {
                       autoPlay
                       playsInline
                       onError={handleVideoError}
-                      // Using a key based on both id and url to force re-render when url changes
-                      key={`${image.id}-${image.url}`}
+                      key={videoKey}
                     >
                       <source 
                         src={image.url} 
