@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
-import { Search, Settings, FileVideo, ImagePlus } from "lucide-react";
+import { Search, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setOpenAIApiKey } from "@/services/aiAnalysisService";
@@ -51,10 +51,6 @@ const Index = () => {
         (image.url?.toLowerCase().includes(query)) ||
         (image.title?.toLowerCase().includes(query))
       );
-    } else if (image.type === "video") {
-      // For videos, search by filename or type
-      return image.url?.toLowerCase().includes(query) || 
-             "video".includes(query);
     }
     
     if (image.patterns && image.patterns.length > 0) {
@@ -64,18 +60,10 @@ const Index = () => {
     return false;
   });
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      Array.from(e.target.files).forEach(file => {
-        addImage(file);
-      });
-    }
-  };
-
   const handleImageClick = (image: ImageItem) => {
     // This function is just a placeholder now since the actual handling
     // is done inside the ImageGrid component with the new modal approach
-    console.log(`${image.type} clicked:`, image.id);
+    console.log("Image clicked:", image.id);
   };
 
   const handleDeleteImage = (id: string) => {
@@ -124,28 +112,12 @@ const Index = () => {
             <>
               {images.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                  <div className="flex space-x-4 mt-4">
-                    <label
-                      htmlFor="file-upload"
-                      className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors cursor-pointer"
-                      onClick={() => {
-                        const input = document.getElementById('file-upload') as HTMLInputElement;
-                        if (input) {
-                          input.click();
-                        }
-                      }}
-                    >
-                      <ImagePlus className="h-4 w-4 mr-2" />
-                      Upload Media
-                    </label>
-                  </div>
                   <input
                     type="file"
                     id="file-upload"
                     className="hidden"
-                    accept="image/*,video/*"
+                    accept="image/*"
                     multiple
-                    onChange={handleFileUpload}
                   />
                 </div>
               )}

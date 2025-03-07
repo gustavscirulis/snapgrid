@@ -2,9 +2,8 @@ import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
 import { fetchUrlMetadata } from "@/lib/metadataUtils";
-import { getVideoDimensions } from "@/lib/imageUtils";
 
-export type ImageItemType = "image" | "url" | "video";
+export type ImageItemType = "image" | "url";
 
 export interface PatternTag {
   name: string;
@@ -26,7 +25,6 @@ export interface ImageItem {
   isAnalyzing?: boolean;
   error?: string;
   actualFilePath?: string;
-  duration?: number; // For videos
 }
 
 export function useImageStore() {
@@ -78,57 +76,16 @@ export function useImageStore() {
         return;
       }
 
-      const isVideo = file.type.startsWith('video/');
-      let width = 0, height = 0, duration = 0;
-
-      try {
-        if (isVideo) {
-          const video = document.createElement('video');
-          video.preload = 'metadata';
-          
-          // Wrap in a Promise to await metadata loading
-          const videoMetadata = await new Promise<{width: number, height: number, duration: number}>((resolve, reject) => {
-            video.onloadedmetadata = () => {
-              resolve({
-                width: video.videoWidth,
-                height: video.videoHeight,
-                duration: video.duration
-              });
-              URL.revokeObjectURL(video.src);
-            };
-            
-            video.onerror = () => {
-              URL.revokeObjectURL(video.src);
-              reject(new Error('Failed to load video metadata'));
-            };
-            
-            video.src = URL.createObjectURL(file);
-          });
-          
-          width = videoMetadata.width;
-          height = videoMetadata.height;
-          duration = videoMetadata.duration;
-        } else {
-          const img = new Image();
-          await new Promise<void>((resolve) => {
-            img.onload = () => {
-              width = img.width;
-              height = img.height;
-              resolve();
-            };
-            img.src = e.target?.result as string;
-          });
-        }
-
+      const img = new Image();
+      img.onload = async () => {
         const newImage: ImageItem = {
           id: crypto.randomUUID(),
-          type: isVideo ? "video" : "image",
+          type: "image",
           url: e.target?.result as string,
-          width,
-          height,
+          width: img.width,
+          height: img.height,
           createdAt: new Date(),
-          isAnalyzing: !isVideo && hasApiKey(),
-          ...(isVideo && { duration }),
+          isAnalyzing: hasApiKey(),
         };
         
         const updatedImages = [newImage, ...images];
@@ -136,7 +93,7 @@ export function useImageStore() {
         
         if (isElectron) {
           try {
-            console.log(`Saving ${isVideo ? 'video' : 'image'} to filesystem:`, newImage.id);
+            console.log("Saving image to filesystem:", newImage.id);
             const result = await window.electron.saveImage({
               id: newImage.id,
               dataUrl: newImage.url,
@@ -146,32 +103,31 @@ export function useImageStore() {
                 width: newImage.width,
                 height: newImage.height,
                 createdAt: newImage.createdAt,
-                isAnalyzing: newImage.isAnalyzing,
-                ...(isVideo && { duration: newImage.duration }),
+                isAnalyzing: newImage.isAnalyzing
               }
             });
             
             if (result.success && result.path) {
-              console.log(`${isVideo ? 'Video' : 'Image'} saved successfully at:`, result.path);
+              console.log("Image saved successfully at:", result.path);
               newImage.actualFilePath = result.path;
               setImages([newImage, ...images.filter(img => img.id !== newImage.id)]);
               
-              toast.success(`${isVideo ? 'Video' : 'Image'} saved to: ${result.path}`);
+              toast.success(`Image saved to: ${result.path}`);
             } else {
-              console.error(`Failed to save ${isVideo ? 'video' : 'image'}:`, result.error);
-              toast.error(`Failed to save ${isVideo ? 'video' : 'image'}: ${result.error || "Unknown error"}`);
+              console.error("Failed to save image:", result.error);
+              toast.error(`Failed to save image: ${result.error || "Unknown error"}`);
             }
           } catch (error) {
-            console.error(`Failed to save ${isVideo ? 'video' : 'image'} to filesystem:`, error);
-            toast.error(`Failed to save ${isVideo ? 'video' : 'image'} to disk`);
+            console.error("Failed to save image to filesystem:", error);
+            toast.error("Failed to save image to disk");
           }
         } else {
-          toast.info(`Running in browser mode. ${isVideo ? 'Video' : 'Image'} is only stored in memory.`);
+          toast.info("Running in browser mode. Image is only stored in memory.");
         }
         
         setIsUploading(false);
         
-        if (!isVideo && hasApiKey()) {
+        if (hasApiKey()) {
           try {
             const patterns = await analyzeImage(newImage.url);
             
@@ -235,11 +191,8 @@ export function useImageStore() {
             toast.error("Failed to analyze image: " + errorMessage);
           }
         }
-      } catch (error) {
-        console.error(`Failed to process ${isVideo ? 'video' : 'image'}:`, error);
-        setIsUploading(false);
-        toast.error(`Failed to process ${isVideo ? 'video' : 'image'}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
+      };
+      img.src = e.target?.result as string;
     };
     
     reader.readAsDataURL(file);

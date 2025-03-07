@@ -1,8 +1,8 @@
 
 import React, { useCallback, useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { validateImageFile, validateVideoFile, validateMediaFile } from "@/lib/imageUtils";
-import { ImagePlus, FileVideo } from "lucide-react";
+import { validateImageFile } from "@/lib/imageUtils";
+import { ImagePlus } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface UploadZoneProps {
@@ -20,22 +20,10 @@ const UploadZone: React.FC<UploadZoneProps> = ({
 }) => {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
-  const [isDraggingVideo, setIsDraggingVideo] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Check if any of the dragged files is a video
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-      for (let i = 0; i < e.dataTransfer.items.length; i++) {
-        if (e.dataTransfer.items[i].type.startsWith('video/')) {
-          setIsDraggingVideo(true);
-          break;
-        }
-      }
-    }
-    
     setIsDragging(true);
   }, []);
 
@@ -43,14 +31,12 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    setIsDraggingVideo(false);
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    setIsDraggingVideo(false);
 
     if (isUploading) return;
 
@@ -58,12 +44,12 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     
     // Process the dropped files
     files.forEach((file) => {
-      if (validateImageFile(file) || validateVideoFile(file)) {
+      if (validateImageFile(file)) {
         onImageUpload(file);
       } else {
         toast({
           title: "Invalid file",
-          description: "Please upload images (max 10MB) or videos (max 100MB).",
+          description: "Please upload images less than 10MB in size.",
           variant: "destructive",
         });
       }
@@ -112,14 +98,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
         {isDragging && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 pointer-events-none">
             <div className="bg-card p-8 rounded-lg shadow-lg flex flex-col items-center animate-float">
-              {isDraggingVideo ? (
-                <FileVideo className="w-12 h-12 text-primary mb-4" />
-              ) : (
-                <ImagePlus className="w-12 h-12 text-primary mb-4" />
-              )}
-              <p className="text-xl font-medium">
-                {isDraggingVideo ? "Drop video to add" : "Drop images to add"}
-              </p>
+              <ImagePlus className="w-12 h-12 text-primary mb-4" />
+              <p className="text-xl font-medium">Drop images to add</p>
             </div>
           </div>
         )}
@@ -137,7 +117,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           type="file"
           id="file-upload"
           className="hidden"
-          accept="image/*,video/*"
+          accept="image/*"
           multiple
         />
       </div>

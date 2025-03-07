@@ -1,9 +1,7 @@
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
-import { Play, Pause, Volume2, VolumeX } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 interface AnimatedImageModalProps {
   isOpen: boolean;
@@ -27,10 +25,6 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     width: number;
     height: number;
   } | null>(null);
-  
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (isOpen && selectedImageRef?.current) {
@@ -51,23 +45,8 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     // Lock body scroll when modal is open
     if (isOpen) {
       document.body.style.overflow = "hidden";
-      
-      // Auto-play video when modal opens
-      if (selectedImage?.type === "video" && videoRef.current) {
-        videoRef.current.play().then(() => {
-          setIsPlaying(true);
-        }).catch(err => {
-          console.error("Failed to autoplay video:", err);
-        });
-      }
     } else {
       document.body.style.overflow = "";
-      
-      // Pause video when modal closes
-      if (selectedImage?.type === "video" && videoRef.current) {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      }
     }
     
     // Escape key handler
@@ -82,7 +61,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
     };
-  }, [isOpen, onClose, selectedImage]);
+  }, [isOpen, onClose]);
 
   if (!selectedImage || !initialPosition) return null;
 
@@ -121,29 +100,6 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   };
 
-  const togglePlayPause = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent closing the modal
-    
-    if (!videoRef.current) return;
-    
-    if (isPlaying) {
-      videoRef.current.pause();
-    } else {
-      videoRef.current.play();
-    }
-    
-    setIsPlaying(!isPlaying);
-  };
-
-  const toggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent closing the modal
-    
-    if (!videoRef.current) return;
-    
-    videoRef.current.muted = !isMuted;
-    setIsMuted(!isMuted);
-  };
-
   return (
     <AnimatePresence onExitComplete={() => onAnimationComplete && onAnimationComplete("exit-complete")}>
       {isOpen && (
@@ -157,7 +113,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             onClick={onClose}
           />
 
-          {/* Media container - fixed position applied directly to the element */}
+          {/* Image container - fixed position applied directly to the element */}
           <motion.div
             className="fixed z-50 overflow-hidden rounded-lg"
             style={{ position: "fixed" }}
@@ -172,61 +128,14 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               }
             }}
           >
-            {selectedImage.type === "video" ? (
-              <div className="relative w-full h-full">
-                <motion.video
-                  ref={videoRef}
-                  src={selectedImage.url}
-                  className="w-full h-full object-contain rounded-lg"
-                  controls={false}
-                  playsInline
-                  initial={{ opacity: 0.8 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0.8 }}
-                />
-                
-                {/* Video controls */}
-                <div 
-                  className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 rounded-full flex items-center px-4 py-2 space-x-2"
-                  onClick={(e) => e.stopPropagation()} // Prevent modal from closing
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-white hover:bg-white/20"
-                    onClick={togglePlayPause}
-                  >
-                    {isPlaying ? (
-                      <Pause className="h-5 w-5" />
-                    ) : (
-                      <Play className="h-5 w-5" />
-                    )}
-                  </Button>
-                  
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-white hover:bg-white/20"
-                    onClick={toggleMute}
-                  >
-                    {isMuted ? (
-                      <VolumeX className="h-5 w-5" />
-                    ) : (
-                      <Volume2 className="h-5 w-5" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <motion.img
-                src={selectedImage.url}
-                alt="Selected image"
-                className="w-full h-full object-contain rounded-lg"
-                initial={{ opacity: 0.8 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0.8 }}
-              />
-            )}
+            <motion.img
+              src={selectedImage.url}
+              alt="Selected image"
+              className="w-full h-full object-contain rounded-lg"
+              initial={{ opacity: 0.8 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0.8 }}
+            />
           </motion.div>
         </>
       )}
