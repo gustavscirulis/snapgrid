@@ -65,10 +65,14 @@ function createWindow() {
     },
   });
 
+  // In production, use file protocol with the correct path
+  // In development, use localhost server
   const startUrl = isDev 
     ? 'http://localhost:8080' 
     : `file://${path.join(__dirname, '../dist/index.html')}`;
     
+  console.log('Loading application from:', startUrl);
+  
   mainWindow.loadURL(startUrl);
 
   if (isDev) {

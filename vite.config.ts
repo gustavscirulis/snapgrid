@@ -20,5 +20,5 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: mode === 'production' ? './' : '/',
+  base: './', // Always use relative paths to ensure Electron can find assets
 }));
