@@ -1,17 +1,48 @@
+interface SaveImageOptions {
+  id: string;
+  dataUrl: string;
+  metadata: any;
+  fileExtension?: string;
+}
+
+interface SaveImageResult {
+  success: boolean;
+  path?: string;
+  error?: string;
+}
+
+interface SaveUrlCardOptions {
+  id: string;
+  metadata: any;
+}
+
+interface DeleteImageResult {
+  success: boolean;
+  error?: string;
+}
+
+interface RenameFileOptions {
+  oldPath: string;
+  newExtension: string;
+}
+
+interface RenameFileResult {
+  success: boolean;
+  newPath?: string;
+  error?: string;
+}
 
 interface ElectronAPI {
-  getAppStorageDir: () => Promise<string>;
-  saveImage: (data: { id: string; dataUrl: string; metadata: any }) => Promise<{ success: boolean; path?: string; error?: string }>;
-  loadImages: () => Promise<any[]>;
-  deleteImage: (id: string) => Promise<{ success: boolean; error?: string }>;
-  saveUrlCard: (data: { id: string; metadata: any }) => Promise<{ success: boolean; error?: string }>;
-  openStorageDir: () => Promise<{ success: boolean; error?: string }>;
+  loadImages(): Promise<any[]>;
+  saveImage(options: SaveImageOptions): Promise<SaveImageResult>;
+  saveUrlCard(options: SaveUrlCardOptions): Promise<void>;
+  deleteImage(id: string): Promise<DeleteImageResult>;
+  renameFile(options: RenameFileOptions): Promise<RenameFileResult>;
 }
 
 declare global {
   interface Window {
     electron: ElectronAPI;
+    ipcRenderer: any;
   }
 }
-
-export {};

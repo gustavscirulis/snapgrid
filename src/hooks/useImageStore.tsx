@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -169,7 +168,7 @@ export function useImageStore() {
             ...newItem,
             url: undefined
           },
-          fileExtension: fileExtension  // Make sure this is passed to the Electron side
+          fileExtension: fileExtension
         };
         
         const result = await window.electron.saveImage(saveOptions);
@@ -177,42 +176,40 @@ export function useImageStore() {
         if (result.success && result.path) {
           console.log(`${type} saved successfully at:`, result.path);
           
-          // Check if the path has the correct extension
-          const expectedExtension = fileExtension ? `.${fileExtension}` : '';
-          const actualExtension = result.path.split('.').pop() || '';
-          
-          if (type === 'video' && expectedExtension && !result.path.endsWith(expectedExtension)) {
-            console.warn(`Path has incorrect extension: expected ${expectedExtension}, but got .${actualExtension}`);
-            
-            // Instead of using the returned path with the wrong extension,
-            // construct our own path with the correct extension
-            const correctPath = result.path.replace(new RegExp(`\\.${actualExtension}$`), expectedExtension);
-            console.log(`Using corrected path: ${correctPath}`);
-            
-            const updatedItem = {
-              ...newItem,
-              actualFilePath: correctPath,  // Use the corrected path
-              url: `file://${correctPath}`   // Use the corrected path in the URL
-            };
-            
-            setImages([updatedItem, ...images.filter(img => img.id !== newItem.id)]);
-            toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} saved with corrected extension: ${correctPath}`);
-          } else {
-            // Normal case - extension is correct or not important
-            if (type === 'video') {
-              const updatedItem = {
-                ...newItem,
-                actualFilePath: result.path,
-                url: `file://${result.path}`
-              };
+          if (type === 'video' && fileExtension) {
+            if (!result.path.endsWith(`.${fileExtension}`)) {
+              console.warn(`Path has incorrect extension: expected .${fileExtension}, but got ${result.path}`);
               
-              setImages([updatedItem, ...images.filter(img => img.id !== newItem.id)]);
+              try {
+                const renameResult = await window.electron.renameFile({
+                  oldPath: result.path,
+                  newExtension: fileExtension
+                });
+                
+                if (renameResult.success && renameResult.newPath) {
+                  console.log(`File successfully renamed to:`, renameResult.newPath);
+                  
+                  const updatedItem = {
+                    ...newItem,
+                    actualFilePath: renameResult.newPath,
+                    url: `file://${renameResult.newPath}`
+                  };
+                  
+                  setImages([updatedItem, ...images.filter(img => img.id !== newItem.id)]);
+                  toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} saved and renamed with correct extension`);
+                } else {
+                  console.error(`Failed to rename file:`, renameResult.error);
+                  handleOriginalPath(type, newItem, result.path);
+                }
+              } catch (renameError) {
+                console.error("Error during file rename:", renameError);
+                handleOriginalPath(type, newItem, result.path);
+              }
             } else {
-              newItem.actualFilePath = result.path;
-              setImages([newItem, ...images.filter(img => img.id !== newItem.id)]);
+              handleOriginalPath(type, newItem, result.path);
             }
-            
-            toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} saved to: ${result.path}`);
+          } else {
+            handleOriginalPath(type, newItem, result.path);
           }
         } else {
           console.error(`Failed to save ${type}:`, result.error);
@@ -292,6 +289,31 @@ export function useImageStore() {
         toast.error("Failed to analyze image: " + errorMessage);
       }
     }
+  };
+
+  const handleOriginalPath = (type: 'image' | 'video', item: ImageItem, path: string) => {
+    if (type === 'video') {
+      const updatedItem = {
+        ...item,
+        actualFilePath: path,
+        url: `file://${path}`
+      };
+      
+      setImages(prevImages => prevImages.map(img => 
+        img.id === item.id ? updatedItem : img
+      ));
+    } else {
+      const updatedItem = {
+        ...item,
+        actualFilePath: path
+      };
+      
+      setImages(prevImages => prevImages.map(img => 
+        img.id === item.id ? updatedItem : img
+      ));
+    }
+    
+    toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} saved to: ${path}`);
   };
 
   const addUrlCard = useCallback(async (url: string) => {
