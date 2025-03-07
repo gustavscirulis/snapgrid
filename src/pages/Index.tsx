@@ -11,10 +11,11 @@ import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Toaster, toast } from "sonner";
 import SettingsPanel from "@/components/SettingsPanel";
 
-// Declare the currentVideoTime property on window
+// Declare the currentVideoTime property on window correctly
 declare global {
   interface Window {
     currentVideoTime?: number;
+    // Use the same modifier as in electron.d.ts (or vice versa)
     electron?: any;
   }
 }
