@@ -83,10 +83,21 @@ export function ImageRenderer({
 
     // In thumbnail view (grid)
     if (!controls) {
+      const [isHovering, setIsHovering] = useState(false);
+      
       return (
-        <div className={`relative ${className}`}>
+        <div 
+          className={`relative ${className}`}
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => {
+            setIsHovering(false);
+            if (videoRef.current) {
+              videoRef.current.pause();
+            }
+          }}
+        >
+          {/* Always render the poster image as the base layer */}
           {image.posterUrl ? (
-            // Show poster image in grid view
             <img 
               src={image.posterUrl} 
               alt={`Video thumbnail ${image.id}`}
@@ -99,6 +110,26 @@ export function ImageRenderer({
               <span>Video thumbnail not available</span>
             </div>
           )}
+
+          {/* Video layer that appears on hover */}
+          {isHovering && (
+            <div className="absolute inset-0">
+              <video 
+                ref={videoRef}
+                src={mediaUrl}
+                className={`w-full h-full object-cover ${className}`}
+                autoPlay
+                muted
+                loop
+                playsInline
+                onError={(e) => {
+                  // If there's an error playing the video on hover, just hide the video
+                  setIsHovering(false);
+                }}
+              />
+            </div>
+          )}
+
           {/* Video indicator icon */}
           <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
