@@ -80,57 +80,32 @@ export function ImageRenderer({
 
   // Render video element
   if (image.type === "video") {
+    console.log('Loading video from URL:', mediaUrl);
 
     // In thumbnail view (grid)
     if (!controls) {
-      const [isHovered, setIsHovered] = useState(false);
-      
-      // Hover handlers
-      const handleMouseEnter = () => setIsHovered(true);
-      const handleMouseLeave = () => setIsHovered(false);
-      
       return (
-        <div 
-          className={`relative ${className}`} 
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          {/* Static thumbnail when not hovered */}
-          {(!isHovered || !image.posterUrl) && (
-            <>
-              {image.posterUrl ? (
-                <img 
-                  src={image.posterUrl} 
-                  alt={`Video thumbnail ${image.id}`}
-                  className={`w-full h-auto object-cover ${className}`}
-                  style={{ minHeight: '120px' }}
-                />
-              ) : (
-                <div className={`flex items-center justify-center bg-gray-200 ${className}`}>
-                  <span>Video thumbnail not available</span>
-                </div>
-              )}
-            </>
-          )}
-          
-          {/* Show video on hover (autoplay, no controls) */}
-          {isHovered && (
-            <video 
-              src={mediaUrl}
-              className={`absolute inset-0 w-full h-full object-cover z-10 ${className}`}
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="auto"
+        <div className={`relative ${className}`}>
+          {image.posterUrl ? (
+            // Show poster image in grid view
+            <img 
+              src={image.posterUrl} 
+              alt={`Video thumbnail ${image.id}`}
+              className={`w-full h-auto object-cover ${className}`}
+              style={{ minHeight: '120px' }}
             />
+          ) : (
+            // Fallback if no poster is available
+            <div className={`flex items-center justify-center bg-gray-200 ${className}`}>
+              <span>Video thumbnail not available</span>
+            </div>
           )}
-          
-          {/* Video indicator badge - just show play icon */}
-          <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs z-20">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+          {/* Video indicator badge */}
+          <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs">
+            <svg className="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
             </svg>
+            {image.duration ? `${Math.floor(image.duration)}s` : 'Video'}
           </div>
         </div>
       );
