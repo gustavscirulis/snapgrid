@@ -22,6 +22,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [selectedImageRef, setSelectedImageRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
   const [clickedImageId, setClickedImageId] = useState<string | null>(null);
   const [exitAnimationComplete, setExitAnimationComplete] = useState(false);
+  const [isModalAnimating, setIsModalAnimating] = useState(false); // Added to track modal animation
 
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
 
@@ -47,7 +48,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   }, []);
 
   const handleImageClick = (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
-    // Set the state with the clicked image
     setSelectedImage(image);
     setSelectedImageRef(ref);
     setModalOpen(true);
@@ -186,7 +186,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                     <div key={image.id} className="masonry-item">
                       <motion.div 
                         ref={ref}
-                        className={`rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full`}
+                        className={`rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full ${isModalAnimating ? 'hidden' : ''}`} //Added conditional class
                         onClick={() => handleImageClick(image, ref)}
                         onMouseEnter={() => setHoveredImageId(image.id)}
                         onMouseLeave={() => setHoveredImageId(null)}
@@ -227,6 +227,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
             selectedImageRef={selectedImageRef}
             patternElements={null}
             onAnimationComplete={handleAnimationComplete}
+            onAnimatingChange={setIsModalAnimating} // Pass animation state to modal
           />
         </>
       )}

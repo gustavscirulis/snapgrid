@@ -11,6 +11,7 @@ interface AnimatedImageModalProps {
   selectedImageRef: React.RefObject<HTMLDivElement> | null;
   patternElements: React.ReactNode | null;
   onAnimationComplete?: (definition: string) => void;
+  onAnimatingChange?: (isAnimating: boolean) => void;
 }
 
 const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
@@ -19,6 +20,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   selectedImage,
   selectedImageRef,
   onAnimationComplete,
+  onAnimatingChange
 }) => {
   const [initialPosition, setInitialPosition] = useState<{
     top: number;
@@ -45,21 +47,28 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     if (isOpen) {
       document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = "";
+      // Add a small delay before allowing scrolling again to match the animation
+      const timer = setTimeout(() => {
+        document.body.style.overflow = "";
+      }, 300); // 300ms is the duration of our exit animation
+      return () => clearTimeout(timer);
     }
+  }, [isOpen]);
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
-    };
+  // Track animation state
+  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, onClose]);
+  const handleClose = () => {
+    setIsAnimatingOut(true);
+    // Notify parent component about animation state
+    if (onAnimatingChange) onAnimatingChange(true);
+    // Delay the actual close to complete the animation
+    setTimeout(() => {
+      onClose();
+      setIsAnimatingOut(false);
+      if (onAnimatingChange) onAnimatingChange(false);
+    }, 300); // Match this to the exit animation duration
+  };
 
   if (!selectedImage || !initialPosition) return null;
 
@@ -108,7 +117,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={handleClose}
           />
 
           {/* Image container - fixed position applied directly to the element */}
@@ -119,7 +128,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             initial="initial"
             animate="open"
             exit="exit"
-            onClick={onClose}
+            onClick={handleClose}
             onAnimationComplete={(definition) => {
               if (definition === "exit") {
                 onAnimationComplete && onAnimationComplete("exit");
