@@ -1,0 +1,33 @@
+Video error details: MediaError {code: 4, message: 'MEDIA_ELEMENT_ERROR: Format error'}
+onError @ ImageRenderer.tsx:103
+callCallback2 @ chunk-R6S4VRB5.js?v=9b907040:3674
+invokeGuardedCallbackDev @ chunk-R6S4VRB5.js?v=9b907040:3699
+invokeGuardedCallback @ chunk-R6S4VRB5.js?v=9b907040:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-R6S4VRB5.js?v=9b907040:3736
+executeDispatch @ chunk-R6S4VRB5.js?v=9b907040:7014
+processDispatchQueueItemsInOrder @ chunk-R6S4VRB5.js?v=9b907040:7034
+processDispatchQueue @ chunk-R6S4VRB5.js?v=9b907040:7043
+dispatchEventsForPlugins @ chunk-R6S4VRB5.js?v=9b907040:7051
+(anonymous) @ chunk-R6S4VRB5.js?v=9b907040:7174
+batchedUpdates$1 @ chunk-R6S4VRB5.js?v=9b907040:18913
+batchedUpdates @ chunk-R6S4VRB5.js?v=9b907040:3579
+dispatchEventForPluginEventSystem @ chunk-R6S4VRB5.js?v=9b907040:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-R6S4VRB5.js?v=9b907040:5478
+dispatchEvent @ chunk-R6S4VRB5.js?v=9b907040:5472
+ImageRenderer.tsx:32 Failed to load media: local-file:///Users/gustavscirulis/Documents/UIReferenceApp/vid_1741505510159_23dwb3t.mp4 SyntheticBaseEvent {_reactName: 'onError', _targetInst: null, type: 'error', nativeEvent: Event, target: video.h-full.w-auto.max-w-full.object-contain.rounded-lg.shadow-xl, …}
+handleError @ ImageRenderer.tsx:32
+onError @ ImageRenderer.tsx:104
+callCallback2 @ chunk-R6S4VRB5.js?v=9b907040:3674
+invokeGuardedCallbackDev @ chunk-R6S4VRB5.js?v=9b907040:3699
+invokeGuardedCallback @ chunk-R6S4VRB5.js?v=9b907040:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-R6S4VRB5.js?v=9b907040:3736
+executeDispatch @ chunk-R6S4VRB5.js?v=9b907040:7014
+processDispatchQueueItemsInOrder @ chunk-R6S4VRB5.js?v=9b907040:7034
+processDispatchQueue @ chunk-R6S4VRB5.js?v=9b907040:7043
+dispatchEventsForPlugins @ chunk-R6S4VRB5.js?v=9b907040:7051
+(anonymous) @ chunk-R6S4VRB5.js?v=9b907040:7174
+batchedUpdates$1 @ chunk-R6S4VRB5.js?v=9b907040:18913
+batchedUpdates @ chunk-R6S4VRB5.js?v=9b907040:3579
+dispatchEventForPluginEventSystem @ chunk-R6S4VRB5.js?v=9b907040:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-R6S4VRB5.js?v=9b907040:5478
+dispatchEvent @ chunk-R6S4VRB5.js?v=9b907040:5472
