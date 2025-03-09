@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ImageItem } from '@/hooks/useImageStore';
 
@@ -24,19 +25,22 @@ export const ImageRenderer: React.FC<MediaRendererProps> = ({
   currentTime,
   onTimeUpdate,
 }) => {
-  const mediaRef = useRef<HTMLVideoElement | HTMLImageElement>(null);
+  // Create separate refs for video and image elements
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    if (image.type === 'video' && mediaRef.current && 'currentTime' in mediaRef.current && currentTime !== undefined) {
-      (mediaRef.current as HTMLVideoElement).currentTime = currentTime;
+    if (image.type === 'video' && videoRef.current && currentTime !== undefined) {
+      videoRef.current.currentTime = currentTime;
     }
   }, [currentTime]);
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => {
     setHasError(true);
     const target = e.target as HTMLImageElement | HTMLVideoElement;
+    // Check if the target is a video element which has the error property
     if ('error' in target && target.error) {
       setErrorMessage(`Media error: ${target.error.message || 'Unknown error'}`);
       console.error('Media error details:', target.error);
@@ -56,7 +60,7 @@ export const ImageRenderer: React.FC<MediaRendererProps> = ({
   if (image.type === 'video') {
     return (
       <video
-        ref={mediaRef}
+        ref={videoRef}
         src={image.url}
         alt={alt}
         className={className}
@@ -65,8 +69,8 @@ export const ImageRenderer: React.FC<MediaRendererProps> = ({
         muted={muted}
         onError={handleError}
         onTimeUpdate={() => {
-          if (mediaRef.current && 'currentTime' in mediaRef.current && onTimeUpdate) {
-            onTimeUpdate((mediaRef.current as HTMLVideoElement).currentTime);
+          if (videoRef.current && onTimeUpdate) {
+            onTimeUpdate(videoRef.current.currentTime);
           }
         }}
       />
@@ -75,7 +79,7 @@ export const ImageRenderer: React.FC<MediaRendererProps> = ({
 
   return (
     <img
-      ref={mediaRef}
+      ref={imageRef}
       src={image.url}
       alt={alt}
       className={className}

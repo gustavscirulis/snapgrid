@@ -1,9 +1,12 @@
+
 import React, { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ImageRenderer } from "@/components/ImageRenderer";
 import AnimatedImageModal from "@/components/AnimatedImageModal";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 interface ImageGridProps {
   images: ImageItem[];

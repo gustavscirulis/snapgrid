@@ -1,3 +1,4 @@
+
 // Helper functions for Electron interaction
 
 /**
@@ -20,7 +21,7 @@ export async function isFileAccessible(filePath: string): Promise<boolean> {
   
   try {
     // Only call checkFileAccess if it exists
-    if (typeof window.electron.checkFileAccess === 'function') {
+    if (window.electron && typeof window.electron.checkFileAccess === 'function') {
       return await window.electron.checkFileAccess(filePath);
     }
     return false;
