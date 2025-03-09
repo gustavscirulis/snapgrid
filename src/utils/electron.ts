@@ -7,7 +7,17 @@
  * Check if the app is running in Electron environment
  */
 export const isElectron = (): boolean => {
-  return window?.electron !== undefined;
+  try {
+    // More robust check for Electron environment
+    return (
+      typeof window !== 'undefined' && 
+      window.electron !== undefined && 
+      window.electron !== null
+    );
+  } catch (error) {
+    console.error('Error checking Electron environment:', error);
+    return false;
+  }
 };
 
 /**
