@@ -88,23 +88,7 @@ export function useImageStore() {
     });
   };
 
-  const getVideoDimensions = async (dataUrl: string): Promise<{ width: number; height: number; duration: number; posterUrl: string }> => {
-    return new Promise((resolve, reject) => {
-      const video = document.createElement('video');
-      video.preload = 'metadata';
-      video.onloadedmetadata = () => {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-        const posterUrl = canvas.toDataURL();
-        resolve({ width: video.videoWidth, height: video.videoHeight, duration: video.duration, posterUrl });
-      };
-      video.onerror = reject;
-      video.src = dataUrl;
-    });
-  };
+  import { getVideoDimensions } from '../lib/videoUtils';
 
 
   const addImage = useCallback(async (file: File) => {

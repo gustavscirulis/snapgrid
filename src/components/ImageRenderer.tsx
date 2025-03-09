@@ -43,7 +43,35 @@ export function MediaRenderer({
   if (image.type === "video") {
     // For Electron, we need special handling of video files
     console.log('Loading video from URL:', mediaUrl);
+    console.log('Video poster URL:', image.posterUrl);
     
+    // In grid view (no controls), show the poster image as a thumbnail
+    if (!controls) {
+      return (
+        <div className={`relative ${className}`}>
+          {image.posterUrl ? (
+            <img 
+              src={image.posterUrl} 
+              alt="Video thumbnail" 
+              className={`w-full h-auto object-cover ${className}`}
+              onError={handleError}
+            />
+          ) : (
+            <div className={`flex items-center justify-center bg-gray-200 ${className}`}>
+              <span>Video thumbnail not available</span>
+            </div>
+          )}
+          <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs">
+            <svg className="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
+            </svg>
+            {image.duration ? `${Math.floor(image.duration)}s` : 'Video'}
+          </div>
+        </div>
+      );
+    }
+    
+    // In full view (with controls), show the actual video player
     return (
       <video 
         src={mediaUrl}
