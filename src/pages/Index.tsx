@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
@@ -10,6 +9,7 @@ import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Toaster, toast } from "sonner";
 import SettingsPanel from "@/components/SettingsPanel";
 import WindowControls from "@/components/WindowControls";
+import { isElectronEnvironment } from "@/utils/electron";
 
 const Index = () => {
   const { images, isUploading, isLoading, addImage, removeImage } = useImageStore();
@@ -18,18 +18,16 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    const isRunningInElectron = window && 
-      typeof window.electron !== 'undefined' && 
-      window.electron !== null;
-      
-    console.log("Electron detection:", {
-      electronExists: typeof window.electron !== 'undefined',
-      electronValue: window.electron
+    const electronAvailable = isElectronEnvironment();
+    
+    console.log("Index page - Electron detection:", {
+      electronAvailable,
+      windowElectron: window.electron
     });
     
-    setIsElectron(isRunningInElectron);
+    setIsElectron(electronAvailable);
     
-    if (isRunningInElectron) {
+    if (electronAvailable) {
       console.log("Running in Electron mode");
     } else {
       console.log("Running in browser mode. Electron APIs not available.");

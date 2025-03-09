@@ -5,9 +5,17 @@
  * Checks if the application is running in Electron environment
  */
 export function isElectronEnvironment(): boolean {
-  return !!(window && 
-    typeof window.electron !== 'undefined' &&
-    window.electron !== null);
+  const isRunningInElectron = typeof window !== 'undefined' && 
+                              window.electron !== undefined && 
+                              window.electron !== null;
+                              
+  console.log("isElectronEnvironment check:", {
+    windowExists: typeof window !== 'undefined',
+    electronExists: typeof window !== 'undefined' && typeof window.electron !== 'undefined',
+    electronValue: typeof window !== 'undefined' ? window.electron : undefined
+  });
+  
+  return isRunningInElectron;
 }
 
 /**

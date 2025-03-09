@@ -1,8 +1,10 @@
+
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey, PatternMatch } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
 import { fetchUrlMetadata } from "@/lib/metadataUtils";
 import { getVideoDimensions } from '../lib/videoUtils';
+import { isElectronEnvironment } from "@/utils/electron";
 
 export type ImageItemType = "image" | "url" | "video";
 
@@ -38,23 +40,21 @@ export function useImageStore() {
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    const isRunningInElectron = window &&
-      typeof window.electron !== 'undefined' &&
-      window.electron !== null;
+    const electronAvailable = isElectronEnvironment();
 
     console.log("useImageStore - Electron detection:", {
-      electronExists: typeof window.electron !== 'undefined',
-      electronValue: window.electron
+      electronAvailable,
+      windowElectron: window.electron
     });
 
-    setIsElectron(isRunningInElectron);
+    setIsElectron(electronAvailable);
 
     const loadImages = async () => {
       try {
-        if (isRunningInElectron) {
+        if (electronAvailable && window.electron && window.electron.loadImages) {
           console.log("Loading images from filesystem...");
           const loadedImages = await window.electron.loadImages();
-          console.log("Loaded images:", loadedImages.length);
+          console.log("Loaded images:", loadedImages?.length || 0);
           // Sort by createdAt with newest first
           const sortedImages = [...(loadedImages || [])].sort((a, b) =>
             new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
@@ -131,7 +131,7 @@ export function useImageStore() {
 
       setImages(prevImages => [newMedia, ...prevImages]);
 
-      if (isElectron && window.electron) {
+      if (isElectron && window.electron && window.electron.saveImage) {
         console.log('Saving media to disk...');
         try {
           const result = await window.electron.saveImage({

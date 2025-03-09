@@ -1,5 +1,6 @@
 
 // A service to identify UI patterns in images using OpenAI's Vision API
+import { isElectronEnvironment } from "@/utils/electron";
 
 export interface PatternMatch {
   pattern: string;
@@ -49,10 +50,8 @@ export function hasApiKey(): boolean {
 }
 
 // Check if we're running in Electron
-function isElectronEnvironment(): boolean {
-  return !!(window && 
-    typeof window.electron !== 'undefined' && 
-    window.electron !== null);
+function isElectronEnv(): boolean {
+  return isElectronEnvironment();
 }
 
 export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
@@ -65,23 +64,27 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
     const isBase64 = imageUrl.startsWith('data:');
     
     // If we're in Electron, use IPC to make the request
-    if (isElectronEnvironment()) {
+    if (isElectronEnv()) {
       console.log("Using Electron IPC for OpenAI request");
       
       try {
-        const result = await window.electron.invokeOpenAI({
-          apiKey,
-          imageUrl,
-          model: "gpt-4o",
-        });
-        
-        console.log("OpenAI Electron IPC response:", result);
-        
-        if (result.error) {
-          throw new Error(result.error);
+        if (window.electron && window.electron.invokeOpenAI) {
+          const result = await window.electron.invokeOpenAI({
+            apiKey,
+            imageUrl,
+            model: "gpt-4o",
+          });
+          
+          console.log("OpenAI Electron IPC response:", result);
+          
+          if (result.error) {
+            throw new Error(result.error);
+          }
+          
+          return result.patterns || [];
+        } else {
+          throw new Error("Electron environment detected but invokeOpenAI method is not available");
         }
-        
-        return result.patterns || [];
       } catch (error) {
         console.error("Error with Electron IPC OpenAI request:", error);
         throw error;

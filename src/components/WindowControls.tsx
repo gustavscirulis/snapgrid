@@ -6,16 +6,18 @@ type WindowControlsProps = {
 };
 
 const WindowControls = ({ className = "" }: WindowControlsProps) => {
-  const isElectron = window && typeof window.electron !== 'undefined';
+  // Check for window.electron in a more reliable way
+  const isElectron = typeof window !== 'undefined' && 
+                     window.electron !== undefined && 
+                     window.electron !== null;
+  
+  console.log("WindowControls - Electron detection:", {
+    exists: isElectron,
+    electronObject: window.electron
+  });
   
   // Don't render anything if not in Electron environment
   if (!isElectron) return null;
-
-  // Check if we should show the custom buttons or if the native ones are already visible
-  // We'll assume that if we're using the custom header approach, we should not show these buttons
-  const useNativeButtons = false; // Set to true if we want to use native buttons
-
-  if (useNativeButtons) return null;
 
   const handleClose = () => {
     if (window.electron?.close) {
@@ -35,7 +37,26 @@ const WindowControls = ({ className = "" }: WindowControlsProps) => {
     }
   };
 
-  return null; // Return null to hide these buttons as we're using the native ones
+  // Render the actual window control buttons
+  return (
+    <div className={`absolute top-1 left-2 flex items-center gap-1.5 ${className}`}>
+      <button
+        onClick={handleClose}
+        className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors"
+        aria-label="Close"
+      />
+      <button
+        onClick={handleMinimize}
+        className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors"
+        aria-label="Minimize"
+      />
+      <button
+        onClick={handleMaximize}
+        className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition-colors"
+        aria-label="Maximize"
+      />
+    </div>
+  );
 };
 
 export default WindowControls;
