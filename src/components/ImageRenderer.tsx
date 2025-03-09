@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { isElectron } from "@/utils/electron";
@@ -11,7 +10,6 @@ interface MediaRendererProps {
   autoPlay?: boolean;
   muted?: boolean;
   loop?: boolean;
-  isHovered?: boolean;
 }
 
 export function MediaRenderer({ 
@@ -21,11 +19,11 @@ export function MediaRenderer({
   controls = true,
   autoPlay = false,
   muted = true,
-  loop = false,
-  isHovered = false
+  loop = false
 }: MediaRendererProps) {
   const [loadError, setLoadError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [isHovered, setIsHovered] = useState(false);
 
   // Get the media URL (handle both direct, local-file and blob URLs)
   let mediaUrl = image.url;
@@ -34,7 +32,7 @@ export function MediaRenderer({
   const isLocalFileProtocol = mediaUrl && mediaUrl.startsWith('local-file://');
 
   // In browser development mode, we can't use local-file:// protocol
-  if (isLocalFileProtocol && !isElectron()) {
+  if (isLocalFileProtocol && !isElectron) {
     // Use a placeholder or fallback for browser development
     console.log('Using fallback for local file in browser mode');
     mediaUrl = '/placeholder.svg'; // Use a placeholder image from public folder
@@ -53,7 +51,7 @@ export function MediaRenderer({
     setLoadError(true);
     
     // Only attempt URL fixes in Electron environment with full controls
-    if (mediaUrl.startsWith('local-file://') && image.type === 'video' && controls && isElectron()) {
+    if (mediaUrl.startsWith('local-file://') && image.type === 'video' && controls && isElectron) {
       const fixedSrc = mediaUrl.replace('local-file://', 'file://');
       console.log("Attempting with corrected URL:", fixedSrc);
       if (videoRef.current){
@@ -62,14 +60,11 @@ export function MediaRenderer({
     }
   }, [image.url, mediaUrl, image.type, controls]);
 
-  // Handle video playback based on hover state
   useEffect(() => {
-    if (image.type === 'video' && videoRef.current) {
-      if (isHovered && !controls) {
-        // Play when hovered in grid view
+    if (image.type === 'video' && videoRef.current && controls) {
+      if (isHovered && !autoPlay) {
         videoRef.current.play().catch(err => console.error('Video play error:', err));
-      } else if (!isHovered && !controls && !autoPlay) {
-        // Pause when not hovered in grid view
+      } else if (!isHovered && !autoPlay) {
         videoRef.current.pause();
       }
     }
@@ -87,22 +82,30 @@ export function MediaRenderer({
   if (image.type === "video") {
     console.log('Loading video from URL:', mediaUrl); 
 
-    // In grid view (no controls), now we show actual video for hover playback
+    // In grid view (no controls), show the poster image as a thumbnail
     if (!controls) {
       return (
-        <div className={`relative ${className}`}>
-          <video 
-            ref={videoRef}
-            src={mediaUrl}
-            className={`w-full h-auto object-cover ${className}`}
-            poster={image.posterUrl}
-            controls={false}
-            muted={true}
-            playsInline
-            loop={true}
-            onError={handleError}
-            style={{ minHeight: '120px' }}
-          />
+        <div className={`relative ${className}`} >
+          {image.posterUrl ? (
+            <>
+              {/* Always use the poster image in thumbnail view to avoid video loading errors */}
+              <div 
+                className={`w-full h-auto object-cover ${className}`}
+                style={{
+                  backgroundImage: `url(${image.posterUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  minHeight: '120px'
+                }}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+              />
+            </>
+          ) : (
+            <div className={`flex items-center justify-center bg-gray-200 ${className}`}>
+              <span>Video thumbnail not available</span>
+            </div>
+          )}
           <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs">
             <svg className="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
@@ -118,7 +121,7 @@ export function MediaRenderer({
       <video 
         ref={videoRef}
         src={mediaUrl}
-        className={`rounded-lg ${className}`}
+        className={className}
         poster={image.posterUrl}
         controls={controls}
         autoPlay={autoPlay}

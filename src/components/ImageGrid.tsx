@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { X, AlertCircle, ImagePlus } from "lucide-react";
@@ -23,10 +22,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [selectedImageRef, setSelectedImageRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
   const [clickedImageId, setClickedImageId] = useState<string | null>(null);
   const [exitAnimationComplete, setExitAnimationComplete] = useState(false);
-  const [currentPlaybackTime, setCurrentPlaybackTime] = useState<Record<string, number>>({});
 
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
-  const videoRefs = useRef<Map<string, HTMLVideoElement>>({});
 
   useEffect(() => {
     const updateColumns = () => {
@@ -50,17 +47,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   }, []);
 
   const handleImageClick = (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
-    // If it's a video, store its current playback time before opening the modal
-    if (image.type === 'video') {
-      const videoElement = document.querySelector(`video[data-id="${image.id}"]`) as HTMLVideoElement;
-      if (videoElement) {
-        setCurrentPlaybackTime(prev => ({
-          ...prev,
-          [image.id]: videoElement.currentTime
-        }));
-      }
-    }
-
     // Set the state with the clicked image
     setSelectedImage(image);
     setSelectedImageRef(ref);
@@ -122,7 +108,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           className="w-full h-auto object-cover rounded-t-lg"
           controls={false}
           autoPlay={false}
-          isHovered={hoveredImageId === item.id}
         />
         <AnimatePresence>
           {hoveredImageId === item.id && (
@@ -173,23 +158,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     }
   };
 
-  // After modal is opened and images are loaded, set the playback time
-  useEffect(() => {
-    if (modalOpen && selectedImage?.type === 'video') {
-      const timer = setTimeout(() => {
-        const modalVideo = document.querySelector('.modal-video') as HTMLVideoElement;
-        if (modalVideo && currentPlaybackTime[selectedImage.id]) {
-          modalVideo.currentTime = currentPlaybackTime[selectedImage.id];
-          modalVideo.play().catch(err => console.error('Error playing modal video:', err));
-        }
-      }, 300); // Wait for modal animation to complete
-      
-      return () => clearTimeout(timer);
-    }
-  }, [modalOpen, selectedImage, currentPlaybackTime]);
-
   return (
-    <div className="px-4 pb-4 w-full">
+    <div className="px-4 py-6 w-full">
       {images.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
@@ -262,6 +232,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       )}
     </div>
   );
-}
+};
 
 export default ImageGrid;
