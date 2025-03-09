@@ -39,32 +39,49 @@ export function MediaRenderer({
   }
 
   const handleError = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLImageElement>) => {
-    // Suppress error logging for thumbnail view since we're now using poster images only
-    if (!controls) return;
-    
     const target = e.target as HTMLVideoElement | HTMLImageElement;
+    
+    // For thumbnail view, only log but don't show error state
+    if (!controls) {
+      console.warn(`Thumbnail media load warning: ${image.url}`);
+      return;
+    }
+    
     if (target.error) {
       console.error(`Media error details:`, target.error);
     }
     console.error(`Failed to load media: ${image.url}`, e);
     
+    // Only set load error for the full view
     setLoadError(true);
     
-    // Only attempt URL fixes in Electron environment with full controls
-    if (mediaUrl.startsWith('local-file://') && image.type === 'video' && controls && isElectron) {
-      const fixedSrc = mediaUrl.replace('local-file://', 'file://');
-      console.log("Attempting with corrected URL:", fixedSrc);
-      if (videoRef.current){
-        videoRef.current.src = fixedSrc;
+    // Try to recover from error in Electron
+    if (mediaUrl.startsWith('local-file://') && image.type === 'video' && isElectron) {
+      // Try both potential fixes
+      try {
+        const fixedSrc = mediaUrl.replace('local-file://', 'file://');
+        console.log("Attempting with corrected URL:", fixedSrc);
+        if (videoRef.current){
+          videoRef.current.src = fixedSrc;
+        }
+      } catch (err) {
+        console.error("Error applying video URL fix:", err);
       }
     }
-  }, [image.url, mediaUrl, image.type, controls]);
+  }, [image.url, mediaUrl, image.type, controls, isElectron]);
 
   // In non-controls mode (thumbnail), we need to handle hover differently
   useEffect(() => {
     if (image.type === 'video' && videoRef.current) {
       if (isHovered && !autoPlay) {
-        videoRef.current.play().catch(err => console.error('Video play error:', err));
+        // Only attempt to play if not already playing
+        if (videoRef.current.paused) {
+          videoRef.current.muted = true; // Ensure muted for autoplay
+          videoRef.current.play().catch(err => {
+            console.error('Video play error on hover:', err);
+            // If playing fails, at least show the poster image
+          });
+        }
       } else if (!isHovered && !autoPlay) {
         videoRef.current.pause();
         // Reset to beginning for next hover
@@ -101,10 +118,19 @@ export function MediaRenderer({
                 muted
                 playsInline
                 loop
+                onError={handleError}
                 preload="metadata"
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
               />
+              {/* Add play overlay icon to indicate it's a video */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className={`w-12 h-12 rounded-full bg-black/40 flex items-center justify-center transition-opacity ${isHovered ? 'opacity-0' : 'opacity-60'}`}>
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
+                  </svg>
+                </div>
+              </div>
             </>
           ) : (
             <div className={`flex items-center justify-center bg-gray-200 ${className}`}>
@@ -127,7 +153,7 @@ export function MediaRenderer({
         ref={videoRef}
         src={mediaUrl}
         className={className}
-        poster={image.posterUrl}
+        poster={image.posterUrl || undefined}
         controls={controls}
         autoPlay={autoPlay}
         muted={muted}
@@ -135,6 +161,9 @@ export function MediaRenderer({
         onError={handleError}
         playsInline
         controlsList="nodownload"
+        onLoadStart={() => console.log("Video loading started")}
+        onLoadedMetadata={() => console.log("Video metadata loaded")}
+        preload="auto"
       />
     );
   }
