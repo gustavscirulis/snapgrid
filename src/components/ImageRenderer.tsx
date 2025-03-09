@@ -41,16 +41,22 @@ export function MediaRenderer({
 
   // Render different elements based on media type
   if (image.type === "video") {
-    // For Electron, we use a different approach to load local video files
+    // For Electron, we need special handling of video files
+    console.log('Loading video from URL:', mediaUrl);
+    
     return (
       <video 
         src={mediaUrl}
         className={className}
         poster={image.posterUrl}
         controls={controls}
+        autoPlay={autoPlay}
         muted={muted}
         loop={loop}
-        onError={handleError}
+        onError={(e) => {
+          console.error('Video error details:', e.currentTarget.error);
+          handleError(e);
+        }}
         playsInline
         controlsList="nodownload"
       />

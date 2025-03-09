@@ -6,6 +6,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld(
   'electron',
   {
+    // Add API for checking file permissions
+    checkFileAccess: (filePath) => ipcRenderer.invoke('check-file-access', filePath),
     // Window control methods
     minimize: () => ipcRenderer.send('window-minimize'),
     maximize: () => ipcRenderer.send('window-maximize'),

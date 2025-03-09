@@ -74,6 +74,18 @@ function createWindow() {
     
   console.log('Loading application from:', startUrl);
   
+  // Add webSecurity configuration and CSP for local media playback
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self' 'unsafe-inline' local-file: file: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
+        ]
+      }
+    });
+  });
+  
   mainWindow.loadURL(startUrl);
 
   if (isDev) {
@@ -265,5 +277,18 @@ ipcMain.handle('save-url-card', async (event, { id, metadata }) => {
   } catch (error) {
     console.error('Error saving URL card:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// Add handler for checking file access permissions
+ipcMain.handle('check-file-access', async (event, filePath) => {
+  try {
+    // Check if file exists and is readable
+    await fs.access(filePath, fs.constants.R_OK);
+    console.log(`File is accessible: ${filePath}`);
+    return { success: true, accessible: true };
+  } catch (error) {
+    console.error(`File access error for ${filePath}:`, error);
+    return { success: true, accessible: false, error: error.message };
   }
 });
