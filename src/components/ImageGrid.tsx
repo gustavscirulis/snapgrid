@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import AnimatedImageModal from "./AnimatedImageModal";
 import { useEffect as useFramerEffect } from "framer-motion";
 import { motion, AnimatePresence } from "framer-motion";
-import { MediaRenderer } from "@/components/ImageRenderer";
+import { ImageRenderer } from "@/components/ImageRenderer";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -102,7 +102,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const renderItem = (item: ImageItem) => {
     return (
       <div className="relative">
-        <MediaRenderer 
+        <ImageRenderer 
           image={item}
           alt="UI Screenshot"
           className="w-full h-auto object-cover rounded-t-lg"
