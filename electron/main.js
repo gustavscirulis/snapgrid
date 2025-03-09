@@ -3,6 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs-extra';
 import os from 'os';
+import {promises as fsPromises} from 'fs'; // Import fsPromises
+
 
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -63,7 +65,8 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.cjs'),
-      webSecurity: true
+      webSecurity: true, // Added for security
+      sandbox: false // Added to allow Node.js modules in preload
     },
   });
 
@@ -81,7 +84,7 @@ function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com local-file: file: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
+          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
         ]
       }
     });
@@ -285,7 +288,7 @@ ipcMain.handle('save-url-card', async (event, { id, metadata }) => {
 ipcMain.handle('check-file-access', async (event, filePath) => {
   try {
     // Check if file exists and is readable
-    await fs.access(filePath, fs.constants.R_OK);
+    await fsPromises.access(filePath, fsPromises.constants.R_OK); // Use fsPromises here
     console.log(`File is accessible: ${filePath}`);
     return { success: true, accessible: true };
   } catch (error) {

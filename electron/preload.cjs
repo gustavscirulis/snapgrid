@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const fs = require('node:fs/promises');
-const path = require('node:path');
+const fs = require('fs');
+const path = require('path');
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -36,7 +36,12 @@ contextBridge.exposeInMainWorld(
           filePath = filePath.replace('file://', '');
         }
 
-        const imageBuffer = await fs.promises.readFile(filePath);
+        const imageBuffer = await new Promise((resolve, reject) => {
+          fs.readFile(filePath, (err, data) => {
+            if (err) reject(err);
+            else resolve(data);
+          });
+        });
 
         const ext = path.extname(filePath).toLowerCase();
         let mimeType = 'image/png'; 

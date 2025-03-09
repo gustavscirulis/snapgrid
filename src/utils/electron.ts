@@ -9,12 +9,21 @@
 export const isElectron = (): boolean => {
   try {
     // More robust check for Electron environment
-    return (
-      typeof window !== 'undefined' && 
-      typeof window.electron !== 'undefined' && 
-      window.electron !== null && 
-      Object.keys(window.electron).length > 0
-    );
+    // First check if the electron property exists
+    if (typeof window !== 'undefined' && 
+        typeof window.electron !== 'undefined' && 
+        window.electron !== null) {
+      
+      console.log('Electron API object detected:', window.electron);
+      
+      // Check if at least one method exists and is callable
+      const hasOneMethod = Object.values(window.electron).some(
+        value => typeof value === 'function'
+      );
+      
+      return hasOneMethod;
+    }
+    return false;
   } catch (error) {
     console.error('Error checking Electron environment:', error);
     return false;
