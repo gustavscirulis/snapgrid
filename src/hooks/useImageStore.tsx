@@ -207,8 +207,6 @@ export function useImageStore() {
             console.log("Updated image in store:", updated.find(img => img.id === newMedia.id));
             return updated;
           });
-
-          }
         } catch (error) {
           console.error('Image analysis failed:', error);
           newMedia.isAnalyzing = false;
