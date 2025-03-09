@@ -141,9 +141,9 @@
     background-color: white;
     outline: none;
   }
-
+  
   /* Add pointer cursor for pattern tags */
   .text-xs.bg-secondary.text-secondary-foreground {
-    cursor: default;
+    cursor: pointer;
   }
 }
