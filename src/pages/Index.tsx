@@ -7,10 +7,9 @@ import { Search, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setOpenAIApiKey } from "@/services/aiAnalysisService";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import SettingsPanel from "@/components/SettingsPanel";
 import WindowControls from "@/components/WindowControls";
-import { isElectronEnvironment } from "@/utils/electron";
 
 const Index = () => {
   const { images, isUploading, isLoading, addImage, removeImage } = useImageStore();
@@ -19,15 +18,22 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    try {
-      const electronAvailable = isElectronEnvironment();
-      setIsElectron(electronAvailable);
+    const isRunningInElectron = window && 
+      typeof window.electron !== 'undefined' && 
+      window.electron !== null;
       
-      if (!electronAvailable) {
-        console.log("Running in browser mode. Electron APIs not available.");
-      }
-    } catch (error) {
-      console.error("Error during Electron detection:", error);
+    console.log("Electron detection:", {
+      electronExists: typeof window.electron !== 'undefined',
+      electronValue: window.electron
+    });
+    
+    setIsElectron(isRunningInElectron);
+    
+    if (isRunningInElectron) {
+      console.log("Running in Electron mode");
+    } else {
+      console.log("Running in browser mode. Electron APIs not available.");
+      toast.warning("Running in browser mode. Local storage features are not available.");
     }
     
     const savedApiKey = localStorage.getItem("openai-api-key");
@@ -107,6 +113,14 @@ const Index = () => {
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
         />
+
+        <footer className="py-4 text-center text-sm text-muted-foreground">
+          {!isElectron && (
+            <p>
+              Running in browser mode. Local storage features are not available.
+            </p>
+          )}
+        </footer>
       </div>
     </UploadZone>
   );

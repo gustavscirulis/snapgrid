@@ -1,43 +1,49 @@
 
-// Helper functions for Electron interaction
+/**
+ * Utility functions for Electron-related operations
+ */
 
 /**
- * Checks if the application is running in Electron environment
+ * Check if the app is running in Electron environment
  */
-export function isElectronEnvironment(): boolean {
-  // Check if window.electron exists without accessing properties
-  // that might not exist
-  const windowExists = typeof window !== 'undefined';
-  const electronExists = windowExists && window.electron !== undefined;
-  
-  // Look for Electron in user agent as a fallback detection method
-  const userAgentHasElectron = windowExists && 
-    typeof window.navigator !== 'undefined' && 
-    /electron/i.test(window.navigator.userAgent);
-    
-  const isRunningInElectron = electronExists || userAgentHasElectron;
-  
-  return isRunningInElectron;
-}
+export const isElectron = (): boolean => {
+  try {
+    // More robust check for Electron environment
+    return (
+      typeof window !== 'undefined' && 
+      typeof window.electron !== 'undefined' && 
+      window.electron !== null && 
+      Object.keys(window.electron).length > 0
+    );
+  } catch (error) {
+    console.error('Error checking Electron environment:', error);
+    return false;
+  }
+};
 
 /**
- * Checks if a file path is accessible in the Electron environment
- * @param filePath Path to check
+ * Get the file protocol for local files
+ * Returns the appropriate protocol based on the environment
  */
-export async function isFileAccessible(filePath: string): Promise<boolean> {
-  if (!isElectronEnvironment() || !window.electron) {
+export const getLocalFileUrl = (filePath: string): string => {
+  // In Electron, the main process registers a custom protocol handler
+  return `local-file://${filePath}`;
+};
+
+/**
+ * Check if a file path is accessible
+ */
+export const checkFileAccess = async (filePath: string): Promise<boolean> => {
+  if (!isElectron()) {
+    console.warn('File access check not available in browser mode');
     return false;
   }
   
   try {
-    // Only call checkFileAccess if it exists
-    if (window.electron && typeof window.electron.checkFileAccess === 'function') {
-      const result = await window.electron.checkFileAccess(filePath);
-      return result;
-    }
-    return false;
+    const result = await window.electron?.checkFileAccess(filePath);
+    return result?.accessible || false;
   } catch (error) {
-    console.error("Error checking file access:", error);
+    console.error('Error checking file access:', error);
     return false;
   }
-}
+};

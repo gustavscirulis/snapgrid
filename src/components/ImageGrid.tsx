@@ -1,12 +1,12 @@
-
-import React, { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { ImageRenderer } from "@/components/ImageRenderer";
-import AnimatedImageModal from "@/components/AnimatedImageModal";
-import { Badge } from "@/components/ui/badge";
+import { X, AlertCircle, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import AnimatedImageModal from "./AnimatedImageModal";
+import { useEffect as useFramerEffect } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { ImageRenderer } from "@/components/ImageRenderer";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -47,6 +47,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   }, []);
 
   const handleImageClick = (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
+    // Set the state with the clicked image
     setSelectedImage(image);
     setSelectedImageRef(ref);
     setModalOpen(true);
@@ -67,14 +68,16 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       if (item.isAnalyzing) {
         return (
           <div className="flex items-center gap-1 text-xs text-primary-foreground bg-primary/80 px-2 py-1 rounded-md">
-            <Badge variant="outline">Analyzing...</Badge>
+            <AlertCircle className="w-3 h-3 animate-pulse" />
+            <span>Analyzing...</span>
           </div>
         );
       }
       if (item.error) {
         return (
           <div className="flex items-center gap-1 text-xs text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-md">
-            <Badge variant="outline">Analysis failed</Badge>
+            <AlertCircle className="w-3 h-3" />
+            <span>Analysis failed</span>
           </div>
         );
       }

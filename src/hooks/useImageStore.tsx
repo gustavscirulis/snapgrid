@@ -1,9 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
-import { analyzeImage, hasApiKey, PatternMatch } from "@/services/aiAnalysisService";
+import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
 import { fetchUrlMetadata } from "@/lib/metadataUtils";
 import { getVideoDimensions } from '../lib/videoUtils';
-import { isElectronEnvironment } from "@/utils/electron";
 
 export type ImageItemType = "image" | "url" | "video";
 
@@ -39,13 +38,24 @@ export function useImageStore() {
   const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
-    const electronAvailable = isElectronEnvironment();
-    setIsElectron(electronAvailable);
+    const isRunningInElectron = window &&
+      typeof window.electron !== 'undefined' &&
+      window.electron !== null;
+
+    console.log("useImageStore - Electron detection:", {
+      electronExists: typeof window.electron !== 'undefined',
+      electronValue: window.electron
+    });
+
+    setIsElectron(isRunningInElectron);
 
     const loadImages = async () => {
       try {
-        if (electronAvailable && window.electron && window.electron.loadImages) {
+        if (isRunningInElectron) {
+          console.log("Loading images from filesystem...");
           const loadedImages = await window.electron.loadImages();
+          console.log("Loaded images:", loadedImages.length);
+          // Sort by createdAt with newest first
           const sortedImages = [...(loadedImages || [])].sort((a, b) =>
             new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
           );
@@ -73,6 +83,7 @@ export function useImageStore() {
     });
   };
 
+
   const getImageDimensions = async (dataUrl: string): Promise<{ width: number; height: number }> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -82,40 +93,20 @@ export function useImageStore() {
     });
   };
 
-  const updateImageMetadata = async (image: ImageItem) => {
-    if (isElectron && window.electron && window.electron.updateImageMetadata) {
-      try {
-        await window.electron.updateImageMetadata({
-          id: image.id,
-          metadata: {
-            width: image.width,
-            height: image.height,
-            createdAt: image.createdAt,
-            title: image.title,
-            description: image.description,
-            type: image.type,
-            duration: image.duration,
-            posterUrl: image.posterUrl,
-            patterns: image.patterns,
-          }
-        });
-      } catch (error) {
-        console.error("Failed to update image metadata:", error);
-        toast.error("Failed to save image metadata");
-      }
-    }
-  };
 
   const addImage = useCallback(async (file: File) => {
     setIsUploading(true);
 
+    // Create a unique ID
     const isVideo = file.type.startsWith('video/');
     const idPrefix = isVideo ? 'vid' : 'img';
     const id = `${idPrefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     try {
+      // Read the file as data URL
       const dataUrl = await readFileAsDataURL(file);
 
+      // Base properties for any media
       let newMedia: ImageItem = {
         id,
         type: isVideo ? "video" : "image",
@@ -126,6 +117,7 @@ export function useImageStore() {
       };
 
       if (isVideo) {
+        // For videos, we need to create a video element to get dimensions and generate a poster
         const videoData = await getVideoDimensions(dataUrl as string);
         newMedia = {
           ...newMedia,
@@ -135,6 +127,7 @@ export function useImageStore() {
           posterUrl: videoData.posterUrl,
         };
       } else {
+        // For images, get dimensions as before
         const { width, height } = await getImageDimensions(dataUrl as string);
         newMedia = {
           ...newMedia,
@@ -143,9 +136,12 @@ export function useImageStore() {
         };
       }
 
+      // Add to images list
       setImages(prevImages => [newMedia, ...prevImages]);
 
-      if (isElectron && window.electron && window.electron.saveImage) {
+      // If running in Electron, save to disk
+      if (isElectron && window.electron) {
+        console.log('Saving media to disk...');
         try {
           const result = await window.electron.saveImage({
             id: newMedia.id,
@@ -163,10 +159,14 @@ export function useImageStore() {
           });
 
           if (result.success && result.path) {
+            console.log("Media saved successfully at:", result.path);
+            // Update with direct file path instead of base64
             newMedia.actualFilePath = result.path;
             newMedia.url = `local-file://${result.path}`;
             newMedia.useDirectPath = true;
             setImages([newMedia, ...images.filter(img => img.id !== newMedia.id)]);
+
+            toast.success(`Media saved to: ${result.path}`);
           } else {
             console.error("Failed to save media:", result.error);
             toast.error(`Failed to save media: ${result.error || "Unknown error"}`);
@@ -181,33 +181,26 @@ export function useImageStore() {
 
       setIsUploading(false);
 
+      // If API key is set and it's an image (not video), analyze the image
       const hasKey = await hasApiKey();
       if (hasKey && newMedia.type === "image") {
+        // Update the state to reflect analysis is in progress
         newMedia.isAnalyzing = true;
         setImages(prevImages =>
           prevImages.map(img => img.id === newMedia.id ? newMedia : img)
         );
 
         try {
-          const patternResults = await analyzeImage(dataUrl as string);
+          const analysis = await analyzeImage(dataUrl as string);
 
-          if (patternResults && patternResults.length > 0) {
-            const patterns: PatternTag[] = patternResults.map(p => ({
-              name: p.pattern,
-              confidence: p.confidence
-            }));
-            newMedia.patterns = patterns;
+          if (analysis.patterns && analysis.patterns.length > 0) {
+            // Update the image with analysis results
+            newMedia.patterns = analysis.patterns;
             newMedia.isAnalyzing = false;
 
             setImages(prevImages =>
               prevImages.map(img => img.id === newMedia.id ? newMedia : img)
             );
-
-            await updateImageMetadata(newMedia);
-            
-            console.log("Image analysis completed:", patterns);
-          } else {
-            throw new Error("No patterns detected");
           }
         } catch (error) {
           console.error('Image analysis failed:', error);
@@ -217,9 +210,6 @@ export function useImageStore() {
           setImages(prevImages =>
             prevImages.map(img => img.id === newMedia.id ? newMedia : img)
           );
-          
-          await updateImageMetadata(newMedia);
-          
           toast.error("Image analysis failed: " + (error instanceof Error ? error.message : 'Unknown error'));
         }
       }
@@ -330,4 +320,3 @@ export function useImageStore() {
     removeImage,
   };
 }
-

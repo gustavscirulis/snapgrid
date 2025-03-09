@@ -24,6 +24,5 @@
     "target": [
       "dmg"
     ]
-  },
-  "asar": false
+  }
 }
