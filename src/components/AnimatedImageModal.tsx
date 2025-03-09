@@ -80,9 +80,14 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           exit="exit"
           transition={{ duration: 0.3 }}
           onClick={handleClickOutside}
-          onAnimationComplete={() => onAnimationComplete?.("enter")}
-          // Changed onExit to exit animation complete
-          onAnimationComplete={() => onAnimationComplete?.("exit")}
+          onAnimationComplete={(definition) => {
+            // Handle both enter and exit animation complete events
+            if (definition === "visible") {
+              onAnimationComplete?.("enter");
+            } else if (definition === "exit") {
+              onAnimationComplete?.("exit");
+            }
+          }}
         >
           <motion.div
             className="relative bg-background rounded-lg shadow-lg max-w-4xl max-h-[90vh] w-full overflow-auto"

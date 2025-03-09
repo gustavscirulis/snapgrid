@@ -62,7 +62,6 @@ export const ImageRenderer: React.FC<MediaRendererProps> = ({
       <video
         ref={videoRef}
         src={image.url}
-        alt={alt}
         className={className}
         controls={controls}
         autoPlay={autoPlay}
@@ -73,6 +72,7 @@ export const ImageRenderer: React.FC<MediaRendererProps> = ({
             onTimeUpdate(videoRef.current.currentTime);
           }
         }}
+        title={alt} // Use title attribute instead of alt for accessibility
       />
     );
   }

@@ -5,13 +5,14 @@ interface IElectronAPI {
   maximize?: () => void;
   close?: () => void;
   
-  // File storage operations
-  loadImages?: () => Promise<any[]>;
-  saveImage?: (data: { id: string; dataUrl: string; metadata: any }) => Promise<{ success: boolean; path?: string; error?: string }>;
-  deleteImage?: (id: string) => Promise<{ success: boolean; error?: string }>;
-  saveUrlCard?: (data: { id: string; metadata: any }) => Promise<{ success: boolean; error?: string }>;
-  getAppStorageDir?: () => Promise<string>;
-  openStorageDir?: () => Promise<{ success: boolean; error?: string }>;
+  // File system operations
+  saveFile?: (content: string, defaultPath?: string) => Promise<string | null>;
+  openFile?: () => Promise<string | null>;
+  readFile?: (filePath: string) => Promise<string | null>;
+  writeFile?: (filePath: string, content: string) => Promise<boolean>;
+  
+  // File metadata
+  getFileMetadata?: (filePath: string) => Promise<any>;
   
   // Browser functionality
   openUrl?: (url: string) => void;
@@ -26,7 +27,6 @@ interface IElectronAPI {
   }>;
 }
 
-// Define the protocol for local file access
 declare global {
   interface Window {
     electron?: IElectronAPI;
