@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey, PatternMatch } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
@@ -41,21 +40,12 @@ export function useImageStore() {
 
   useEffect(() => {
     const electronAvailable = isElectronEnvironment();
-
-    console.log("useImageStore - Electron detection:", {
-      electronAvailable,
-      windowElectron: window.electron
-    });
-
     setIsElectron(electronAvailable);
 
     const loadImages = async () => {
       try {
         if (electronAvailable && window.electron && window.electron.loadImages) {
-          console.log("Loading images from filesystem...");
           const loadedImages = await window.electron.loadImages();
-          console.log("Loaded images:", loadedImages?.length || 0);
-          // Sort by createdAt with newest first
           const sortedImages = [...(loadedImages || [])].sort((a, b) =>
             new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
           );
@@ -90,6 +80,30 @@ export function useImageStore() {
       img.onerror = reject;
       img.src = dataUrl;
     });
+  };
+
+  const updateImageMetadata = async (image: ImageItem) => {
+    if (isElectron && window.electron && window.electron.updateImageMetadata) {
+      try {
+        await window.electron.updateImageMetadata({
+          id: image.id,
+          metadata: {
+            width: image.width,
+            height: image.height,
+            createdAt: image.createdAt,
+            title: image.title,
+            description: image.description,
+            type: image.type,
+            duration: image.duration,
+            posterUrl: image.posterUrl,
+            patterns: image.patterns,
+          }
+        });
+      } catch (error) {
+        console.error("Failed to update image metadata:", error);
+        toast.error("Failed to save image metadata");
+      }
+    }
   };
 
   const addImage = useCallback(async (file: File) => {
@@ -132,7 +146,6 @@ export function useImageStore() {
       setImages(prevImages => [newMedia, ...prevImages]);
 
       if (isElectron && window.electron && window.electron.saveImage) {
-        console.log('Saving media to disk...');
         try {
           const result = await window.electron.saveImage({
             id: newMedia.id,
@@ -150,13 +163,10 @@ export function useImageStore() {
           });
 
           if (result.success && result.path) {
-            console.log("Media saved successfully at:", result.path);
             newMedia.actualFilePath = result.path;
             newMedia.url = `local-file://${result.path}`;
             newMedia.useDirectPath = true;
             setImages([newMedia, ...images.filter(img => img.id !== newMedia.id)]);
-
-            toast.success(`Media saved to: ${result.path}`);
           } else {
             console.error("Failed to save media:", result.error);
             toast.error(`Failed to save media: ${result.error || "Unknown error"}`);
@@ -192,6 +202,9 @@ export function useImageStore() {
             setImages(prevImages =>
               prevImages.map(img => img.id === newMedia.id ? newMedia : img)
             );
+
+            await updateImageMetadata(newMedia);
+            
             console.log("Image analysis completed:", patterns);
           } else {
             throw new Error("No patterns detected");
@@ -204,6 +217,9 @@ export function useImageStore() {
           setImages(prevImages =>
             prevImages.map(img => img.id === newMedia.id ? newMedia : img)
           );
+          
+          await updateImageMetadata(newMedia);
+          
           toast.error("Image analysis failed: " + (error instanceof Error ? error.message : 'Unknown error'));
         }
       }
@@ -314,3 +330,4 @@ export function useImageStore() {
     removeImage,
   };
 }
+
