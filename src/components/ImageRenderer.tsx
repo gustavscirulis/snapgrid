@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 
 interface MediaRendererProps {
@@ -24,14 +24,28 @@ export function MediaRenderer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isHovered, setIsHovered] = useState(false);
 
-  // For direct file paths, use the URL directly
-  // For base64 or web URLs, use them as is
-  const mediaUrl = image.url;
+  // Get the media URL (handle both direct, local-file and blob URLs)
+  let mediaUrl = image.url;
 
-  const handleError = (e: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => {
-    console.error(`Failed to load media: ${mediaUrl}`, e);
+  // If we're in browser mode and using local-file protocol, create a fallback
+  const isLocalFileProtocol = mediaUrl && mediaUrl.startsWith('local-file://');
+  const isRunningInElectron = window && typeof window.electron !== 'undefined' && window.electron !== null;
+
+  // In browser development mode, we can't use local-file:// protocol
+  if (isLocalFileProtocol && !isRunningInElectron) {
+    // Use a placeholder or fallback for browser development
+    console.log('Using fallback for local file in browser mode');
+    mediaUrl = '/placeholder.svg'; // Use a placeholder image from public folder
+  }
+
+  const handleError = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLImageElement>) => {
+    const target = e.target as HTMLVideoElement;
+    if (target.error) {
+      console.error(`Video error details:`, target.error);
+    }
+    console.error(`Failed to load media: ${image.url}`, e);
     setLoadError(true);
-  };
+  }, [image.url]);
 
   useEffect(() => {
     if (image.type === 'video' && videoRef.current) {
@@ -53,7 +67,7 @@ export function MediaRenderer({
 
   // Render different elements based on media type
   if (image.type === "video") {
-    console.log('Loading video from URL:', mediaUrl); //Removed "Video poster URL" log
+    console.log('Loading video from URL:', mediaUrl); 
 
     // In grid view (no controls), show the poster image as a thumbnail
     if (!controls) {
@@ -99,10 +113,7 @@ export function MediaRenderer({
         autoPlay={autoPlay}
         muted={muted}
         loop={loop}
-        onError={(e) => {
-          console.error('Video error details:', e.currentTarget.error);
-          handleError(e);
-        }}
+        onError={handleError}
         playsInline
         controlsList="nodownload"
       />

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
 import { MediaRenderer } from "@/components/ImageRenderer";
+import { isElectron } from "@/utils/electron"; // Assuming this utility function exists
 
 interface AnimatedImageModalProps {
   isOpen: boolean;
@@ -36,20 +37,17 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         height: rect.height,
       });
     } else if (!isOpen) {
-      // Don't reset position immediately to maintain the animation target
       setTimeout(() => setInitialPosition(null), 300);
     }
   }, [isOpen, selectedImageRef]);
 
   useEffect(() => {
-    // Lock body scroll when modal is open
     if (isOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
     }
 
-    // Escape key handler
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
         onClose();
@@ -115,7 +113,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
           {/* Image container - fixed position applied directly to the element */}
           <motion.div
-            className="fixed z-50 overflow-hidden rounded-lg"
+            className="fixed z-50 overflow-hidden rounded-lg flex items-center justify-center" // Added centering classes
             style={{ position: "fixed" }}
             variants={modalVariants}
             initial="initial"
@@ -135,6 +133,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               controls={true}
               autoPlay={selectedImage.type === "video"}
               muted={false}
+              isElectron={isElectron} // Pass isElectron flag to MediaRenderer
             />
           </motion.div>
         </>
