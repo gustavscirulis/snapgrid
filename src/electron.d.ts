@@ -17,6 +17,13 @@ interface IElectronAPI {
   openUrl?: (url: string) => void;
 }
 
+// Define the protocol for local file access
+declare global {
+  interface Window {
+    electron?: IElectronAPI;
+  }
+}
+
 declare global {
   interface Window {
     electron?: IElectronAPI;

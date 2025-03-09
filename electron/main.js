@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs-extra';
@@ -85,7 +85,19 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  // Register custom protocol to serve local files
+  protocol.registerFileProtocol('local-file', (request, callback) => {
+    const url = request.url.replace('local-file://', '');
+    try {
+      return callback(decodeURI(url));
+    } catch (error) {
+      console.error('Error with protocol handler:', error);
+    }
+  });
+  
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -173,15 +185,15 @@ ipcMain.handle('load-images', async () => {
           // Load metadata
           const metadata = await fs.readJson(metadataPath);
           
-          // Read the image file and convert to base64 for display
-          const imageData = await fs.readFile(imagePath);
-          const base64Image = `data:image/png;base64,${imageData.toString('base64')}`;
+          // Instead of base64, use the local-file protocol
+          const localFileUrl = `local-file://${imagePath}`;
           
           return {
             ...metadata,
             id,
-            url: base64Image,
-            actualFilePath: imagePath
+            url: localFileUrl,
+            actualFilePath: imagePath,
+            useDirectPath: true // Flag to indicate this is a direct file path
           };
         } catch (err) {
           console.error(`Error loading image ${id}:`, err);

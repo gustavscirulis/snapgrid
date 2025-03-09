@@ -25,6 +25,7 @@ export interface ImageItem {
   isAnalyzing?: boolean;
   error?: string;
   actualFilePath?: string;
+  useDirectPath?: boolean; // Flag to indicate if we're using direct file path
 }
 
 export function useImageStore() {
@@ -109,7 +110,10 @@ export function useImageStore() {
             
             if (result.success && result.path) {
               console.log("Image saved successfully at:", result.path);
+              // Update with direct file path instead of base64
               newImage.actualFilePath = result.path;
+              newImage.url = `local-file://${result.path}`;
+              newImage.useDirectPath = true;
               setImages([newImage, ...images.filter(img => img.id !== newImage.id)]);
               
               toast.success(`Image saved to: ${result.path}`);
