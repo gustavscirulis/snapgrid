@@ -11,6 +11,14 @@ interface IElectronAPI {
   readFile?: (filePath: string) => Promise<string | null>;
   writeFile?: (filePath: string, content: string) => Promise<boolean>;
   
+  // Image management operations
+  loadImages?: () => Promise<any[]>;
+  saveImage?: (data: { id: string; dataUrl: string; metadata: any }) => Promise<{ success: boolean; path?: string; error?: string }>;
+  deleteImage?: (id: string) => Promise<{ success: boolean; error?: string }>;
+  saveUrlCard?: (data: { id: string; metadata: any }) => Promise<{ success: boolean; error?: string }>;
+  getAppStorageDir?: () => Promise<string>;
+  openStorageDir?: () => Promise<{ success: boolean; error?: string }>;
+  
   // File metadata
   getFileMetadata?: (filePath: string) => Promise<any>;
   
