@@ -54,16 +54,12 @@ export function useImageStore() {
         if (isRunningInElectron) {
           console.log("Loading images from filesystem...");
           const loadedImages = await window.electron.loadImages();
-          console.log("Loaded images from Electron storage:", loadedImages);
-
-          if (Array.isArray(loadedImages) && loadedImages.length > 0) {
-            // Make sure we properly parse any stored patterns
-            const processedImages = loadedImages.map(img => ({
-              ...img,
-              patterns: img.patterns || [] // Ensure patterns is always an array
-            }));
-            setImages(processedImages);
-          }
+          console.log("Loaded images:", loadedImages.length);
+          // Sort by createdAt with newest first
+          const sortedImages = [...(loadedImages || [])].sort((a, b) =>
+            new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+          );
+          setImages(sortedImages);
         } else {
           setImages([]);
           toast.warning("Running in browser mode. Images will not be saved permanently.");
@@ -159,7 +155,6 @@ export function useImageStore() {
               type: newMedia.type,
               duration: newMedia.duration,
               posterUrl: newMedia.posterUrl,
-              patterns: newMedia.patterns // Include patterns if they exist
             }
           });
 
@@ -191,58 +186,30 @@ export function useImageStore() {
       if (hasKey && newMedia.type === "image") {
         // Update the state to reflect analysis is in progress
         newMedia.isAnalyzing = true;
-        toast.info("Analyzing image for UI patterns...");
-
-        // Update in-memory state first
         setImages(prevImages =>
-          prevImages.map(img =>
-            img.id === newMedia.id ? { ...img, isAnalyzing: true } : img
-          )
+          prevImages.map(img => img.id === newMedia.id ? newMedia : img)
         );
 
         try {
-          const analysis = await analyzeImage(newMedia.url);
-          console.log("Image analysis results:", analysis);
+          const analysis = await analyzeImage(dataUrl as string);
 
-          // Update the analysis state with parsed patterns
-          const patternTags = Array.isArray(analysis) ? analysis : [];
-          newMedia.patterns = patternTags;
-          newMedia.isAnalyzing = false;
+          if (analysis.patterns && analysis.patterns.length > 0) {
+            // Update the image with analysis results
+            newMedia.patterns = analysis.patterns;
+            newMedia.isAnalyzing = false;
 
-          console.log(`Saving patterns for ${newMedia.id}:`, patternTags);
-
-          // Update in React state
-          setImages(currentImages => {
-            const updatedImages = currentImages.map(img =>
-              img.id === newMedia.id
-                ? { ...img, patterns: patternTags, isAnalyzing: false }
-                : img
+            setImages(prevImages =>
+              prevImages.map(img => img.id === newMedia.id ? newMedia : img)
             );
-            // Force a re-render by creating a new array
-            return [...updatedImages];
-          });
-          
-          // Save to electron storage
-          if (window.electron && window.electron.saveMediaData) {
-            const mediaToSave = {...newMedia};
-            // Ensure the data is serializable
-            delete mediaToSave.element;
-            window.electron.saveMediaData(mediaToSave);
           }
         } catch (error) {
           console.error('Image analysis failed:', error);
           newMedia.isAnalyzing = false;
           newMedia.error = 'Analysis failed';
 
-          setImages(currentImages => {
-            const updatedImages = currentImages.map(img =>
-              img.id === newMedia.id
-                ? { ...img, error: error.message, isAnalyzing: false }
-                : img
-            );
-            // Force a re-render by creating a new array
-            return [...updatedImages];
-          });
+          setImages(prevImages =>
+            prevImages.map(img => img.id === newMedia.id ? newMedia : img)
+          );
           toast.error("Image analysis failed: " + (error instanceof Error ? error.message : 'Unknown error'));
         }
       }

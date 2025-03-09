@@ -19,13 +19,13 @@ let mainWindow;
 const getAppStorageDir = () => {
   const platform = process.platform;
   let storageDir;
-
+  
   if (platform === 'darwin') {
     // On macOS, try to use Documents folder first for visibility
     const homeDir = os.homedir();
     storageDir = path.join(homeDir, 'Documents', 'UIReferenceApp');
     console.log('Using Documents folder path:', storageDir);
-
+    
     // Create a README file to help users find the folder
     const readmePath = path.join(storageDir, 'README.txt');
     if (!fs.existsSync(readmePath)) {
@@ -42,17 +42,17 @@ const getAppStorageDir = () => {
     storageDir = path.join(app.getPath('userData'), 'images');
     console.log('Using userData path:', storageDir);
   }
-
+  
   // Ensure directory exists
   fs.ensureDirSync(storageDir);
-
+  
   return storageDir;
 };
 
 function createWindow() {
   appStorageDir = getAppStorageDir();
   console.log('App storage directory:', appStorageDir);
-
+  
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -63,7 +63,6 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.cjs'),
-      webSecurity: true,
     },
   });
 
@@ -72,21 +71,21 @@ function createWindow() {
   const startUrl = isDev 
     ? 'http://localhost:8080' 
     : `file://${path.join(__dirname, '../dist/index.html')}`;
-
+    
   console.log('Loading application from:', startUrl);
-
-  // Set Content Security Policy to allow OpenAI API
+  
+  // Add webSecurity configuration and CSP for local media playback
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com/; script-src 'self' 'unsafe-inline' 'unsafe-eval'; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:; "
+          "default-src 'self' 'unsafe-inline' local-file: file: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
         ]
       }
     });
   });
-
+  
   mainWindow.loadURL(startUrl);
 
   if (isDev) {
@@ -105,14 +104,14 @@ app.whenReady().then(() => {
     try {
       // Log the request to help debug
       console.log('Protocol handler request:', { url: request.url, decodedPath: decodeURI(url) });
-
+      
       // Return the file path
       return callback(decodeURI(url));
     } catch (error) {
       console.error('Error with protocol handler:', error);
     }
   });
-
+  
   createWindow();
 });
 
@@ -160,10 +159,10 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
   try {
     // Determine if this is a video or image based on the ID prefix or metadata
     const isVideo = id.startsWith('vid_') || metadata.type === 'video';
-
+    
     // Choose the appropriate file extension
     const fileExt = isVideo ? '.mp4' : '.png';
-
+    
     // Strip data URL prefix to get base64 data
     let base64Data;
     if (isVideo) {
@@ -172,13 +171,13 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
       base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
     }
     const buffer = Buffer.from(base64Data, 'base64');
-
+    
     // Save media file with correct extension
     const filePath = path.join(appStorageDir, `${id}${fileExt}`);
     await fs.writeFile(filePath, buffer);
-
+    
     console.log(`Media saved to: ${filePath}`);
-
+    
     // Save metadata as separate JSON file
     const metadataPath = path.join(appStorageDir, `${id}.json`);
     await fs.writeJson(metadataPath, {
@@ -186,7 +185,7 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
       filePath: filePath, // Include actual file path in metadata
       type: isVideo ? 'video' : 'image' // Ensure type is correctly set
     });
-
+    
     console.log(`Media saved to: ${filePath}`);
     return { success: true, path: filePath };
   } catch (error) {
@@ -199,33 +198,33 @@ ipcMain.handle('load-images', async () => {
   try {
     const files = await fs.readdir(appStorageDir);
     const jsonFiles = files.filter(file => file.endsWith('.json'));
-
+    
     const images = await Promise.all(
       jsonFiles.map(async (file) => {
         const id = path.basename(file, '.json');
         const metadataPath = path.join(appStorageDir, file);
-
+        
         // Check if this is a video based on id prefix
         const isVideo = id.startsWith('vid_');
         // Use appropriate extension
         const fileExt = isVideo ? '.mp4' : '.png';
         const mediaPath = path.join(appStorageDir, `${id}${fileExt}`);
-
+        
         try {
           // Check if both metadata and media file exist
           if (!(await fs.pathExists(mediaPath))) {
             console.warn(`Media file not found: ${mediaPath}`);
             return null;
           }
-
+          
           // Load metadata
           const metadata = await fs.readJson(metadataPath);
-
+          
           // Use the local-file protocol for both images and videos
           const localFileUrl = `local-file://${mediaPath}`;
-
+          
           console.log(`Loading media: ${id}, path: ${mediaPath}, url: ${localFileUrl}`);
-
+          
           return {
             ...metadata,
             id,
@@ -240,7 +239,7 @@ ipcMain.handle('load-images', async () => {
         }
       })
     );
-
+    
     // Filter out any null entries (failed loads)
     return images.filter(Boolean);
   } catch (error) {
@@ -254,13 +253,13 @@ ipcMain.handle('delete-image', async (event, id) => {
     // Determine if this is a video based on id prefix
     const isVideo = id.startsWith('vid_');
     const fileExt = isVideo ? '.mp4' : '.png';
-
+    
     const mediaPath = path.join(appStorageDir, `${id}${fileExt}`);
     const metadataPath = path.join(appStorageDir, `${id}.json`);
-
+    
     await fs.remove(mediaPath);
     await fs.remove(metadataPath);
-
+    
     console.log(`Deleted media: ${mediaPath}`);
     return { success: true };
   } catch (error) {
