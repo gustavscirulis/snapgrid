@@ -45,7 +45,8 @@ export function MediaRenderer({
     if (!controls) return;
     
     const target = e.target as HTMLVideoElement | HTMLImageElement;
-    if (target.error) {
+    // Check for video.error property which exists on HTMLVideoElement
+    if ('error' in target && target.error) {
       console.error(`Media error details:`, target.error);
     }
     console.error(`Failed to load media: ${image.url}`, e);

@@ -83,7 +83,6 @@ export function useImageStore() {
     });
   };
 
-
   const getImageDimensions = async (dataUrl: string): Promise<{ width: number; height: number }> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -93,20 +92,16 @@ export function useImageStore() {
     });
   };
 
-
   const addImage = useCallback(async (file: File) => {
     setIsUploading(true);
 
-    // Create a unique ID
     const isVideo = file.type.startsWith('video/');
     const idPrefix = isVideo ? 'vid' : 'img';
     const id = `${idPrefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     try {
-      // Read the file as data URL
       const dataUrl = await readFileAsDataURL(file);
 
-      // Base properties for any media
       let newMedia: ImageItem = {
         id,
         type: isVideo ? "video" : "image",
@@ -117,7 +112,6 @@ export function useImageStore() {
       };
 
       if (isVideo) {
-        // For videos, we need to create a video element to get dimensions and generate a poster
         const videoData = await getVideoDimensions(dataUrl as string);
         newMedia = {
           ...newMedia,
@@ -127,7 +121,6 @@ export function useImageStore() {
           posterUrl: videoData.posterUrl,
         };
       } else {
-        // For images, get dimensions as before
         const { width, height } = await getImageDimensions(dataUrl as string);
         newMedia = {
           ...newMedia,
@@ -136,10 +129,8 @@ export function useImageStore() {
         };
       }
 
-      // Add to images list
       setImages(prevImages => [newMedia, ...prevImages]);
 
-      // If running in Electron, save to disk
       if (isElectron && window.electron) {
         console.log('Saving media to disk...');
         try {
@@ -160,7 +151,6 @@ export function useImageStore() {
 
           if (result.success && result.path) {
             console.log("Media saved successfully at:", result.path);
-            // Update with direct file path instead of base64
             newMedia.actualFilePath = result.path;
             newMedia.url = `local-file://${result.path}`;
             newMedia.useDirectPath = true;
@@ -181,10 +171,8 @@ export function useImageStore() {
 
       setIsUploading(false);
 
-      // If API key is set and it's an image (not video), analyze the image
       const hasKey = await hasApiKey();
       if (hasKey && newMedia.type === "image") {
-        // Update the state to reflect analysis is in progress
         newMedia.isAnalyzing = true;
         setImages(prevImages =>
           prevImages.map(img => img.id === newMedia.id ? newMedia : img)
@@ -193,9 +181,11 @@ export function useImageStore() {
         try {
           const analysis = await analyzeImage(dataUrl as string);
 
-          if (analysis.patterns && analysis.patterns.length > 0) {
-            // Update the image with analysis results
-            newMedia.patterns = analysis.patterns;
+          if (analysis && Array.isArray(analysis) && analysis.length > 0) {
+            newMedia.patterns = analysis.map(item => ({
+              name: item.name,
+              confidence: item.confidence
+            }));
             newMedia.isAnalyzing = false;
 
             setImages(prevImages =>
