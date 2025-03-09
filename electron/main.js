@@ -210,8 +210,11 @@ ipcMain.handle('load-images', async () => {
           // Load metadata
           const metadata = await fs.readJson(metadataPath);
           
-          // Instead of base64, use the local-file protocol
-          const localFileUrl = `local-file://${mediaPath}`;
+          // Instead of base64, use the local-file protocol for images
+          // For videos, we'll use the direct file path
+          const localFileUrl = isVideo ? `file://${mediaPath}` : `local-file://${mediaPath}`;
+          
+          console.log(`Loading media: ${id}, path: ${mediaPath}, url: ${localFileUrl}`);
           
           return {
             ...metadata,

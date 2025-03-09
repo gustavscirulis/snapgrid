@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 
@@ -22,16 +21,16 @@ export function MediaRenderer({
   loop = false
 }: MediaRendererProps) {
   const [loadError, setLoadError] = useState(false);
-  
+
   // For direct file paths, use the URL directly
   // For base64 or web URLs, use them as is
   const mediaUrl = image.url;
-  
+
   const handleError = (e: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => {
     console.error(`Failed to load media: ${mediaUrl}`, e);
     setLoadError(true);
   };
-  
+
   if (loadError) {
     return (
       <div className={`bg-gray-200 flex items-center justify-center ${className}`}>
@@ -44,7 +43,7 @@ export function MediaRenderer({
   if (image.type === "video") {
     return (
       <video 
-        src={mediaUrl} 
+        src={image.actualFilePath ? `file://${image.actualFilePath}` : mediaUrl} 
         className={className}
         poster={image.posterUrl}
         controls={controls}
@@ -52,10 +51,11 @@ export function MediaRenderer({
         muted={muted}
         loop={loop}
         onError={handleError}
+        playsInline
       />
     );
   }
-  
+
   // Default to image rendering
   return (
     <img 
