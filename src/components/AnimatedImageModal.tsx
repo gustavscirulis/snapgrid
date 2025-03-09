@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ImageRenderer } from "@/components/ImageRenderer";
-import { isElectron } from "@/utils/electron";
 
 interface AnimatedImageModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedImage: ImageItem | null;
   selectedImageRef: React.RefObject<HTMLDivElement> | null;
-  patternElements: React.ReactNode | null;
+  patternElements: React.ReactElement[] | null;
   onAnimationComplete?: (definition: string) => void;
 }
 
@@ -18,38 +19,15 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   onClose,
   selectedImage,
   selectedImageRef,
+  patternElements,
   onAnimationComplete,
 }) => {
-  const [initialPosition, setInitialPosition] = useState<{
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-  } | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const modalOverlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isOpen && selectedImageRef?.current) {
-      const rect = selectedImageRef.current.getBoundingClientRect();
-      setInitialPosition({
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-      });
-    } else if (!isOpen) {
-      setTimeout(() => setInitialPosition(null), 300);
-    }
-  }, [isOpen, selectedImageRef]);
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isOpen) {
         onClose();
       }
     };
@@ -57,85 +35,107 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
     };
   }, [isOpen, onClose]);
 
-  if (!selectedImage || !initialPosition) return null;
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
-  const modalVariants = {
-    initial: {
-      top: initialPosition.top,
-      left: initialPosition.left,
-      width: initialPosition.width,
-      height: initialPosition.height,
-      borderRadius: "0.5rem",
-      zIndex: 50
-    },
-    open: {
-      top: window.innerHeight / 2 - Math.min(selectedImage.height || 600, window.innerHeight * 0.95) / 2,
-      left: window.innerWidth / 2 - Math.min(selectedImage.width || 800, window.innerWidth * 0.98) / 2,
-      width: Math.min(selectedImage.width || 800, window.innerWidth * 0.98),
-      height: Math.min(selectedImage.height || 600, window.innerHeight * 0.95),
-      borderRadius: "1rem",
-      transition: {
-        type: "spring",
-        damping: 30,
-        stiffness: 300
-      }
-    },
-    exit: {
-      top: initialPosition.top,
-      left: initialPosition.left,
-      width: initialPosition.width,
-      height: initialPosition.height,
-      borderRadius: "0.5rem",
-      transition: {
-        type: "spring",
-        damping: 30,
-        stiffness: 300
-      }
+  const handleClickOutside = (event: MouseEvent) => {
+    if (modalOverlayRef.current && !modalOverlayRef.current.contains(event.target as Node)) {
+      onClose();
     }
   };
 
-  return (
-    <AnimatePresence onExitComplete={() => onAnimationComplete && onAnimationComplete("exit-complete")}>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            className="fixed inset-0 bg-black/80 z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
+  const modalVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+    exit: { opacity: 0 },
+  };
 
-          {/* Image container - fixed position applied directly to the element */}
+  const modalContentVariants = {
+    hidden: { y: 50, opacity: 0 },
+    visible: { y: 0, opacity: 1 },
+    exit: { y: 50, opacity: 0 },
+  };
+
+  return (
+    <AnimatePresence onExitComplete={() => onAnimationComplete?.("exit-complete")}>
+      {isOpen && selectedImage && (
+        <motion.div
+          ref={modalOverlayRef}
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          variants={modalVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          transition={{ duration: 0.3 }}
+          onClick={handleClickOutside}
+          onAnimationComplete={() => onAnimationComplete?.("enter")}
+          onExit={() => onAnimationComplete?.("exit")}
+        >
           <motion.div
-            className="fixed z-50 overflow-hidden rounded-lg flex items-center justify-center" // Added centering classes
-            style={{ position: "fixed" }}
-            variants={modalVariants}
-            initial="initial"
-            animate="open"
-            exit="exit"
-            onClick={onClose}
-            onAnimationComplete={(definition) => {
-              if (definition === "exit") {
-                onAnimationComplete && onAnimationComplete("exit");
-              }
+            className="relative bg-background rounded-lg shadow-lg max-w-4xl max-h-[90vh] w-full overflow-auto"
+            variants={modalContentVariants}
+            transition={{ duration: 0.3 }}
+            style={{
+              width: selectedImage.width ? Math.min(selectedImage.width, 1920) : 'auto',
+              height: selectedImage.height ? Math.min(selectedImage.height, 1080) : 'auto',
             }}
           >
-            <ImageRenderer
-              image={selectedImage}
-              alt={selectedImage.title || "Selected media"}
-              className={`h-full w-auto max-w-full object-contain rounded-lg shadow-xl ${selectedImage.type === 'video' ? 'w-auto max-w-full' : 'mx-auto'}`}
-              controls={true}
-              autoPlay={selectedImage.type === "video"}
-              muted={false}
-            />
+            <div className="absolute top-2 right-2">
+              <Button variant="ghost" size="icon" onClick={onClose}>
+                <X className="h-5 w-5" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </div>
+
+            <div className="p-4">
+              <h2 className="text-lg font-semibold mb-2">{selectedImage.title || "Image Preview"}</h2>
+              {selectedImage.description && (
+                <p className="text-sm text-muted-foreground mb-4">{selectedImage.description}</p>
+              )}
+
+              <div className="relative">
+                {selectedImage.type === "video" ? (
+                  <video
+                    src={selectedImage.url}
+                    controls
+                    autoPlay={isPlaying}
+                    className="w-full h-auto object-contain rounded-lg"
+                    onClick={() => setIsPlaying(!isPlaying)}
+                  />
+                ) : (
+                  <ImageRenderer 
+                    image={selectedImage}
+                    alt="Selected image"
+                    className="w-full h-auto object-contain rounded-lg"
+                    controls={true}
+                    autoPlay={isPlaying}
+                    muted={false}
+                  />
+                )}
+              </div>
+
+              {patternElements && (
+                <div className="mt-4">
+                  <h3 className="text-md font-semibold mb-2">Detected UI Patterns:</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {patternElements}
+                  </div>
+                </div>
+              )}
+            </div>
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>
   );

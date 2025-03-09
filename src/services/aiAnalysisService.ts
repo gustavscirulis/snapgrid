@@ -1,7 +1,7 @@
 
 // A service to identify UI patterns in images using OpenAI's Vision API
 
-interface PatternMatch {
+export interface PatternMatch {
   pattern: string;
   confidence: number;
 }
@@ -81,7 +81,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
               {
                 type: "image_url",
                 image_url: {
-                  url: isBase64 ? imageUrl : imageUrl,
+                  url: imageUrl,
                 }
               }
             ]

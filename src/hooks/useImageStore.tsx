@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
+import { analyzeImage, hasApiKey, PatternMatch } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
 import { fetchUrlMetadata } from "@/lib/metadataUtils";
 import { getVideoDimensions } from '../lib/videoUtils';
@@ -83,7 +83,6 @@ export function useImageStore() {
     });
   };
 
-
   const getImageDimensions = async (dataUrl: string): Promise<{ width: number; height: number }> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -93,20 +92,16 @@ export function useImageStore() {
     });
   };
 
-
   const addImage = useCallback(async (file: File) => {
     setIsUploading(true);
 
-    // Create a unique ID
     const isVideo = file.type.startsWith('video/');
     const idPrefix = isVideo ? 'vid' : 'img';
     const id = `${idPrefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     try {
-      // Read the file as data URL
       const dataUrl = await readFileAsDataURL(file);
 
-      // Base properties for any media
       let newMedia: ImageItem = {
         id,
         type: isVideo ? "video" : "image",
@@ -117,7 +112,6 @@ export function useImageStore() {
       };
 
       if (isVideo) {
-        // For videos, we need to create a video element to get dimensions and generate a poster
         const videoData = await getVideoDimensions(dataUrl as string);
         newMedia = {
           ...newMedia,
@@ -127,7 +121,6 @@ export function useImageStore() {
           posterUrl: videoData.posterUrl,
         };
       } else {
-        // For images, get dimensions as before
         const { width, height } = await getImageDimensions(dataUrl as string);
         newMedia = {
           ...newMedia,
@@ -136,10 +129,8 @@ export function useImageStore() {
         };
       }
 
-      // Add to images list
       setImages(prevImages => [newMedia, ...prevImages]);
 
-      // If running in Electron, save to disk
       if (isElectron && window.electron) {
         console.log('Saving media to disk...');
         try {
@@ -160,7 +151,6 @@ export function useImageStore() {
 
           if (result.success && result.path) {
             console.log("Media saved successfully at:", result.path);
-            // Update with direct file path instead of base64
             newMedia.actualFilePath = result.path;
             newMedia.url = `local-file://${result.path}`;
             newMedia.useDirectPath = true;
@@ -181,26 +171,30 @@ export function useImageStore() {
 
       setIsUploading(false);
 
-      // If API key is set and it's an image (not video), analyze the image
       const hasKey = await hasApiKey();
       if (hasKey && newMedia.type === "image") {
-        // Update the state to reflect analysis is in progress
         newMedia.isAnalyzing = true;
         setImages(prevImages =>
           prevImages.map(img => img.id === newMedia.id ? newMedia : img)
         );
 
         try {
-          const analysis = await analyzeImage(dataUrl as string);
+          const patternResults = await analyzeImage(dataUrl as string);
 
-          if (analysis.patterns && analysis.patterns.length > 0) {
-            // Update the image with analysis results
-            newMedia.patterns = analysis.patterns;
+          if (patternResults && patternResults.length > 0) {
+            const patterns: PatternTag[] = patternResults.map(p => ({
+              name: p.pattern,
+              confidence: p.confidence
+            }));
+            newMedia.patterns = patterns;
             newMedia.isAnalyzing = false;
 
             setImages(prevImages =>
               prevImages.map(img => img.id === newMedia.id ? newMedia : img)
             );
+            console.log("Image analysis completed:", patterns);
+          } else {
+            throw new Error("No patterns detected");
           }
         } catch (error) {
           console.error('Image analysis failed:', error);
