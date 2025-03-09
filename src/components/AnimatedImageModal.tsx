@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
 import { MediaRenderer } from "@/components/ImageRenderer";
-import { isElectron } from "@/utils/electron"; // Assuming this utility function exists
+import { isElectron } from "@/utils/electron";
 
 interface AnimatedImageModalProps {
   isOpen: boolean;

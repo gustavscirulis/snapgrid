@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 
+// Added utility function to check for Electron environment
+export const isElectron = typeof window !== 'undefined' && window.electron !== undefined;
+
 interface MediaRendererProps {
   image: ImageItem;
   className?: string;
@@ -29,23 +32,30 @@ export function MediaRenderer({
 
   // If we're in browser mode and using local-file protocol, create a fallback
   const isLocalFileProtocol = mediaUrl && mediaUrl.startsWith('local-file://');
-  const isRunningInElectron = window && typeof window.electron !== 'undefined' && window.electron !== null;
 
   // In browser development mode, we can't use local-file:// protocol
-  if (isLocalFileProtocol && !isRunningInElectron) {
+  if (isLocalFileProtocol && !isElectron) {
     // Use a placeholder or fallback for browser development
     console.log('Using fallback for local file in browser mode');
     mediaUrl = '/placeholder.svg'; // Use a placeholder image from public folder
   }
 
   const handleError = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLImageElement>) => {
-    const target = e.target as HTMLVideoElement;
+    const target = e.target as HTMLVideoElement | HTMLImageElement;
     if (target.error) {
-      console.error(`Video error details:`, target.error);
+      console.error(`Media error details:`, target.error);
     }
     console.error(`Failed to load media: ${image.url}`, e);
     setLoadError(true);
-  }, [image.url]);
+    // Attempt to fix local file protocol issues
+    if (mediaUrl.startsWith('local-file://') && image.type === 'video') {
+      const fixedSrc = mediaUrl.replace('local-file://', 'file://');
+      console.log("Attempting with corrected URL:", fixedSrc);
+      if (videoRef.current){
+        videoRef.current.src = fixedSrc;
+      }
+    }
+  }, [image.url, mediaUrl, image.type]);
 
   useEffect(() => {
     if (image.type === 'video' && videoRef.current) {
