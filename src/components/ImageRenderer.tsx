@@ -81,9 +81,19 @@ export function ImageRenderer({
   // Render video element
   if (image.type === "video") {
 
+    // Store current time to resume playback when going full screen
+    const [currentTime, setCurrentTime] = useState(0);
+    
     // In thumbnail view (grid)
     if (!controls) {
       const [isHovering, setIsHovering] = useState(false);
+      
+      // Update current time while video is playing in thumbnail
+      const updateCurrentTime = () => {
+        if (videoRef.current) {
+          setCurrentTime(videoRef.current.currentTime);
+        }
+      };
       
       return (
         <div 
@@ -93,6 +103,8 @@ export function ImageRenderer({
             setIsHovering(false);
             if (videoRef.current) {
               videoRef.current.pause();
+              // Save current time on mouse leave
+              setCurrentTime(videoRef.current.currentTime);
             }
           }}
         >
@@ -122,6 +134,7 @@ export function ImageRenderer({
                 muted
                 loop
                 playsInline
+                onTimeUpdate={updateCurrentTime}
                 onError={(e) => {
                   // If there's an error playing the video on hover, just hide the video
                   setIsHovering(false);
@@ -141,6 +154,13 @@ export function ImageRenderer({
     }
 
     // In full view (modal with controls)
+    useEffect(() => {
+      // Set the video to start from the saved time position when in full view
+      if (controls && videoRef.current) {
+        videoRef.current.currentTime = currentTime;
+      }
+    }, [controls, currentTime]);
+    
     return (
       <video 
         ref={videoRef}
