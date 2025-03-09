@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
 import { fetchUrlMetadata } from "@/lib/metadataUtils";
+import { getVideoDimensions } from '../lib/videoUtils';
 
 export type ImageItemType = "image" | "url" | "video";
 
@@ -87,8 +88,6 @@ export function useImageStore() {
       img.src = dataUrl;
     });
   };
-
-  import { getVideoDimensions } from '../lib/videoUtils';
 
 
   const addImage = useCallback(async (file: File) => {
