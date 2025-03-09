@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { X, AlertCircle, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import AnimatedImageModal from "./AnimatedImageModal";
+import { useEffect as useFramerEffect } from "framer-motion";
 import { motion, AnimatePresence } from "framer-motion";
 import { MediaRenderer } from "@/components/ImageRenderer";
 
@@ -24,7 +26,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [currentPlaybackTime, setCurrentPlaybackTime] = useState<Record<string, number>>({});
 
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
-  const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const videoRefs = useRef<Map<string, HTMLVideoElement>>({});
 
   useEffect(() => {
     const updateColumns = () => {
@@ -171,6 +173,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     }
   };
 
+  // After modal is opened and images are loaded, set the playback time
   useEffect(() => {
     if (modalOpen && selectedImage?.type === 'video') {
       const timer = setTimeout(() => {

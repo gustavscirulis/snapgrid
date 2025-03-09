@@ -32,7 +32,6 @@ export const getLocalFileUrl = (filePath: string): string => {
 
 /**
  * Check if a file path is accessible
- * Note: This is a stub implementation since window.electron.checkFileAccess doesn't exist yet
  */
 export const checkFileAccess = async (filePath: string): Promise<boolean> => {
   if (!isElectron()) {
@@ -41,14 +40,8 @@ export const checkFileAccess = async (filePath: string): Promise<boolean> => {
   }
   
   try {
-    // Check if the API exists before calling it
-    if (window.electron && 'checkFileAccess' in window.electron) {
-      const result = await window.electron.checkFileAccess(filePath);
-      return result?.accessible || false;
-    }
-    
-    console.warn('checkFileAccess method is not available in the electron API');
-    return false;
+    const result = await window.electron?.checkFileAccess(filePath);
+    return result?.accessible || false;
   } catch (error) {
     console.error('Error checking file access:', error);
     return false;
