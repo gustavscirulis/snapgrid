@@ -1,39 +1,54 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { isElectronEnvironment } from "@/utils/electron";
 
 type WindowControlsProps = {
   className?: string;
 };
 
 const WindowControls = ({ className = "" }: WindowControlsProps) => {
-  // Check for window.electron in a more reliable way
-  const isElectron = typeof window !== 'undefined' && 
-                     window.electron !== undefined && 
-                     window.electron !== null;
+  const [isElectron, setIsElectron] = useState(false);
   
-  console.log("WindowControls - Electron detection:", {
-    exists: isElectron,
-    electronObject: window.electron
-  });
+  useEffect(() => {
+    // Check Electron environment on component mount
+    const electronAvailable = isElectronEnvironment();
+    
+    console.log("WindowControls - Electron detection:", {
+      electronAvailable,
+      windowElectron: window.electron,
+      windowElectronMethods: window.electron ? Object.keys(window.electron) : []
+    });
+    
+    setIsElectron(electronAvailable);
+  }, []);
   
   // Don't render anything if not in Electron environment
   if (!isElectron) return null;
 
   const handleClose = () => {
+    console.log("Close button clicked");
     if (window.electron?.close) {
       window.electron.close();
+    } else {
+      console.warn("window.electron.close method not available");
     }
   };
 
   const handleMinimize = () => {
+    console.log("Minimize button clicked");
     if (window.electron?.minimize) {
       window.electron.minimize();
+    } else {
+      console.warn("window.electron.minimize method not available");
     }
   };
 
   const handleMaximize = () => {
+    console.log("Maximize button clicked");
     if (window.electron?.maximize) {
       window.electron.maximize();
+    } else {
+      console.warn("window.electron.maximize method not available");
     }
   };
 

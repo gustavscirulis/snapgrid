@@ -1,5 +1,8 @@
+
+// Use strict for better error detection
+'use strict';
+
 const { contextBridge, ipcRenderer } = require('electron');
-const path = require('path');
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -27,3 +30,5 @@ contextBridge.exposeInMainWorld('electron', {
   // Invoke OpenAI API
   invokeOpenAI: (params) => ipcRenderer.invoke('invoke-openai', params)
 });
+
+console.log('Preload script loaded successfully');

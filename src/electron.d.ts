@@ -29,7 +29,7 @@ interface IElectronAPI {
   checkFileAccess?: (filePath: string) => Promise<boolean>;
   
   // Invoke OpenAI functionality
-  invokeOpenAI: (params: { apiKey: string; imageUrl: string; model: string }) => Promise<{
+  invokeOpenAI?: (params: { apiKey: string; imageUrl: string; model: string }) => Promise<{
     patterns?: Array<{ pattern: string; confidence: number }>;
     error?: string;
   }>;
@@ -37,7 +37,7 @@ interface IElectronAPI {
 
 declare global {
   interface Window {
-    electron?: IElectronAPI;
+    electron: IElectronAPI;
   }
 }
 

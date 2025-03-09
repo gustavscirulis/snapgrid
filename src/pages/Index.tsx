@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import UploadZone from "@/components/UploadZone";
@@ -18,20 +19,28 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    const electronAvailable = isElectronEnvironment();
-    
-    console.log("Index page - Electron detection:", {
-      electronAvailable,
-      windowElectron: window.electron
-    });
-    
-    setIsElectron(electronAvailable);
-    
-    if (electronAvailable) {
-      console.log("Running in Electron mode");
-    } else {
-      console.log("Running in browser mode. Electron APIs not available.");
-      toast.warning("Running in browser mode. Local storage features are not available.");
+    try {
+      const electronAvailable = isElectronEnvironment();
+      
+      console.log("Index page - Electron detection:", {
+        electronAvailable,
+        windowElectron: window.electron,
+        electronMethods: window.electron ? Object.keys(window.electron) : [],
+        userAgent: window.navigator.userAgent
+      });
+      
+      setIsElectron(electronAvailable);
+      
+      if (electronAvailable) {
+        console.log("Running in Electron mode");
+        toast.success("Running in Electron mode with full functionality");
+      } else {
+        console.log("Running in browser mode. Electron APIs not available.");
+        toast.warning("Running in browser mode. Local storage features are not available.");
+      }
+    } catch (error) {
+      console.error("Error during Electron detection:", error);
+      toast.error("Error detecting environment type");
     }
     
     const savedApiKey = localStorage.getItem("openai-api-key");
@@ -116,6 +125,11 @@ const Index = () => {
           {!isElectron && (
             <p>
               Running in browser mode. Local storage features are not available.
+            </p>
+          )}
+          {isElectron && (
+            <p>
+              Running in Electron mode with full functionality.
             </p>
           )}
         </footer>
