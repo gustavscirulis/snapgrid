@@ -41,15 +41,17 @@ export function MediaRenderer({
   const handleError = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLImageElement>) => {
     const target = e.target as HTMLVideoElement | HTMLImageElement;
     
-    // For thumbnail view, only log but don't show error state
+    // Log the error for debugging but handle differently based on view mode
+    if (target.error) {
+      console.log(`Media error details:`, target.error);
+    }
+    
+    // For thumbnail view, log but don't show error state
     if (!controls) {
-      console.warn(`Thumbnail media load warning: ${image.url}`);
+      // Prevent showing error UI in thumbnail mode
       return;
     }
     
-    if (target.error) {
-      console.error(`Media error details:`, target.error);
-    }
     console.error(`Failed to load media: ${image.url}`, e);
     
     // Only set load error for the full view
@@ -57,11 +59,10 @@ export function MediaRenderer({
     
     // Try to recover from error in Electron
     if (mediaUrl.startsWith('local-file://') && image.type === 'video' && isElectron) {
-      // Try both potential fixes
       try {
         const fixedSrc = mediaUrl.replace('local-file://', 'file://');
         console.log("Attempting with corrected URL:", fixedSrc);
-        if (videoRef.current){
+        if (videoRef.current) {
           videoRef.current.src = fixedSrc;
         }
       } catch (err) {
@@ -72,23 +73,38 @@ export function MediaRenderer({
 
   // In non-controls mode (thumbnail), we need to handle hover differently
   useEffect(() => {
-    if (image.type === 'video' && videoRef.current) {
-      if (isHovered && !autoPlay) {
-        // Only attempt to play if not already playing
-        if (videoRef.current.paused) {
-          videoRef.current.muted = true; // Ensure muted for autoplay
-          videoRef.current.play().catch(err => {
-            console.error('Video play error on hover:', err);
-            // If playing fails, at least show the poster image
-          });
+    // Only apply hover behavior for thumbnail view (when controls are false)
+    if (image.type === 'video' && videoRef.current && !controls) {
+      const video = videoRef.current;
+      
+      // Create a stable reference to the play function
+      const playVideo = () => {
+        if (video.paused) {
+          video.muted = true; // Ensure muted for autoplay
+          // Use a flag to track if we're still trying to play this video
+          let playAttemptCancelled = false;
+          
+          // Set a small timeout to avoid race conditions
+          setTimeout(() => {
+            if (!playAttemptCancelled && isHovered) {
+              video.play().catch(err => {
+                console.log('Video hover playback failed:', err.message);
+              });
+            }
+          }, 50);
+          
+          return () => { playAttemptCancelled = true; };
         }
+      };
+      
+      if (isHovered && !autoPlay) {
+        const cancelPlay = playVideo();
+        return cancelPlay;
       } else if (!isHovered && !autoPlay) {
-        videoRef.current.pause();
-        // Reset to beginning for next hover
-        videoRef.current.currentTime = 0;
+        video.pause();
       }
     }
-  }, [isHovered, autoPlay, image.type]);
+  }, [isHovered, autoPlay, image.type, controls]);
 
   if (loadError) {
     return (
@@ -123,14 +139,6 @@ export function MediaRenderer({
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
               />
-              {/* Add play overlay icon to indicate it's a video */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className={`w-12 h-12 rounded-full bg-black/40 flex items-center justify-center transition-opacity ${isHovered ? 'opacity-0' : 'opacity-60'}`}>
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
-                  </svg>
-                </div>
-              </div>
             </>
           ) : (
             <div className={`flex items-center justify-center bg-gray-200 ${className}`}>
