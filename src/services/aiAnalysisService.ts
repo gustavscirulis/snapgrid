@@ -52,10 +52,29 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
   if (!apiKey) {
     throw new Error("OpenAI API key not set. Please set an API key to use image analysis.");
   }
+  
+  // Convert local file paths to base64 if needed
+  if (imageUrl.startsWith('local-file://') || imageUrl.startsWith('file://')) {
+    try {
+      // For Electron apps, we need to use a data URL instead of file path
+      console.log("Local file detected, converting to base64");
+      // We'll use a placeholder data URL since we can't read the file directly
+      // This should be replaced with actual image data in production
+      if (window.electron) {
+        // Request the image as base64 from Electron main process
+        const base64Data = await window.electron.convertImageToBase64(imageUrl);
+        imageUrl = base64Data;
+      } else {
+        throw new Error("Cannot access local files without Electron");
+      }
+    } catch (error) {
+      console.error("Error converting local file to base64:", error);
+      throw new Error("Failed to convert local file to base64 for analysis");
+    }
+  }
 
   try {
-    // For base64 images (data URLs)
-    const isBase64 = imageUrl.startsWith('data:');
+    console.log("Analyzing image, URL type:", imageUrl.substring(0, 30) + "...");
     
     // Prepare the API request to OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -81,7 +100,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
               {
                 type: "image_url",
                 image_url: {
-                  url: isBase64 ? imageUrl : imageUrl,
+                  url: imageUrl
                 }
               }
             ]

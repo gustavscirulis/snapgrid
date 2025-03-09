@@ -205,7 +205,7 @@ export function useImageStore() {
           console.log("Image analysis results:", analysis);
 
           // Update the analysis state with parsed patterns
-          const patternTags = analysis.patterns || [];
+          const patternTags = Array.isArray(analysis) ? analysis : [];
           newMedia.patterns = patternTags;
           newMedia.isAnalyzing = false;
 
@@ -221,6 +221,14 @@ export function useImageStore() {
             // Force a re-render by creating a new array
             return [...updatedImages];
           });
+          
+          // Save to electron storage
+          if (window.electron && window.electron.saveMediaData) {
+            const mediaToSave = {...newMedia};
+            // Ensure the data is serializable
+            delete mediaToSave.element;
+            window.electron.saveMediaData(mediaToSave);
+          }
         } catch (error) {
           console.error('Image analysis failed:', error);
           newMedia.isAnalyzing = false;
