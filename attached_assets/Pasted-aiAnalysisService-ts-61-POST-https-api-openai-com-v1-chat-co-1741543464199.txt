@@ -1,0 +1,73 @@
+aiAnalysisService.ts:61 
+            
+            
+           POST https://api.openai.com/v1/chat/completions 400 (Bad Request)
+analyzeImage @ aiAnalysisService.ts:61
+(anonymous) @ useImageStore.tsx:204
+await in (anonymous)
+(anonymous) @ UploadZone.tsx:45
+(anonymous) @ UploadZone.tsx:43
+callCallback2 @ chunk-R6S4VRB5.js?v=9b907040:3674
+invokeGuardedCallbackDev @ chunk-R6S4VRB5.js?v=9b907040:3699
+invokeGuardedCallback @ chunk-R6S4VRB5.js?v=9b907040:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-R6S4VRB5.js?v=9b907040:3736
+executeDispatch @ chunk-R6S4VRB5.js?v=9b907040:7014
+processDispatchQueueItemsInOrder @ chunk-R6S4VRB5.js?v=9b907040:7034
+processDispatchQueue @ chunk-R6S4VRB5.js?v=9b907040:7043
+dispatchEventsForPlugins @ chunk-R6S4VRB5.js?v=9b907040:7051
+(anonymous) @ chunk-R6S4VRB5.js?v=9b907040:7174
+batchedUpdates$1 @ chunk-R6S4VRB5.js?v=9b907040:18913
+batchedUpdates @ chunk-R6S4VRB5.js?v=9b907040:3579
+dispatchEventForPluginEventSystem @ chunk-R6S4VRB5.js?v=9b907040:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-R6S4VRB5.js?v=9b907040:5478
+dispatchEvent @ chunk-R6S4VRB5.js?v=9b907040:5472
+dispatchDiscreteEvent @ chunk-R6S4VRB5.js?v=9b907040:5449
+aiAnalysisService.ts:96 OpenAI API error: {error: {…}}error: {message: 'Failed to download image from local-file:///Users/…nts/UIReferenceApp/img_1741543415320_7agn51b.png.', type: 'invalid_request_error', param: null, code: 'invalid_image_url'}[[Prototype]]: Object
+analyzeImage @ aiAnalysisService.ts:96
+await in analyzeImage
+(anonymous) @ useImageStore.tsx:204
+await in (anonymous)
+(anonymous) @ UploadZone.tsx:45
+(anonymous) @ UploadZone.tsx:43
+callCallback2 @ chunk-R6S4VRB5.js?v=9b907040:3674
+invokeGuardedCallbackDev @ chunk-R6S4VRB5.js?v=9b907040:3699
+invokeGuardedCallback @ chunk-R6S4VRB5.js?v=9b907040:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-R6S4VRB5.js?v=9b907040:3736
+executeDispatch @ chunk-R6S4VRB5.js?v=9b907040:7014
+processDispatchQueueItemsInOrder @ chunk-R6S4VRB5.js?v=9b907040:7034
+processDispatchQueue @ chunk-R6S4VRB5.js?v=9b907040:7043
+dispatchEventsForPlugins @ chunk-R6S4VRB5.js?v=9b907040:7051
+(anonymous) @ chunk-R6S4VRB5.js?v=9b907040:7174
+batchedUpdates$1 @ chunk-R6S4VRB5.js?v=9b907040:18913
+batchedUpdates @ chunk-R6S4VRB5.js?v=9b907040:3579
+dispatchEventForPluginEventSystem @ chunk-R6S4VRB5.js?v=9b907040:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-R6S4VRB5.js?v=9b907040:5478
+dispatchEvent @ chunk-R6S4VRB5.js?v=9b907040:5472
+dispatchDiscreteEvent @ chunk-R6S4VRB5.js?v=9b907040:5449
+aiAnalysisService.ts:130 Error analyzing image with OpenAI: Error: OpenAI API error: Failed to download image from local-file:///Users/gustavscirulis/Documents/UIReferenceApp/img_1741543415320_7agn51b.png.
+    at analyzeImage (aiAnalysisService.ts:97:13)
+    at async useImageStore.tsx:204:28
+analyzeImage @ aiAnalysisService.ts:130
+await in analyzeImage
+(anonymous) @ useImageStore.tsx:204
+await in (anonymous)
+(anonymous) @ UploadZone.tsx:45
+(anonymous) @ UploadZone.tsx:43
+callCallback2 @ chunk-R6S4VRB5.js?v=9b907040:3674
+invokeGuardedCallbackDev @ chunk-R6S4VRB5.js?v=9b907040:3699
+invokeGuardedCallback @ chunk-R6S4VRB5.js?v=9b907040:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-R6S4VRB5.js?v=9b907040:3736
+executeDispatch @ chunk-R6S4VRB5.js?v=9b907040:7014
+processDispatchQueueItemsInOrder @ chunk-R6S4VRB5.js?v=9b907040:7034
+processDispatchQueue @ chunk-R6S4VRB5.js?v=9b907040:7043
+dispatchEventsForPlugins @ chunk-R6S4VRB5.js?v=9b907040:7051
+(anonymous) @ chunk-R6S4VRB5.js?v=9b907040:7174
+batchedUpdates$1 @ chunk-R6S4VRB5.js?v=9b907040:18913
+batchedUpdates @ chunk-R6S4VRB5.js?v=9b907040:3579
+dispatchEventForPluginEventSystem @ chunk-R6S4VRB5.js?v=9b907040:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-R6S4VRB5.js?v=9b907040:5478
+dispatchEvent @ chunk-R6S4VRB5.js?v=9b907040:5472
+dispatchDiscreteEvent @ chunk-R6S4VRB5.js?v=9b907040:5449
+useImageStore.tsx:225 Image analysis failed: Error: OpenAI API error: Failed to download image from local-file:///Users/gustavscirulis/Documents/UIReferenceApp/img_1741543415320_7agn51b.png.
+    at analyzeImage (aiAnalysisService.ts:97:13)
+    at async useImageStore.tsx:204:28
