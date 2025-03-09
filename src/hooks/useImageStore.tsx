@@ -54,12 +54,16 @@ export function useImageStore() {
         if (isRunningInElectron) {
           console.log("Loading images from filesystem...");
           const loadedImages = await window.electron.loadImages();
-          console.log("Loaded images:", loadedImages.length);
-          // Sort by createdAt with newest first
-          const sortedImages = [...(loadedImages || [])].sort((a, b) =>
-            new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-          );
-          setImages(sortedImages);
+          console.log("Loaded images from Electron storage:", loadedImages);
+
+          if (Array.isArray(loadedImages) && loadedImages.length > 0) {
+            // Make sure we properly parse any stored patterns
+            const processedImages = loadedImages.map(img => ({
+              ...img,
+              patterns: img.patterns || [] // Ensure patterns is always an array
+            }));
+            setImages(processedImages);
+          }
         } else {
           setImages([]);
           toast.warning("Running in browser mode. Images will not be saved permanently.");
@@ -155,6 +159,7 @@ export function useImageStore() {
               type: newMedia.type,
               duration: newMedia.duration,
               posterUrl: newMedia.posterUrl,
+              patterns: newMedia.patterns // Include patterns if they exist
             }
           });
 
@@ -201,7 +206,7 @@ export function useImageStore() {
             setImages(currentImages => {
               const updatedImages = currentImages.map(img =>
                 img.id === newMedia.id
-                  ? { ...img, patterns: patternTags, isAnalyzing: false }
+                  ? { ...img, patterns: analysis.patterns, isAnalyzing: false }
                   : img
               );
               // Force a re-render by creating a new array
