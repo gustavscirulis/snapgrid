@@ -80,6 +80,7 @@ export function ImageRenderer({
 
   // Render video element
   if (image.type === "video") {
+    console.log('Loading video from URL:', mediaUrl);
 
     // In thumbnail view (grid)
     if (!controls) {
@@ -99,11 +100,12 @@ export function ImageRenderer({
               <span>Video thumbnail not available</span>
             </div>
           )}
-          {/* Video indicator icon */}
+          {/* Video indicator badge */}
           <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <svg className="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
             </svg>
+            {image.duration ? `${Math.floor(image.duration)}s` : 'Video'}
           </div>
         </div>
       );
