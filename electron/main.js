@@ -156,9 +156,11 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
     }
     const buffer = Buffer.from(base64Data, 'base64');
     
-    // Save media file
+    // Save media file with correct extension
     const filePath = path.join(appStorageDir, `${id}${fileExt}`);
     await fs.writeFile(filePath, buffer);
+    
+    console.log(`Media saved to: ${filePath}`);
     
     // Save metadata as separate JSON file
     const metadataPath = path.join(appStorageDir, `${id}.json`);
@@ -185,12 +187,17 @@ ipcMain.handle('load-images', async () => {
       jsonFiles.map(async (file) => {
         const id = path.basename(file, '.json');
         const metadataPath = path.join(appStorageDir, file);
-        const imagePath = path.join(appStorageDir, `${id}.png`);
+        
+        // Check if this is a video based on id prefix
+        const isVideo = id.startsWith('vid_');
+        // Use appropriate extension
+        const fileExt = isVideo ? '.mp4' : '.png';
+        const mediaPath = path.join(appStorageDir, `${id}${fileExt}`);
         
         try {
-          // Check if both metadata and image exist
-          if (!(await fs.pathExists(imagePath))) {
-            console.warn(`Image file not found: ${imagePath}`);
+          // Check if both metadata and media file exist
+          if (!(await fs.pathExists(mediaPath))) {
+            console.warn(`Media file not found: ${mediaPath}`);
             return null;
           }
           
@@ -198,18 +205,14 @@ ipcMain.handle('load-images', async () => {
           const metadata = await fs.readJson(metadataPath);
           
           // Instead of base64, use the local-file protocol
-          const localFileUrl = `local-file://${imagePath}`;
-          
-          // Get file extension to determine if it's a video
-          const fileExt = path.extname(imagePath).toLowerCase();
-          const isVideo = ['.mp4', '.webm', '.mov', '.avi'].includes(fileExt);
+          const localFileUrl = `local-file://${mediaPath}`;
           
           return {
             ...metadata,
             id,
             url: localFileUrl,
             type: isVideo ? 'video' : metadata.type || 'image',
-            actualFilePath: imagePath,
+            actualFilePath: mediaPath,
             useDirectPath: true // Flag to indicate this is a direct file path
           };
         } catch (err) {
@@ -229,13 +232,17 @@ ipcMain.handle('load-images', async () => {
 
 ipcMain.handle('delete-image', async (event, id) => {
   try {
-    const imagePath = path.join(appStorageDir, `${id}.png`);
+    // Determine if this is a video based on id prefix
+    const isVideo = id.startsWith('vid_');
+    const fileExt = isVideo ? '.mp4' : '.png';
+    
+    const mediaPath = path.join(appStorageDir, `${id}${fileExt}`);
     const metadataPath = path.join(appStorageDir, `${id}.json`);
     
-    await fs.remove(imagePath);
+    await fs.remove(mediaPath);
     await fs.remove(metadataPath);
     
-    console.log(`Deleted image: ${imagePath}`);
+    console.log(`Deleted media: ${mediaPath}`);
     return { success: true };
   } catch (error) {
     console.error('Error deleting image:', error);
