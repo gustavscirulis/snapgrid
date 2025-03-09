@@ -11,6 +11,7 @@ declare global {
       deleteImage: (id: string) => Promise<{ success: boolean; error?: string }>;
       checkFileAccess: (path: string) => Promise<boolean>;
       updateImageMetadata: (data: { id: string; metadata: any }) => Promise<{ success: boolean; error?: string }>;
+      invokeOpenAI: (params: { apiKey: string; imageUrl: string; model: string }) => Promise<{ patterns?: { pattern: string; confidence: number }[]; error?: string }>;
     };
   }
 }

@@ -68,7 +68,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
       console.log("Using Electron IPC for OpenAI request");
       
       try {
-        if (window.electron && window.electron.invokeOpenAI) {
+        if (window.electron && typeof window.electron.invokeOpenAI === 'function') {
           const result = await window.electron.invokeOpenAI({
             apiKey,
             imageUrl,
