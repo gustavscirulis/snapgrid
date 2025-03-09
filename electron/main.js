@@ -90,7 +90,13 @@ app.whenReady().then(() => {
   protocol.registerFileProtocol('local-file', (request, callback) => {
     const url = request.url.replace('local-file://', '');
     try {
-      return callback(decodeURI(url));
+      // Log the request to help debug
+      console.log('Protocol handler request:', { url: request.url, decodedPath: decodeURI(url) });
+      
+      // Return the file path
+      return callback({ 
+        path: decodeURI(url)
+      });
     } catch (error) {
       console.error('Error with protocol handler:', error);
     }

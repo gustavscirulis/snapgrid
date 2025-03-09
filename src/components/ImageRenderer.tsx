@@ -27,8 +27,8 @@ export function MediaRenderer({
   // For base64 or web URLs, use them as is
   const mediaUrl = image.url;
   
-  const handleError = () => {
-    console.error(`Failed to load media: ${mediaUrl}`);
+  const handleError = (e: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => {
+    console.error(`Failed to load media: ${mediaUrl}`, e);
     setLoadError(true);
   };
   
