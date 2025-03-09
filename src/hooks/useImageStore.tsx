@@ -191,16 +191,20 @@ export function useImageStore() {
         );
 
         try {
+          console.log("Starting analysis for image:", id);
           const analysis = await analyzeImage(dataUrl as string);
+          console.log("Analysis complete, patterns:", analysis);
 
           if (analysis.patterns && analysis.patterns.length > 0) {
             // Update the image with analysis results
             newMedia.patterns = analysis.patterns;
             newMedia.isAnalyzing = false;
-
+            console.log("Updating images with analysis results");
             setImages(prevImages =>
               prevImages.map(img => img.id === newMedia.id ? newMedia : img)
             );
+            console.log("Images updated:", prevImages.find(img => img.id === newMedia.id)?.patterns);
+
           }
         } catch (error) {
           console.error('Image analysis failed:', error);

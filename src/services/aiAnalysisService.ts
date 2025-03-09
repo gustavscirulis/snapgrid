@@ -111,13 +111,40 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
     let content = data.choices[0]?.message?.content;
 
     // Clean up any markdown formatting that might be in the response
-    content = content.replace(/```json|```|`/g, '').trim();
-
-    console.log("OpenAI raw response:", content);
+    
+    console.log("Raw OpenAI content:", content);
 
     // Parse the JSON response from OpenAI
     try {
-      let patterns: PatternMatch[] = JSON.parse(content);
+      let patterns;
+      try {
+        // Try to parse the JSON response
+        // Note: The response could be a string of JSON or have markdown formatting
+        let jsonString = content;
+
+        // Clean up common markdown formatting
+        if (content.includes('```json')) {
+          jsonString = content.split('```json')[1].split('```')[0].trim();
+        } else if (content.includes('```')) {
+          jsonString = content.split('```')[1].split('```')[0].trim();
+        }
+
+        console.log("Cleaned JSON string:", jsonString);
+        patterns = JSON.parse(jsonString);
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError);
+        // Try a more aggressive cleanup approach
+        let jsonString = content.replace(/```/g, '').replace(/json/g, '').trim();
+        // Remove any non-JSON text before or after the array
+        const arrayMatch = jsonString.match(/\[\s*\{.*\}\s*\]/s);
+        if (arrayMatch) {
+          jsonString = arrayMatch[0];
+        }
+        console.log("Second attempt JSON string:", jsonString);
+        patterns = JSON.parse(jsonString);
+      }
+
+      console.log("Parsed patterns:", patterns);
 
       // Validate and clean up the response
       if (Array.isArray(patterns)) {

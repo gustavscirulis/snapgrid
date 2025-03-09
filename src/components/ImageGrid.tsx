@@ -64,6 +64,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   };
 
   const renderPatternTags = (item: ImageItem) => {
+    console.log("Rendering pattern tags for image:", item.id, "patterns:", item.patterns);
+    
     if (!item.patterns || item.patterns.length === 0) {
       if (item.isAnalyzing) {
         return (
