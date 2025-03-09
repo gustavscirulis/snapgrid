@@ -1,0 +1,49 @@
+ImageRenderer.tsx:81 Video play error on hover: AbortError: The play() request was interrupted by a call to pause(). https://goo.gl/LdLk22
+(anonymous) @ ImageRenderer.tsx:81
+Promise.catch
+(anonymous) @ ImageRenderer.tsx:80
+commitHookEffectListMount @ chunk-R6S4VRB5.js?v=9b907040:16915
+commitPassiveMountOnFiber @ chunk-R6S4VRB5.js?v=9b907040:18156
+commitPassiveMountEffects_complete @ chunk-R6S4VRB5.js?v=9b907040:18129
+commitPassiveMountEffects_begin @ chunk-R6S4VRB5.js?v=9b907040:18119
+commitPassiveMountEffects @ chunk-R6S4VRB5.js?v=9b907040:18109
+flushPassiveEffectsImpl @ chunk-R6S4VRB5.js?v=9b907040:19490
+flushPassiveEffects @ chunk-R6S4VRB5.js?v=9b907040:19447
+(anonymous) @ chunk-R6S4VRB5.js?v=9b907040:19328
+workLoop @ chunk-R6S4VRB5.js?v=9b907040:197
+flushWork @ chunk-R6S4VRB5.js?v=9b907040:176
+performWorkUntilDeadline @ chunk-R6S4VRB5.js?v=9b907040:384
+ImageRenderer.tsx:51 Media error details: MediaError {code: 4, message: 'MEDIA_ELEMENT_ERROR: Format error'}
+(anonymous) @ ImageRenderer.tsx:51
+callCallback2 @ chunk-R6S4VRB5.js?v=9b907040:3674
+invokeGuardedCallbackDev @ chunk-R6S4VRB5.js?v=9b907040:3699
+invokeGuardedCallback @ chunk-R6S4VRB5.js?v=9b907040:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-R6S4VRB5.js?v=9b907040:3736
+executeDispatch @ chunk-R6S4VRB5.js?v=9b907040:7014
+processDispatchQueueItemsInOrder @ chunk-R6S4VRB5.js?v=9b907040:7034
+processDispatchQueue @ chunk-R6S4VRB5.js?v=9b907040:7043
+dispatchEventsForPlugins @ chunk-R6S4VRB5.js?v=9b907040:7051
+(anonymous) @ chunk-R6S4VRB5.js?v=9b907040:7174
+batchedUpdates$1 @ chunk-R6S4VRB5.js?v=9b907040:18913
+batchedUpdates @ chunk-R6S4VRB5.js?v=9b907040:3579
+dispatchEventForPluginEventSystem @ chunk-R6S4VRB5.js?v=9b907040:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-R6S4VRB5.js?v=9b907040:5478
+dispatchEvent @ chunk-R6S4VRB5.js?v=9b907040:5472
+ImageRenderer.tsx:53 Failed to load media: local-file:///Users/gustavscirulis/Documents/UIReferenceApp/vid_1741505510159_23dwb3t.mp4 SyntheticBaseEvent {_reactName: 'onError', _targetInst: null, type: 'error', nativeEvent: Event, target: video.h-full.w-auto.max-w-full.object-contain.rounded-lg.shadow-xl, …}
+(anonymous) @ ImageRenderer.tsx:53
+callCallback2 @ chunk-R6S4VRB5.js?v=9b907040:3674
+invokeGuardedCallbackDev @ chunk-R6S4VRB5.js?v=9b907040:3699
+invokeGuardedCallback @ chunk-R6S4VRB5.js?v=9b907040:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-R6S4VRB5.js?v=9b907040:3736
+executeDispatch @ chunk-R6S4VRB5.js?v=9b907040:7014
+processDispatchQueueItemsInOrder @ chunk-R6S4VRB5.js?v=9b907040:7034
+processDispatchQueue @ chunk-R6S4VRB5.js?v=9b907040:7043
+dispatchEventsForPlugins @ chunk-R6S4VRB5.js?v=9b907040:7051
+(anonymous) @ chunk-R6S4VRB5.js?v=9b907040:7174
+batchedUpdates$1 @ chunk-R6S4VRB5.js?v=9b907040:18913
+batchedUpdates @ chunk-R6S4VRB5.js?v=9b907040:3579
+dispatchEventForPluginEventSystem @ chunk-R6S4VRB5.js?v=9b907040:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-R6S4VRB5.js?v=9b907040:5478
+dispatchEvent @ chunk-R6S4VRB5.js?v=9b907040:5472
+ImageRenderer.tsx:63 Attempting with corrected URL: file:///Users/gustavscirulis/Documents/UIReferenceApp/vid_1741505510159_23dwb3t.mp4
+localhost/:1 Not allowed to load local resource: file:///Users/gustavscirulis/Documents/UIReferenceApp/vid_1741505510159_23dwb3t.mp4
