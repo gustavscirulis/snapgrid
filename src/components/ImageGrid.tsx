@@ -4,6 +4,7 @@ import { X, AlertCircle, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import AnimatedImageModal from "./AnimatedImageModal";
+import { useEffect as useFramerEffect } from "framer-motion";
 import { motion, AnimatePresence } from "framer-motion";
 import { MediaRenderer } from "@/components/ImageRenderer";
 
@@ -46,6 +47,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   }, []);
 
   const handleImageClick = (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
+    // Set the state with the clicked image
     setSelectedImage(image);
     setSelectedImageRef(ref);
     setModalOpen(true);

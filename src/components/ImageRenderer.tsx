@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 
 interface MediaRendererProps {
@@ -21,6 +21,8 @@ export function MediaRenderer({
   loop = false
 }: MediaRendererProps) {
   const [loadError, setLoadError] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isHovered, setIsHovered] = useState(false);
 
   // For direct file paths, use the URL directly
   // For base64 or web URLs, use them as is
@@ -30,6 +32,16 @@ export function MediaRenderer({
     console.error(`Failed to load media: ${mediaUrl}`, e);
     setLoadError(true);
   };
+
+  useEffect(() => {
+    if (image.type === 'video' && videoRef.current) {
+      if (isHovered && !autoPlay) {
+        videoRef.current.play().catch(err => console.error('Video play error:', err));
+      } else if (!isHovered && !autoPlay) {
+        videoRef.current.pause();
+      }
+    }
+  }, [isHovered, autoPlay, image.type]);
 
   if (loadError) {
     return (
@@ -41,20 +53,25 @@ export function MediaRenderer({
 
   // Render different elements based on media type
   if (image.type === "video") {
-    // For Electron, we need special handling of video files
-    console.log('Loading video from URL:', mediaUrl);
-    console.log('Video poster URL:', image.posterUrl);
-    
+    console.log('Loading video from URL:', mediaUrl); //Removed "Video poster URL" log
+
     // In grid view (no controls), show the poster image as a thumbnail
     if (!controls) {
       return (
-        <div className={`relative ${className}`}>
+        <div className={`relative ${className}`} >
           {image.posterUrl ? (
-            <img 
-              src={image.posterUrl} 
-              alt="Video thumbnail" 
+            <video 
+              ref={videoRef}
+              src={mediaUrl}
               className={`w-full h-auto object-cover ${className}`}
+              poster={image.posterUrl}
+              muted={true}
+              loop={loop}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
               onError={handleError}
+              playsInline
+              controlsList="nodownload"
             />
           ) : (
             <div className={`flex items-center justify-center bg-gray-200 ${className}`}>
@@ -70,10 +87,11 @@ export function MediaRenderer({
         </div>
       );
     }
-    
+
     // In full view (with controls), show the actual video player
     return (
       <video 
+        ref={videoRef}
         src={mediaUrl}
         className={className}
         poster={image.posterUrl}

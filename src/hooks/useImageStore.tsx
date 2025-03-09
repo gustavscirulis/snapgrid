@@ -55,7 +55,11 @@ export function useImageStore() {
           console.log("Loading images from filesystem...");
           const loadedImages = await window.electron.loadImages();
           console.log("Loaded images:", loadedImages.length);
-          setImages(loadedImages);
+          // Sort by createdAt with newest first
+          const sortedImages = [...(loadedImages || [])].sort((a, b) =>
+            new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+          );
+          setImages(sortedImages);
         } else {
           setImages([]);
           toast.warning("Running in browser mode. Images will not be saved permanently.");

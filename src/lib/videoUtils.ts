@@ -60,7 +60,6 @@ export function getVideoDimensions(videoSrc: string): Promise<{
 
           // Convert the canvas to a data URL (JPEG for smaller size)
           const posterUrl = canvas.toDataURL('image/jpeg', 0.8);
-          console.log('Generated poster URL (length):', posterUrl.length);
 
           // Clean up
           video.src = '';
