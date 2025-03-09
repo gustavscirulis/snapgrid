@@ -67,8 +67,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
         
         {isDragging && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 pointer-events-none">
-            <div className="bg-card p-8 rounded-lg shadow-lg flex flex-col items-center animate-float">
-              <ImagePlus className="w-12 h-12 text-primary mb-4" />
+            <div className="bg-card p-6 rounded-lg shadow-lg flex flex-col items-center animate-float">
+              <ImagePlus className="w-12 h-12 text-primary" />
             </div>
           </div>
         )}
