@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-
-// Added utility function to check for Electron environment
-export const isElectron = typeof window !== 'undefined' && window.electron !== undefined;
+import { isElectron } from "@/utils/electron";
 
 interface MediaRendererProps {
   image: ImageItem;
@@ -41,26 +39,23 @@ export function MediaRenderer({
   }
 
   const handleError = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLImageElement>) => {
+    // Suppress error logging for thumbnail view since we're now using poster images only
+    if (!controls) return;
+    
     const target = e.target as HTMLVideoElement | HTMLImageElement;
     if (target.error) {
       console.error(`Media error details:`, target.error);
     }
     console.error(`Failed to load media: ${image.url}`, e);
     
-    // Only set the load error if we're not in thumbnail view (where errors are expected on hover)
-    if (controls) {
-      setLoadError(true);
-    }
+    setLoadError(true);
     
-    // Don't try to fix the URL when in thumbnail mode, as it will be handled in modal view
-    if (mediaUrl.startsWith('local-file://') && image.type === 'video' && controls) {
-      // In Electron, we can try different protocol formats, but this shouldn't execute in browser
-      if (isElectron) {
-        const fixedSrc = mediaUrl.replace('local-file://', 'file://');
-        console.log("Attempting with corrected URL:", fixedSrc);
-        if (videoRef.current){
-          videoRef.current.src = fixedSrc;
-        }
+    // Only attempt URL fixes in Electron environment with full controls
+    if (mediaUrl.startsWith('local-file://') && image.type === 'video' && controls && isElectron) {
+      const fixedSrc = mediaUrl.replace('local-file://', 'file://');
+      console.log("Attempting with corrected URL:", fixedSrc);
+      if (videoRef.current){
+        videoRef.current.src = fixedSrc;
       }
     }
   }, [image.url, mediaUrl, image.type, controls]);
@@ -93,35 +88,18 @@ export function MediaRenderer({
         <div className={`relative ${className}`} >
           {image.posterUrl ? (
             <>
-              {/* Use image tag for thumbnail in non-Electron environments to avoid protocol errors */}
-              {!isElectron ? (
-                <div 
-                  className={`w-full h-auto object-cover ${className}`}
-                  style={{
-                    backgroundImage: `url(${image.posterUrl})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    minHeight: '120px'
-                  }}
-                  onMouseEnter={() => setIsHovered(true)}
-                  onMouseLeave={() => setIsHovered(false)}
-                />
-              ) : (
-                <video 
-                  ref={videoRef}
-                  src={mediaUrl}
-                  className={`w-full h-auto object-cover ${className}`}
-                  poster={image.posterUrl}
-                  muted={true}
-                  loop={loop}
-                  onMouseEnter={() => setIsHovered(true)}
-                  onMouseLeave={() => setIsHovered(false)}
-                  // Only attach error handler in Electron environment
-                  onError={isElectron ? handleError : undefined}
-                  playsInline
-                  preload="none" // Don't preload video data until needed
-                  controlsList="nodownload"
-                />
+              {/* Always use the poster image in thumbnail view to avoid video loading errors */}
+              <div 
+                className={`w-full h-auto object-cover ${className}`}
+                style={{
+                  backgroundImage: `url(${image.posterUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  minHeight: '120px'
+                }}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+              />
               )}
             </>
           ) : (

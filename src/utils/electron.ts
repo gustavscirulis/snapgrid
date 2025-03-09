@@ -11,8 +11,9 @@ export const isElectron = (): boolean => {
     // More robust check for Electron environment
     return (
       typeof window !== 'undefined' && 
-      window.electron !== undefined && 
-      window.electron !== null
+      typeof window.electron !== 'undefined' && 
+      window.electron !== null && 
+      Object.keys(window.electron).length > 0
     );
   } catch (error) {
     console.error('Error checking Electron environment:', error);
