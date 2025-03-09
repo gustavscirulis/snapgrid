@@ -181,7 +181,7 @@ export function useImageStore() {
 
       setIsUploading(false);
 
-      // If API key is set and it's an image (not video), analyze the image
+      // Run image analysis if OpenAI API key is set
       const hasKey = await hasApiKey();
       if (hasKey && newMedia.type === "image") {
         // Update the state to reflect analysis is in progress
@@ -198,18 +198,30 @@ export function useImageStore() {
             newMedia.patterns = analysis.patterns;
             newMedia.isAnalyzing = false;
 
-            setImages(prevImages =>
-              prevImages.map(img => img.id === newMedia.id ? newMedia : img)
-            );
+            setImages(currentImages => {
+              const updatedImages = currentImages.map(img =>
+                img.id === newMedia.id
+                  ? { ...img, patterns: patternTags, isAnalyzing: false }
+                  : img
+              );
+              // Force a re-render by creating a new array
+              return [...updatedImages];
+            });
           }
         } catch (error) {
           console.error('Image analysis failed:', error);
           newMedia.isAnalyzing = false;
           newMedia.error = 'Analysis failed';
 
-          setImages(prevImages =>
-            prevImages.map(img => img.id === newMedia.id ? newMedia : img)
-          );
+          setImages(currentImages => {
+            const updatedImages = currentImages.map(img =>
+              img.id === newMedia.id
+                ? { ...img, error: error.message, isAnalyzing: false }
+                : img
+            );
+            // Force a re-render by creating a new array
+            return [...updatedImages];
+          });
           toast.error("Image analysis failed: " + (error instanceof Error ? error.message : 'Unknown error'));
         }
       }
