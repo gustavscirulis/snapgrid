@@ -1,4 +1,3 @@
-
 // A service to identify UI patterns in images using OpenAI's Vision API
 
 interface PatternMatch {
@@ -54,61 +53,72 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
   }
 
   try {
-    // For base64 images (data URLs)
-    const isBase64 = imageUrl.startsWith('data:');
-    
-    // Prepare the API request to OpenAI
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: "gpt-4o", // Using GPT-4o which supports vision
-        messages: [
-          {
-            role: "system",
-            content: "You are an AI specialized in UI/UX design pattern recognition. Analyze the image and identify common UI patterns present in it. Focus on design elements, layouts, and components."
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Analyze this UI design image and identify the UI patterns present. Return only the top 5 patterns you can identify with a confidence score from 0 to 1. Format your response as a strict valid JSON array with 'pattern' and 'confidence' fields only, no markdown formatting, no code block symbols."
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: isBase64 ? imageUrl : imageUrl,
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 300
-      })
-    });
+    console.log("Analyzing image, URL type:", imageUrl.substring(0, 30) + "...");
 
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("OpenAI API error:", error);
-      throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`);
+    // Prepare the request payload
+    const payload = {
+      model: "gpt-4o", // Using GPT-4o which supports vision
+      messages: [
+        {
+          role: "system",
+          content: "You are an AI specialized in UI/UX design pattern recognition. Analyze the image and identify common UI patterns present in it. Focus on design elements, layouts, and components."
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Analyze this UI design image and identify the UI patterns present. Return only the top 5 patterns you can identify with a confidence score from 0 to 1. Format your response as a strict valid JSON array with 'pattern' and 'confidence' fields only, no markdown formatting, no code block symbols."
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: imageUrl
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 300
+    };
+
+    let data;
+
+    // Try to use Electron proxy if available, otherwise fall back to fetch
+    if (window.electron && window.electron.callOpenAI) {
+      console.log("Using Electron proxy for OpenAI API call");
+      data = await window.electron.callOpenAI(apiKey, payload);
+    } else {
+      console.log("Using fetch API for OpenAI API call");
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error("OpenAI API error:", error);
+        throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`);
+      }
+
+      data = await response.json();
     }
 
-    const data = await response.json();
     let content = data.choices[0]?.message?.content;
-    
+
     // Clean up any markdown formatting that might be in the response
     content = content.replace(/```json|```|`/g, '').trim();
-    
+
     console.log("OpenAI raw response:", content);
 
     // Parse the JSON response from OpenAI
     try {
       let patterns: PatternMatch[] = JSON.parse(content);
-      
+
       // Validate and clean up the response
       if (Array.isArray(patterns)) {
         patterns = patterns
@@ -118,7 +128,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
             confidence: Math.min(Math.max(p.confidence, 0), 1) // Ensure confidence is between 0 and 1
           }))
           .slice(0, 5); // Limit to top 5
-        
+
         return patterns;
       }
       throw new Error('Invalid response format from OpenAI');
