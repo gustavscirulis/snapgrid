@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
-import { MediaRenderer } from "@/components/ImageRenderer";
+import { ImageRenderer } from "@/components/ImageRenderer";
 import { isElectron } from "@/utils/electron";
 
 interface AnimatedImageModalProps {
@@ -126,14 +126,13 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               }
             }}
           >
-            <MediaRenderer
+            <ImageRenderer
               image={selectedImage}
               alt={selectedImage.title || "Selected media"}
               className={`h-full w-auto max-w-full object-contain rounded-lg shadow-xl ${selectedImage.type === 'video' ? 'w-auto max-w-full' : 'mx-auto'}`}
               controls={true}
               autoPlay={selectedImage.type === "video"}
               muted={false}
-              isElectron={isElectron} // Pass isElectron flag to MediaRenderer
             />
           </motion.div>
         </>
