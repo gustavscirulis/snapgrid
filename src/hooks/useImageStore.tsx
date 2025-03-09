@@ -186,33 +186,41 @@ export function useImageStore() {
 
       setIsUploading(false);
 
-      // Run image analysis if OpenAI API key is set
+      // If API key is set and it's an image (not video), analyze the image
       const hasKey = await hasApiKey();
       if (hasKey && newMedia.type === "image") {
         // Update the state to reflect analysis is in progress
         newMedia.isAnalyzing = true;
+        toast.info("Analyzing image for UI patterns...");
+
+        // Update in-memory state first
         setImages(prevImages =>
-          prevImages.map(img => img.id === newMedia.id ? newMedia : img)
+          prevImages.map(img =>
+            img.id === newMedia.id ? { ...img, isAnalyzing: true } : img
+          )
         );
 
         try {
-          const analysis = await analyzeImage(dataUrl as string);
+          const analysis = await analyzeImage(newMedia.url);
+          console.log("Image analysis results:", analysis);
 
-          if (analysis.patterns && analysis.patterns.length > 0) {
-            // Update the image with analysis results
-            newMedia.patterns = analysis.patterns;
-            newMedia.isAnalyzing = false;
+          // Update the analysis state with parsed patterns
+          const patternTags = analysis.patterns || [];
+          newMedia.patterns = patternTags;
+          newMedia.isAnalyzing = false;
 
-            setImages(currentImages => {
-              const updatedImages = currentImages.map(img =>
-                img.id === newMedia.id
-                  ? { ...img, patterns: analysis.patterns, isAnalyzing: false }
-                  : img
-              );
-              // Force a re-render by creating a new array
-              return [...updatedImages];
-            });
-          }
+          console.log(`Saving patterns for ${newMedia.id}:`, patternTags);
+
+          // Update in React state
+          setImages(currentImages => {
+            const updatedImages = currentImages.map(img =>
+              img.id === newMedia.id
+                ? { ...img, patterns: patternTags, isAnalyzing: false }
+                : img
+            );
+            // Force a re-render by creating a new array
+            return [...updatedImages];
+          });
         } catch (error) {
           console.error('Image analysis failed:', error);
           newMedia.isAnalyzing = false;
