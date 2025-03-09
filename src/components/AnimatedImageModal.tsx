@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
@@ -49,7 +50,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     };
   }, [isOpen]);
 
-  const handleClickOutside = (event: MouseEvent) => {
+  const handleClickOutside = (event: React.MouseEvent<HTMLDivElement>) => {
     if (modalOverlayRef.current && !modalOverlayRef.current.contains(event.target as Node)) {
       onClose();
     }
@@ -105,24 +106,14 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               )}
 
               <div className="relative">
-                {selectedImage.type === "video" ? (
-                  <video
-                    src={selectedImage.url}
-                    controls
-                    autoPlay={isPlaying}
-                    className="w-full h-auto object-contain rounded-lg"
-                    onClick={() => setIsPlaying(!isPlaying)}
-                  />
-                ) : (
-                  <ImageRenderer 
-                    image={selectedImage}
-                    alt="Selected image"
-                    className="w-full h-auto object-contain rounded-lg"
-                    controls={true}
-                    autoPlay={isPlaying}
-                    muted={false}
-                  />
-                )}
+                <ImageRenderer 
+                  image={selectedImage}
+                  alt="Selected image"
+                  className="w-full h-auto object-contain rounded-lg"
+                  controls={true}
+                  autoPlay={isPlaying}
+                  muted={false}
+                />
               </div>
 
               {patternElements && (

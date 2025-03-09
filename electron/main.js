@@ -292,3 +292,88 @@ ipcMain.handle('check-file-access', async (event, filePath) => {
     return { success: true, accessible: false, error: error.message };
   }
 });
+
+// Add the OpenAI API handler
+ipcMain.handle('invoke-openai', async (event, params) => {
+  try {
+    const { apiKey, imageUrl, model } = params;
+    
+    if (!apiKey) {
+      return { error: 'API key is required' };
+    }
+    
+    console.log('Making OpenAI API request from main process');
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model || "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are an AI specialized in UI/UX design pattern recognition. Analyze the image and identify common UI patterns present in it. Focus on design elements, layouts, and components."
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Analyze this UI design image and identify the UI patterns present. Return only the top 5 patterns you can identify with a confidence score from 0 to 1. Format your response as a strict valid JSON array with 'pattern' and 'confidence' fields only, no markdown formatting, no code block symbols."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: imageUrl,
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 300
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("OpenAI API error:", error);
+      return { error: `OpenAI API error: ${error.error?.message || 'Unknown error'}` };
+    }
+    
+    const data = await response.json();
+    let content = data.choices[0]?.message?.content;
+    
+    // Clean up any markdown formatting
+    content = content.replace(/```json|```|`/g, '').trim();
+    
+    console.log("OpenAI raw response:", content);
+    
+    // Parse the JSON response
+    try {
+      let patterns = JSON.parse(content);
+      
+      // Validate and clean up
+      if (Array.isArray(patterns)) {
+        patterns = patterns
+          .filter(p => p && p.pattern && typeof p.confidence === 'number')
+          .map(p => ({
+            pattern: p.pattern,
+            confidence: Math.min(Math.max(p.confidence, 0), 1)
+          }))
+          .slice(0, 5);
+        
+        return { patterns };
+      }
+      return { error: 'Invalid response format from OpenAI' };
+    } catch (e) {
+      console.error("Failed to parse OpenAI response:", e, content);
+      return { error: 'Failed to parse response from OpenAI' };
+    }
+  } catch (error) {
+    console.error("Error invoking OpenAI from main process:", error);
+    return { error: error.message || 'Unknown error' };
+  }
+});

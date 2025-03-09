@@ -1,15 +1,31 @@
+// Helper functions for Electron interaction
 
-// Fix for the checkFileAccess method that's causing build errors
-// We'll add a type guard to check if the function exists before calling it
+/**
+ * Checks if the application is running in Electron environment
+ */
+export function isElectronEnvironment(): boolean {
+  return !!(window && 
+    typeof window.electron !== 'undefined' &&
+    window.electron !== null);
+}
 
-export const checkFileExists = async (filePath: string): Promise<boolean> => {
-  if (window.electron) {
+/**
+ * Checks if a file path is accessible in the Electron environment
+ * @param filePath Path to check
+ */
+export async function isFileAccessible(filePath: string): Promise<boolean> {
+  if (!isElectronEnvironment() || !window.electron) {
+    return false;
+  }
+  
+  try {
+    // Only call checkFileAccess if it exists
     if (typeof window.electron.checkFileAccess === 'function') {
       return await window.electron.checkFileAccess(filePath);
-    } else {
-      console.warn('checkFileAccess function not available in electron API');
-      return false;
     }
+    return false;
+  } catch (error) {
+    console.error("Error checking file access:", error);
+    return false;
   }
-  return false;
-};
+}

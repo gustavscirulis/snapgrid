@@ -1,4 +1,3 @@
-
 interface IElectronAPI {
   // Window control methods
   minimize?: () => void;
@@ -15,6 +14,12 @@ interface IElectronAPI {
   
   // Browser functionality
   openUrl?: (url: string) => void;
+  
+  // Invoke OpenAI functionality
+  invokeOpenAI: (params: { apiKey: string; imageUrl: string; model: string }) => Promise<{
+    patterns?: Array<{ pattern: string; confidence: number }>;
+    error?: string;
+  }>;
 }
 
 // Define the protocol for local file access
