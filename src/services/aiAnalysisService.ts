@@ -149,9 +149,9 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
       // Validate and clean up the response
       if (Array.isArray(patterns)) {
         patterns = patterns
-          .filter(p => p && p.pattern && typeof p.confidence === 'number')
+          .filter(p => p && (p.pattern || p.name) && typeof p.confidence === 'number')
           .map(p => ({
-            pattern: p.pattern,
+            name: p.pattern || p.name, // Map 'pattern' field to 'name' as expected by the UI
             confidence: Math.min(Math.max(p.confidence, 0), 1) // Ensure confidence is between 0 and 1
           }))
           .slice(0, 5); // Limit to top 5

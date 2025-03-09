@@ -195,15 +195,18 @@ export function useImageStore() {
           const analysis = await analyzeImage(dataUrl as string);
           console.log("Analysis complete, patterns:", analysis);
 
-          if (analysis.patterns && analysis.patterns.length > 0) {
-            // Update the image with analysis results
-            newMedia.patterns = analysis.patterns;
-            newMedia.isAnalyzing = false;
-            console.log("Updating images with analysis results");
-            setImages(prevImages =>
-              prevImages.map(img => img.id === newMedia.id ? newMedia : img)
+          // Update the image with analysis results regardless of patterns length
+          newMedia.patterns = analysis;
+          newMedia.isAnalyzing = false;
+          console.log("Updating images with analysis results:", newMedia.patterns);
+          
+          setImages(prevImages => {
+            const updated = prevImages.map(img => 
+              img.id === newMedia.id ? {...newMedia} : img
             );
-            console.log("Images updated:", prevImages.find(img => img.id === newMedia.id)?.patterns);
+            console.log("Updated image in store:", updated.find(img => img.id === newMedia.id));
+            return updated;
+          });
 
           }
         } catch (error) {
