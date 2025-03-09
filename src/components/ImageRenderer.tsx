@@ -33,9 +33,15 @@ export function MediaRenderer({
 
   // In browser development mode, we can't use local-file:// protocol
   if (isLocalFileProtocol && !isElectron) {
-    // Use a placeholder or fallback for browser development
-    console.log('Using fallback for local file in browser mode');
-    mediaUrl = '/placeholder.svg'; // Use a placeholder image from public folder
+    if (image.type === 'video') {
+      // For videos in browser mode, just keep the URL but we'll handle errors separately
+      console.log('Video in browser mode - will show poster or placeholder');
+      // We'll rely on the poster image or error handling
+    } else {
+      // For images, use a placeholder
+      console.log('Using fallback for local file in browser mode');
+      mediaUrl = '/placeholder.svg'; // Use a placeholder image from public folder
+    }
   }
 
   const handleError = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLImageElement>) => {
@@ -77,34 +83,52 @@ export function MediaRenderer({
     if (image.type === 'video' && videoRef.current && !controls) {
       const video = videoRef.current;
       
-      // Create a stable reference to the play function
-      const playVideo = () => {
-        if (video.paused) {
-          video.muted = true; // Ensure muted for autoplay
-          // Use a flag to track if we're still trying to play this video
-          let playAttemptCancelled = false;
-          
-          // Set a small timeout to avoid race conditions
-          setTimeout(() => {
-            if (!playAttemptCancelled && isHovered) {
-              video.play().catch(err => {
-                console.log('Video hover playback failed:', err.message);
-              });
-            }
-          }, 50);
-          
-          return () => { playAttemptCancelled = true; };
-        }
-      };
+      // Set up event listeners for video loading in browser mode
+      if (!isElectron && mediaUrl.startsWith('local-file://')) {
+        // In browser mode, we can't play local files due to security restrictions
+        // Instead, just show the poster image when hovering in browser mode
+        return;
+      }
       
+      // Handle hover state
       if (isHovered && !autoPlay) {
-        const cancelPlay = playVideo();
-        return cancelPlay;
-      } else if (!isHovered && !autoPlay) {
-        video.pause();
+        // Make sure video is muted to allow autoplay
+        video.muted = true;
+        
+        // Use promise-based approach with better error handling
+        const playPromise = video.play();
+        
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.log(`Video hover playback issue: ${error.name}`, error.message);
+            // Don't show errors in UI for thumbnails
+          });
+        }
+        
+        // Cleanup function
+        return () => {
+          // Only pause if the play promise is resolved
+          // This prevents the race condition that causes AbortError
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              if (!isHovered) {
+                video.pause();
+                video.currentTime = 0; // Reset to beginning
+              }
+            }).catch(() => {
+              // Play failed, no need to pause
+            });
+          }
+        };
+      } else if (!isHovered) {
+        // Handle mouseout - pause the video
+        if (!video.paused) {
+          video.pause();
+          video.currentTime = 0; // Reset to beginning
+        }
       }
     }
-  }, [isHovered, autoPlay, image.type, controls]);
+  }, [isHovered, autoPlay, image.type, controls, isElectron, mediaUrl]);
 
   if (loadError) {
     return (
