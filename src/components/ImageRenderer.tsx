@@ -60,15 +60,18 @@ export function MediaRenderer({
     }
   }, [image.url, mediaUrl, image.type, controls]);
 
+  // In non-controls mode (thumbnail), we need to handle hover differently
   useEffect(() => {
-    if (image.type === 'video' && videoRef.current && controls) {
+    if (image.type === 'video' && videoRef.current) {
       if (isHovered && !autoPlay) {
         videoRef.current.play().catch(err => console.error('Video play error:', err));
       } else if (!isHovered && !autoPlay) {
         videoRef.current.pause();
+        // Reset to beginning for next hover
+        videoRef.current.currentTime = 0;
       }
     }
-  }, [isHovered, autoPlay, image.type, controls]);
+  }, [isHovered, autoPlay, image.type]);
 
   if (loadError) {
     return (
@@ -82,21 +85,23 @@ export function MediaRenderer({
   if (image.type === "video") {
     console.log('Loading video from URL:', mediaUrl); 
 
-    // In grid view (no controls), show the poster image as a thumbnail
+    // In grid view (no controls), show video with poster but enable hover playback
     if (!controls) {
       return (
         <div className={`relative ${className}`} >
           {image.posterUrl ? (
             <>
-              {/* Always use the poster image in thumbnail view to avoid video loading errors */}
-              <div 
+              {/* Use video element with poster for thumbnail view */}
+              <video 
+                ref={videoRef}
                 className={`w-full h-auto object-cover ${className}`}
-                style={{
-                  backgroundImage: `url(${image.posterUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  minHeight: '120px'
-                }}
+                style={{ minHeight: '120px' }}
+                src={mediaUrl}
+                poster={image.posterUrl}
+                muted
+                playsInline
+                loop
+                preload="metadata"
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
               />
