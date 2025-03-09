@@ -7,7 +7,7 @@ import { Search, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setOpenAIApiKey } from "@/services/aiAnalysisService";
-import { Toaster, toast } from "sonner";
+import { Toaster } from "sonner";
 import SettingsPanel from "@/components/SettingsPanel";
 import WindowControls from "@/components/WindowControls";
 import { isElectronEnvironment } from "@/utils/electron";
@@ -21,26 +21,13 @@ const Index = () => {
   useEffect(() => {
     try {
       const electronAvailable = isElectronEnvironment();
-      
-      console.log("Index page - Electron detection:", {
-        electronAvailable,
-        windowElectron: window.electron,
-        electronMethods: window.electron ? Object.keys(window.electron) : [],
-        userAgent: window.navigator.userAgent
-      });
-      
       setIsElectron(electronAvailable);
       
-      if (electronAvailable) {
-        console.log("Running in Electron mode");
-        toast.success("Running in Electron mode with full functionality");
-      } else {
+      if (!electronAvailable) {
         console.log("Running in browser mode. Electron APIs not available.");
-        toast.warning("Running in browser mode. Local storage features are not available.");
       }
     } catch (error) {
       console.error("Error during Electron detection:", error);
-      toast.error("Error detecting environment type");
     }
     
     const savedApiKey = localStorage.getItem("openai-api-key");
@@ -120,19 +107,6 @@ const Index = () => {
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
         />
-
-        <footer className="py-4 text-center text-sm text-muted-foreground">
-          {!isElectron && (
-            <p>
-              Running in browser mode. Local storage features are not available.
-            </p>
-          )}
-          {isElectron && (
-            <p>
-              Running in Electron mode with full functionality.
-            </p>
-          )}
-        </footer>
       </div>
     </UploadZone>
   );

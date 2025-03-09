@@ -12,13 +12,6 @@ const WindowControls = ({ className = "" }: WindowControlsProps) => {
   useEffect(() => {
     // Check Electron environment on component mount
     const electronAvailable = isElectronEnvironment();
-    
-    console.log("WindowControls - Electron detection:", {
-      electronAvailable,
-      windowElectron: window.electron,
-      windowElectronMethods: window.electron ? Object.keys(window.electron) : []
-    });
-    
     setIsElectron(electronAvailable);
   }, []);
   
@@ -26,29 +19,20 @@ const WindowControls = ({ className = "" }: WindowControlsProps) => {
   if (!isElectron) return null;
 
   const handleClose = () => {
-    console.log("Close button clicked");
     if (window.electron?.close) {
       window.electron.close();
-    } else {
-      console.warn("window.electron.close method not available");
     }
   };
 
   const handleMinimize = () => {
-    console.log("Minimize button clicked");
     if (window.electron?.minimize) {
       window.electron.minimize();
-    } else {
-      console.warn("window.electron.minimize method not available");
     }
   };
 
   const handleMaximize = () => {
-    console.log("Maximize button clicked");
     if (window.electron?.maximize) {
       window.electron.maximize();
-    } else {
-      console.warn("window.electron.maximize method not available");
     }
   };
 
