@@ -94,9 +94,7 @@ app.whenReady().then(() => {
       console.log('Protocol handler request:', { url: request.url, decodedPath: decodeURI(url) });
       
       // Return the file path
-      return callback({ 
-        path: decodeURI(url)
-      });
+      return callback(decodeURI(url));
     } catch (error) {
       console.error('Error with protocol handler:', error);
     }
@@ -210,9 +208,8 @@ ipcMain.handle('load-images', async () => {
           // Load metadata
           const metadata = await fs.readJson(metadataPath);
           
-          // Instead of base64, use the local-file protocol for images
-          // For videos, we'll use the direct file path
-          const localFileUrl = isVideo ? `file://${mediaPath}` : `local-file://${mediaPath}`;
+          // Use the local-file protocol for both images and videos
+          const localFileUrl = `local-file://${mediaPath}`;
           
           console.log(`Loading media: ${id}, path: ${mediaPath}, url: ${localFileUrl}`);
           

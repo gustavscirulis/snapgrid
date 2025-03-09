@@ -41,17 +41,18 @@ export function MediaRenderer({
 
   // Render different elements based on media type
   if (image.type === "video") {
+    // For Electron, we use a different approach to load local video files
     return (
       <video 
-        src={image.actualFilePath ? `file://${image.actualFilePath}` : mediaUrl} 
+        src={mediaUrl}
         className={className}
         poster={image.posterUrl}
         controls={controls}
-        autoPlay={autoPlay}
         muted={muted}
         loop={loop}
         onError={handleError}
         playsInline
+        controlsList="nodownload"
       />
     );
   }
