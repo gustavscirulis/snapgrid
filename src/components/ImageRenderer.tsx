@@ -61,14 +61,14 @@ export function MediaRenderer({
   }, [image.url, mediaUrl, image.type, controls]);
 
   useEffect(() => {
-    if (image.type === 'video' && videoRef.current) {
+    if (image.type === 'video' && videoRef.current && controls) {
       if (isHovered && !autoPlay) {
         videoRef.current.play().catch(err => console.error('Video play error:', err));
       } else if (!isHovered && !autoPlay) {
         videoRef.current.pause();
       }
     }
-  }, [isHovered, autoPlay, image.type]);
+  }, [isHovered, autoPlay, image.type, controls]);
 
   if (loadError) {
     return (
@@ -100,7 +100,6 @@ export function MediaRenderer({
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
               />
-              )}
             </>
           ) : (
             <div className={`flex items-center justify-center bg-gray-200 ${className}`}>
