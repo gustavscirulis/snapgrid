@@ -1,7 +1,7 @@
-
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
+import { MediaRenderer } from "@/components/ImageRenderer";
 
 interface AnimatedImageModalProps {
   isOpen: boolean;
@@ -48,7 +48,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     } else {
       document.body.style.overflow = "";
     }
-    
+
     // Escape key handler
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -128,13 +128,13 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               }
             }}
           >
-            <motion.img
-              src={selectedImage.url}
-              alt="Selected image"
-              className="w-full h-full object-contain rounded-lg"
-              initial={{ opacity: 0.8 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0.8 }}
+            <MediaRenderer
+              image={selectedImage}
+              alt={selectedImage.title || "Selected media"}
+              className="h-full w-auto max-w-full object-contain rounded-lg shadow-xl"
+              controls={true}
+              autoPlay={selectedImage.type === "video"}
+              muted={false}
             />
           </motion.div>
         </>

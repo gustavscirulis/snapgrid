@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { X, AlertCircle, ImagePlus } from "lucide-react";
@@ -6,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import AnimatedImageModal from "./AnimatedImageModal";
 import { motion, AnimatePresence } from "framer-motion";
+import { MediaRenderer } from "@/components/ImageRenderer";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -100,11 +100,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const renderItem = (item: ImageItem) => {
     return (
       <div className="relative">
-        <img
-          src={item.url}
+        <MediaRenderer 
+          image={item}
           alt="UI Screenshot"
           className="w-full h-auto object-cover rounded-t-lg"
-          loading="lazy"
+          controls={false}
+          autoPlay={false}
         />
         <AnimatePresence>
           {hoveredImageId === item.id && (
@@ -125,15 +126,15 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
   const distributeImages = () => {
     const columnArrays: ImageItem[][] = Array.from({ length: columns }, () => []);
-    
+
     images.forEach((image, index) => {
       const shortestColumnIndex = columnArrays
         .map((column, i) => ({ height: column.length, index: i }))
         .sort((a, b) => a.height - b.height)[0].index;
-      
+
       columnArrays[shortestColumnIndex].push(image);
     });
-    
+
     return columnArrays;
   };
 
@@ -176,7 +177,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 className="masonry-column"
                 style={{ width: `${100 / columns}%` }}
               >
-                {column.map((image) => {
+                {column.map((image, index) => {
                   const ref = imageRefs.current.get(image.id) || React.createRef<HTMLDivElement>();
                   const isSelected = clickedImageId === image.id;
                   return (
@@ -195,7 +196,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                         }}
                       >
                         {renderItem(image)}
-                        
+
                         {onImageDelete && (
                           <Button
                             variant="ghost"

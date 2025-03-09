@@ -1,16 +1,35 @@
-
-export function validateImageFile(file: File): boolean {
-  // Check if the file is an image
-  if (!file.type.match('image.*')) {
+export function validateMediaFile(file: File): boolean {
+  // Check if the file is an image or video
+  if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
     return false;
   }
-  
-  // Check file size (max 10MB)
+
+  // Check if the file size is less than 25MB
+  const maxSize = 25 * 1024 * 1024; // 25MB
+  if (file.size > maxSize) {
+    return false;
+  }
+
+  return true;
+}
+
+export function isVideoFile(file: File): boolean {
+  return file.type.startsWith('video/');
+}
+
+export function validateImageFile(file: File): boolean {
+  // Keep original function for backward compatibility
+  // Check if the file is an image
+  if (!file.type.startsWith('image/')) {
+    return false;
+  }
+
+  // Check if the file size is less than 10MB
   const maxSize = 10 * 1024 * 1024; // 10MB
   if (file.size > maxSize) {
     return false;
   }
-  
+
   return true;
 }
 

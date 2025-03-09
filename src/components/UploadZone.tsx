@@ -1,7 +1,7 @@
 
 import React, { useCallback, useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { validateImageFile } from "@/lib/imageUtils";
+import { validateMediaFile } from "@/lib/imageUtils";
 import { ImagePlus } from "lucide-react";
 
 interface UploadZoneProps {
@@ -41,12 +41,12 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     
     // Process the dropped files
     files.forEach((file) => {
-      if (validateImageFile(file)) {
+      if (validateMediaFile(file)) {
         onImageUpload(file);
       } else {
         toast({
           title: "Invalid file",
-          description: "Please upload images less than 10MB in size.",
+          description: "Please upload images or videos less than 25MB in size.",
           variant: "destructive",
         });
       }
@@ -86,7 +86,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           type="file"
           id="file-upload"
           className="hidden"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
         />
       </div>

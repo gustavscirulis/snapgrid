@@ -141,25 +141,37 @@ ipcMain.handle('open-storage-dir', () => {
 
 ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
   try {
+    // Determine if this is a video or image based on the ID prefix or metadata
+    const isVideo = id.startsWith('vid_') || metadata.type === 'video';
+    
+    // Choose the appropriate file extension
+    const fileExt = isVideo ? '.mp4' : '.png';
+    
     // Strip data URL prefix to get base64 data
-    const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    let base64Data;
+    if (isVideo) {
+      base64Data = dataUrl.replace(/^data:video\/\w+;base64,/, '');
+    } else {
+      base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    }
     const buffer = Buffer.from(base64Data, 'base64');
     
-    // Save image file
-    const imagePath = path.join(appStorageDir, `${id}.png`);
-    await fs.writeFile(imagePath, buffer);
+    // Save media file
+    const filePath = path.join(appStorageDir, `${id}${fileExt}`);
+    await fs.writeFile(filePath, buffer);
     
     // Save metadata as separate JSON file
     const metadataPath = path.join(appStorageDir, `${id}.json`);
     await fs.writeJson(metadataPath, {
       ...metadata,
-      filePath: imagePath // Include actual file path in metadata
+      filePath: filePath, // Include actual file path in metadata
+      type: isVideo ? 'video' : 'image' // Ensure type is correctly set
     });
     
-    console.log(`Image saved to: ${imagePath}`);
-    return { success: true, path: imagePath };
+    console.log(`Media saved to: ${filePath}`);
+    return { success: true, path: filePath };
   } catch (error) {
-    console.error('Error saving image:', error);
+    console.error('Error saving media:', error);
     return { success: false, error: error.message };
   }
 });
@@ -188,10 +200,15 @@ ipcMain.handle('load-images', async () => {
           // Instead of base64, use the local-file protocol
           const localFileUrl = `local-file://${imagePath}`;
           
+          // Get file extension to determine if it's a video
+          const fileExt = path.extname(imagePath).toLowerCase();
+          const isVideo = ['.mp4', '.webm', '.mov', '.avi'].includes(fileExt);
+          
           return {
             ...metadata,
             id,
             url: localFileUrl,
+            type: isVideo ? 'video' : metadata.type || 'image',
             actualFilePath: imagePath,
             useDirectPath: true // Flag to indicate this is a direct file path
           };
