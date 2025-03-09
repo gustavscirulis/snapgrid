@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ImageItem } from '@/hooks/useImageStore';
 
 interface ImageRendererProps {
@@ -83,18 +83,18 @@ export function ImageRenderer({
 
     // Store current time to resume playback when going full screen
     const [currentTime, setCurrentTime] = useState(0);
-    
+
     // In thumbnail view (grid)
     if (!controls) {
       const [isHovering, setIsHovering] = useState(false);
-      
+
       // Update current time while video is playing in thumbnail
       const updateCurrentTime = () => {
         if (videoRef.current) {
           setCurrentTime(videoRef.current.currentTime);
         }
       };
-      
+
       return (
         <div 
           className={`relative ${className}`}
@@ -160,7 +160,7 @@ export function ImageRenderer({
         videoRef.current.currentTime = currentTime;
       }
     }, [controls, currentTime]);
-    
+
     return (
       <video 
         ref={videoRef}
