@@ -70,7 +70,7 @@ const Index = () => {
         <Toaster />
         <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border py-4 px-6 relative draggable">
           <WindowControls />
-          <div className="max-w-screen-xl mx-auto flex justify-between items-center non-draggable">
+          <div className="mx-auto flex justify-between items-center non-draggable">
             <div className="w-8"></div> {/* Empty div for centering */}
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -93,7 +93,7 @@ const Index = () => {
           </div>
         </header>
 
-        <main className="max-w-screen-xl mx-auto">
+        <main className="mx-auto">
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

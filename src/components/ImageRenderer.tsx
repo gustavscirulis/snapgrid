@@ -9,6 +9,7 @@ interface ImageRendererProps {
   autoPlay?: boolean;
   muted?: boolean;
   loop?: boolean;
+  onLoad?: (event: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => void;
 }
 
 export function ImageRenderer({
@@ -18,7 +19,8 @@ export function ImageRenderer({
   controls = false,
   autoPlay = false,
   muted = true,
-  loop = false
+  loop = false,
+  onLoad
 }: ImageRendererProps) {
   const [loadError, setLoadError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -48,8 +50,8 @@ export function ImageRenderer({
   const handleError = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLImageElement>) => {
     const target = e.target as HTMLVideoElement | HTMLImageElement;
 
-    if (target.error) {
-      console.log(`Media error details:`, target.error);
+    if (target instanceof HTMLVideoElement && target.error) {
+      console.log(`Video error details:`, target.error);
     }
 
     console.error(`Failed to load media: ${image.url}`, e);
@@ -68,6 +70,13 @@ export function ImageRenderer({
       }
     }
   }, [image.url, mediaUrl, image.type, isElectron]);
+
+  // Handle media load success
+  const handleLoad = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLImageElement>) => {
+    if (onLoad) {
+      onLoad(e);
+    }
+  }, [onLoad]);
 
   // Display error state if media failed to load
   if (loadError) {
@@ -103,6 +112,7 @@ export function ImageRenderer({
               alt={`Video thumbnail ${image.id}`}
               className={`w-full h-auto object-cover ${className}`}
               style={{ minHeight: '120px' }}
+              onLoad={handleLoad}
             />
           ) : (
             // Fallback if no poster is available
@@ -122,6 +132,7 @@ export function ImageRenderer({
                 muted
                 loop
                 playsInline
+                onLoadedMetadata={handleLoad}
                 onError={(e) => {
                   // If there's an error playing the video on hover, just hide the video
                   setIsHovering(false);
@@ -152,6 +163,7 @@ export function ImageRenderer({
         muted={muted}
         loop={loop}
         onError={handleError}
+        onLoadedMetadata={handleLoad}
         playsInline
         controlsList="nodownload"
         preload="auto"
@@ -166,6 +178,7 @@ export function ImageRenderer({
       alt={alt || `Image ${image.id}`} 
       className={className} 
       onError={handleError}
+      onLoad={handleLoad}
     />
   );
 }

@@ -1,0 +1,36 @@
+/* Masonry grid styles */
+.my-masonry-grid {
+  display: flex;
+  width: 100%;
+  margin-left: -16px; /* Adjust the gutter size */
+  max-width: none; /* Remove max-width constraint */
+}
+
+.my-masonry-grid_column {
+  padding-left: 16px; /* Gutter size */
+  background-clip: padding-box;
+}
+
+/* Style your items */
+.masonry-item {
+  margin-bottom: 16px;
+}
+
+/* Ensure images fill their container */
+.masonry-item img, 
+.masonry-item video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: none; /* Remove max-height constraint */
+}
+
+/* Smooth transitions for all items */
+.masonry-item {
+  transition: transform 0.2s ease-in-out;
+}
+
+/* Optional hover effect */
+.masonry-item:hover {
+  transform: translateY(-2px);
+} 
