@@ -6,6 +6,11 @@ export function getVideoDimensions(videoSrc: string): Promise<{
   posterUrl: string;
 }> {
   return new Promise((resolve, reject) => {
+    if (!videoSrc) {
+      reject(new Error('Video source is empty'));
+      return;
+    }
+
     const video = document.createElement('video');
 
     // Ensure we load the metadata
@@ -42,8 +47,22 @@ export function getVideoDimensions(videoSrc: string): Promise<{
 
     // Handle errors
     video.onerror = (e) => {
-      console.error('Video loading error:', video.error);
-      reject(new Error(`Video error: ${video.error?.message || 'Unknown error'}`));
+      const errorMessage = video.error?.message || 'Unknown error';
+      // Only log as error if it's not the empty src attribute case
+      if (video.error?.code !== 4) {
+        console.error('Video loading error:', video.error);
+      }
+      // For empty src, provide default dimensions
+      if (video.error?.code === 4) {
+        resolve({
+          width: 640,
+          height: 360,
+          duration: 0,
+          posterUrl: '',
+        });
+      } else {
+        reject(new Error(`Video error: ${errorMessage}`));
+      }
     };
 
     function generatePoster() {
@@ -62,7 +81,8 @@ export function getVideoDimensions(videoSrc: string): Promise<{
           const posterUrl = canvas.toDataURL('image/jpeg', 0.8);
 
           // Clean up
-          video.src = '';
+          video.removeAttribute('src'); // Use removeAttribute instead of setting to empty string
+          video.load(); // Ensure the video element is properly reset
 
           // Resolve with the video dimensions and poster URL
           resolve({

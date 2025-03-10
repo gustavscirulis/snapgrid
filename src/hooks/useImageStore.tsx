@@ -171,7 +171,7 @@ export function useImageStore() {
               ...prevImages.filter(img => img.id !== newMedia.id)
             ]);
 
-            toast.success(`Media saved to: ${result.path}`);
+            toast.success(`Media saved successfully`);
           } else {
             console.error("Failed to save media:", result.error);
             toast.error(`Failed to save media: ${result.error || "Unknown error"}`);
