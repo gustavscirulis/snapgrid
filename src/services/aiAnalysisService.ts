@@ -1,7 +1,8 @@
 // A service to identify UI patterns in images using OpenAI's Vision API
 
 interface PatternMatch {
-  pattern: string;
+  pattern?: string;
+  name?: string;
   confidence: number;
 }
 

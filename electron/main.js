@@ -229,7 +229,8 @@ ipcMain.handle('load-images', async () => {
 
           console.log(`Loading media: ${id}, path: ${mediaPath}, url: ${localFileUrl}`);
 
-          return {
+          // Construct the media object with correct paths
+          const mediaObject = {
             ...metadata,
             id,
             url: localFileUrl,
@@ -237,6 +238,11 @@ ipcMain.handle('load-images', async () => {
             actualFilePath: mediaPath,
             useDirectPath: true // Flag to indicate this is a direct file path
           };
+
+          // Log the constructed object for debugging
+          console.log("Constructed media object:", mediaObject);
+
+          return mediaObject;
         } catch (err) {
           console.error(`Error loading image ${id}:`, err);
           return null;
@@ -294,5 +300,17 @@ ipcMain.handle('check-file-access', async (event, filePath) => {
   } catch (error) {
     console.error(`File access error for ${filePath}:`, error);
     return { success: true, accessible: false, error: error.message };
+  }
+});
+
+ipcMain.handle('update-metadata', async (event, { id, metadata }) => {
+  try {
+    const metadataPath = path.join(appStorageDir, `${id}.json`);
+    await fs.writeJson(metadataPath, metadata);
+    console.log(`Updated metadata at: ${metadataPath}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating metadata:', error);
+    return { success: false, error: error.message };
   }
 });

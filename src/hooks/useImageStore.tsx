@@ -140,6 +140,7 @@ export function useImageStore() {
       setImages(prevImages => [newMedia, ...prevImages]);
 
       // If running in Electron, save to disk
+      let savedFilePath: string | undefined;
       if (isElectron && window.electron) {
         console.log('Saving media to disk...');
         try {
@@ -160,6 +161,7 @@ export function useImageStore() {
 
           if (result.success && result.path) {
             console.log("Media saved successfully at:", result.path);
+            savedFilePath = result.path;  // Store the path for later use
             // Update with direct file path instead of base64
             newMedia.actualFilePath = result.path;
             newMedia.url = `local-file://${result.path}`;
@@ -195,10 +197,52 @@ export function useImageStore() {
           const analysis = await analyzeImage(dataUrl as string);
           console.log("Analysis complete, patterns:", analysis);
 
-          // Update the image with analysis results regardless of patterns length
-          newMedia.patterns = analysis;
+          // Map the analysis results to PatternTag format and ensure all fields are present
+          const patternTags = analysis
+            .map(pattern => {
+              const name = pattern.pattern || pattern.name;
+              if (!name) {
+                console.error("Pattern missing both name and pattern fields:", pattern);
+                return null;
+              }
+              return {
+                name,
+                confidence: pattern.confidence
+              };
+            })
+            .filter((tag): tag is PatternTag => tag !== null);
+
+          console.log("Mapped pattern tags:", patternTags);
+
+          // Update the image with analysis results
+          newMedia.patterns = patternTags;
           newMedia.isAnalyzing = false;
           console.log("Updating images with analysis results:", newMedia.patterns);
+          
+          // Save the updated metadata with patterns to disk
+          if (isElectron && window.electron && savedFilePath) {
+            try {
+              await window.electron.updateMetadata({
+                id: newMedia.id,
+                metadata: {
+                  width: newMedia.width,
+                  height: newMedia.height,
+                  createdAt: newMedia.createdAt,
+                  title: newMedia.title,
+                  description: newMedia.description,
+                  type: newMedia.type,
+                  duration: newMedia.duration,
+                  posterUrl: newMedia.posterUrl,
+                  patterns: patternTags,
+                  filePath: savedFilePath  // Use the saved path from the first save
+                }
+              });
+              console.log("Updated metadata with patterns");
+            } catch (error) {
+              console.error("Failed to update metadata:", error);
+              toast.error("Failed to save pattern analysis");
+            }
+          }
           
           setImages(prevImages => {
             const updated = prevImages.map(img => 
