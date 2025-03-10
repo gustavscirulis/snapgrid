@@ -54,8 +54,6 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
   }
 
   try {
-    console.log("Analyzing image, URL type:", imageUrl.substring(0, 30) + "...");
-
     // Prepare the request payload
     const payload = {
       model: "gpt-4o", // Using GPT-4o which supports vision
@@ -87,7 +85,6 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
 
     // Try to use Electron proxy if available, otherwise fall back to fetch
     if (window.electron && window.electron.callOpenAI) {
-      console.log("Using Electron proxy for OpenAI API call");
       data = await window.electron.callOpenAI(apiKey, payload);
     } else {
       console.log("Using fetch API for OpenAI API call");
@@ -111,10 +108,6 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
 
     let content = data.choices[0]?.message?.content;
 
-    // Clean up any markdown formatting that might be in the response
-    
-    console.log("Raw OpenAI content:", content);
-
     // Parse the JSON response from OpenAI
     try {
       let patterns;
@@ -130,10 +123,8 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
           jsonString = content.split('```')[1].split('```')[0].trim();
         }
 
-        console.log("Cleaned JSON string:", jsonString);
         patterns = JSON.parse(jsonString);
       } catch (parseError) {
-        console.error("JSON parse error:", parseError);
         // Try a more aggressive cleanup approach
         let jsonString = content.replace(/```/g, '').replace(/json/g, '').trim();
         // Remove any non-JSON text before or after the array
@@ -141,11 +132,9 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
         if (arrayMatch) {
           jsonString = arrayMatch[0];
         }
-        console.log("Second attempt JSON string:", jsonString);
         patterns = JSON.parse(jsonString);
       }
 
-      console.log("Parsed patterns:", patterns);
 
       // Validate and clean up the response
       if (Array.isArray(patterns)) {

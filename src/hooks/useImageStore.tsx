@@ -166,7 +166,10 @@ export function useImageStore() {
             newMedia.actualFilePath = result.path;
             newMedia.url = `local-file://${result.path}`;
             newMedia.useDirectPath = true;
-            setImages([newMedia, ...images.filter(img => img.id !== newMedia.id)]);
+            setImages(prevImages => [
+              {...newMedia},
+              ...prevImages.filter(img => img.id !== newMedia.id)
+            ]);
 
             toast.success(`Media saved to: ${result.path}`);
           } else {
@@ -189,13 +192,11 @@ export function useImageStore() {
         // Update the state to reflect analysis is in progress
         newMedia.isAnalyzing = true;
         setImages(prevImages =>
-          prevImages.map(img => img.id === newMedia.id ? newMedia : img)
+          prevImages.map(img => img.id === newMedia.id ? {...newMedia} : img)
         );
 
         try {
-          console.log("Starting analysis for image:", id);
           const analysis = await analyzeImage(dataUrl as string);
-          console.log("Analysis complete, patterns:", analysis);
 
           // Map the analysis results to PatternTag format and ensure all fields are present
           const patternTags = analysis
@@ -212,32 +213,32 @@ export function useImageStore() {
             })
             .filter((tag): tag is PatternTag => tag !== null);
 
-          console.log("Mapped pattern tags:", patternTags);
 
           // Update the image with analysis results
-          newMedia.patterns = patternTags;
-          newMedia.isAnalyzing = false;
-          console.log("Updating images with analysis results:", newMedia.patterns);
+          const updatedMedia = {
+            ...newMedia,
+            patterns: patternTags,
+            isAnalyzing: false
+          };
           
           // Save the updated metadata with patterns to disk
           if (isElectron && window.electron && savedFilePath) {
             try {
-              await window.electron.updateMetadata({
-                id: newMedia.id,
+              await window.electron.saveUrlCard({
+                id: updatedMedia.id,
                 metadata: {
-                  width: newMedia.width,
-                  height: newMedia.height,
-                  createdAt: newMedia.createdAt,
-                  title: newMedia.title,
-                  description: newMedia.description,
-                  type: newMedia.type,
-                  duration: newMedia.duration,
-                  posterUrl: newMedia.posterUrl,
+                  width: updatedMedia.width,
+                  height: updatedMedia.height,
+                  createdAt: updatedMedia.createdAt,
+                  title: updatedMedia.title,
+                  description: updatedMedia.description,
+                  type: updatedMedia.type,
+                  duration: updatedMedia.duration,
+                  posterUrl: updatedMedia.posterUrl,
                   patterns: patternTags,
                   filePath: savedFilePath  // Use the saved path from the first save
                 }
               });
-              console.log("Updated metadata with patterns");
             } catch (error) {
               console.error("Failed to update metadata:", error);
               toast.error("Failed to save pattern analysis");
@@ -245,19 +246,20 @@ export function useImageStore() {
           }
           
           setImages(prevImages => {
-            const updated = prevImages.map(img => 
-              img.id === newMedia.id ? {...newMedia} : img
+            return prevImages.map(img => 
+              img.id === updatedMedia.id ? updatedMedia : img
             );
-            console.log("Updated image in store:", updated.find(img => img.id === newMedia.id));
-            return updated;
           });
         } catch (error) {
           console.error('Image analysis failed:', error);
-          newMedia.isAnalyzing = false;
-          newMedia.error = 'Analysis failed';
+          const errorMedia = {
+            ...newMedia,
+            isAnalyzing: false,
+            error: 'Analysis failed'
+          };
 
           setImages(prevImages =>
-            prevImages.map(img => img.id === newMedia.id ? newMedia : img)
+            prevImages.map(img => img.id === newMedia.id ? errorMedia : img)
           );
           toast.error("Image analysis failed: " + (error instanceof Error ? error.message : 'Unknown error'));
         }
