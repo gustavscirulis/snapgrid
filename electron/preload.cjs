@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld(
     // File storage operations
     loadImages: () => ipcRenderer.invoke('load-images'),
     saveImage: (data) => ipcRenderer.invoke('save-image', data),
+    updateMetadata: (data) => ipcRenderer.invoke('update-metadata', data),
     saveUrlCard: (data) => ipcRenderer.invoke('save-url-card', data),
     deleteImage: (id) => ipcRenderer.invoke('delete-image', id),
 
