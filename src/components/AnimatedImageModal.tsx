@@ -129,7 +129,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             <ImageRenderer
               image={selectedImage}
               alt={selectedImage.title || "Selected media"}
-              className={`h-full w-auto max-w-full object-contain rounded-lg shadow-xl ${selectedImage.type === 'video' ? 'w-auto max-w-full' : 'mx-auto'}`}
+              className={`h-full w-auto max-w-full object-contain rounded-xl shadow-xl ${selectedImage.type === 'video' ? 'w-auto max-w-full' : 'mx-auto'}`}
               controls={true}
               autoPlay={selectedImage.type === "video"}
               muted={false}

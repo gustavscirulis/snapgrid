@@ -89,7 +89,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         {item.patterns.map((pattern, index) => (
           <span 
             key={index} 
-            className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md"
+            className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md cursor-default"
             title={`Confidence: ${Math.round(pattern.confidence * 100)}%`}
           >
             {pattern.name}
@@ -113,7 +113,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           {hoveredImageId === item.id && (
             <motion.div 
               id={`pattern-tags-${item.id}`}
-              className="absolute bottom-0 left-0 right-0 p-2"
+              className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/50 to-transparent"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
@@ -203,7 +203,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full h-8 w-8 bg-black/60 text-white hover:bg-black/80"
+                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full h-8 w-8 bg-black/60 text-white hover:text-white hover:bg-black/80"
                             onClick={(e) => {
                               e.stopPropagation();
                               onImageDelete(image.id);
