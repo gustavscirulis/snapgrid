@@ -123,7 +123,7 @@
   .masonry-item {
     margin-bottom: 1rem;
     width: 100%;
-    break-inside: avoid;
+    break-inside: avoid; 
   }
 
   .url-card {
@@ -141,7 +141,7 @@
     background-color: white;
     outline: none;
   }
-  
+
   /* Add pointer cursor for pattern tags */
   .text-xs.bg-secondary.text-secondary-foreground {
     cursor: pointer;
