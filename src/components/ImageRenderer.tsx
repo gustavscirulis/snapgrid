@@ -32,20 +32,32 @@ export function ImageRenderer({
 
   // Process the media URL
   let mediaUrl = image.url;
-  const isLocalFileProtocol = mediaUrl.startsWith('local-file://');
+  const isLocalFileProtocol = mediaUrl?.startsWith('local-file://');
+  
+  // Check for invalid URLs
+  if (!mediaUrl) {
+    console.error('Missing URL for media:', image.id);
+    setLoadError(true);
+    mediaUrl = ''; // Set to empty string to avoid undefined errors
+  }
 
   // In browser development mode, we can't use local-file:// protocol for security reasons
   if (isLocalFileProtocol && !isElectron) {
+    // For videos, use the poster image instead of trying to load the video
     if (image.type === 'video') {
-      console.log('Video in browser mode - will use poster image');
-      // We'll rely on the poster image for thumbnails in browser mode
+      // If we have a poster URL, we'll use that in the UI
+      if (!image.posterUrl) {
+        setLoadError(true); // Mark as error if no poster available
+      }
     } else {
       // For images in browser, use a placeholder
-      console.log('Using placeholder for local file in browser mode');
       mediaUrl = '/placeholder.svg';
     }
   }
 
+  // For videos in thumbnail view, always use the poster if available
+  const shouldUsePoster = image.type === 'video' && !controls && image.posterUrl;
+  
   // Handle media loading errors
   const handleError = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLImageElement>) => {
     const target = e.target as HTMLVideoElement | HTMLImageElement;
@@ -61,7 +73,6 @@ export function ImageRenderer({
     if (mediaUrl.startsWith('local-file://') && image.type === 'video' && isElectron) {
       try {
         const fixedSrc = mediaUrl.replace('local-file://', 'file://');
-        console.log("Attempting with corrected URL:", fixedSrc);
         if (videoRef.current) {
           videoRef.current.src = fixedSrc;
         }
@@ -80,6 +91,30 @@ export function ImageRenderer({
 
   // Display error state if media failed to load
   if (loadError) {
+    // Special handling for videos with poster images
+    if (image.type === 'video' && image.posterUrl) {
+      return (
+        <div className={`relative bg-gray-200 flex flex-col items-center justify-center ${className}`}>
+          <img 
+            src={image.posterUrl} 
+            alt={`Video thumbnail ${image.id}`}
+            className={`w-full h-auto object-cover ${className}`}
+            style={{ minHeight: '120px' }}
+          />
+          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white p-4">
+            <div className="text-center">
+              <p className="font-medium">Video playback unavailable</p>
+              <p className="text-sm mt-1 text-gray-200">This video cannot be played in the browser</p>
+              {isElectron && (
+                <p className="text-xs mt-2 text-gray-300">Try opening the file directly</p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Default error state for other media types
     return (
       <div className={`bg-gray-200 flex items-center justify-center ${className}`}>
         <span className="text-gray-500">Media failed to load</span>
@@ -89,15 +124,17 @@ export function ImageRenderer({
 
   // Render video element
   if (image.type === "video") {
-
     // In thumbnail view (grid)
     if (!controls) {
       const [isHovering, setIsHovering] = useState(false);
       
+      // If we're in a browser and it's a local file, don't try to play the video on hover
+      const canPlayOnHover = !(isLocalFileProtocol && !isElectron);
+      
       return (
         <div 
           className={`relative ${className}`}
-          onMouseEnter={() => setIsHovering(true)}
+          onMouseEnter={() => canPlayOnHover && setIsHovering(true)}
           onMouseLeave={() => {
             setIsHovering(false);
             if (videoRef.current) {
@@ -121,8 +158,8 @@ export function ImageRenderer({
             </div>
           )}
 
-          {/* Video layer that appears on hover */}
-          {isHovering && (
+          {/* Video layer that appears on hover - only if we can play it */}
+          {isHovering && canPlayOnHover && (
             <div className="absolute inset-0">
               <video 
                 ref={videoRef}
@@ -152,6 +189,32 @@ export function ImageRenderer({
     }
 
     // In full view (modal with controls)
+    // If we're in a browser and it's a local file, show an error message
+    if (isLocalFileProtocol && !isElectron) {
+      return (
+        <div className={`relative bg-gray-800 flex flex-col items-center justify-center ${className}`}>
+          {image.posterUrl && (
+            <img 
+              src={image.posterUrl} 
+              alt={`Video thumbnail ${image.id}`}
+              className="w-full h-full object-contain opacity-30"
+            />
+          )}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
+            <div className="text-center max-w-md">
+              <h3 className="text-xl font-medium mb-2">Video Cannot Be Played</h3>
+              <p className="mb-4">
+                This video file cannot be played in the browser due to security restrictions that prevent access to local files.
+              </p>
+              <p className="text-sm text-gray-300">
+                To view this video, you need to use the desktop app or open it directly in a video player.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <video 
         ref={videoRef}

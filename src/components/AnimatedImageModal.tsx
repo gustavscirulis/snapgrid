@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ImageRenderer } from "@/components/ImageRenderer";
@@ -75,6 +75,21 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   // Add state to store actual video dimensions
   const [actualVideoDimensions, setActualVideoDimensions] = useState<{width: number, height: number} | null>(null);
 
+  // Add a new state to track media loading errors
+  const [mediaLoadError, setMediaLoadError] = useState(false);
+
+  // Handle media load error
+  const handleMediaError = useCallback(() => {
+    setMediaLoadError(true);
+  }, []);
+
+  // Reset error state when modal closes or image changes
+  useEffect(() => {
+    if (!isOpen) {
+      setMediaLoadError(false);
+    }
+  }, [isOpen, selectedImage]);
+
   // Calculate optimal dimensions using the new function
   const optimalDimensions = useMemo(() => {
     if (!selectedImage) return null;
@@ -96,17 +111,36 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
   useEffect(() => {
     if (isOpen && selectedImageRef?.current) {
-      const rect = selectedImageRef.current.getBoundingClientRect();
+      try {
+        const rect = selectedImageRef.current.getBoundingClientRect();
+        setInitialPosition({
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        });
+      } catch (error) {
+        console.error('Error getting initial position:', error);
+        // Provide a fallback position in the center of the screen
+        setInitialPosition({
+          top: window.innerHeight / 2 - 150,
+          left: window.innerWidth / 2 - 200,
+          width: 400,
+          height: 300,
+        });
+      }
+    } else if (isOpen && !initialPosition) {
+      // If the ref is not available but modal should be open, use a default position
       setInitialPosition({
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
+        top: window.innerHeight / 2 - 150,
+        left: window.innerWidth / 2 - 200,
+        width: 400,
+        height: 300,
       });
     } else if (!isOpen) {
       setTimeout(() => setInitialPosition(null), 300);
     }
-  }, [isOpen, selectedImageRef]);
+  }, [isOpen, selectedImageRef, initialPosition]);
 
   useEffect(() => {
     if (isOpen) {
@@ -169,7 +203,97 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   }, [isOpen, selectedImage]);
 
-  if (!selectedImage || !initialPosition || !optimalDimensions) return null;
+  if (!selectedImage || !initialPosition || !optimalDimensions) {
+    // If we have selectedImage and initialPosition but no optimalDimensions,
+    // we can still render the modal with default dimensions
+    if (selectedImage && initialPosition && !optimalDimensions) {
+      const fallbackDimensions = {
+        width: Math.min(800, window.innerWidth * 0.8),
+        height: Math.min(600, window.innerHeight * 0.8),
+        top: window.innerHeight / 2 - Math.min(600, window.innerHeight * 0.8) / 2,
+        left: window.innerWidth / 2 - Math.min(800, window.innerWidth * 0.8) / 2
+      };
+      
+      const modalVariants = {
+        initial: {
+          top: initialPosition.top,
+          left: initialPosition.left,
+          width: initialPosition.width,
+          height: initialPosition.height,
+          borderRadius: "0.5rem",
+          zIndex: 50
+        },
+        open: {
+          top: fallbackDimensions.top,
+          left: fallbackDimensions.left,
+          width: fallbackDimensions.width,
+          height: fallbackDimensions.height,
+          borderRadius: "1rem",
+          transition: {
+            type: "spring",
+            damping: 30,
+            stiffness: 300
+          }
+        },
+        exit: {
+          top: initialPosition.top,
+          left: initialPosition.left,
+          width: initialPosition.width,
+          height: initialPosition.height,
+          borderRadius: "0.5rem",
+          transition: {
+            type: "spring",
+            damping: 30,
+            stiffness: 300
+          }
+        }
+      };
+      
+      return (
+        <AnimatePresence onExitComplete={() => onAnimationComplete && onAnimationComplete("exit-complete")}>
+          {isOpen && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                className="fixed inset-0 bg-black/80 z-50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={onClose}
+              />
+
+              {/* Image container - fixed position applied directly to the element */}
+              <motion.div
+                className="fixed z-50 overflow-hidden rounded-lg flex items-center justify-center"
+                style={{ position: "fixed" }}
+                variants={modalVariants}
+                initial="initial"
+                animate="open"
+                exit="exit"
+                onClick={onClose}
+                onAnimationComplete={(definition) => {
+                  if (definition === "exit") {
+                    onAnimationComplete && onAnimationComplete("exit");
+                  }
+                }}
+              >
+                <ImageRenderer
+                  image={selectedImage}
+                  alt={selectedImage.title || "Selected media"}
+                  className={`h-full w-auto max-w-full object-contain rounded-xl shadow-xl ${selectedImage.type === 'video' ? 'w-auto max-w-full' : 'mx-auto'}`}
+                  controls={true}
+                  autoPlay={selectedImage.type === "video"}
+                  muted={false}
+                />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      );
+    }
+    
+    return null;
+  }
 
   const modalVariants = {
     initial: {
@@ -221,7 +345,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
           {/* Image container - fixed position applied directly to the element */}
           <motion.div
-            className="fixed z-50 overflow-hidden rounded-lg flex items-center justify-center" // Added centering classes
+            className="fixed z-50 overflow-hidden rounded-lg flex items-center justify-center"
             style={{ position: "fixed" }}
             variants={modalVariants}
             initial="initial"
@@ -242,6 +366,18 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               autoPlay={selectedImage.type === "video"}
               muted={false}
             />
+            
+            {/* Close button */}
+            <button 
+              className="absolute top-4 right-4 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition-colors"
+              onClick={onClose}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              <span className="sr-only">Close</span>
+            </button>
           </motion.div>
         </>
       )}
