@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ImageRenderer } from "@/components/ImageRenderer";
@@ -13,6 +13,48 @@ interface AnimatedImageModalProps {
   onAnimationComplete?: (definition: string) => void;
 }
 
+// Function to calculate optimal dimensions
+const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, screenHeight: number) => {
+  // For videos, use maximum screen space while respecting original dimensions
+  if (image.type === 'video') {
+    // Calculate maximum available space (95% of screen)
+    const maxWidth = screenWidth * 0.95;
+    const maxHeight = screenHeight * 0.95;
+    
+    // Get original dimensions, with fallbacks
+    const originalWidth = image.width || 800;
+    const originalHeight = image.height || 600;
+    
+    // Calculate scaling factors to fit within screen
+    const widthScale = maxWidth / originalWidth;
+    const heightScale = maxHeight / originalHeight;
+    
+    // Use the smaller scaling factor to ensure both dimensions fit
+    // If scale > 1, it means we can fit the video at larger than original size,
+    // but we'll cap at 1 to avoid quality loss
+    const scale = Math.min(widthScale, heightScale);
+    
+    // Calculate final dimensions - never exceed original dimensions
+    const width = originalWidth * Math.min(scale, 1);
+    const height = originalHeight * Math.min(scale, 1);
+    
+    return {
+      width,
+      height,
+      top: (screenHeight - height) / 2,
+      left: (screenWidth - width) / 2
+    };
+  }
+  
+  // For images, use existing logic
+  return {
+    width: Math.min(image.width || 800, screenWidth * 0.98),
+    height: Math.min(image.height || 600, screenHeight * 0.95),
+    top: screenHeight / 2 - Math.min(image.height || 600, screenHeight * 0.95) / 2,
+    left: screenWidth / 2 - Math.min(image.width || 800, screenWidth * 0.98) / 2
+  };
+};
+
 const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   isOpen,
   onClose,
@@ -26,6 +68,31 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     width: number;
     height: number;
   } | null>(null);
+  
+  // Add a ref to access the video element
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  
+  // Add state to store actual video dimensions
+  const [actualVideoDimensions, setActualVideoDimensions] = useState<{width: number, height: number} | null>(null);
+
+  // Calculate optimal dimensions using the new function
+  const optimalDimensions = useMemo(() => {
+    if (!selectedImage) return null;
+    
+    // If we have actual video dimensions from the video element, use those instead
+    if (selectedImage.type === 'video' && actualVideoDimensions) {
+      // Create a copy of the selectedImage with updated dimensions
+      const updatedImage = {
+        ...selectedImage,
+        width: actualVideoDimensions.width,
+        height: actualVideoDimensions.height
+      };
+      
+      return calculateOptimalDimensions(updatedImage, window.innerWidth, window.innerHeight);
+    }
+    
+    return calculateOptimalDimensions(selectedImage, window.innerWidth, window.innerHeight);
+  }, [selectedImage, window.innerWidth, window.innerHeight, actualVideoDimensions]);
 
   useEffect(() => {
     if (isOpen && selectedImageRef?.current) {
@@ -61,7 +128,48 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  if (!selectedImage || !initialPosition) return null;
+  // Add a new useEffect to get the actual video dimensions once it's loaded
+  useEffect(() => {
+    // Function to get video element and its dimensions
+    const getVideoElement = () => {
+      // Look for video element in the DOM
+      const videoElement = document.querySelector('video');
+      if (videoElement && selectedImage?.type === 'video') {
+        videoRef.current = videoElement;
+        
+        // Function to update dimensions when metadata is loaded
+        const updateDimensions = () => {
+          const width = videoElement.videoWidth;
+          const height = videoElement.videoHeight;
+          
+          if (width && height) {
+            setActualVideoDimensions({ width, height });
+          }
+        };
+        
+        // If metadata is already loaded
+        if (videoElement.readyState >= 1) {
+          updateDimensions();
+        } else {
+          // Otherwise wait for metadata to load
+          videoElement.addEventListener('loadedmetadata', updateDimensions);
+          return () => videoElement.removeEventListener('loadedmetadata', updateDimensions);
+        }
+      }
+    };
+    
+    // If modal is open, try to get video dimensions
+    if (isOpen && selectedImage?.type === 'video') {
+      // Initial attempt
+      getVideoElement();
+      
+      // Try again after a short delay to ensure the video element is in the DOM
+      const timeoutId = setTimeout(getVideoElement, 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isOpen, selectedImage]);
+
+  if (!selectedImage || !initialPosition || !optimalDimensions) return null;
 
   const modalVariants = {
     initial: {
@@ -73,10 +181,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
       zIndex: 50
     },
     open: {
-      top: window.innerHeight / 2 - Math.min(selectedImage.height || 600, window.innerHeight * 0.95) / 2,
-      left: window.innerWidth / 2 - Math.min(selectedImage.width || 800, window.innerWidth * 0.98) / 2,
-      width: Math.min(selectedImage.width || 800, window.innerWidth * 0.98),
-      height: Math.min(selectedImage.height || 600, window.innerHeight * 0.95),
+      top: optimalDimensions.top,
+      left: optimalDimensions.left,
+      width: optimalDimensions.width,
+      height: optimalDimensions.height,
       borderRadius: "1rem",
       transition: {
         type: "spring",
