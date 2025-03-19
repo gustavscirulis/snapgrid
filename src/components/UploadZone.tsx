@@ -62,20 +62,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onPaste={async (e) => {
-          e.preventDefault();
-          const text = e.clipboardData.getData('text');
-          if (text && text.startsWith('http')) {
-            try {
-              await onImageUpload([{
-                type: 'url',
-                data: text
-              }]);
-            } catch (error) {
-              console.error('Error processing pasted URL:', error);
-            }
-          }
-        }}
       >
         {children}
         
