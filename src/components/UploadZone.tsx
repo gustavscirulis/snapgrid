@@ -64,8 +64,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
         onDrop={handleDrop}
         onPaste={async (e) => {
           e.preventDefault();
-          const text = e.clipboardData.getData('text');
-          if (text && text.startsWith('http')) {
+          const text = e.clipboardData?.getData('text/plain');
+          if (text && typeof text === 'string' && text.trim().startsWith('http')) {
             try {
               await onImageUpload([{
                 type: 'url',
