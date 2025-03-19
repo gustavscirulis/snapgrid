@@ -13,6 +13,20 @@ const __dirname = path.dirname(__filename);
 // Detect development mode without using electron-is-dev
 const isDev = process.env.NODE_ENV === 'development' || !/[\\/]app\.asar[\\/]/.test(__dirname);
 
+// Helper function for conditional logging
+const devLog = (...args) => {
+  if (isDev) {
+    console.log(...args);
+  }
+};
+
+// Helper function for conditional warning logging
+const devWarn = (...args) => {
+  if (isDev) {
+    console.warn(...args);
+  }
+};
+
 // Global storage path that will be exposed to the renderer
 let appStorageDir;
 let mainWindow;
@@ -26,7 +40,7 @@ const getAppStorageDir = () => {
     // On macOS, try to use Documents folder first for visibility
     const homeDir = os.homedir();
     storageDir = path.join(homeDir, 'Documents', 'UIReferenceApp');
-    console.log('Using Documents folder path:', storageDir);
+    devLog('Using Documents folder path:', storageDir);
 
     // Create a README file to help users find the folder
     const readmePath = path.join(storageDir, 'README.txt');
@@ -42,7 +56,7 @@ const getAppStorageDir = () => {
   } else {
     // For other platforms, use app.getPath('userData')
     storageDir = path.join(app.getPath('userData'), 'images');
-    console.log('Using userData path:', storageDir);
+    devLog('Using userData path:', storageDir);
   }
 
   // Ensure directory exists
@@ -53,7 +67,7 @@ const getAppStorageDir = () => {
 
 function createWindow() {
   appStorageDir = getAppStorageDir();
-  console.log('App storage directory:', appStorageDir);
+  devLog('App storage directory:', appStorageDir);
 
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -76,7 +90,7 @@ function createWindow() {
     ? 'http://localhost:8080' 
     : `file://${path.join(__dirname, '../dist/index.html')}`;
 
-  console.log('Loading application from:', startUrl);
+  devLog('Loading application from:', startUrl);
 
   // Add webSecurity configuration and CSP for local media playback and OpenAI API
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
@@ -84,7 +98,11 @@ function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
+          "default-src 'self' 'unsafe-inline' local-file: file: data:; " +
+          "connect-src 'self' https://api.openai.com https://api.allorigins.win https://* local-file: file: data:; " +
+          "img-src 'self' https://* local-file: file: blob: data:; " +
+          "script-src 'self' 'unsafe-inline' blob:; " +
+          "media-src 'self' local-file: file: blob: data:;"
         ]
       }
     });
@@ -94,6 +112,23 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
+    
+    // Suppress DevTools console errors related to Autofill and other missing features
+    mainWindow.webContents.on('did-finish-load', () => {
+      mainWindow.webContents.executeJavaScript(`
+        // Suppress specific console errors
+        const originalConsoleError = console.error;
+        console.error = function(...args) {
+          // Filter out DevTools protocol errors
+          if (args.length > 0 && typeof args[0] === 'string' && 
+              (args[0].includes("Request Autofill") || 
+               args[0].includes("wasn't found"))) {
+            return;
+          }
+          originalConsoleError.apply(console, args);
+        };
+      `);
+    });
   }
 
   mainWindow.on('closed', () => {
@@ -177,23 +212,38 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
     const filePath = path.join(appStorageDir, `${id}${fileExt}`);
     await fs.writeFile(filePath, buffer);
 
-    console.log(`Media saved to: ${filePath}`);
-
-    // Save metadata as separate JSON file
-    const metadataPath = path.join(appStorageDir, `${id}.json`);
-    await fs.writeJson(metadataPath, {
+    // Ensure metadata is serializable
+    const safeMetadata = safeSerialize({
       ...metadata,
       filePath: filePath, // Include actual file path in metadata
       type: isVideo ? 'video' : 'image' // Ensure type is correctly set
     });
 
-    console.log(`Media saved to: ${filePath}`);
+    // Save metadata as separate JSON file
+    const metadataPath = path.join(appStorageDir, `${id}.json`);
+    await fs.writeJson(metadataPath, safeMetadata);
+
     return { success: true, path: filePath };
   } catch (error) {
     console.error('Error saving media:', error);
     return { success: false, error: error.message };
   }
 });
+
+// Add a helper function for safer object serialization
+const safeSerialize = (obj) => {
+  try {
+    // Test if the object can be serialized
+    JSON.stringify(obj);
+    return obj;
+  } catch (error) {
+    // If serialization fails, return a simplified error object
+    return {
+      error: 'Object could not be serialized',
+      message: error.message
+    };
+  }
+};
 
 ipcMain.handle('load-images', async () => {
   try {
@@ -214,7 +264,8 @@ ipcMain.handle('load-images', async () => {
         try {
           // Check if both metadata and media file exist
           if (!(await fs.pathExists(mediaPath))) {
-            console.warn(`Media file not found: ${mediaPath}`);
+            // Only log in development mode
+            devWarn(`Media file not found: ${mediaPath}`);
             return null;
           }
 
@@ -223,8 +274,6 @@ ipcMain.handle('load-images', async () => {
 
           // Use the local-file protocol for both images and videos
           const localFileUrl = `local-file://${mediaPath}`;
-
-          console.log(`Loading media: ${id}, path: ${mediaPath}, url: ${localFileUrl}`);
 
           // Construct the media object with correct paths
           const mediaObject = {
@@ -236,12 +285,10 @@ ipcMain.handle('load-images', async () => {
             useDirectPath: true // Flag to indicate this is a direct file path
           };
 
-          // Log the constructed object for debugging
-          console.log("Constructed media object:", mediaObject);
-
-          return mediaObject;
+          return safeSerialize(mediaObject);
         } catch (err) {
-          console.error(`Error loading image ${id}:`, err);
+          // Only log in development mode
+          devWarn(`Error loading image ${id}:`, err);
           return null;
         }
       })
@@ -267,7 +314,6 @@ ipcMain.handle('delete-image', async (event, id) => {
     await fs.remove(mediaPath);
     await fs.remove(metadataPath);
 
-    console.log(`Deleted media: ${mediaPath}`);
     return { success: true };
   } catch (error) {
     console.error('Error deleting image:', error);
@@ -277,9 +323,34 @@ ipcMain.handle('delete-image', async (event, id) => {
 
 ipcMain.handle('save-url-card', async (event, { id, metadata }) => {
   try {
+    // Ensure metadata is serializable before saving
+    let safeMetadata;
+    try {
+      // Test serialization
+      JSON.stringify(metadata);
+      safeMetadata = metadata;
+    } catch (err) {
+      devWarn('Metadata contains non-serializable data, cleaning...', err);
+      // Create a clean version with only serializable properties
+      safeMetadata = {
+        id: metadata.id,
+        type: metadata.type,
+        url: metadata.url,
+        width: metadata.width || 400,
+        height: metadata.height || 400,
+        createdAt: metadata.createdAt || new Date(),
+        title: metadata.title || '',
+        description: metadata.description || ''
+      };
+      
+      // Selectively add other properties if they exist and are serializable
+      if (metadata.thumbnailUrl) safeMetadata.thumbnailUrl = metadata.thumbnailUrl;
+      if (metadata.faviconUrl) safeMetadata.faviconUrl = metadata.faviconUrl;
+    }
+    
     const metadataPath = path.join(appStorageDir, `${id}.json`);
-    await fs.writeJson(metadataPath, metadata);
-    console.log(`Saved URL card: ${metadataPath}`);
+    await fs.writeJson(metadataPath, safeMetadata);
+    devLog(`Saved URL card: ${metadataPath}`);
     return { success: true };
   } catch (error) {
     console.error('Error saving URL card:', error);
@@ -292,22 +363,36 @@ ipcMain.handle('check-file-access', async (event, filePath) => {
   try {
     // Check if file exists and is readable
     await fsPromises.access(filePath, fsPromises.constants.R_OK); // Use fsPromises here
-    console.log(`File is accessible: ${filePath}`);
+    devLog(`File is accessible: ${filePath}`);
     return { success: true, accessible: true };
   } catch (error) {
-    console.error(`File access error for ${filePath}:`, error);
+    devWarn(`File access error for ${filePath}:`, error);
     return { success: true, accessible: false, error: error.message };
   }
 });
 
 ipcMain.handle('update-metadata', async (event, { id, metadata }) => {
   try {
+    // Ensure metadata is serializable
+    const safeMetadata = safeSerialize(metadata);
+    
     const metadataPath = path.join(appStorageDir, `${id}.json`);
-    await fs.writeJson(metadataPath, metadata);
-    console.log(`Updated metadata at: ${metadataPath}`);
+    await fs.writeJson(metadataPath, safeMetadata);
+    devLog(`Updated metadata at: ${metadataPath}`);
     return { success: true };
   } catch (error) {
     console.error('Error updating metadata:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('open-url', async (event, url) => {
+  try {
+    devLog(`Opening URL in default browser: ${url}`);
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening URL:', error);
     return { success: false, error: error.message };
   }
 });

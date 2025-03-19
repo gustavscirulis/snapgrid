@@ -30,6 +30,9 @@ export interface ImageItem {
   posterUrl?: string;
 }
 
+// Helper to determine if we're in development mode
+const isDev = process.env.NODE_ENV === 'development';
+
 export function useImageStore() {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -41,19 +44,32 @@ export function useImageStore() {
       typeof window.electron !== 'undefined' &&
       window.electron !== null;
 
-    console.log("useImageStore - Electron detection:", {
-      electronExists: typeof window.electron !== 'undefined',
-      electronValue: window.electron
-    });
+    if (isDev) {
+      console.log("useImageStore - Electron detection:", {
+        electronExists: typeof window.electron !== 'undefined',
+        electronValue: window.electron
+      });
+    }
 
     setIsElectron(isRunningInElectron);
 
     const loadImages = async () => {
       try {
-        if (isRunningInElectron) {
-          console.log("Loading images from filesystem...");
-          const loadedImages = await window.electron.loadImages();
-          console.log("Loaded images:", loadedImages.length);
+        if (isRunningInElectron && window.electron?.loadImages) {
+          if (isDev) console.log("Loading images from filesystem...");
+          let loadedImages;
+          try {
+            loadedImages = await window.electron.loadImages();
+          } catch (loadError) {
+            console.error("Error in loadImages IPC call:", loadError);
+            toast.error("Failed to load images from filesystem");
+            setImages([]);
+            setIsLoading(false);
+            return;
+          }
+          
+          if (isDev) console.log("Loaded images:", loadedImages?.length || 0);
+          
           // Sort by createdAt with newest first
           const sortedImages = [...(loadedImages || [])].sort((a, b) =>
             new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
@@ -61,13 +77,20 @@ export function useImageStore() {
           setImages(sortedImages);
         } else {
           setImages([]);
-          toast.warning("Running in browser mode. Images will not be saved permanently.");
+          if (!isRunningInElectron) {
+            toast.warning("Running in browser mode. Images will not be saved permanently.");
+          } else if (!window.electron?.loadImages) {
+            console.error("loadImages method not available on electron object");
+            toast.error("Image loading API not available");
+          }
         }
       } catch (error) {
         console.error("Error loading images:", error);
         toast.error("Failed to load images");
+        setImages([]);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     loadImages();
@@ -92,29 +115,33 @@ export function useImageStore() {
   };
 
   const saveMediaToDisk = async (media: ImageItem, dataUrl: string): Promise<string | undefined> => {
-    if (!isElectron || !window.electron) return undefined;
+    if (!isElectron || !window.electron?.saveImage) return undefined;
 
     try {
+      // Create a simplified metadata object to avoid serialization issues
+      const safeMetadata: Record<string, any> = {
+        width: media.width,
+        height: media.height,
+        createdAt: media.createdAt,
+        title: media.title,
+        description: media.description,
+        type: media.type
+      };
+      
+      // Only add optional properties if they exist
+      if (media.duration) safeMetadata.duration = media.duration;
+      if (media.posterUrl) safeMetadata.posterUrl = media.posterUrl;
+
       const result = await window.electron.saveImage({
         id: media.id,
         dataUrl: dataUrl,
-        metadata: {
-          width: media.width,
-          height: media.height,
-          createdAt: media.createdAt,
-          title: media.title,
-          description: media.description,
-          type: media.type,
-          duration: media.duration,
-          posterUrl: media.posterUrl,
-        }
+        metadata: safeMetadata
       });
 
-      if (result.success && result.path) {
-        console.log("Media saved successfully at:", result.path);
+      if (result?.success && result?.path) {
         return result.path;
       } else {
-        throw new Error(result.error || "Unknown error");
+        throw new Error(result?.error || "Unknown error saving media");
       }
     } catch (error) {
       console.error("Failed to save media to filesystem:", error);
@@ -223,6 +250,7 @@ export function useImageStore() {
   const addUrlCard = useCallback(async (url: string) => {
     setIsUploading(true);
     try {
+      // Create the card object
       const card: ImageItem = {
         id: crypto.randomUUID(),
         type: "url",
@@ -233,13 +261,26 @@ export function useImageStore() {
         title: url
       };
 
+      // Add to local state first
       setImages(prevImages => [card, ...prevImages]);
 
-      if (isElectron) {
+      // Save to disk if in Electron
+      if (isElectron && window.electron?.saveUrlCard) {
         try {
+          // Create a simplified object to avoid serialization issues
+          const safeCard = {
+            id: card.id,
+            type: card.type,
+            url: card.url,
+            width: card.width,
+            height: card.height,
+            createdAt: card.createdAt,
+            title: card.title
+          };
+          
           await window.electron.saveUrlCard({
             id: card.id,
-            metadata: card
+            metadata: safeCard
           });
           toast.success(`URL card saved to disk`);
         } catch (error) {
@@ -247,6 +288,9 @@ export function useImageStore() {
           toast.error("Failed to save URL card to disk");
         }
       }
+    } catch (error) {
+      console.error("Error adding URL card:", error);
+      toast.error("Failed to add URL card");
     } finally {
       setIsUploading(false);
     }

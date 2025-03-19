@@ -2,31 +2,66 @@ const { contextBridge, ipcRenderer } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
+// Helper function to safely handle IPC calls
+const safeIpcInvoke = async (channel, ...args) => {
+  try {
+    // Make sure args are serializable
+    const safeArgs = args.map(arg => {
+      try {
+        JSON.stringify(arg);
+        return arg;
+      } catch (err) {
+        console.warn(`Non-serializable data passed to ${channel}`, err);
+        // Return a simplified version if possible
+        if (typeof arg === 'object' && arg !== null) {
+          const safeObj = {};
+          // Copy only serializable properties
+          Object.keys(arg).forEach(key => {
+            try {
+              JSON.stringify(arg[key]);
+              safeObj[key] = arg[key];
+            } catch (err) {
+              // Skip non-serializable properties
+            }
+          });
+          return safeObj;
+        }
+        return {};
+      }
+    });
+    
+    return await ipcRenderer.invoke(channel, ...safeArgs);
+  } catch (error) {
+    console.error(`Error in IPC invoke (${channel}):`, error);
+    throw error;
+  }
+};
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld(
   'electron',
   {
     // Add API for checking file permissions
-    checkFileAccess: (filePath) => ipcRenderer.invoke('check-file-access', filePath),
+    checkFileAccess: (filePath) => safeIpcInvoke('check-file-access', filePath),
     // Window control methods
     minimize: () => ipcRenderer.send('window-minimize'),
     maximize: () => ipcRenderer.send('window-maximize'),
     close: () => ipcRenderer.send('window-close'),
 
     // File storage operations
-    loadImages: () => ipcRenderer.invoke('load-images'),
-    saveImage: (data) => ipcRenderer.invoke('save-image', data),
-    updateMetadata: (data) => ipcRenderer.invoke('update-metadata', data),
-    saveUrlCard: (data) => ipcRenderer.invoke('save-url-card', data),
-    deleteImage: (id) => ipcRenderer.invoke('delete-image', id),
+    loadImages: () => safeIpcInvoke('load-images'),
+    saveImage: (data) => safeIpcInvoke('save-image', data),
+    updateMetadata: (data) => safeIpcInvoke('update-metadata', data),
+    saveUrlCard: (data) => safeIpcInvoke('save-url-card', data),
+    deleteImage: (id) => safeIpcInvoke('delete-image', id),
 
     // Storage path info
-    getAppStorageDir: () => ipcRenderer.invoke('get-app-storage-dir'),
-    openStorageDir: () => ipcRenderer.invoke('open-storage-dir'),
+    getAppStorageDir: () => safeIpcInvoke('get-app-storage-dir'),
+    openStorageDir: () => safeIpcInvoke('open-storage-dir'),
 
     // Browser functionality
-    openUrl: (url) => ipcRenderer.invoke('open-url', url),
+    openUrl: (url) => safeIpcInvoke('open-url', url),
 
     convertImageToBase64: async (fileUrl) => {
       try {
