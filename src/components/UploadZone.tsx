@@ -67,14 +67,11 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           const text = e.clipboardData?.getData('text/plain');
           if (text && typeof text === 'string' && text.trim().startsWith('http')) {
             try {
-              const trimmedUrl = text.trim();
-              onImageUpload([{
-                type: 'url',
-                url: trimmedUrl,
-                id: crypto.randomUUID(),
-                title: trimmedUrl,
-                isAnalyzing: true
-              }]);
+              // Create a File object from the URL
+              const response = await fetch(text);
+              const blob = await response.blob();
+              const file = new File([blob], 'pasted-image.jpg', { type: 'image/jpeg' });
+              onImageUpload(file);
             } catch (error) {
               console.error('Error processing pasted URL:', error);
             }
