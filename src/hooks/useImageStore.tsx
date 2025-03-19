@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
-import { fetchUrlMetadata } from "@/lib/metadataUtils";
 import { getVideoDimensions } from '../lib/videoUtils';
 
 export type ImageItemType = "image" | "url" | "video";
@@ -20,15 +19,15 @@ export interface ImageItem {
   createdAt: Date;
   title?: string;
   description?: string;
-  thumbnailUrl?: string;
-  sourceUrl?: string;
   patterns?: PatternTag[];
   isAnalyzing?: boolean;
   error?: string;
+  // File system related props
   actualFilePath?: string;
-  useDirectPath?: boolean; // Flag to indicate if we're using direct file path
-  duration?: number; // Added for video duration
-  posterUrl?: string; // Added for video poster
+  useDirectPath?: boolean;
+  // Video specific props
+  duration?: number;
+  posterUrl?: string;
 }
 
 export function useImageStore() {
@@ -83,7 +82,6 @@ export function useImageStore() {
     });
   };
 
-
   const getImageDimensions = async (dataUrl: string): Promise<{ width: number; height: number }> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -93,274 +91,179 @@ export function useImageStore() {
     });
   };
 
+  const saveMediaToDisk = async (media: ImageItem, dataUrl: string): Promise<string | undefined> => {
+    if (!isElectron || !window.electron) return undefined;
+
+    try {
+      const result = await window.electron.saveImage({
+        id: media.id,
+        dataUrl: dataUrl,
+        metadata: {
+          width: media.width,
+          height: media.height,
+          createdAt: media.createdAt,
+          title: media.title,
+          description: media.description,
+          type: media.type,
+          duration: media.duration,
+          posterUrl: media.posterUrl,
+        }
+      });
+
+      if (result.success && result.path) {
+        console.log("Media saved successfully at:", result.path);
+        return result.path;
+      } else {
+        throw new Error(result.error || "Unknown error");
+      }
+    } catch (error) {
+      console.error("Failed to save media to filesystem:", error);
+      toast.error("Failed to save media to disk");
+      return undefined;
+    }
+  };
+
+  const analyzeAndUpdateImage = async (media: ImageItem, dataUrl: string, savedFilePath?: string) => {
+    if (media.type !== "image") return media;
+
+    const hasKey = await hasApiKey();
+    if (!hasKey) return media;
+
+    try {
+      const analysis = await analyzeImage(dataUrl);
+      const patternTags = analysis
+        .map(pattern => {
+          const name = pattern.pattern || pattern.name;
+          return name ? { name, confidence: pattern.confidence } : null;
+        })
+        .filter((tag): tag is PatternTag => tag !== null);
+
+      const updatedMedia = { ...media, patterns: patternTags, isAnalyzing: false };
+
+      if (isElectron && window.electron && savedFilePath) {
+        try {
+          await window.electron.saveUrlCard({
+            id: updatedMedia.id,
+            metadata: {
+              ...updatedMedia,
+              filePath: savedFilePath
+            }
+          });
+        } catch (error) {
+          console.error("Failed to update metadata:", error);
+          toast.error("Failed to save pattern analysis");
+        }
+      }
+
+      return updatedMedia;
+    } catch (error) {
+      console.error('Image analysis failed:', error);
+      toast.error("Image analysis failed: " + (error instanceof Error ? error.message : 'Unknown error'));
+      return { ...media, isAnalyzing: false, error: 'Analysis failed' };
+    }
+  };
 
   const addImage = useCallback(async (file: File) => {
     setIsUploading(true);
 
-    // Create a unique ID
-    const isVideo = file.type.startsWith('video/');
-    const idPrefix = isVideo ? 'vid' : 'img';
-    const id = `${idPrefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
     try {
-      // Read the file as data URL
+      const isVideo = file.type.startsWith('video/');
+      const id = `${isVideo ? 'vid' : 'img'}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       const dataUrl = await readFileAsDataURL(file);
 
-      // Base properties for any media
-      let newMedia: ImageItem = {
+      let media: ImageItem = {
         id,
         type: isVideo ? "video" : "image",
-        url: dataUrl as string,
+        url: dataUrl,
         width: 0,
         height: 0,
         createdAt: new Date(),
       };
 
+      // Get dimensions and additional data
       if (isVideo) {
-        // For videos, we need to create a video element to get dimensions and generate a poster
-        const videoData = await getVideoDimensions(dataUrl as string);
-        newMedia = {
-          ...newMedia,
-          width: videoData.width,
-          height: videoData.height,
-          duration: videoData.duration,
-          posterUrl: videoData.posterUrl,
-        };
+        const videoData = await getVideoDimensions(dataUrl);
+        media = { ...media, ...videoData };
       } else {
-        // For images, get dimensions as before
-        const { width, height } = await getImageDimensions(dataUrl as string);
-        newMedia = {
-          ...newMedia,
-          width,
-          height,
-        };
+        const dimensions = await getImageDimensions(dataUrl);
+        media = { ...media, ...dimensions };
       }
 
       // Add to images list
-      setImages(prevImages => [newMedia, ...prevImages]);
+      setImages(prevImages => [media, ...prevImages]);
 
-      // If running in Electron, save to disk
-      let savedFilePath: string | undefined;
-      if (isElectron && window.electron) {
-        console.log('Saving media to disk...');
-        try {
-          const result = await window.electron.saveImage({
-            id: newMedia.id,
-            dataUrl: newMedia.url,
-            metadata: {
-              width: newMedia.width,
-              height: newMedia.height,
-              createdAt: newMedia.createdAt,
-              title: newMedia.title,
-              description: newMedia.description,
-              type: newMedia.type,
-              duration: newMedia.duration,
-              posterUrl: newMedia.posterUrl,
-            }
-          });
-
-          if (result.success && result.path) {
-            console.log("Media saved successfully at:", result.path);
-            savedFilePath = result.path;  // Store the path for later use
-            // Update with direct file path instead of base64
-            newMedia.actualFilePath = result.path;
-            newMedia.url = `local-file://${result.path}`;
-            newMedia.useDirectPath = true;
-            setImages(prevImages => [
-              {...newMedia},
-              ...prevImages.filter(img => img.id !== newMedia.id)
-            ]);
-
-            toast.success(`Media saved successfully`);
-          } else {
-            console.error("Failed to save media:", result.error);
-            toast.error(`Failed to save media: ${result.error || "Unknown error"}`);
-          }
-        } catch (error) {
-          console.error("Failed to save media to filesystem:", error);
-          toast.error("Failed to save media to disk");
-        }
-      } else {
-        toast.info("Running in browser mode. Media is only stored in memory.");
+      // Save to disk if in Electron
+      const savedFilePath = await saveMediaToDisk(media, dataUrl);
+      if (savedFilePath) {
+        media = {
+          ...media,
+          actualFilePath: savedFilePath,
+          url: `local-file://${savedFilePath}`,
+          useDirectPath: true
+        };
+        setImages(prevImages => [media, ...prevImages.filter(img => img.id !== media.id)]);
       }
 
-      setIsUploading(false);
-
-      // If API key is set and it's an image (not video), analyze the image
-      const hasKey = await hasApiKey();
-      if (hasKey && newMedia.type === "image") {
-        // Update the state to reflect analysis is in progress
-        newMedia.isAnalyzing = true;
-        setImages(prevImages =>
-          prevImages.map(img => img.id === newMedia.id ? {...newMedia} : img)
-        );
-
-        try {
-          const analysis = await analyzeImage(dataUrl as string);
-
-          // Map the analysis results to PatternTag format and ensure all fields are present
-          const patternTags = analysis
-            .map(pattern => {
-              const name = pattern.pattern || pattern.name;
-              if (!name) {
-                console.error("Pattern missing both name and pattern fields:", pattern);
-                return null;
-              }
-              return {
-                name,
-                confidence: pattern.confidence
-              };
-            })
-            .filter((tag): tag is PatternTag => tag !== null);
-
-
-          // Update the image with analysis results
-          const updatedMedia = {
-            ...newMedia,
-            patterns: patternTags,
-            isAnalyzing: false
-          };
-          
-          // Save the updated metadata with patterns to disk
-          if (isElectron && window.electron && savedFilePath) {
-            try {
-              await window.electron.saveUrlCard({
-                id: updatedMedia.id,
-                metadata: {
-                  width: updatedMedia.width,
-                  height: updatedMedia.height,
-                  createdAt: updatedMedia.createdAt,
-                  title: updatedMedia.title,
-                  description: updatedMedia.description,
-                  type: updatedMedia.type,
-                  duration: updatedMedia.duration,
-                  posterUrl: updatedMedia.posterUrl,
-                  patterns: patternTags,
-                  filePath: savedFilePath  // Use the saved path from the first save
-                }
-              });
-            } catch (error) {
-              console.error("Failed to update metadata:", error);
-              toast.error("Failed to save pattern analysis");
-            }
-          }
-          
-          setImages(prevImages => {
-            return prevImages.map(img => 
-              img.id === updatedMedia.id ? updatedMedia : img
-            );
-          });
-        } catch (error) {
-          console.error('Image analysis failed:', error);
-          const errorMedia = {
-            ...newMedia,
-            isAnalyzing: false,
-            error: 'Analysis failed'
-          };
-
-          setImages(prevImages =>
-            prevImages.map(img => img.id === newMedia.id ? errorMedia : img)
-          );
-          toast.error("Image analysis failed: " + (error instanceof Error ? error.message : 'Unknown error'));
-        }
+      // Analyze image if applicable
+      if (media.type === "image") {
+        media = { ...media, isAnalyzing: true };
+        setImages(prevImages => prevImages.map(img => img.id === media.id ? media : img));
+        
+        const analyzedMedia = await analyzeAndUpdateImage(media, dataUrl, savedFilePath);
+        setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
       }
     } catch (error) {
       console.error("Error adding media:", error);
-      setIsUploading(false);
       toast.error("Failed to add media: " + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsUploading(false);
     }
-  }, [images, isElectron]);
+  }, [isElectron]);
 
   const addUrlCard = useCallback(async (url: string) => {
     setIsUploading(true);
     try {
-      const initialCard: ImageItem = {
+      const card: ImageItem = {
         id: crypto.randomUUID(),
         type: "url",
         url: url,
         width: 400,
         height: 400,
         createdAt: new Date(),
-        title: url,
-        sourceUrl: url,
-        isAnalyzing: true
+        title: url
       };
 
-      setImages(prevImages => [initialCard, ...prevImages]);
+      setImages(prevImages => [card, ...prevImages]);
 
-      try {
-        const metadata = await fetchUrlMetadata(url);
-
-        const updatedCard: ImageItem = {
-          ...initialCard,
-          isAnalyzing: false,
-          title: metadata.title || url,
-          description: metadata.description,
-          thumbnailUrl: metadata.imageUrl || metadata.faviconUrl
-        };
-
-        setImages(prevImages =>
-          prevImages.map(img => img.id === initialCard.id ? updatedCard : img)
-        );
-
-        if (isElectron) {
-          try {
-            await window.electron.saveUrlCard({
-              id: updatedCard.id,
-              metadata: updatedCard
-            });
-            toast.success(`URL card saved to disk`);
-          } catch (error) {
-            console.error("Failed to save URL card:", error);
-            toast.error("Failed to save URL card to disk");
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching URL metadata:", error);
-
-        setImages(prevImages =>
-          prevImages.map(img =>
-            img.id === initialCard.id
-              ? { ...img, isAnalyzing: false, error: "Failed to fetch metadata" }
-              : img
-          )
-        );
-
-        if (isElectron) {
-          try {
-            await window.electron.saveUrlCard({
-              id: initialCard.id,
-              metadata: {
-                ...initialCard,
-                isAnalyzing: false,
-                error: "Failed to fetch metadata"
-              }
-            });
-          } catch (saveError) {
-            console.error("Failed to save fallback URL card:", saveError);
-            toast.error("Failed to save URL card to disk");
-          }
+      if (isElectron) {
+        try {
+          await window.electron.saveUrlCard({
+            id: card.id,
+            metadata: card
+          });
+          toast.success(`URL card saved to disk`);
+        } catch (error) {
+          console.error("Failed to save URL card:", error);
+          toast.error("Failed to save URL card to disk");
         }
       }
     } finally {
       setIsUploading(false);
     }
-  }, [images, isElectron]);
+  }, [isElectron]);
 
   const removeImage = useCallback(async (id: string) => {
-    if (isElectron) {
-      try {
+    try {
+      if (isElectron) {
         await window.electron.deleteImage(id);
-        toast.success("Image deleted from disk");
-      } catch (error) {
-        console.error("Failed to delete image from filesystem:", error);
-        toast.error("Failed to delete image from disk");
       }
+      setImages(prevImages => prevImages.filter(img => img.id !== id));
+      toast.success("Image removed successfully");
+    } catch (error) {
+      console.error("Failed to delete image:", error);
+      toast.error("Failed to delete image");
     }
-
-    const updatedImages = images.filter(img => img.id !== id);
-    setImages(updatedImages);
-  }, [images, isElectron]);
+  }, [isElectron]);
 
   return {
     images,
