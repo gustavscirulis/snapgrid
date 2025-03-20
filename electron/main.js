@@ -224,8 +224,6 @@ ipcMain.handle('load-images', async () => {
           // Use the local-file protocol for both images and videos
           const localFileUrl = `local-file://${mediaPath}`;
 
-          console.log(`Loading media: ${id}, path: ${mediaPath}, url: ${localFileUrl}`);
-
           // Construct the media object with correct paths
           const mediaObject = {
             ...metadata,
@@ -235,9 +233,6 @@ ipcMain.handle('load-images', async () => {
             actualFilePath: mediaPath,
             useDirectPath: true // Flag to indicate this is a direct file path
           };
-
-          // Log the constructed object for debugging
-          console.log("Constructed media object:", mediaObject);
 
           return mediaObject;
         } catch (err) {
