@@ -327,30 +327,31 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
           {/* Image container - fixed position applied directly to the element */}
           <motion.div
-            className="fixed z-50 overflow-hidden rounded-lg flex items-center justify-center"
+            className="fixed z-50 overflow-hidden rounded-lg"
             style={{ 
               position: "fixed",
-              top: initialPosition?.top,
-              left: initialPosition?.left,
-              width: initialPosition?.width,
-              height: initialPosition?.height
+              top: initialPosition?.top || 0,
+              left: initialPosition?.left || 0,
+              width: initialPosition?.width || 0,
+              height: initialPosition?.height || 0,
+              transformOrigin: "top left"
             }}
+            initial={{ opacity: 1 }}
             animate={{
               top: optimalDimensions?.top || 0,
               left: optimalDimensions?.left || 0,
               width: optimalDimensions?.width || "100%",
               height: optimalDimensions?.height || "100%",
-              scale: 1,
               opacity: 1
             }}
-            initial={{
-              opacity: 0,
-              scale: 0.3
-            }}
             exit={{
-              opacity: 0,
-              scale: 0.3
+              top: initialPosition?.top || 0,
+              left: initialPosition?.left || 0,
+              width: initialPosition?.width || 0,
+              height: initialPosition?.height || 0,
+              opacity: 0
             }}
+            transition={{ duration: 0.3 }}
             transition={{
               duration: 0.3,
               ease: "easeInOut"
