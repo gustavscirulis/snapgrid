@@ -46,12 +46,32 @@ const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, scree
     };
   }
   
-  // For images, use existing logic
+  // For images, ensure we never exceed original dimensions
+  const originalWidth = image.width || 800;
+  const originalHeight = image.height || 600;
+  
+  // Calculate maximum available space (95% of screen)
+  const maxWidth = screenWidth * 0.95;
+  const maxHeight = screenHeight * 0.95;
+  
+  // Calculate scaling factors to fit within screen
+  const widthScale = maxWidth / originalWidth;
+  const heightScale = maxHeight / originalHeight;
+  
+  // Use the smaller scaling factor to ensure both dimensions fit
+  // If scale > 1, it means we can fit the image at larger than original size,
+  // but we'll cap at 1 to avoid quality loss
+  const scale = Math.min(widthScale, heightScale);
+  
+  // Calculate final dimensions - never exceed original dimensions
+  const width = originalWidth * Math.min(scale, 1);
+  const height = originalHeight * Math.min(scale, 1);
+  
   return {
-    width: Math.min(image.width || 800, screenWidth * 0.98),
-    height: Math.min(image.height || 600, screenHeight * 0.95),
-    top: screenHeight / 2 - Math.min(image.height || 600, screenHeight * 0.95) / 2,
-    left: screenWidth / 2 - Math.min(image.width || 800, screenWidth * 0.98) / 2
+    width,
+    height,
+    top: (screenHeight - height) / 2,
+    left: (screenWidth - width) / 2
   };
 };
 
