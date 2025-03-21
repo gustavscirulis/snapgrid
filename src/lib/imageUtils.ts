@@ -4,12 +4,6 @@ export function validateMediaFile(file: File): boolean {
     return false;
   }
 
-  // Check if the file size is less than 25MB
-  const maxSize = 25 * 1024 * 1024; // 25MB
-  if (file.size > maxSize) {
-    return false;
-  }
-
   return true;
 }
 

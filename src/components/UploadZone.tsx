@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { validateMediaFile } from "@/lib/imageUtils";
@@ -46,7 +45,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
       } else {
         toast({
           title: "Invalid file",
-          description: "Please upload images or videos less than 25MB in size.",
+          description: "Please upload images or videos only.",
           variant: "destructive",
         });
       }
