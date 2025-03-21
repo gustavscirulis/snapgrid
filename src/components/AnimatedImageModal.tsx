@@ -20,24 +20,24 @@ const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, scree
     // Calculate maximum available space (95% of screen)
     const maxWidth = screenWidth * 0.95;
     const maxHeight = screenHeight * 0.95;
-
+    
     // Get original dimensions, with fallbacks
     const originalWidth = image.width || 800;
     const originalHeight = image.height || 600;
-
+    
     // Calculate scaling factors to fit within screen
     const widthScale = maxWidth / originalWidth;
     const heightScale = maxHeight / originalHeight;
-
+    
     // Use the smaller scaling factor to ensure both dimensions fit
     // If scale > 1, it means we can fit the video at larger than original size,
     // but we'll cap at 1 to avoid quality loss
     const scale = Math.min(widthScale, heightScale);
-
+    
     // Calculate final dimensions - never exceed original dimensions
     const width = originalWidth * Math.min(scale, 1);
     const height = originalHeight * Math.min(scale, 1);
-
+    
     return {
       width,
       height,
@@ -45,7 +45,7 @@ const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, scree
       left: (screenWidth - width) / 2
     };
   }
-
+  
   // For images, use existing logic
   return {
     width: Math.min(image.width || 800, screenWidth * 0.98),
@@ -68,10 +68,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     width: number;
     height: number;
   } | null>(null);
-
+  
   // Add a ref to access the video element
   const videoRef = useRef<HTMLVideoElement | null>(null);
-
+  
   // Add state to store actual video dimensions
   const [actualVideoDimensions, setActualVideoDimensions] = useState<{width: number, height: number} | null>(null);
 
@@ -93,7 +93,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   // Calculate optimal dimensions using the new function
   const optimalDimensions = useMemo(() => {
     if (!selectedImage) return null;
-
+    
     // If we have actual video dimensions from the video element, use those instead
     if (selectedImage.type === 'video' && actualVideoDimensions) {
       // Create a copy of the selectedImage with updated dimensions
@@ -102,27 +102,45 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         width: actualVideoDimensions.width,
         height: actualVideoDimensions.height
       };
-
+      
       return calculateOptimalDimensions(updatedImage, window.innerWidth, window.innerHeight);
     }
-
+    
     return calculateOptimalDimensions(selectedImage, window.innerWidth, window.innerHeight);
   }, [selectedImage, window.innerWidth, window.innerHeight, actualVideoDimensions]);
 
   useEffect(() => {
     if (isOpen && selectedImageRef?.current) {
-      const rect = selectedImageRef.current.getBoundingClientRect();
-      const position = {
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-      };
-      setInitialPosition(position);
+      try {
+        const rect = selectedImageRef.current.getBoundingClientRect();
+        setInitialPosition({
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        });
+      } catch (error) {
+        console.error('Error getting initial position:', error);
+        // Provide a fallback position in the center of the screen
+        setInitialPosition({
+          top: window.innerHeight / 2 - 150,
+          left: window.innerWidth / 2 - 200,
+          width: 400,
+          height: 300,
+        });
+      }
+    } else if (isOpen && !initialPosition) {
+      // If the ref is not available but modal should be open, use a default position
+      setInitialPosition({
+        top: window.innerHeight / 2 - 150,
+        left: window.innerWidth / 2 - 200,
+        width: 400,
+        height: 300,
+      });
     } else if (!isOpen) {
-      setInitialPosition(null);
+      setTimeout(() => setInitialPosition(null), 300);
     }
-  }, [isOpen, selectedImageRef]);
+  }, [isOpen, selectedImageRef, initialPosition]);
 
   useEffect(() => {
     if (isOpen) {
@@ -152,17 +170,17 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
       const videoElement = document.querySelector('video');
       if (videoElement && selectedImage?.type === 'video') {
         videoRef.current = videoElement;
-
+        
         // Function to update dimensions when metadata is loaded
         const updateDimensions = () => {
           const width = videoElement.videoWidth;
           const height = videoElement.videoHeight;
-
+          
           if (width && height) {
             setActualVideoDimensions({ width, height });
           }
         };
-
+        
         // If metadata is already loaded
         if (videoElement.readyState >= 1) {
           updateDimensions();
@@ -173,12 +191,12 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         }
       }
     };
-
+    
     // If modal is open, try to get video dimensions
     if (isOpen && selectedImage?.type === 'video') {
       // Initial attempt
       getVideoElement();
-
+      
       // Try again after a short delay to ensure the video element is in the DOM
       const timeoutId = setTimeout(getVideoElement, 500);
       return () => clearTimeout(timeoutId);
@@ -195,7 +213,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         top: window.innerHeight / 2 - Math.min(600, window.innerHeight * 0.8) / 2,
         left: window.innerWidth / 2 - Math.min(800, window.innerWidth * 0.8) / 2
       };
-
+      
       const modalVariants = {
         initial: {
           top: initialPosition.top,
@@ -230,7 +248,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           }
         }
       };
-
+      
       return (
         <AnimatePresence onExitComplete={() => onAnimationComplete && onAnimationComplete("exit-complete")}>
           {isOpen && (
@@ -273,7 +291,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         </AnimatePresence>
       );
     }
-
+    
     return null;
   }
 
@@ -348,7 +366,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               autoPlay={selectedImage.type === "video"}
               muted={false}
             />
-
+            
             {/* Close button */}
             <button 
               className="absolute top-4 right-4 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition-colors"
