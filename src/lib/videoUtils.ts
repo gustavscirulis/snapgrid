@@ -21,11 +21,6 @@ export function getVideoDimensions(videoSrc: string): Promise<{
 
     // Add event handlers
     video.onloadedmetadata = () => {
-      console.log('Video metadata loaded:', {
-        width: video.videoWidth,
-        height: video.videoHeight,
-        duration: video.duration
-      });
 
       const width = video.videoWidth;
       const height = video.videoHeight;
