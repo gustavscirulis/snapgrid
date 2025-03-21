@@ -39,12 +39,20 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   useEffect(() => {
     images.forEach(image => {
       if (!imageRefs.current.has(image.id)) {
-        imageRefs.current.set(image.id, React.createRef<HTMLDivElement>());
+        const ref = React.createRef<HTMLDivElement>();
+        console.log('Creating ref for image:', image.id);
+        imageRefs.current.set(image.id, ref);
       }
     });
   }, [images]);
   
   const handleImageClick = (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
+    console.log('Image clicked:', {
+      imageId: image.id,
+      hasRef: !!ref?.current,
+      ref: ref
+    });
+    
     setSelectedImage(image);
     setSelectedImageRef(ref);
     setModalOpen(true);
@@ -56,6 +64,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     setModalOpen(false);
     setTimeout(() => {
       setSelectedImage(null);
+      setSelectedImageRef(null);
       setClickedImageId(null);
     }, 300);
   };
@@ -128,7 +137,13 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               columnClassName="my-masonry-grid_column"
             >
               {images.map((image) => {
-                const ref = imageRefs.current.get(image.id) || React.createRef<HTMLDivElement>();
+                // Get or create ref for the image
+                let ref = imageRefs.current.get(image.id);
+                if (!ref) {
+                  ref = React.createRef<HTMLDivElement>();
+                  imageRefs.current.set(image.id, ref);
+                }
+                
                 const isSelected = clickedImageId === image.id;
                 
                 return (
