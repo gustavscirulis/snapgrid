@@ -273,7 +273,6 @@ export function useImageStore() {
       setImages(prevImages => prevImages.filter(img => img.id !== id));
       // Add to history
       setDeletedItemsHistory(prev => [...prev, itemToDelete]);
-      toast.success("Image moved to trash");
     } catch (error) {
       console.error("Failed to delete image:", error);
       toast.error("Failed to delete image");
