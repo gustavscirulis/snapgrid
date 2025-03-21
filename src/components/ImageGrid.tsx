@@ -118,8 +118,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   return (
     <div className="w-full px-4 py-6">
       {images.length === 0 ? (
-        <div className="flex items-center justify-center h-[calc(100vh-200px)] text-center">
-          <p className="text-lg text-muted-foreground">
+        <div className="flex items-center justify-center h-[calc(100vh-170px)] text-center">
+          <p className="text-sm text-muted-foreground">
             Drag and drop images or videos here
           </p>
         </div>
