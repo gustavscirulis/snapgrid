@@ -2,18 +2,19 @@
 .my-masonry-grid {
   display: flex;
   width: 100%;
-  margin-left: -16px; /* Adjust the gutter size */
-  max-width: none; /* Remove max-width constraint */
+  margin-left: -16px;
+  max-width: none;
 }
 
 .my-masonry-grid_column {
-  padding-left: 16px; /* Gutter size */
+  padding-left: 16px;
   background-clip: padding-box;
 }
 
 /* Style your items */
 .masonry-item {
   margin-bottom: 16px;
+  will-change: transform;
 }
 
 /* Ensure images fill their container */
@@ -22,10 +23,5 @@
   display: block;
   width: 100%;
   height: auto;
-  max-height: none; /* Remove max-height constraint */
-}
-
-/* Smooth transitions for all items */
-.masonry-item {
-  transition: transform 0.2s ease-in-out;
+  max-height: none;
 } 

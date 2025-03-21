@@ -69,6 +69,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     }, 300);
   };
 
+  const handleDeleteImage = (id: string) => {
+    onImageDelete?.(id);
+  };
+
   const renderPatternTags = (item: ImageItem) => {
     if (!item.patterns || item.patterns.length === 0) {
       if (item.isAnalyzing) {
@@ -148,18 +152,9 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 
                 return (
                   <div key={image.id} className="masonry-item">
-                    <motion.div 
+                    <div 
                       ref={ref}
-                      className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-all relative group w-full"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ 
-                        opacity: isSelected && modalOpen && !exitAnimationComplete ? 0 : 1,
-                        y: 0
-                      }}
-                      transition={{ 
-                        opacity: { duration: isSelected && modalOpen && !exitAnimationComplete ? 0.2 : 0, delay: isSelected && modalOpen && !exitAnimationComplete ? 0 : 0.3 },
-                        y: { type: "spring", stiffness: 300, damping: 30 }
-                      }}
+                      className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md relative group w-full"
                       onClick={() => handleImageClick(image, ref)}
                       onMouseEnter={() => setHoveredImageId(image.id)}
                       onMouseLeave={() => setHoveredImageId(null)}
@@ -197,14 +192,14 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                             className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full h-8 w-8 bg-black/60 text-white hover:text-white hover:bg-black/80"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onImageDelete(image.id);
+                              handleDeleteImage(image.id);
                             }}
                           >
                             <X className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
-                    </motion.div>
+                    </div>
                   </div>
                 );
               })}
