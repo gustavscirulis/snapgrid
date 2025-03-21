@@ -157,7 +157,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                         y: 0
                       }}
                       transition={{ 
-                        opacity: { duration: 0.2 },
+                        opacity: { duration: isSelected && modalOpen && !exitAnimationComplete ? 0.2 : 0, delay: isSelected && modalOpen && !exitAnimationComplete ? 0 : 0.3 },
                         y: { type: "spring", stiffness: 300, damping: 30 }
                       }}
                       onClick={() => handleImageClick(image, ref)}
