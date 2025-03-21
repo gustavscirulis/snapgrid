@@ -149,7 +149,7 @@ export function useImageStore() {
 
       if (isElectron && window.electron && savedFilePath) {
         try {
-          await window.electron.saveUrlCard({
+          await window.electron.updateMetadata({
             id: updatedMedia.id,
             metadata: {
               ...updatedMedia,
