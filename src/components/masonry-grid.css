@@ -28,9 +28,4 @@
 /* Smooth transitions for all items */
 .masonry-item {
   transition: transform 0.2s ease-in-out;
-}
-
-/* Optional hover effect */
-.masonry-item:hover {
-  transform: translateY(-2px);
 } 
