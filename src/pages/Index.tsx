@@ -75,7 +75,7 @@ const Index = () => {
       onImageUpload={addImage} 
       isUploading={isUploading}
     >
-      <div className="min-h-screen">
+      <div className="min-h-screen flex flex-col">
         <Toaster />
         <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border py-4 px-6 relative">
           <div className="absolute inset-0 draggable"></div>
@@ -107,7 +107,7 @@ const Index = () => {
           <WindowControls />
         </header>
 
-        <main className="mx-auto">
+        <main className="mx-auto flex-1 flex flex-col min-h-0">
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -127,14 +127,6 @@ const Index = () => {
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
         />
-
-        <footer className="py-4 text-center text-sm text-muted-foreground">
-          {!isElectron && (
-            <p>
-              Running in browser mode. Local storage features are not available.
-            </p>
-          )}
-        </footer>
       </div>
     </UploadZone>
   );

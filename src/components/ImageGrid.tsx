@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { X, AlertCircle } from "lucide-react";
+import { X, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AnimatedImageModal from "./AnimatedImageModal";
 import { motion, AnimatePresence } from "framer-motion";
@@ -77,8 +77,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     if (!item.patterns || item.patterns.length === 0) {
       if (item.isAnalyzing) {
         return (
-          <div className="flex items-center gap-1 text-xs text-primary-foreground bg-primary/80 px-2 py-1 rounded-md">
-            <AlertCircle className="w-3 h-3 animate-pulse" />
+          <div className="inline-flex items-center gap-1 text-xs text-primary-background bg-secondary px-2 py-1 rounded-md">
+            <Loader2 className="w-4 h-4 animate-spin" />
             <span>Analyzing...</span>
           </div>
         );
@@ -120,9 +120,9 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   };
 
   return (
-    <div className="w-full px-4 py-6">
+    <div className="w-full px-4 py-4 flex-1 flex flex-col min-h-0">
       {images.length === 0 ? (
-        <div className="flex items-center justify-center h-[calc(100vh-170px)] text-center">
+        <div className="flex-1 flex items-center justify-center text-center min-h-0">
           <p className="text-sm text-muted-foreground">
             Drag and drop images or videos here
           </p>
