@@ -3,7 +3,7 @@ import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
 import { getVideoDimensions } from '../lib/videoUtils';
 
-export type ImageItemType = "image" | "url" | "video";
+export type ImageItemType = "image" | "video";
 
 export interface PatternTag {
   name: string;
@@ -227,38 +227,6 @@ export function useImageStore() {
     }
   }, [isElectron]);
 
-  const addUrlCard = useCallback(async (url: string) => {
-    setIsUploading(true);
-    try {
-      const card: ImageItem = {
-        id: crypto.randomUUID(),
-        type: "url",
-        url: url,
-        width: 400,
-        height: 400,
-        createdAt: new Date(),
-        title: url
-      };
-
-      setImages(prevImages => [card, ...prevImages]);
-
-      if (isElectron) {
-        try {
-          await window.electron.saveUrlCard({
-            id: card.id,
-            metadata: card
-          });
-          toast.success(`URL card saved to disk`);
-        } catch (error) {
-          console.error("Failed to save URL card:", error);
-          toast.error("Failed to save URL card to disk");
-        }
-      }
-    } finally {
-      setIsUploading(false);
-    }
-  }, [isElectron]);
-
   const removeImage = useCallback(async (id: string) => {
     try {
       const itemToDelete = images.find(img => img.id === id);
@@ -325,7 +293,6 @@ export function useImageStore() {
     isLoading,
     canUndo: deletedItemsHistory.length > 0,
     addImage,
-    addUrlCard,
     removeImage,
     undoDelete,
     emptyTrash,

@@ -13,7 +13,6 @@ interface IElectronAPI {
   emptyTrash?: () => Promise<{ success: boolean; error?: string }>;
   listTrash?: () => Promise<any[]>;
   getTrashDir?: () => Promise<string>;
-  saveUrlCard?: (data: { id: string; metadata: any }) => Promise<{ success: boolean; error?: string }>;
   getAppStorageDir?: () => Promise<string>;
   openStorageDir?: () => Promise<{ success: boolean; error?: string }>;
   checkFileAccess?: (filePath: string) => Promise<{ success: boolean; accessible: boolean; error?: string }>;

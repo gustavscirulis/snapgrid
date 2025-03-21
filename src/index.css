@@ -126,13 +126,6 @@
     break-inside: avoid;
   }
 
-  .url-card {
-    @apply bg-card border border-border rounded-lg;
-    display: flex;
-    flex-direction: column;
-    height: 100%; /* Ensure full height */
-  }
-
   .drag-active {
     @apply bg-primary/5 border-primary/30;
   }

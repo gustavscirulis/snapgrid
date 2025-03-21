@@ -360,18 +360,6 @@ ipcMain.handle('list-trash', async () => {
   }
 });
 
-ipcMain.handle('save-url-card', async (event, { id, metadata }) => {
-  try {
-    const metadataPath = path.join(appStorageDir, `${id}.json`);
-    await fs.writeJson(metadataPath, metadata);
-    console.log(`Saved URL card: ${metadataPath}`);
-    return { success: true };
-  } catch (error) {
-    console.error('Error saving URL card:', error);
-    return { success: false, error: error.message };
-  }
-});
-
 // Add handler for checking file access permissions
 ipcMain.handle('check-file-access', async (event, filePath) => {
   try {
