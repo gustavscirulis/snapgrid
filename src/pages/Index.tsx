@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import UploadZone from "@/components/UploadZone";
@@ -16,6 +16,7 @@ const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isElectron, setIsElectron] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Set up keyboard shortcuts
   useKeyboardShortcuts({
@@ -23,6 +24,12 @@ const Index = () => {
       if (canUndo) {
         undoDelete();
       }
+    },
+    onFocusSearch: () => {
+      searchInputRef.current?.focus();
+    },
+    onUnfocusSearch: () => {
+      searchInputRef.current?.blur();
     }
   });
 
@@ -85,6 +92,7 @@ const Index = () => {
               <div className="relative w-96 non-draggable">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
+                  ref={searchInputRef}
                   placeholder="Search..."
                   className="pl-9 bg-white dark:bg-neutral-900"
                   value={searchQuery}
