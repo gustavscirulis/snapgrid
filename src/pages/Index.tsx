@@ -33,6 +33,34 @@ const Index = () => {
     }
   });
 
+  // Handle clipboard paste events
+  useEffect(() => {
+    const handlePaste = async (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          event.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            try {
+              await addImage(file);
+              toast.success("Image pasted successfully");
+            } catch (error) {
+              console.error("Error pasting image:", error);
+              toast.error("Failed to paste image");
+            }
+          }
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [addImage]);
+
   useEffect(() => {
     const isRunningInElectron = window && 
       typeof window.electron !== 'undefined' && 
