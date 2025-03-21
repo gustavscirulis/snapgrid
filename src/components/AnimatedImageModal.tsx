@@ -62,6 +62,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   selectedImageRef,
   onAnimationComplete,
 }) => {
+
   const [initialPosition, setInitialPosition] = useState<{
     top: number;
     left: number;
@@ -78,6 +79,14 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   // Add a new state to track media loading errors
   const [mediaLoadError, setMediaLoadError] = useState(false);
 
+  // Add state for fallback dimensions
+  const [fallbackDimensions, setFallbackDimensions] = useState<{
+    width: number;
+    height: number;
+    top: number;
+    left: number;
+  } | null>(null);
+
   // Handle media load error
   const handleMediaError = useCallback(() => {
     setMediaLoadError(true);
@@ -92,7 +101,9 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
   // Calculate optimal dimensions using the new function
   const optimalDimensions = useMemo(() => {
-    if (!selectedImage) return null;
+    if (!selectedImage) {
+      return null;
+    }
     
     // If we have actual video dimensions from the video element, use those instead
     if (selectedImage.type === 'video' && actualVideoDimensions) {
@@ -103,12 +114,32 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         height: actualVideoDimensions.height
       };
       
-      return calculateOptimalDimensions(updatedImage, window.innerWidth, window.innerHeight);
+      const dimensions = calculateOptimalDimensions(updatedImage, window.innerWidth, window.innerHeight);
+      return dimensions;
     }
     
-    return calculateOptimalDimensions(selectedImage, window.innerWidth, window.innerHeight);
+    const dimensions = calculateOptimalDimensions(selectedImage, window.innerWidth, window.innerHeight);
+    return dimensions;
   }, [selectedImage, window.innerWidth, window.innerHeight, actualVideoDimensions]);
 
+  // Calculate fallback dimensions when needed
+  useEffect(() => {
+
+
+    if (selectedImage && initialPosition && !optimalDimensions) {
+      const fallback = {
+        width: Math.min(800, window.innerWidth * 0.8),
+        height: Math.min(600, window.innerHeight * 0.8),
+        top: window.innerHeight / 2 - Math.min(600, window.innerHeight * 0.8) / 2,
+        left: window.innerWidth / 2 - Math.min(800, window.innerWidth * 0.8) / 2
+      };
+      setFallbackDimensions(fallback);
+    } else {
+      setFallbackDimensions(null);
+    }
+  }, [selectedImage, initialPosition, optimalDimensions]);
+
+  // Get initial position from thumbnail
   useEffect(() => {
     if (isOpen && selectedImageRef?.current) {
       try {
@@ -121,27 +152,24 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         });
       } catch (error) {
         console.error('Error getting initial position:', error);
-        // Provide a fallback position in the center of the screen
-        setInitialPosition({
+        // Only use fallback if we really can't get the position
+        const fallback = {
           top: window.innerHeight / 2 - 150,
           left: window.innerWidth / 2 - 200,
           width: 400,
           height: 300,
-        });
+        };
+        setInitialPosition(fallback);
       }
-    } else if (isOpen && !initialPosition) {
-      // If the ref is not available but modal should be open, use a default position
-      setInitialPosition({
-        top: window.innerHeight / 2 - 150,
-        left: window.innerWidth / 2 - 200,
-        width: 400,
-        height: 300,
-      });
     } else if (!isOpen) {
       setTimeout(() => setInitialPosition(null), 300);
     }
-  }, [isOpen, selectedImageRef, initialPosition]);
+  }, [isOpen, selectedImageRef]);
 
+  // Log optimal dimensions
+  useEffect(() => {}, [optimalDimensions]);
+
+  // Handle body overflow and keyboard events
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -162,16 +190,13 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  // Add a new useEffect to get the actual video dimensions once it's loaded
+  // Get video dimensions
   useEffect(() => {
-    // Function to get video element and its dimensions
     const getVideoElement = () => {
-      // Look for video element in the DOM
       const videoElement = document.querySelector('video');
       if (videoElement && selectedImage?.type === 'video') {
         videoRef.current = videoElement;
         
-        // Function to update dimensions when metadata is loaded
         const updateDimensions = () => {
           const width = videoElement.videoWidth;
           const height = videoElement.videoHeight;
@@ -181,154 +206,78 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           }
         };
         
-        // If metadata is already loaded
         if (videoElement.readyState >= 1) {
           updateDimensions();
         } else {
-          // Otherwise wait for metadata to load
           videoElement.addEventListener('loadedmetadata', updateDimensions);
           return () => videoElement.removeEventListener('loadedmetadata', updateDimensions);
         }
       }
     };
     
-    // If modal is open, try to get video dimensions
     if (isOpen && selectedImage?.type === 'video') {
-      // Initial attempt
       getVideoElement();
-      
-      // Try again after a short delay to ensure the video element is in the DOM
       const timeoutId = setTimeout(getVideoElement, 500);
       return () => clearTimeout(timeoutId);
     }
   }, [isOpen, selectedImage]);
 
-  if (!selectedImage || !initialPosition || !optimalDimensions) {
-    // If we have selectedImage and initialPosition but no optimalDimensions,
-    // we can still render the modal with default dimensions
-    if (selectedImage && initialPosition && !optimalDimensions) {
-      const fallbackDimensions = {
-        width: Math.min(800, window.innerWidth * 0.8),
-        height: Math.min(600, window.innerHeight * 0.8),
-        top: window.innerHeight / 2 - Math.min(600, window.innerHeight * 0.8) / 2,
-        left: window.innerWidth / 2 - Math.min(800, window.innerWidth * 0.8) / 2
-      };
-      
-      const modalVariants = {
-        initial: {
-          top: initialPosition.top,
-          left: initialPosition.left,
-          width: initialPosition.width,
-          height: initialPosition.height,
-          borderRadius: "0.5rem",
-          zIndex: 50
-        },
-        open: {
-          top: fallbackDimensions.top,
-          left: fallbackDimensions.left,
-          width: fallbackDimensions.width,
-          height: fallbackDimensions.height,
-          borderRadius: "1rem",
-          transition: {
-            type: "spring",
-            damping: 30,
-            stiffness: 300
-          }
-        },
-        exit: {
-          top: initialPosition.top,
-          left: initialPosition.left,
-          width: initialPosition.width,
-          height: initialPosition.height,
-          borderRadius: "0.5rem",
-          transition: {
-            type: "spring",
-            damping: 30,
-            stiffness: 300
-          }
-        }
-      };
-      
-      return (
-        <AnimatePresence onExitComplete={() => onAnimationComplete && onAnimationComplete("exit-complete")}>
-          {isOpen && (
-            <>
-              {/* Backdrop */}
-              <motion.div
-                className="fixed inset-0 bg-black/80 z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={onClose}
-              />
-
-              {/* Image container - fixed position applied directly to the element */}
-              <motion.div
-                className="fixed z-50 overflow-hidden rounded-lg flex items-center justify-center"
-                style={{ position: "fixed" }}
-                variants={modalVariants}
-                initial="initial"
-                animate="open"
-                exit="exit"
-                onClick={onClose}
-                onAnimationComplete={(definition) => {
-                  if (definition === "exit") {
-                    onAnimationComplete && onAnimationComplete("exit");
-                  }
-                }}
-              >
-                <ImageRenderer
-                  image={selectedImage}
-                  alt={selectedImage.title || "Selected media"}
-                  className={`h-full w-auto max-w-full object-contain rounded-xl shadow-xl ${selectedImage.type === 'video' ? 'w-auto max-w-full' : 'mx-auto'}`}
-                  controls={true}
-                  autoPlay={selectedImage.type === "video"}
-                  muted={false}
-                />
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-      );
+  // Create modal variants
+  const modalVariants = useMemo(() => {
+    if (!initialPosition) {
+      return null;
     }
-    
+
+    const finalDimensions = optimalDimensions || fallbackDimensions;
+    if (!finalDimensions) {
+      return null;
+    }
+
+    const variants = {
+      initial: {
+        top: initialPosition.top,
+        left: initialPosition.left,
+        width: initialPosition.width,
+        height: initialPosition.height,
+        borderRadius: "0.5rem",
+        zIndex: 50
+      },
+      open: {
+        top: finalDimensions.top,
+        left: finalDimensions.left,
+        width: finalDimensions.width,
+        height: finalDimensions.height,
+        borderRadius: "1rem",
+        transition: {
+          type: "spring",
+          damping: 30,
+          stiffness: 300
+        }
+      },
+      exit: {
+        top: initialPosition.top,
+        left: initialPosition.left,
+        width: initialPosition.width,
+        height: initialPosition.height,
+        borderRadius: "0.5rem",
+        transition: {
+          type: "spring",
+          damping: 30,
+          stiffness: 300
+        }
+      }
+    };
+
+    return variants;
+  }, [initialPosition, optimalDimensions, fallbackDimensions]);
+
+  // Log animation variants
+  useEffect(() => {}, [modalVariants]);
+
+  // Check render conditions
+  if (!selectedImage || !initialPosition || !modalVariants) {
     return null;
   }
-
-  const modalVariants = {
-    initial: {
-      top: initialPosition.top,
-      left: initialPosition.left,
-      width: initialPosition.width,
-      height: initialPosition.height,
-      borderRadius: "0.5rem",
-      zIndex: 50
-    },
-    open: {
-      top: optimalDimensions.top,
-      left: optimalDimensions.left,
-      width: optimalDimensions.width,
-      height: optimalDimensions.height,
-      borderRadius: "1rem",
-      transition: {
-        type: "spring",
-        damping: 30,
-        stiffness: 300
-      }
-    },
-    exit: {
-      top: initialPosition.top,
-      left: initialPosition.left,
-      width: initialPosition.width,
-      height: initialPosition.height,
-      borderRadius: "0.5rem",
-      transition: {
-        type: "spring",
-        damping: 30,
-        stiffness: 300
-      }
-    }
-  };
 
   return (
     <AnimatePresence onExitComplete={() => onAnimationComplete && onAnimationComplete("exit-complete")}>
@@ -343,7 +292,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             onClick={onClose}
           />
 
-          {/* Image container - fixed position applied directly to the element */}
+          {/* Image container */}
           <motion.div
             className="fixed z-50 overflow-hidden rounded-lg flex items-center justify-center"
             style={{ position: "fixed" }}
