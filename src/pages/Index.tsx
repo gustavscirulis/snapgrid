@@ -46,7 +46,6 @@ const Index = () => {
           if (file) {
             try {
               await addImage(file);
-              toast.success("Image pasted successfully");
             } catch (error) {
               console.error("Error pasting image:", error);
               toast.error("Failed to paste image");

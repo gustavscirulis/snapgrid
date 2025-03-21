@@ -264,7 +264,6 @@ export function useImageStore() {
       setTrashItems(loadedTrashItems);
       // Remove the last item from history
       setDeletedItemsHistory(prev => prev.slice(0, -1));
-      toast.success("Image restored from trash");
     } catch (error) {
       console.error("Failed to restore image:", error);
       toast.error("Failed to restore image");
@@ -279,7 +278,6 @@ export function useImageStore() {
       setTrashItems([]);
       // Clear the history when emptying trash
       setDeletedItemsHistory([]);
-      toast.success("Trash emptied successfully");
     } catch (error) {
       console.error("Failed to empty trash:", error);
       toast.error("Failed to empty trash");
