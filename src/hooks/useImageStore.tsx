@@ -32,9 +32,11 @@ export interface ImageItem {
 
 export function useImageStore() {
   const [images, setImages] = useState<ImageItem[]>([]);
+  const [trashItems, setTrashItems] = useState<ImageItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isElectron, setIsElectron] = useState(false);
+  const [deletedItemsHistory, setDeletedItemsHistory] = useState<ImageItem[]>([]);
 
   useEffect(() => {
     const isRunningInElectron = window &&
@@ -52,15 +54,20 @@ export function useImageStore() {
       try {
         if (isRunningInElectron) {
           console.log("Loading images from filesystem...");
-          const loadedImages = await window.electron.loadImages();
+          const [loadedImages, loadedTrashItems] = await Promise.all([
+            window.electron.loadImages(),
+            window.electron.listTrash()
+          ]);
           console.log("Loaded images:", loadedImages.length);
           // Sort by createdAt with newest first
           const sortedImages = [...(loadedImages || [])].sort((a, b) =>
             new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
           );
           setImages(sortedImages);
+          setTrashItems(loadedTrashItems || []);
         } else {
           setImages([]);
+          setTrashItems([]);
           toast.warning("Running in browser mode. Images will not be saved permanently.");
         }
       } catch (error) {
@@ -254,23 +261,74 @@ export function useImageStore() {
 
   const removeImage = useCallback(async (id: string) => {
     try {
+      const itemToDelete = images.find(img => img.id === id);
+      if (!itemToDelete) return;
+
       if (isElectron) {
         await window.electron.deleteImage(id);
+        // Update trash items list
+        const updatedTrashItems = await window.electron.listTrash();
+        setTrashItems(updatedTrashItems);
       }
       setImages(prevImages => prevImages.filter(img => img.id !== id));
-      toast.success("Image removed successfully");
+      // Add to history
+      setDeletedItemsHistory(prev => [...prev, itemToDelete]);
+      toast.success("Image moved to trash");
     } catch (error) {
       console.error("Failed to delete image:", error);
       toast.error("Failed to delete image");
+    }
+  }, [isElectron, images]);
+
+  const undoDelete = useCallback(async () => {
+    if (deletedItemsHistory.length === 0 || !isElectron) return;
+
+    try {
+      // Get the last deleted item
+      const lastDeletedItem = deletedItemsHistory[deletedItemsHistory.length - 1];
+      await window.electron.restoreFromTrash(lastDeletedItem.id);
+      
+      // Reload images and trash items
+      const [loadedImages, loadedTrashItems] = await Promise.all([
+        window.electron.loadImages(),
+        window.electron.listTrash()
+      ]);
+      setImages(loadedImages);
+      setTrashItems(loadedTrashItems);
+      // Remove the last item from history
+      setDeletedItemsHistory(prev => prev.slice(0, -1));
+      toast.success("Image restored from trash");
+    } catch (error) {
+      console.error("Failed to restore image:", error);
+      toast.error("Failed to restore image");
+    }
+  }, [deletedItemsHistory, isElectron]);
+
+  const emptyTrash = useCallback(async () => {
+    if (!isElectron) return;
+
+    try {
+      await window.electron.emptyTrash();
+      setTrashItems([]);
+      // Clear the history when emptying trash
+      setDeletedItemsHistory([]);
+      toast.success("Trash emptied successfully");
+    } catch (error) {
+      console.error("Failed to empty trash:", error);
+      toast.error("Failed to empty trash");
     }
   }, [isElectron]);
 
   return {
     images,
+    trashItems,
     isUploading,
     isLoading,
+    canUndo: deletedItemsHistory.length > 0,
     addImage,
     addUrlCard,
     removeImage,
+    undoDelete,
+    emptyTrash,
   };
 }

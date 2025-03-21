@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
 import { Search, Settings } from "lucide-react";
@@ -11,10 +12,19 @@ import SettingsPanel from "@/components/SettingsPanel";
 import WindowControls from "@/components/WindowControls";
 
 const Index = () => {
-  const { images, isUploading, isLoading, addImage, removeImage } = useImageStore();
+  const { images, isUploading, isLoading, addImage, removeImage, undoDelete, canUndo } = useImageStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [isElectron, setIsElectron] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Set up keyboard shortcuts
+  useKeyboardShortcuts({
+    onUndo: () => {
+      if (canUndo) {
+        undoDelete();
+      }
+    }
+  });
 
   useEffect(() => {
     const isRunningInElectron = window && 

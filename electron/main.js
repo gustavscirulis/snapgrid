@@ -15,6 +15,7 @@ const isDev = process.env.NODE_ENV === 'development' || !/[\\/]app\.asar[\\/]/.t
 
 // Global storage path that will be exposed to the renderer
 let appStorageDir;
+let trashDir;
 let mainWindow;
 
 // Determine app storage directory in iCloud or local folder
@@ -47,6 +48,10 @@ const getAppStorageDir = () => {
 
   // Ensure directory exists
   fs.ensureDirSync(storageDir);
+
+  // Create trash directory
+  trashDir = path.join(storageDir, '.trash');
+  fs.ensureDirSync(trashDir);
 
   return storageDir;
 };
@@ -150,6 +155,10 @@ ipcMain.on('window-close', () => {
 // IPC handlers for file system operations
 ipcMain.handle('get-app-storage-dir', () => {
   return appStorageDir;
+});
+
+ipcMain.handle('get-trash-dir', () => {
+  return trashDir;
 });
 
 ipcMain.handle('open-storage-dir', () => {
@@ -258,15 +267,96 @@ ipcMain.handle('delete-image', async (event, id) => {
 
     const mediaPath = path.join(appStorageDir, `${id}${fileExt}`);
     const metadataPath = path.join(appStorageDir, `${id}.json`);
+    const trashMediaPath = path.join(trashDir, `${id}${fileExt}`);
+    const trashMetadataPath = path.join(trashDir, `${id}.json`);
 
-    await fs.remove(mediaPath);
-    await fs.remove(metadataPath);
+    // Move files to trash instead of deleting
+    await fs.move(mediaPath, trashMediaPath, { overwrite: true });
+    await fs.move(metadataPath, trashMetadataPath, { overwrite: true });
 
-    console.log(`Deleted media: ${mediaPath}`);
+    console.log(`Moved media to trash: ${trashMediaPath}`);
     return { success: true };
   } catch (error) {
-    console.error('Error deleting image:', error);
+    console.error('Error moving image to trash:', error);
     return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('restore-from-trash', async (event, id) => {
+  try {
+    // Determine if this is a video based on id prefix
+    const isVideo = id.startsWith('vid_');
+    const fileExt = isVideo ? '.mp4' : '.png';
+
+    const mediaPath = path.join(appStorageDir, `${id}${fileExt}`);
+    const metadataPath = path.join(appStorageDir, `${id}.json`);
+    const trashMediaPath = path.join(trashDir, `${id}${fileExt}`);
+    const trashMetadataPath = path.join(trashDir, `${id}.json`);
+
+    // Move files back from trash
+    await fs.move(trashMediaPath, mediaPath, { overwrite: true });
+    await fs.move(trashMetadataPath, metadataPath, { overwrite: true });
+
+    console.log(`Restored media from trash: ${mediaPath}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error restoring from trash:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('empty-trash', async () => {
+  try {
+    await fs.emptyDir(trashDir);
+    console.log('Trash emptied successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('Error emptying trash:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('list-trash', async () => {
+  try {
+    const files = await fs.readdir(trashDir);
+    const jsonFiles = files.filter(file => file.endsWith('.json'));
+
+    const trashItems = await Promise.all(
+      jsonFiles.map(async (file) => {
+        const id = path.basename(file, '.json');
+        const metadataPath = path.join(trashDir, file);
+        const isVideo = id.startsWith('vid_');
+        const fileExt = isVideo ? '.mp4' : '.png';
+        const mediaPath = path.join(trashDir, `${id}${fileExt}`);
+
+        try {
+          if (!(await fs.pathExists(mediaPath))) {
+            console.warn(`Trash media file not found: ${mediaPath}`);
+            return null;
+          }
+
+          const metadata = await fs.readJson(metadataPath);
+          const localFileUrl = `local-file://${mediaPath}`;
+
+          return {
+            ...metadata,
+            id,
+            url: localFileUrl,
+            type: isVideo ? 'video' : metadata.type || 'image',
+            actualFilePath: mediaPath,
+            useDirectPath: true
+          };
+        } catch (err) {
+          console.error(`Error loading trash item ${id}:`, err);
+          return null;
+        }
+      })
+    );
+
+    return trashItems.filter(Boolean);
+  } catch (error) {
+    console.error('Error listing trash:', error);
+    return [];
   }
 });
 

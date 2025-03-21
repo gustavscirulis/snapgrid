@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld(
     updateMetadata: (data) => ipcRenderer.invoke('update-metadata', data),
     saveUrlCard: (data) => ipcRenderer.invoke('save-url-card', data),
     deleteImage: (id) => ipcRenderer.invoke('delete-image', id),
+    restoreFromTrash: (id) => ipcRenderer.invoke('restore-from-trash', id),
+    emptyTrash: () => ipcRenderer.invoke('empty-trash'),
+    listTrash: () => ipcRenderer.invoke('list-trash'),
+    getTrashDir: () => ipcRenderer.invoke('get-trash-dir'),
 
     // Storage path info
     getAppStorageDir: () => ipcRenderer.invoke('get-app-storage-dir'),
