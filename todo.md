@@ -5,7 +5,6 @@
 
 ## Bugs
 - [ ] Fix working with tall images (full-width and scrollable, truncate cards)
-- [ ] Don't show window size while resizing
 - [ ] Update all referneces to be Snapgrid
 
 ## Publish
