@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ImageItem } from '@/hooks/useImageStore';
 
 interface ImageRendererProps {
@@ -10,6 +10,7 @@ interface ImageRendererProps {
   muted?: boolean;
   loop?: boolean;
   onLoad?: (event: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => void;
+  currentTime?: number;
 }
 
 export function ImageRenderer({
@@ -20,10 +21,18 @@ export function ImageRenderer({
   autoPlay = false,
   muted = true,
   loop = false,
-  onLoad
+  onLoad,
+  currentTime
 }: ImageRendererProps) {
   const [loadError, setLoadError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Set video current time when it's ready
+  useEffect(() => {
+    if (videoRef.current && typeof currentTime === 'number') {
+      videoRef.current.currentTime = currentTime;
+    }
+  }, [currentTime]);
 
   // Determine if we're running in Electron
   const isElectron = window && 
@@ -127,6 +136,7 @@ export function ImageRenderer({
     // In thumbnail view (grid)
     if (!controls) {
       const [isHovering, setIsHovering] = useState(false);
+      const [thumbnailTime, setThumbnailTime] = useState(0);
       
       // If we're in a browser and it's a local file, don't try to play the video on hover
       const canPlayOnHover = !(isLocalFileProtocol && !isElectron);
@@ -138,6 +148,7 @@ export function ImageRenderer({
           onMouseLeave={() => {
             setIsHovering(false);
             if (videoRef.current) {
+              setThumbnailTime(videoRef.current.currentTime);
               videoRef.current.pause();
             }
           }}

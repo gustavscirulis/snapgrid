@@ -96,8 +96,11 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   // Add state to store actual video dimensions
   const [actualVideoDimensions, setActualVideoDimensions] = useState<{width: number, height: number} | null>(null);
 
-  // Add a new state to track media loading errors
+  // Add state to track media loading errors
   const [mediaLoadError, setMediaLoadError] = useState(false);
+
+  // Add state to track video current time
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
 
   // Add state for fallback dimensions
   const [fallbackDimensions, setFallbackDimensions] = useState<{
@@ -242,6 +245,16 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   }, [isOpen, selectedImage]);
 
+  // Get video current time from thumbnail when modal opens
+  useEffect(() => {
+    if (isOpen && selectedImage?.type === 'video') {
+      const thumbnailVideo = document.querySelector(`video[src="${selectedImage.url}"]`);
+      if (thumbnailVideo instanceof HTMLVideoElement) {
+        setVideoCurrentTime(thumbnailVideo.currentTime);
+      }
+    }
+  }, [isOpen, selectedImage]);
+
   // Create modal variants
   const modalVariants = useMemo(() => {
     if (!initialPosition) {
@@ -334,6 +347,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               controls={true}
               autoPlay={selectedImage.type === "video"}
               muted={false}
+              currentTime={videoCurrentTime}
             />
           </motion.div>
         </>
