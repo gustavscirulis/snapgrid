@@ -211,6 +211,10 @@ export function useImageStore() {
         setImages(prevImages => [media, ...prevImages.filter(img => img.id !== media.id)]);
       }
 
+      // Set isUploading to false here after the upload is complete but before analysis
+      // This allows users to upload more images while the analysis is running
+      setIsUploading(false);
+
       // Analyze image if applicable
       if (media.type === "image") {
         media = { ...media, isAnalyzing: true };
@@ -222,8 +226,7 @@ export function useImageStore() {
     } catch (error) {
       console.error("Error adding media:", error);
       toast.error("Failed to add media: " + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      setIsUploading(false);
+      setIsUploading(false); // Ensure isUploading is set to false on error
     }
   }, [isElectron]);
 
