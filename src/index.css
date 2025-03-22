@@ -93,6 +93,10 @@
     width: 100%;
     max-width: 100%;
     margin: 0 auto;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
   }
 
   .masonry-column {
@@ -101,12 +105,20 @@
     padding-left: 0.5rem;
     padding-right: 0.5rem;
     box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
   }
 
   .masonry-item {
     margin-bottom: 1rem;
     width: 100%;
     break-inside: avoid;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
   }
 
   .drag-active {
