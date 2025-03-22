@@ -89,6 +89,17 @@ const Index = () => {
     const query = searchQuery.toLowerCase();
     if (query === "") return true;
     
+    // If query starts with "vid", show all videos
+    if (query.startsWith("vid")) {
+      return image.type === "video";
+    }
+    
+    // If query starts with "img", show all images
+    if (query.startsWith("img")) {
+      return image.type === "image";
+    }
+    
+    // Otherwise, search in patterns
     if (image.patterns && image.patterns.length > 0) {
       return image.patterns.some(pattern => pattern.name.toLowerCase().includes(query));
     }
@@ -97,7 +108,6 @@ const Index = () => {
   });
 
   const handleImageClick = (image: ImageItem) => {
-    console.log("Image clicked:", image.id);
   };
 
   const handleDeleteImage = (id: string) => {

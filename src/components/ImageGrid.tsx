@@ -47,12 +47,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   }, [images]);
   
   const handleImageClick = (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
-    console.log('Image clicked:', {
-      imageId: image.id,
-      hasRef: !!ref?.current,
-      ref: ref
-    });
-    
     setSelectedImage(image);
     setSelectedImageRef(ref);
     setModalOpen(true);
