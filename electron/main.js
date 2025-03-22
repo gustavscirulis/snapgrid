@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs-extra';
 import os from 'os';
 import {promises as fsPromises} from 'fs'; // Import fsPromises
+import windowStateKeeper from 'electron-window-state';
 
 
 // Get the directory name of the current module
@@ -60,20 +61,31 @@ function createWindow() {
   appStorageDir = getAppStorageDir();
   console.log('App storage directory:', appStorageDir);
 
+  // Load the window state
+  const mainWindowState = windowStateKeeper({
+    defaultWidth: 1200,
+    defaultHeight: 800
+  });
+
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    frame: false, // Hides the default title bar
-    titleBarStyle: "hidden", // Hides default macOS traffic light buttons
-    titleBarOverlay: false, // Ensure no default overlay
+    x: mainWindowState.x,
+    y: mainWindowState.y,
+    width: mainWindowState.width,
+    height: mainWindowState.height,
+    frame: false,
+    titleBarStyle: "hidden",
+    titleBarOverlay: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.cjs'),
-      webSecurity: true, // Added for security
-      sandbox: false // Added to allow Node.js modules in preload
+      webSecurity: true,
+      sandbox: false
     },
   });
+
+  // Let mainWindowState manage the window state
+  mainWindowState.manage(mainWindow);
 
   // In production, use file protocol with the correct path
   // In development, use localhost server
