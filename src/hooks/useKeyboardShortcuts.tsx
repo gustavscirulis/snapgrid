@@ -4,9 +4,15 @@ interface KeyboardShortcutsProps {
   onUndo: () => void;
   onFocusSearch: () => void;
   onUnfocusSearch: () => void;
+  onOpenSettings?: () => void;
 }
 
-export function useKeyboardShortcuts({ onUndo, onFocusSearch, onUnfocusSearch }: KeyboardShortcutsProps) {
+export function useKeyboardShortcuts({ 
+  onUndo, 
+  onFocusSearch, 
+  onUnfocusSearch,
+  onOpenSettings 
+}: KeyboardShortcutsProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Check for Command+Z (Mac) or Ctrl+Z (Windows/Linux)
@@ -24,6 +30,12 @@ export function useKeyboardShortcuts({ onUndo, onFocusSearch, onUnfocusSearch }:
         onFocusSearch();
       }
 
+      // Check for Command+comma to open settings (Mac standard)
+      if ((event.metaKey || event.ctrlKey) && event.key === ',') {
+        event.preventDefault();
+        onOpenSettings?.();
+      }
+
       // Check for Escape to unfocus search
       if (event.key === 'Escape') {
         onUnfocusSearch();
@@ -32,5 +44,5 @@ export function useKeyboardShortcuts({ onUndo, onFocusSearch, onUnfocusSearch }:
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onUndo, onFocusSearch, onUnfocusSearch]);
+  }, [onUndo, onFocusSearch, onUnfocusSearch, onOpenSettings]);
 } 

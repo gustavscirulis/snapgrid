@@ -83,6 +83,7 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
         variant="outline" 
         size="sm" 
         onClick={() => setIsOpen(true)}
+        className="text-xs rounded-md border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-zinc-800/80 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700"
       >
         {keyExists ? "Update API Key" : "Set API Key"}
       </Button>
@@ -95,40 +96,40 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
         variant="outline" 
         size="sm" 
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-1"
+        className="flex items-center gap-1 text-xs rounded-md border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-zinc-800/80"
       >
-        <Key className="h-4 w-4" />
+        <Key className="h-3.5 w-3.5" />
         <span>{keyExists ? "Update API Key" : "Set API Key"}</span>
       </Button>
 
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>OpenAI API Key</DialogTitle>
-            <DialogDescription>
-              Enter your OpenAI API key to enable AI image analysis. Your key is stored securely on your device and is never sent to our servers.
+        <DialogContent className="sm:max-w-md rounded-xl border-transparent bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl shadow-xl">
+          <DialogHeader className="border-b border-gray-200 dark:border-gray-800 pb-4 mb-4">
+            <DialogTitle className="text-xl font-medium">OpenAI API Key</DialogTitle>
+            <DialogDescription className="text-gray-500 dark:text-gray-400 mt-1">
+              Enter your OpenAI API key to enable AI image analysis
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex flex-col gap-4 py-4">
+          <div className="flex flex-col gap-4 py-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-1 mac-scrollbar">
             <Input
               id="apiKey"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="sk-..."
-              className="w-full"
+              className="rounded-md text-sm border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400"
               type="password"
             />
             {error && (
               <p className="text-sm text-red-500">{error}</p>
             )}
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               You'll need an OpenAI API key with access to GPT-4 Vision models. 
               <a 
                 href="https://platform.openai.com/api-keys" 
                 target="_blank" 
                 rel="noreferrer" 
-                className="underline text-primary ml-1"
+                className="underline text-gray-700 dark:text-gray-300 ml-1"
               >
                 Get an API key
               </a>
@@ -138,26 +139,24 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
             </div>
           </div>
 
-          <DialogFooter className="flex gap-2 sm:gap-0">
+          <DialogFooter className="mt-6 border-t border-gray-200 dark:border-zinc-800 pt-4">
             <Button
-              type="button"
               variant="secondary"
               onClick={() => {
                 if (keyExists) {
                   setIsOpen(false);
-                } else {
-                  toast.warning("API key is required for image analysis");
                 }
               }}
+              className="text-gray-700 dark:text-gray-300"
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
               onClick={handleSubmit}
               disabled={isSubmitting || !apiKey.trim()}
+              className="bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900"
             >
-              {isSubmitting ? "Saving..." : "Save API Key"}
+              {isSubmitting ? "Saving..." : "Save Key"}
             </Button>
           </DialogFooter>
         </DialogContent>

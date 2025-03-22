@@ -30,6 +30,9 @@ const Index = () => {
     },
     onUnfocusSearch: () => {
       searchInputRef.current?.blur();
+    },
+    onOpenSettings: () => {
+      setSettingsOpen(true);
     }
   });
 
@@ -149,11 +152,12 @@ const Index = () => {
             <div className="w-8 draggable"></div> {/* Left draggable area */}
             <div className="flex-1 flex justify-center">
               <div className="relative w-96 non-draggable">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <Input
                   ref={searchInputRef}
                   placeholder="Search..."
-                  className="pl-9 bg-white dark:bg-neutral-900"
+                  type="search"
+                  className="pl-9"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
