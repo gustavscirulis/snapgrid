@@ -4,6 +4,7 @@ interface PatternMatch {
   pattern?: string;
   name?: string;
   confidence: number;
+  imageContext?: string; // Add this field to store the context description
 }
 
 // API key handling functions
@@ -87,14 +88,14 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
       messages: [
         {
           role: "system",
-          content: "You are an expert AI in UI/UX design pattern recognition. Your task is to analyze visual interfaces and identify commonly used UI design patterns based on layout, components, and design structure."
+          content: "You are an expert AI in UI/UX design pattern recognition. Your task is to analyze visual interfaces and identify commonly used UI design patterns based on layout, components, and design structure. Additionally, provide a brief contextual description of what the screenshot shows (e.g., e-commerce product page, admin dashboard, mobile app, etc.)."
         },
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: "Review this UI design image and extract the top 10 recognizable UI components. For each pattern, include a confidence score between 0 and 1. Respond with a strict, valid JSON array containing only 'pattern' and 'confidence' fields. Do not include markdown formatting, explanations, or code block symbols. Use title case."
+              text: "Review this UI design image and provide two things:\n1. Extract the top 10 recognizable UI components with confidence scores between 0 and 1.\n2. Include a brief description of what this screenshot shows (e.g., what type of product, website, or application).\n\nRespond with a strict, valid JSON array where each object contains 'pattern', 'confidence', and 'imageContext' fields. The 'imageContext' field should be the same in all objects and describe what the screenshot shows. Do not include markdown formatting, explanations, or code block symbols. Use title case."
             },
             {
               type: "image_url",
@@ -190,11 +191,15 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
 
       // Validate and clean up the response
       if (Array.isArray(patterns)) {
+        // Extract the imageContext from the first item (should be the same in all)
+        const imageContext = patterns[0]?.imageContext || '';
+        
         patterns = patterns
           .filter(p => p && (p.pattern || p.name) && typeof p.confidence === 'number' && p.confidence >= 0.7)
           .map(p => ({
             name: p.pattern || p.name, // Map 'pattern' field to 'name' as expected by the UI
-            confidence: Math.min(Math.max(p.confidence, 0), 1) // Ensure confidence is between 0 and 1
+            confidence: Math.min(Math.max(p.confidence, 0), 1), // Ensure confidence is between 0 and 1
+            imageContext: p.imageContext || imageContext // Include the image context description
           }))
           .sort((a, b) => b.confidence - a.confidence) // Sort by confidence score
           .slice(0, 10); // Keep up to 10 patterns for searching but only display top 5 in UI

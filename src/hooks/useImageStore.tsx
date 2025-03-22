@@ -8,6 +8,7 @@ export type ImageItemType = "image" | "video";
 export interface PatternTag {
   name: string;
   confidence: number;
+  imageContext?: string;
 }
 
 export interface ImageItem {
@@ -141,7 +142,13 @@ export function useImageStore() {
       const patternTags = analysis
         .map(pattern => {
           const name = pattern.pattern || pattern.name;
-          return name ? { name, confidence: pattern.confidence } : null;
+          if (!name) return null;
+          
+          return { 
+            name, 
+            confidence: pattern.confidence,
+            imageContext: pattern.imageContext 
+          } as PatternTag;
         })
         .filter((tag): tag is PatternTag => tag !== null);
 

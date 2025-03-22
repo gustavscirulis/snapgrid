@@ -100,9 +100,19 @@ const Index = () => {
       return image.type === "image";
     }
     
-    // Otherwise, search in patterns
+    // Otherwise, search in patterns and imageContext
     if (image.patterns && image.patterns.length > 0) {
-      return image.patterns.some(pattern => pattern.name.toLowerCase().includes(query));
+      // Search in pattern names
+      const patternMatch = image.patterns.some(pattern => 
+        pattern.name.toLowerCase().includes(query)
+      );
+      
+      // Also search in imageContext if it exists
+      const contextMatch = image.patterns.some(pattern => 
+        pattern.imageContext && pattern.imageContext.toLowerCase().includes(query)
+      );
+      
+      return patternMatch || contextMatch;
     }
     
     return false;
@@ -115,14 +125,22 @@ const Index = () => {
     
     // Find the highest confidence score for matching patterns in each image
     const aMaxConfidence = a.patterns?.reduce((max, pattern) => {
-      if (pattern.name.toLowerCase().includes(query)) {
+      // Match in pattern name or imageContext
+      const matchesPattern = pattern.name.toLowerCase().includes(query);
+      const matchesContext = pattern.imageContext && pattern.imageContext.toLowerCase().includes(query);
+      
+      if (matchesPattern || matchesContext) {
         return Math.max(max, pattern.confidence);
       }
       return max;
     }, 0) || 0;
     
     const bMaxConfidence = b.patterns?.reduce((max, pattern) => {
-      if (pattern.name.toLowerCase().includes(query)) {
+      // Match in pattern name or imageContext
+      const matchesPattern = pattern.name.toLowerCase().includes(query);
+      const matchesContext = pattern.imageContext && pattern.imageContext.toLowerCase().includes(query);
+      
+      if (matchesPattern || matchesContext) {
         return Math.max(max, pattern.confidence);
       }
       return max;
