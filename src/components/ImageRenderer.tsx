@@ -246,11 +246,27 @@ export function ImageRenderer({
   }
 
   // Default to image rendering
+  const isTallImage = image.height > image.width * 2;
+  
+  if (isTallImage && !controls) {
+    return (
+      <div className="relative w-full aspect-[1/2] overflow-hidden">
+        <img 
+          src={mediaUrl} 
+          alt={alt || `Image ${image.id}`} 
+          className={`absolute inset-0 w-full h-full object-cover ${className}`}
+          onError={handleError}
+          onLoad={handleLoad}
+        />
+      </div>
+    );
+  }
+  
   return (
     <img 
       src={mediaUrl} 
       alt={alt || `Image ${image.id}`} 
-      className={className} 
+      className={className}
       onError={handleError}
       onLoad={handleLoad}
     />

@@ -54,13 +54,25 @@ const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, scree
   const maxWidth = screenWidth * 0.95;
   const maxHeight = screenHeight * 0.95;
   
-  // Calculate scaling factors to fit within screen
+  // Check if image is tall (height > 2x width)
+  const isTallImage = originalHeight > originalWidth * 2;
+  
+  if (isTallImage) {
+    // For tall images, fit to width and top-align
+    const width = Math.min(originalWidth, maxWidth);
+    const height = (width / originalWidth) * originalHeight;
+    
+    return {
+      width,
+      height,
+      top: 40, // Fixed padding that's consistent with the design
+      left: (screenWidth - width) / 2
+    };
+  }
+  
+  // For regular images, use the smaller scaling factor to ensure both dimensions fit
   const widthScale = maxWidth / originalWidth;
   const heightScale = maxHeight / originalHeight;
-  
-  // Use the smaller scaling factor to ensure both dimensions fit
-  // If scale > 1, it means we can fit the image at larger than original size,
-  // but we'll cap at 1 to avoid quality loss
   const scale = Math.min(widthScale, heightScale);
   
   // Calculate final dimensions - never exceed original dimensions
@@ -170,22 +182,15 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     if (isOpen && selectedImageRef?.current) {
       try {
         const rect = selectedImageRef.current.getBoundingClientRect();
-        setInitialPosition({
+        const position = {
           top: rect.top,
           left: rect.left,
           width: rect.width,
           height: rect.height,
-        });
+        };
+        setInitialPosition(position);
       } catch (error) {
         console.error('Error getting initial position:', error);
-        // Only use fallback if we really can't get the position
-        const fallback = {
-          top: window.innerHeight / 2 - 150,
-          left: window.innerWidth / 2 - 200,
-          width: 400,
-          height: 300,
-        };
-        setInitialPosition(fallback);
       }
     } else if (!isOpen) {
       // Ensure we clean up after the exit animation
@@ -196,13 +201,22 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   }, [isOpen, selectedImageRef]);
 
-  // Log optimal dimensions
-  useEffect(() => {}, [optimalDimensions]);
+  // Handle close with debounce
+  const handleClose = useCallback(() => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    onClose();
+  }, [onClose]);
 
   // Handle body overflow and keyboard events
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = "hidden";
+      // Allow scrolling for tall images
+      if (selectedImage?.height > (selectedImage?.width || 0) * 2) {
+        // Tall image - keep scrolling enabled
+      } else {
+        document.body.style.overflow = "hidden";
+      }
       isAnimatingRef.current = true;
       isClosingRef.current = false;
     } else {
@@ -222,14 +236,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
       isAnimatingRef.current = false;
       isClosingRef.current = false;
     };
-  }, [isOpen]);
-
-  // Handle close with debounce
-  const handleClose = useCallback(() => {
-    if (isClosingRef.current) return;
-    isClosingRef.current = true;
-    onClose();
-  }, [onClose]);
+  }, [isOpen, selectedImage, handleClose]);
 
   // Get video dimensions
   useEffect(() => {
@@ -284,20 +291,38 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
       return null;
     }
 
+    // Calculate the center position for our scrollable flex container
+    const containerCenter = window.innerWidth / 2;
+    
+    // Calculate how to position the element so it appears at the same spot as the thumbnail
+    const initialX = initialPosition.left - containerCenter + (initialPosition.width / 2);
+    
+    // For Y position, we need to adjust for the scrollable container
+    const initialY = initialPosition.top;
+    
+    // Determine if this is a tall image
+    const isTallImage = selectedImage && selectedImage.height > selectedImage.width * 2;
+    
+    // For tall images, use top alignment with padding
+    // For regular images, center vertically
+    const finalY = isTallImage ? 40 : (window.innerHeight - finalDimensions.height) / 2;
+    
+    // For the position-absolute scrollable layout, we only need width and height
+    // The position is handled by the scrollable container
     const variants = {
       initial: {
-        top: initialPosition.top,
-        left: initialPosition.left,
         width: initialPosition.width,
         height: initialPosition.height,
+        x: initialX,
+        y: initialY,
         borderRadius: "0.5rem",
         zIndex: 50
       },
       open: {
-        top: finalDimensions.top,
-        left: finalDimensions.left,
         width: finalDimensions.width,
         height: finalDimensions.height,
+        x: 0,
+        y: finalY,
         borderRadius: "1rem",
         transition: {
           type: "spring",
@@ -306,10 +331,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         }
       },
       exit: {
-        top: initialPosition.top,
-        left: initialPosition.left,
         width: initialPosition.width,
         height: initialPosition.height,
+        x: initialX,
+        y: initialY,
         borderRadius: "0.5rem",
         transition: {
           type: "spring",
@@ -340,40 +365,66 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         <>
           {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 bg-black/80 z-50"
+            className="fixed inset-0 bg-black/80 z-40"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleClose}
           />
 
-          {/* Image container */}
-          <motion.div
-            className="fixed z-50 overflow-hidden rounded-lg flex items-center justify-center"
-            style={{ position: "fixed" }}
-            variants={modalVariants}
-            initial="initial"
-            animate="open"
-            exit="exit"
-            onClick={handleClose}
-            onAnimationComplete={(definition) => {
-              if (definition === "exit") {
-                onAnimationComplete && onAnimationComplete("exit");
-                isAnimatingRef.current = false;
-                isClosingRef.current = false;
-              }
+          {/* Scrollable wrapper - fixed position but allows scrolling */}
+          <div 
+            className="fixed inset-0 z-50 flex justify-center" 
+            style={{ 
+              overflow: 'auto',
+              paddingTop: 0,
+              paddingBottom: '20px'
             }}
+            onClick={handleClose}
           >
-            <ImageRenderer
-              image={selectedImage}
-              alt={selectedImage.title || "Selected media"}
-              className={`h-full w-auto max-w-full object-contain rounded-xl shadow-xl ${selectedImage.type === 'video' ? 'w-auto max-w-full' : 'mx-auto'}`}
-              controls={true}
-              autoPlay={selectedImage.type === "video"}
-              muted={false}
-              currentTime={videoCurrentTime}
-            />
-          </motion.div>
+            {/* Image container with animation */}
+            <motion.div
+              className="rounded-lg flex justify-center"
+              style={{ 
+                position: 'relative',
+                alignSelf: 'flex-start',
+                marginTop: 0,
+                marginBottom: 0,
+                paddingBottom: selectedImage.height > selectedImage.width * 2 ? '30px' : 0,
+                height: 'fit-content',
+                width: 'fit-content',
+                minWidth: initialPosition.width,
+                minHeight: initialPosition.height,
+                transformOrigin: 'center center'
+              }}
+              variants={modalVariants}
+              initial="initial"
+              animate="open"
+              exit="exit"
+              onClick={(e) => {
+                // Allow clicks to propagate to parent for closing
+                handleClose();
+              }}
+              onAnimationComplete={(definition) => {
+                if (definition === "exit") {
+                  onAnimationComplete && onAnimationComplete("exit");
+                  isAnimatingRef.current = false;
+                  isClosingRef.current = false;
+                }
+              }}
+            >
+              <ImageRenderer
+                image={selectedImage}
+                alt={selectedImage.title || "Selected media"}
+                className={`w-full h-full ${selectedImage.height > selectedImage.width * 2 ? 'object-cover object-top' : 'object-contain'} rounded-xl shadow-xl`}
+                controls={true}
+                autoPlay={selectedImage.type === "video"}
+                muted={false}
+                currentTime={videoCurrentTime}
+                onLoad={(e) => {}}
+              />
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
