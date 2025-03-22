@@ -1,4 +1,3 @@
-
 {
   "appId": "com.uireference.app",
   "productName": "UI Reference",
@@ -13,6 +12,10 @@
     {
       "from": "node_modules/fs-extra",
       "to": "node_modules/fs-extra"
+    },
+    {
+      "from": "node_modules/electron-window-state",
+      "to": "node_modules/electron-window-state"
     }
   ],
   "extraMetadata": {

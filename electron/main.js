@@ -4,7 +4,8 @@ import { fileURLToPath } from 'url';
 import fs from 'fs-extra';
 import os from 'os';
 import {promises as fsPromises} from 'fs'; // Import fsPromises
-import windowStateKeeper from 'electron-window-state';
+// We'll use dynamic import for electron-window-state instead
+// import windowStateKeeper from 'electron-window-state';
 
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -147,9 +148,33 @@ const getAppStorageDir = () => {
   return storageDir;
 };
 
-function createWindow() {
+async function createWindow() {
   appStorageDir = getAppStorageDir();
   console.log('App storage directory:', appStorageDir);
+
+  // Dynamically import electron-window-state
+  let windowStateKeeper;
+  try {
+    if (isDev) {
+      // In dev mode, use the regular import
+      const windowStateModule = await import('electron-window-state');
+      windowStateKeeper = windowStateModule.default;
+    } else {
+      // In production, try to load from the extraResources path
+      const windowStateModule = await import(path.join(process.resourcesPath, 'node_modules', 'electron-window-state', 'index.js'));
+      windowStateKeeper = windowStateModule.default;
+    }
+  } catch (error) {
+    console.error('Failed to load electron-window-state:', error);
+    // Fallback if window state fails to load
+    windowStateKeeper = (opts) => ({
+      x: undefined,
+      y: undefined,
+      width: opts.defaultWidth,
+      height: opts.defaultHeight,
+      manage: () => {}
+    });
+  }
 
   // Load the window state
   const mainWindowState = windowStateKeeper({
@@ -222,7 +247,7 @@ app.whenReady().then(async () => {
     }
   });
 
-  createWindow();
+  await createWindow();
 });
 
 app.on('window-all-closed', () => {
@@ -231,9 +256,9 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('activate', () => {
+app.on('activate', async () => {
   if (mainWindow === null) {
-    createWindow();
+    await createWindow();
   }
 });
 
@@ -341,14 +366,15 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
       type: isVideo ? 'video' : 'image' // Ensure type is correctly set
     });
 
-    console.log(`Media saved to: ${filePath}`);
+    console.log(`File is accessible`);
     return { success: true, path: filePath };
   } catch (error) {
-    console.error('Error saving media:', error);
+    console.error('Error saving image:', error);
     return { success: false, error: error.message };
   }
 });
 
+// Add the missing load-images handler
 ipcMain.handle('load-images', async () => {
   try {
     const files = await fs.readdir(appStorageDir);
@@ -404,6 +430,7 @@ ipcMain.handle('load-images', async () => {
   }
 });
 
+// Add the delete-image handler
 ipcMain.handle('delete-image', async (event, id) => {
   try {
     // Determine if this is a video based on id prefix
@@ -427,6 +454,7 @@ ipcMain.handle('delete-image', async (event, id) => {
   }
 });
 
+// Add restore-from-trash handler
 ipcMain.handle('restore-from-trash', async (event, id) => {
   try {
     // Determine if this is a video based on id prefix
@@ -450,6 +478,7 @@ ipcMain.handle('restore-from-trash', async (event, id) => {
   }
 });
 
+// Add empty-trash handler
 ipcMain.handle('empty-trash', async () => {
   try {
     await fs.emptyDir(trashDir);
@@ -461,6 +490,7 @@ ipcMain.handle('empty-trash', async () => {
   }
 });
 
+// Add list-trash handler
 ipcMain.handle('list-trash', async () => {
   try {
     const files = await fs.readdir(trashDir);
@@ -505,11 +535,11 @@ ipcMain.handle('list-trash', async () => {
   }
 });
 
-// Add handler for checking file access permissions
+// Add check-file-access handler
 ipcMain.handle('check-file-access', async (event, filePath) => {
   try {
     // Check if file exists and is readable
-    await fsPromises.access(filePath, fsPromises.constants.R_OK); // Use fsPromises here
+    await fsPromises.access(filePath, fsPromises.constants.R_OK);
     console.log(`File is accessible: ${filePath}`);
     return { success: true, accessible: true };
   } catch (error) {
@@ -518,6 +548,7 @@ ipcMain.handle('check-file-access', async (event, filePath) => {
   }
 });
 
+// Add update-metadata handler
 ipcMain.handle('update-metadata', async (event, { id, metadata }) => {
   try {
     const metadataPath = path.join(appStorageDir, `${id}.json`);
@@ -528,4 +559,4 @@ ipcMain.handle('update-metadata', async (event, { id, metadata }) => {
     console.error('Error updating metadata:', error);
     return { success: false, error: error.message };
   }
-});
+}); 
