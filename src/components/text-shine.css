@@ -1,0 +1,27 @@
+/* Text shine animation effect */
+.text-shine {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    to right,
+    hsl(var(--muted-foreground)) 20%,
+    hsl(var(--foreground)) 40%,
+    hsl(var(--foreground)) 60%,
+    hsl(var(--muted-foreground)) 80%
+  );
+  background-size: 200% auto;
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine 1.5s linear infinite;
+}
+
+@keyframes shine {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: 0% center;
+  }
+} 

@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ImageRenderer } from "@/components/ImageRenderer";
 import Masonry from 'react-masonry-css';
 import './masonry-grid.css'; // We'll create this CSS file
+import './text-shine.css'; // Import the text shine animation CSS
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -93,8 +94,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       if (item.isAnalyzing) {
         return (
           <div className="inline-flex items-center gap-1 text-xs text-primary-background bg-secondary px-2 py-1 rounded-md">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Analyzing...</span>
+            <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+            <span className="text-shine">Analyzing...</span>
           </div>
         );
       }
