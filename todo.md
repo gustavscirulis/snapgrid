@@ -5,14 +5,12 @@
 
 ## Bugs
 - [ ] Fix working with tall images (full-width and scrollable, truncate cards)
-- [ ] Thumbnail is visible after you click on it
 - [ ] Remember window size after restart
 - [ ] Don't permanently show the scroll bar
 - [ ] Don't show window size while resizing
 - [ ] Update all referneces to be Snapgrid
 
-## Business
-- [ ] Figure out monetization model
-- [ ] Build a website
+## Publish
 - [ ] Update readme.md
-- [ ] Launch
+- [ ] Add license
+- [ ] Publish on GitHub
