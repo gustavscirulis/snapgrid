@@ -103,6 +103,30 @@ const Index = () => {
     }
     
     return false;
+  }).sort((a, b) => {
+    // Only sort by confidence when there's a search query and it's not a media type filter
+    const query = searchQuery.toLowerCase();
+    if (query === "" || query.startsWith("vid") || query.startsWith("img")) {
+      return 0; // Keep original order
+    }
+    
+    // Find the highest confidence score for matching patterns in each image
+    const aMaxConfidence = a.patterns?.reduce((max, pattern) => {
+      if (pattern.name.toLowerCase().includes(query)) {
+        return Math.max(max, pattern.confidence);
+      }
+      return max;
+    }, 0) || 0;
+    
+    const bMaxConfidence = b.patterns?.reduce((max, pattern) => {
+      if (pattern.name.toLowerCase().includes(query)) {
+        return Math.max(max, pattern.confidence);
+      }
+      return max;
+    }, 0) || 0;
+    
+    // Sort by confidence score (highest first)
+    return bMaxConfidence - aMaxConfidence;
   });
 
   const handleImageClick = (image: ImageItem) => {
