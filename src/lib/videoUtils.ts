@@ -26,8 +26,8 @@ export function getVideoDimensions(videoSrc: string): Promise<{
       const height = video.videoHeight;
       const duration = video.duration;
 
-      // Generate a poster image at the 1 second mark or at the start if shorter
-      const seekTime = duration > 1 ? 1 : 0;
+      // Always generate poster from the first frame
+      const seekTime = 0;
 
       try {
         video.currentTime = seekTime;
