@@ -6,7 +6,6 @@ import os from 'os';
 import {promises as fsPromises} from 'fs'; // Import fsPromises
 import windowStateKeeper from 'electron-window-state';
 
-
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +17,97 @@ const isDev = process.env.NODE_ENV === 'development' || !/[\\/]app\.asar[\\/]/.t
 let appStorageDir;
 let trashDir;
 let mainWindow;
+
+// Simple API key storage with basic persistence
+const apiKeyStorage = {
+  keys: new Map(),
+  initialized: false,
+  
+  // Storage file path
+  get filePath() {
+    return path.join(app.getPath('userData'), 'api-keys.json');
+  },
+  
+  // Load stored keys from disk
+  init() {
+    if (this.initialized) return;
+    
+    try {
+      if (fs.existsSync(this.filePath)) {
+        const data = fs.readFileSync(this.filePath, 'utf8');
+        const keyData = JSON.parse(data);
+        
+        // Convert back from object to Map
+        Object.entries(keyData).forEach(([service, key]) => {
+          this.keys.set(service, key);
+        });
+        
+        console.log('API keys loaded from disk');
+      }
+    } catch (error) {
+      console.error('Error loading API keys from disk:', error);
+    }
+    
+    this.initialized = true;
+  },
+  
+  // Save keys to disk
+  save() {
+    try {
+      // Convert Map to object for JSON serialization
+      const keyData = {};
+      this.keys.forEach((value, key) => {
+        keyData[key] = value;
+      });
+      
+      fs.writeFileSync(this.filePath, JSON.stringify(keyData, null, 2), 'utf8');
+    } catch (error) {
+      console.error('Error saving API keys to disk:', error);
+    }
+  },
+  
+  setApiKey(service, key) {
+    if (!service || !key) return false;
+    try {
+      this.init();
+      this.keys.set(service, key);
+      this.save();
+      return true;
+    } catch (error) {
+      console.error(`Error storing API key for ${service}:`, error);
+      return false;
+    }
+  },
+  
+  getApiKey(service) {
+    if (!service) return null;
+    try {
+      this.init();
+      return this.keys.get(service) || null;
+    } catch (error) {
+      console.error(`Error retrieving API key for ${service}:`, error);
+      return null;
+    }
+  },
+  
+  hasApiKey(service) {
+    this.init();
+    return this.keys.has(service);
+  },
+  
+  deleteApiKey(service) {
+    if (!service) return false;
+    try {
+      this.init();
+      const result = this.keys.delete(service);
+      if (result) this.save();
+      return result;
+    } catch (error) {
+      console.error(`Error deleting API key for ${service}:`, error);
+      return false;
+    }
+  }
+};
 
 // Determine app storage directory in iCloud or local folder
 const getAppStorageDir = () => {
@@ -120,7 +210,7 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Register custom protocol to serve local files
   protocol.registerFileProtocol('local-file', (request, callback) => {
     const url = request.url.replace('local-file://', '');
@@ -164,6 +254,47 @@ ipcMain.on('window-maximize', () => {
 
 ipcMain.on('window-close', () => {
   if (mainWindow) mainWindow.close();
+});
+
+// Add API key management handlers
+ipcMain.handle('set-api-key', async (event, { service, key }) => {
+  try {
+    const result = apiKeyStorage.setApiKey(service, key);
+    return { success: result };
+  } catch (error) {
+    console.error('Error setting API key:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-api-key', async (event, { service }) => {
+  try {
+    const key = apiKeyStorage.getApiKey(service);
+    return { success: true, key };
+  } catch (error) {
+    console.error('Error getting API key:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('has-api-key', async (event, { service }) => {
+  try {
+    const hasKey = apiKeyStorage.hasApiKey(service);
+    return { success: true, hasKey };
+  } catch (error) {
+    console.error('Error checking API key existence:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('delete-api-key', async (event, { service }) => {
+  try {
+    const result = apiKeyStorage.deleteApiKey(service);
+    return { success: result };
+  } catch (error) {
+    console.error('Error deleting API key:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // IPC handlers for file system operations

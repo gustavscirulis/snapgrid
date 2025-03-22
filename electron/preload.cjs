@@ -31,6 +31,12 @@ contextBridge.exposeInMainWorld(
     // Browser functionality
     openUrl: (url) => ipcRenderer.invoke('open-url', url),
 
+    // Secure API key management
+    setApiKey: (service, key) => ipcRenderer.invoke('set-api-key', { service, key }),
+    getApiKey: (service) => ipcRenderer.invoke('get-api-key', { service }),
+    hasApiKey: (service) => ipcRenderer.invoke('has-api-key', { service }),
+    deleteApiKey: (service) => ipcRenderer.invoke('delete-api-key', { service }),
+
     convertImageToBase64: async (fileUrl) => {
       try {
         let filePath = fileUrl;
@@ -68,9 +74,17 @@ contextBridge.exposeInMainWorld(
       }
     },
 
-    // Proxy function to make OpenAI API requests from main process
-    callOpenAI: async (apiKey, payload) => {
+    // Updated OpenAI API function to use secure storage
+    callOpenAI: async (payload) => {
       try {
+        // Get API key securely from main process
+        const result = await ipcRenderer.invoke('get-api-key', { service: 'openai' });
+        if (!result.success || !result.key) {
+          throw new Error('OpenAI API key not found in secure storage');
+        }
+        
+        const apiKey = result.key;
+        
         // This function runs in the Node.js context and can make network requests
         const https = require('https');
 

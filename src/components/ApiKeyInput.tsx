@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,16 +22,21 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
   const [apiKey, setApiKey] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [keyExists, setKeyExists] = useState(false);
 
-  // Check for stored API key on component mount
+  // Check for API key on component mount
   useEffect(() => {
-    const savedApiKey = localStorage.getItem("openai-api-key");
-    if (savedApiKey) {
-      setOpenAIApiKey(savedApiKey);
-    } else if (!inSettingsPanel) {
-      // Only show dialog on first load if no API key exists and not in settings panel
-      setIsOpen(!hasApiKey());
-    }
+    const checkApiKey = async () => {
+      const exists = await hasApiKey();
+      setKeyExists(exists);
+      
+      // If in settings panel, don't open dialog automatically
+      if (!exists && !inSettingsPanel) {
+        setIsOpen(true);
+      }
+    };
+    
+    checkApiKey();
   }, [inSettingsPanel]);
 
   const handleSubmit = async () => {
@@ -45,14 +49,16 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
     setError(null);
 
     try {
-      // Save the API key
-      setOpenAIApiKey(apiKey.trim());
+      // Save the API key securely
+      const success = await setOpenAIApiKey(apiKey.trim());
       
-      // Store in localStorage for persistence
-      localStorage.setItem("openai-api-key", apiKey.trim());
-      
-      setIsOpen(false);
-      toast.success("API key saved successfully. New images will now be analyzed with OpenAI Vision.");
+      if (success) {
+        setIsOpen(false);
+        setKeyExists(true);
+        toast.success("API key saved successfully. New images will now be analyzed with OpenAI Vision.");
+      } else {
+        throw new Error("Failed to save API key");
+      }
     } catch (err) {
       console.error("Error saving API key:", err);
       setError("Failed to save API key");
@@ -64,7 +70,7 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
 
   const handleOpenChange = (open: boolean) => {
     // Only allow closing if we have a key or user is forcing close
-    if (!open && hasApiKey()) {
+    if (!open && keyExists) {
       setIsOpen(false);
     } else {
       setIsOpen(open);
@@ -78,7 +84,7 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
         size="sm" 
         onClick={() => setIsOpen(true)}
       >
-        {hasApiKey() ? "Update API Key" : "Set API Key"}
+        {keyExists ? "Update API Key" : "Set API Key"}
       </Button>
     );
   }
@@ -92,7 +98,7 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
         className="flex items-center gap-1"
       >
         <Key className="h-4 w-4" />
-        <span>{hasApiKey() ? "Update API Key" : "Set API Key"}</span>
+        <span>{keyExists ? "Update API Key" : "Set API Key"}</span>
       </Button>
 
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -100,7 +106,7 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
           <DialogHeader>
             <DialogTitle>OpenAI API Key</DialogTitle>
             <DialogDescription>
-              Enter your OpenAI API key to enable AI image analysis. Your key is stored locally in your browser and is never sent to our servers.
+              Enter your OpenAI API key to enable AI image analysis. Your key is stored securely on your device and is never sent to our servers.
             </DialogDescription>
           </DialogHeader>
           
@@ -131,12 +137,25 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
               <strong>Note:</strong> Image analysis requires the gpt-4o model access. Make sure your API key has access to the latest GPT-4o model.
             </div>
           </div>
-          
-          <DialogFooter>
+
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                if (keyExists) {
+                  setIsOpen(false);
+                } else {
+                  toast.warning("API key is required for image analysis");
+                }
+              }}
+            >
+              Cancel
+            </Button>
             <Button 
               type="submit" 
-              disabled={isSubmitting || !apiKey.trim()}
               onClick={handleSubmit}
+              disabled={isSubmitting || !apiKey.trim()}
             >
               {isSubmitting ? "Saving..." : "Save API Key"}
             </Button>

@@ -19,11 +19,17 @@ interface IElectronAPI {
 
   // Browser functionality
   openUrl?: (url: string) => void;
+  
+  // Secure API key management
+  setApiKey?: (service: string, key: string) => Promise<{ success: boolean; error?: string }>;
+  getApiKey?: (service: string) => Promise<{ success: boolean; key?: string; error?: string }>;
+  hasApiKey?: (service: string) => Promise<{ success: boolean; hasKey: boolean; error?: string }>;
+  deleteApiKey?: (service: string) => Promise<{ success: boolean; error?: string }>;
+
   // Added methods
   convertImageToBase64?: (filePath: string) => Promise<string>;
-  callOpenAI?: (apiKey: string, payload: any) => Promise<any>;
+  callOpenAI?: (payload: any) => Promise<any>;
   saveMediaData?: (data: any) => Promise<any>;
-
 }
 
 // Define the protocol for local file access

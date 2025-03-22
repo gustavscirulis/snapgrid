@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Toaster, toast } from "sonner";
-import SettingsPanel from "@/components/SettingsPanel";
+import { SettingsPanel } from "@/components/SettingsPanel";
 import WindowControls from "@/components/WindowControls";
 
 const Index = () => {
@@ -79,10 +79,8 @@ const Index = () => {
       toast.warning("Running in browser mode. Local storage features are not available.");
     }
     
-    const savedApiKey = localStorage.getItem("openai-api-key");
-    if (savedApiKey) {
-      setOpenAIApiKey(savedApiKey);
-    }
+    // Initial loading of API key happens in the aiAnalysisService
+    // No need to manually load from localStorage here as it's handled by the service
   }, []);
 
   const filteredImages = images.filter(image => {

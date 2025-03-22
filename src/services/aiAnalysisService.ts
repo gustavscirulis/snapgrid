@@ -37,19 +37,77 @@ const UI_PATTERNS = [
   "Minimalist UI"
 ];
 
-// OpenAI API configuration
-let apiKey = '';
-
-export function setOpenAIApiKey(key: string): void {
-  apiKey = key;
+// API key handling functions
+export async function setOpenAIApiKey(key: string): Promise<boolean> {
+  try {
+    if (window.electron && window.electron.setApiKey) {
+      // Use secure storage in Electron
+      const result = await window.electron.setApiKey('openai', key);
+      return result.success;
+    } else {
+      // Fallback to localStorage for web version
+      localStorage.setItem("openai-api-key", key);
+      return true;
+    }
+  } catch (error) {
+    console.error("Error storing API key:", error);
+    return false;
+  }
 }
 
-export function hasApiKey(): boolean {
-  return !!apiKey;
+export async function hasApiKey(): Promise<boolean> {
+  try {
+    if (window.electron && window.electron.hasApiKey) {
+      // Check secure storage in Electron
+      const result = await window.electron.hasApiKey('openai');
+      return result.success && result.hasKey;
+    } else {
+      // Fallback to localStorage for web version
+      return !!localStorage.getItem("openai-api-key");
+    }
+  } catch (error) {
+    console.error("Error checking API key:", error);
+    return false;
+  }
+}
+
+export async function getApiKey(): Promise<string | null> {
+  try {
+    if (window.electron && window.electron.getApiKey) {
+      // Get from secure storage in Electron
+      const result = await window.electron.getApiKey('openai');
+      return result.success ? result.key : null;
+    } else {
+      // Fallback to localStorage for web version
+      return localStorage.getItem("openai-api-key");
+    }
+  } catch (error) {
+    console.error("Error retrieving API key:", error);
+    return null;
+  }
+}
+
+export async function deleteApiKey(): Promise<boolean> {
+  try {
+    if (window.electron && window.electron.deleteApiKey) {
+      // Delete from secure storage in Electron
+      const result = await window.electron.deleteApiKey('openai');
+      return result.success;
+    } else {
+      // Fallback to localStorage for web version
+      localStorage.removeItem("openai-api-key");
+      return true;
+    }
+  } catch (error) {
+    console.error("Error deleting API key:", error);
+    return false;
+  }
 }
 
 export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
-  if (!apiKey) {
+  // Check if API key exists
+  const hasKey = await hasApiKey();
+  if (!hasKey) {
     throw new Error("OpenAI API key not set. Please set an API key to use image analysis.");
   }
 
@@ -85,9 +143,17 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
 
     // Try to use Electron proxy if available, otherwise fall back to fetch
     if (window.electron && window.electron.callOpenAI) {
-      data = await window.electron.callOpenAI(apiKey, payload);
+      // In Electron mode, API key is handled securely on the main process side
+      data = await window.electron.callOpenAI(payload);
     } else {
+      // In web mode, use fetch with API key from localStorage
       console.log("Using fetch API for OpenAI API call");
+      const apiKey = await getApiKey();
+      
+      if (!apiKey) {
+        throw new Error("API key not found");
+      }
+      
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {

@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { useTheme } from "@/components/ThemeProvider";
 import { Moon, Sun, SunMoon } from "lucide-react";
-import { setOpenAIApiKey, hasApiKey } from "@/services/aiAnalysisService";
+import { setOpenAIApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
@@ -13,7 +13,23 @@ interface SettingsPanelProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const ThemeToggle = () => {
+export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Settings</DialogTitle>
+        </DialogHeader>
+        <div className="py-4 space-y-6">
+          <ThemeSelector />
+          <ApiKeySection />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const ThemeSelector = () => {
   const { theme, setTheme } = useTheme();
 
   return (
@@ -24,7 +40,7 @@ const ThemeToggle = () => {
           variant={theme === "light" ? "default" : "outline"}
           size="sm"
           onClick={() => setTheme("light")}
-          className="flex items-center gap-1"
+          className="gap-1"
         >
           <Sun className="h-4 w-4" />
           <span>Light</span>
@@ -33,7 +49,7 @@ const ThemeToggle = () => {
           variant={theme === "dark" ? "default" : "outline"}
           size="sm"
           onClick={() => setTheme("dark")}
-          className="flex items-center gap-1"
+          className="gap-1"
         >
           <Moon className="h-4 w-4" />
           <span>Dark</span>
@@ -42,7 +58,7 @@ const ThemeToggle = () => {
           variant={theme === "system" ? "default" : "outline"}
           size="sm"
           onClick={() => setTheme("system")}
-          className="flex items-center gap-1"
+          className="gap-1"
         >
           <SunMoon className="h-4 w-4" />
           <span>System</span>
@@ -55,8 +71,19 @@ const ThemeToggle = () => {
 const ApiKeySection = () => {
   const [apiKey, setApiKey] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [keyExists, setKeyExists] = useState(false);
 
-  const handleUpdateApiKey = () => {
+  // Check for API key when component mounts
+  useEffect(() => {
+    const checkApiKey = async () => {
+      const exists = await hasApiKey();
+      setKeyExists(exists);
+    };
+    
+    checkApiKey();
+  }, []);
+
+  const handleUpdateApiKey = async () => {
     if (!apiKey.trim()) {
       toast.error("Please enter an API key");
       return;
@@ -69,19 +96,38 @@ const ApiKeySection = () => {
 
     setIsSubmitting(true);
     try {
-      // Save the API key
-      setOpenAIApiKey(apiKey.trim());
+      // Save the API key securely
+      const success = await setOpenAIApiKey(apiKey.trim());
       
-      // Store in localStorage for persistence
-      localStorage.setItem("openai-api-key", apiKey.trim());
-      
-      toast.success("API key updated successfully");
-      setApiKey("");
+      if (success) {
+        toast.success("API key updated successfully");
+        setApiKey("");
+        setKeyExists(true);
+      } else {
+        throw new Error("Failed to update API key");
+      }
     } catch (err) {
       console.error("Error saving API key:", err);
       toast.error("Failed to update API key");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteApiKey = async () => {
+    if (window.confirm("Are you sure you want to remove your API key?")) {
+      try {
+        const success = await deleteApiKey();
+        if (success) {
+          toast.success("API key removed");
+          setKeyExists(false);
+        } else {
+          throw new Error("Failed to remove API key");
+        }
+      } catch (err) {
+        console.error("Error removing API key:", err);
+        toast.error("Failed to remove API key");
+      }
     }
   };
 
@@ -111,29 +157,21 @@ const ApiKeySection = () => {
             {isSubmitting ? "Updating..." : "Update"}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {hasApiKey() ? "API key is currently set" : "No API key set"}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            {keyExists ? "API key is currently set" : "No API key set"}
+          </p>
+          {keyExists && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleDeleteApiKey}
+            >
+              Remove Key
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
 };
-
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ open, onOpenChange }) => {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Settings</DialogTitle>
-        </DialogHeader>
-        
-        <div className="flex flex-col gap-6 py-4">
-          <ThemeToggle />
-          <ApiKeySection />
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-export default SettingsPanel;
