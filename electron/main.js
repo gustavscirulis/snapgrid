@@ -72,6 +72,8 @@ function createWindow() {
     y: mainWindowState.y,
     width: mainWindowState.width,
     height: mainWindowState.height,
+    minWidth: 520,
+    minHeight: 370,
     frame: false,
     titleBarStyle: "hidden",
     titleBarOverlay: false,
