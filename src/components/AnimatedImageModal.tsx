@@ -15,11 +15,15 @@ interface AnimatedImageModalProps {
 
 // Function to calculate optimal dimensions
 const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, screenHeight: number) => {
+  // Account for padding in available height
+  const verticalPadding = 40; // 20px top + 20px bottom
+  const availableHeight = screenHeight - verticalPadding;
+  
   // For videos, use maximum screen space while respecting original dimensions
   if (image.type === 'video') {
     // Calculate maximum available space (95% of screen)
     const maxWidth = screenWidth * 0.95;
-    const maxHeight = screenHeight * 0.95;
+    const maxHeight = availableHeight * 0.95;
     
     // Get original dimensions, with fallbacks
     const originalWidth = image.width || 800;
@@ -52,7 +56,7 @@ const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, scree
   
   // Calculate maximum available space (95% of screen)
   const maxWidth = screenWidth * 0.95;
-  const maxHeight = screenHeight * 0.95;
+  const maxHeight = availableHeight * 0.95;
   
   // Check if image is tall (height > 2x width)
   const isTallImage = originalHeight > originalWidth * 2;
@@ -303,9 +307,9 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     // Determine if this is a tall image
     const isTallImage = selectedImage && selectedImage.height > selectedImage.width * 2;
     
-    // For tall images, use top alignment with padding
-    // For regular images, center vertically
-    const finalY = isTallImage ? 40 : (window.innerHeight - finalDimensions.height) / 2;
+    // For tall images, keep top alignment with 40px padding
+    // For regular images, add moderate top padding (20px)
+    const finalY = isTallImage ? 40 : Math.max(20, (window.innerHeight - finalDimensions.height) / 2);
     
     // For the position-absolute scrollable layout, we only need width and height
     // The position is handled by the scrollable container
@@ -378,7 +382,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             style={{ 
               overflow: 'auto',
               paddingTop: 0,
-              paddingBottom: '20px'
+              paddingBottom: selectedImage.height > selectedImage.width * 2 ? '40px' : '20px'
             }}
             onClick={handleClose}
           >
