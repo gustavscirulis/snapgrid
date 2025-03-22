@@ -72,15 +72,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           </div>
         )}
         
-        {isUploading && (
-          <div className="fixed bottom-6 right-6 bg-card p-4 rounded-lg shadow-lg z-40 animate-slide-up">
-            <p className="text-sm font-medium flex items-center">
-              <span className="inline-block w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></span>
-              Adding to collection...
-            </p>
-          </div>
-        )}
-        
         <input
           type="file"
           id="file-upload"
