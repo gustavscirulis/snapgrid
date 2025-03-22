@@ -112,7 +112,9 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
     return (
       <div className="flex flex-wrap gap-1 mt-2">
-        {item.patterns.map((pattern, index) => (
+        {item.patterns
+          .slice(0, 5) // Only display top 5 patterns (already sorted by confidence in aiAnalysisService.ts)
+          .map((pattern, index) => (
           <span 
             key={index} 
             className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md cursor-default"

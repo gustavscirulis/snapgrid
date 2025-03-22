@@ -94,7 +94,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
           content: [
             {
               type: "text",
-              text: "Review this UI design image and extract the top 7 recognizable UI patterns. For each pattern, include a confidence score between 0 and 1. Respond with a strict, valid JSON array containing only 'pattern' and 'confidence' fields. Do not include markdown formatting, explanations, or code block symbols. Use title case."
+              text: "Review this UI design image and extract the top 10 recognizable UI patterns. For each pattern, include a confidence score between 0 and 1. Respond with a strict, valid JSON array containing only 'pattern' and 'confidence' fields. Do not include markdown formatting, explanations, or code block symbols. Use title case."
             },
             {
               type: "image_url",
@@ -105,7 +105,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
           ]
         }
       ],
-      max_tokens: 300
+      max_tokens: 800
     };
 
     let data;
@@ -158,15 +158,32 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
           jsonString = content.split('```')[1].split('```')[0].trim();
         }
 
+        // Handle potential truncated JSON by checking and fixing incomplete items
+        const lastBraceIndex = jsonString.lastIndexOf('}');
+        const lastBracketIndex = jsonString.lastIndexOf(']');
+        
+        if (lastBraceIndex > lastBracketIndex) {
+          // JSON might be truncated - fix by adding closing bracket
+          jsonString = jsonString.substring(0, lastBraceIndex + 1) + ']';
+        }
+        
         patterns = JSON.parse(jsonString);
       } catch (parseError) {
         // Try a more aggressive cleanup approach
         let jsonString = content.replace(/```/g, '').replace(/json/g, '').trim();
+        
         // Remove any non-JSON text before or after the array
         const arrayMatch = jsonString.match(/\[\s*\{.*\}\s*\]/s);
         if (arrayMatch) {
           jsonString = arrayMatch[0];
+        } else {
+          // Handle truncated JSON by finding the last complete object
+          const matches = jsonString.match(/\{[^{}]*\}/g);
+          if (matches && matches.length > 0) {
+            jsonString = '[' + matches.join(',') + ']';
+          }
         }
+        
         patterns = JSON.parse(jsonString);
       }
 
@@ -179,7 +196,8 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
             name: p.pattern || p.name, // Map 'pattern' field to 'name' as expected by the UI
             confidence: Math.min(Math.max(p.confidence, 0), 1) // Ensure confidence is between 0 and 1
           }))
-          .slice(0, 7); // Limit to top 7
+          .sort((a, b) => b.confidence - a.confidence) // Sort by confidence score
+          .slice(0, 10); // Keep up to 10 patterns for searching but only display top 5 in UI
 
         return patterns;
       }
