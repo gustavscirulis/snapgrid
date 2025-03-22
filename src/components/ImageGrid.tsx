@@ -13,9 +13,10 @@ interface ImageGridProps {
   images: ImageItem[];
   onImageClick: (image: ImageItem) => void;
   onImageDelete?: (id: string) => void;
+  searchQuery?: string;
 }
 
-const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete }) => {
+const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete, searchQuery = "" }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -132,7 +133,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       {images.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-center min-h-0">
           <p className="text-sm text-muted-foreground">
-            Drag and drop images or videos here
+            {searchQuery ? "Nothing found" : "Drag and drop images or videos here"}
           </p>
         </div>
       ) : (

@@ -189,6 +189,7 @@ const Index = () => {
                 images={filteredImages} 
                 onImageClick={handleImageClick} 
                 onImageDelete={handleDeleteImage}
+                searchQuery={searchQuery}
               />
             </>
           )}
