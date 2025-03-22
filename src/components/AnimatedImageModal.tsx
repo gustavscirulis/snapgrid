@@ -82,7 +82,6 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   selectedImageRef,
   onAnimationComplete,
 }) => {
-
   const [initialPosition, setInitialPosition] = useState<{
     top: number;
     left: number;
@@ -109,6 +108,12 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     top: number;
     left: number;
   } | null>(null);
+
+  // Add ref to track if we're currently animating
+  const isAnimatingRef = useRef(false);
+
+  // Add ref to track if we're currently closing
+  const isClosingRef = useRef(false);
 
   // Handle media load error
   const handleMediaError = useCallback(() => {
@@ -147,8 +152,6 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
   // Calculate fallback dimensions when needed
   useEffect(() => {
-
-
     if (selectedImage && initialPosition && !optimalDimensions) {
       const fallback = {
         width: Math.min(800, window.innerWidth * 0.8),
@@ -185,7 +188,11 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         setInitialPosition(fallback);
       }
     } else if (!isOpen) {
-      setTimeout(() => setInitialPosition(null), 300);
+      // Ensure we clean up after the exit animation
+      setTimeout(() => {
+        setInitialPosition(null);
+        isAnimatingRef.current = false;
+      }, 300);
     }
   }, [isOpen, selectedImageRef]);
 
@@ -196,13 +203,15 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      isAnimatingRef.current = true;
+      isClosingRef.current = false;
     } else {
       document.body.style.overflow = "";
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
-        onClose();
+        handleClose();
       }
     };
 
@@ -210,8 +219,17 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
+      isAnimatingRef.current = false;
+      isClosingRef.current = false;
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
+
+  // Handle close with debounce
+  const handleClose = useCallback(() => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    onClose();
+  }, [onClose]);
 
   // Get video dimensions
   useEffect(() => {
@@ -313,7 +331,11 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   }
 
   return (
-    <AnimatePresence onExitComplete={() => onAnimationComplete && onAnimationComplete("exit-complete")}>
+    <AnimatePresence onExitComplete={() => {
+      onAnimationComplete && onAnimationComplete("exit");
+      isAnimatingRef.current = false;
+      isClosingRef.current = false;
+    }}>
       {isOpen && (
         <>
           {/* Backdrop */}
@@ -322,7 +344,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={handleClose}
           />
 
           {/* Image container */}
@@ -333,10 +355,12 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             initial="initial"
             animate="open"
             exit="exit"
-            onClick={onClose}
+            onClick={handleClose}
             onAnimationComplete={(definition) => {
               if (definition === "exit") {
                 onAnimationComplete && onAnimationComplete("exit");
+                isAnimatingRef.current = false;
+                isClosingRef.current = false;
               }
             }}
           >

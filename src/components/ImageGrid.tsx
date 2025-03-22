@@ -21,6 +21,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [selectedImageRef, setSelectedImageRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
   const [clickedImageId, setClickedImageId] = useState<string | null>(null);
   const [exitAnimationComplete, setExitAnimationComplete] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   
   // Image refs for animations
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
@@ -46,7 +47,20 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     });
   }, [images]);
   
+  // Reset exitAnimationComplete after a delay
+  useEffect(() => {
+    if (exitAnimationComplete) {
+      const timeoutId = setTimeout(() => {
+        setExitAnimationComplete(false);
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [exitAnimationComplete]);
+  
   const handleImageClick = (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
+    if (isAnimating) return; // Prevent clicks during animation
+    
+    setIsAnimating(true);
     setSelectedImage(image);
     setSelectedImageRef(ref);
     setModalOpen(true);
@@ -54,13 +68,20 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     onImageClick(image);
   };
 
+  const handleAnimationComplete = (definition: string) => {
+    if (definition === "exit") {
+      setExitAnimationComplete(true);
+      // Reset all states immediately instead of using a timeout
+      setIsAnimating(false);
+      setClickedImageId(null);
+    }
+  };
+
   const closeModal = () => {
     setModalOpen(false);
-    setTimeout(() => {
-      setSelectedImage(null);
-      setSelectedImageRef(null);
-      setClickedImageId(null);
-    }, 300);
+    // Make thumbnail immediately visible
+    setClickedImageId(null);
+    setExitAnimationComplete(true);
   };
 
   const handleDeleteImage = (id: string) => {
@@ -103,16 +124,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     );
   };
 
-  const handleAnimationComplete = (definition: string) => {
-    if (definition === "exit") {
-      setExitAnimationComplete(true);
-    } else if (definition === "exit-complete") {
-      setTimeout(() => {
-        setExitAnimationComplete(false);
-      }, 100);
-    }
-  };
-
   return (
     <div className="w-full px-4 py-4 flex-1 flex flex-col min-h-0">
       {images.length === 0 ? (
@@ -135,7 +146,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               columnClassName="my-masonry-grid_column"
             >
               {images.map((image) => {
-                // Get or create ref for the image
                 let ref = imageRefs.current.get(image.id);
                 if (!ref) {
                   ref = React.createRef<HTMLDivElement>();
@@ -153,8 +163,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                       onMouseEnter={() => setHoveredImageId(image.id)}
                       onMouseLeave={() => setHoveredImageId(null)}
                       style={{
-                        opacity: isSelected ? 0 : 1,
-                        visibility: isSelected ? 'hidden' : 'visible'
+                        opacity: isSelected && !exitAnimationComplete ? 0 : 1,
+                        visibility: isSelected && !exitAnimationComplete ? 'hidden' : 'visible',
+                        pointerEvents: isAnimating ? 'none' : 'auto',
+                        transition: modalOpen ? 'opacity 0.3s ease-out, visibility 0.3s ease-out' : 'none'
                       }}
                     >
                       <div className="relative">
