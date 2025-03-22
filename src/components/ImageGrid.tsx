@@ -158,6 +158,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                       onClick={() => handleImageClick(image, ref)}
                       onMouseEnter={() => setHoveredImageId(image.id)}
                       onMouseLeave={() => setHoveredImageId(null)}
+                      style={{
+                        opacity: isSelected ? 0 : 1,
+                        visibility: isSelected ? 'hidden' : 'visible'
+                      }}
                     >
                       <div className="relative">
                         <ImageRenderer 
