@@ -6,37 +6,6 @@ interface PatternMatch {
   confidence: number;
 }
 
-// Common UI design patterns to detect
-const UI_PATTERNS = [
-  "Card Layout",
-  "Grid System",
-  "Hero Section",
-  "Navigation Bar",
-  "Sidebar",
-  "Modal Dialog",
-  "Form Controls",
-  "Data Table",
-  "Tabs",
-  "Dropdown Menu",
-  "Notification",
-  "Carousel",
-  "Progress Indicator",
-  "Timeline",
-  "Avatar",
-  "Badge",
-  "Button",
-  "Icon Set",
-  "Typography System",
-  "Color System",
-  "Dark Mode",
-  "Mobile Layout",
-  "Responsive Design",
-  "Material Design",
-  "Glassmorphism",
-  "Neumorphism",
-  "Minimalist UI"
-];
-
 // API key handling functions
 export async function setOpenAIApiKey(key: string): Promise<boolean> {
   try {
@@ -118,14 +87,14 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
       messages: [
         {
           role: "system",
-          content: "You are an AI specialized in UI/UX design pattern recognition. Analyze the image and identify common UI patterns present in it. Focus on design elements, layouts, and components."
+          content: "You are an expert AI in UI/UX design pattern recognition. Your task is to analyze visual interfaces and identify commonly used UI design patterns based on layout, components, and design structure."
         },
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: "Analyze this UI design image and identify the UI patterns present. Return only the top 5 patterns you can identify with a confidence score from 0 to 1. Format your response as a strict valid JSON array with 'pattern' and 'confidence' fields only, no markdown formatting, no code block symbols."
+              text: "Review this UI design image and extract the top 7 recognizable UI patterns. For each pattern, include a confidence score between 0 and 1. Respond with a strict, valid JSON array containing only 'pattern' and 'confidence' fields. Do not include markdown formatting, explanations, or code block symbols. Use title case."
             },
             {
               type: "image_url",
@@ -205,12 +174,12 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
       // Validate and clean up the response
       if (Array.isArray(patterns)) {
         patterns = patterns
-          .filter(p => p && (p.pattern || p.name) && typeof p.confidence === 'number')
+          .filter(p => p && (p.pattern || p.name) && typeof p.confidence === 'number' && p.confidence >= 0.7)
           .map(p => ({
             name: p.pattern || p.name, // Map 'pattern' field to 'name' as expected by the UI
             confidence: Math.min(Math.max(p.confidence, 0), 1) // Ensure confidence is between 0 and 1
           }))
-          .slice(0, 5); // Limit to top 5
+          .slice(0, 7); // Limit to top 7
 
         return patterns;
       }
