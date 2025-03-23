@@ -1,83 +1,92 @@
-# Welcome to your Lovable project
+# SnapGrid
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/cda288ea-bdda-4606-a89c-8379a97cace3
+SnapGrid is an open-source desktop application designed for collecting, organizing, and analyzing UI screenshots. It uses AI to automatically detect UI patterns and components, making it an invaluable tool for UI/UX designers, developers, and design system teams.
 
-## How can I edit this code?
+It's built by @gustavscirulis and all of the code is entirely AI-generated.
 
-There are several ways of editing your application.
+## Features
 
-**Use Lovable**
+- **Screenshot Management**: Collect and organize your UI screenshots in a visual grid layout
+- **AI-Powered Pattern Detection**: Automatically identify common UI components and patterns using OpenAI's Vision API
+- **Smart Organization**: Search and filter your screenshots based on detected UI patterns
+- **Drag & Drop Support**: Easily import screenshots via drag and drop or clipboard paste
+- **Cross-Platform**: Works on macOS, Windows, and Linux (primary focus on macOS)
+- **Local Storage**: All your screenshots and metadata are stored locally and can be synced using iCloud
+- **Dark Mode Support**: Beautiful dark and light themes for comfortable viewing
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/cda288ea-bdda-4606-a89c-8379a97cace3) and start prompting.
+### Installation
 
-Changes made via Lovable will be committed automatically to this repo.
+Download the latest release for your platform from the [Releases](https://github.com/snapgrid/snapgrid/releases) page.
 
-**Use your preferred IDE**
+### Requirements
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- **OpenAI API Key**: To use the AI pattern detection feature, you'll need to add your OpenAI API key in the settings. The app uses GPT-4o for vision analysis. The app can still be used without this feature.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
 
 ## File Storage Structure
 
-The application stores files in a structured manner:
+SnapGrid stores files in the following locations:
 
-- On macOS: `~/Documents/SnapGrid/`
-- On other platforms: In the app's user data directory
+- **macOS**: `~/Documents/SnapGrid/`
+- **Other platforms**: In the app's user data directory
 
 Within this directory:
 - `images/` - Contains all media files (PNG images and MP4 videos)
 - `metadata/` - Contains JSON metadata files for each media item
 - `.trash/` - Trash directory with the same structure (images/ and metadata/ subdirectories)
 
-When you upload a file to the application, the image/video is stored in the `images` directory and its metadata in the `metadata` directory with matching filenames.
+## Development
 
-## How can I deploy this project?
+SnapGrid is built with:
 
-Simply open [Lovable](https://lovable.dev/projects/cda288ea-bdda-4606-a89c-8379a97cace3) and click on Share -> Publish.
+- Electron
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
 
-## I want to use a custom domain - is that possible?
+### Setting Up Development Environment
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+```sh
+# Clone the repository
+git clone https://github.com/snapgrid/snapgrid.git
+
+# Navigate to the project directory
+cd snapgrid
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run electron:dev
+```
+
+### Building for Production
+
+```sh
+# Build for production
+npm run electron:build
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Thanks to OpenAI for their Vision API that powers the pattern detection
+- Built with [Electron](https://www.electronjs.org/) and [React](https://reactjs.org/)
+- UI components from [shadcn/ui](https://ui.shadcn.com/)
