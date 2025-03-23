@@ -205,7 +205,10 @@ export function useImageStore() {
       // Add to images list
       setImages(prevImages => [media, ...prevImages]);
 
-      // Save to disk if in Electron
+      // Set isUploading to false here so other uploads can proceed
+      setIsUploading(false);
+
+      // Save to disk if in Electron - this can continue in the background
       const savedFilePath = await saveMediaToDisk(media, dataUrl);
       if (savedFilePath) {
         media = {
@@ -217,7 +220,7 @@ export function useImageStore() {
         setImages(prevImages => [media, ...prevImages.filter(img => img.id !== media.id)]);
       }
 
-      // Analyze image if applicable
+      // Analyze image if applicable - this can also happen in the background
       if (media.type === "image") {
         media = { ...media, isAnalyzing: true };
         setImages(prevImages => prevImages.map(img => img.id === media.id ? media : img));
@@ -228,7 +231,7 @@ export function useImageStore() {
     } catch (error) {
       console.error("Error adding media:", error);
       toast.error("Failed to add media: " + (error instanceof Error ? error.message : 'Unknown error'));
-      setIsUploading(false); // Ensure isUploading is set to false on error
+      setIsUploading(false); // Make sure to reset on error
     }
   }, [isElectron]);
 
@@ -406,7 +409,6 @@ export function useImageStore() {
       } catch (error) {
         console.error("Failed to import media:", error);
         toast.error("Failed to import media");
-      } finally {
         setIsUploading(false);
       }
     } catch (error) {

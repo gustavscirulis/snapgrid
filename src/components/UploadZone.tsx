@@ -53,7 +53,9 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     dragCounter.current = 0;
     setIsDragging(false);
 
-    if (isUploading) return;
+    if (isUploading) {
+      return;
+    }
 
     const files = Array.from(e.dataTransfer.files);
     
