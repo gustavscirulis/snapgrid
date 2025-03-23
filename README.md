@@ -60,6 +60,20 @@ This project is built with .
 - shadcn-ui
 - Tailwind CSS
 
+## File Storage Structure
+
+The application stores files in a structured manner:
+
+- On macOS: `~/Documents/UIReferenceApp/`
+- On other platforms: In the app's user data directory
+
+Within this directory:
+- `images/` - Contains all media files (PNG images and MP4 videos)
+- `metadata/` - Contains JSON metadata files for each media item
+- `.trash/` - Trash directory with the same structure (images/ and metadata/ subdirectories)
+
+When you upload a file to the application, the image/video is stored in the `images` directory and its metadata in the `metadata` directory with matching filenames.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/cda288ea-bdda-4606-a89c-8379a97cace3) and click on Share -> Publish.

@@ -128,22 +128,33 @@ const getAppStorageDir = () => {
       fs.writeFileSync(
         readmePath, 
         'This folder contains your UI Reference app images and data.\n' +
-        'Files are stored as PNG images with accompanying JSON metadata.\n\n' +
+        'Files are stored in the images/ directory with metadata in the metadata/ directory.\n\n' +
         'Storage location: ' + storageDir
       );
     }
   } else {
     // For other platforms, use app.getPath('userData')
-    storageDir = path.join(app.getPath('userData'), 'images');
+    storageDir = path.join(app.getPath('userData'), 'storage');
     console.log('Using userData path:', storageDir);
   }
 
-  // Ensure directory exists
+  // Ensure main directory exists
   fs.ensureDirSync(storageDir);
+
+  // Create images and metadata subdirectories
+  const imagesDir = path.join(storageDir, 'images');
+  const metadataDir = path.join(storageDir, 'metadata');
+  fs.ensureDirSync(imagesDir);
+  fs.ensureDirSync(metadataDir);
 
   // Create trash directory
   trashDir = path.join(storageDir, '.trash');
   fs.ensureDirSync(trashDir);
+  // Create trash subdirectories for images and metadata
+  const trashImagesDir = path.join(trashDir, 'images');
+  const trashMetadataDir = path.join(trashDir, 'metadata');
+  fs.ensureDirSync(trashImagesDir);
+  fs.ensureDirSync(trashMetadataDir);
 
   return storageDir;
 };
@@ -151,6 +162,9 @@ const getAppStorageDir = () => {
 async function createWindow() {
   appStorageDir = getAppStorageDir();
   console.log('App storage directory:', appStorageDir);
+  
+  // Migrate existing files if needed
+  await migrateFilesToNewStructure();
 
   // Dynamically import electron-window-state
   let windowStateKeeper;
@@ -233,6 +247,101 @@ async function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+// Function to migrate existing files from flat structure to new directory structure
+async function migrateFilesToNewStructure() {
+  try {
+    // Check if migration is needed by looking for image files in the root directory
+    const allFiles = await fs.readdir(appStorageDir);
+    
+    // Filter for image/video and JSON files directly in the root directory
+    const mediaFiles = allFiles.filter(file => {
+      const ext = path.extname(file).toLowerCase();
+      return (ext === '.png' || ext === '.mp4') && !file.startsWith('.');
+    });
+    
+    const jsonFiles = allFiles.filter(file => {
+      return path.extname(file).toLowerCase() === '.json' && 
+             file !== 'README.txt' && 
+             !file.startsWith('.');
+    });
+    
+    // If no files to migrate, return early
+    if (mediaFiles.length === 0 && jsonFiles.length === 0) {
+      console.log("No files to migrate, using new directory structure");
+      return;
+    }
+    
+    console.log(`Found ${mediaFiles.length} media files and ${jsonFiles.length} JSON files to migrate`);
+    
+    // Create a backup directory
+    const backupDir = path.join(appStorageDir, '.backup-' + new Date().toISOString().replace(/:/g, '-'));
+    await fs.ensureDir(backupDir);
+    
+    // Copy all files to backup first (safety measure)
+    for (const file of [...mediaFiles, ...jsonFiles]) {
+      const srcPath = path.join(appStorageDir, file);
+      const destPath = path.join(backupDir, file);
+      await fs.copy(srcPath, destPath);
+    }
+    
+    console.log(`Backed up ${mediaFiles.length + jsonFiles.length} files to ${backupDir}`);
+    
+    // Now move files to their new locations
+    const imagesDir = path.join(appStorageDir, 'images');
+    const metadataDir = path.join(appStorageDir, 'metadata');
+    
+    // Move media files to images dir
+    for (const file of mediaFiles) {
+      const srcPath = path.join(appStorageDir, file);
+      const destPath = path.join(imagesDir, file);
+      await fs.move(srcPath, destPath, { overwrite: true });
+    }
+    
+    // Move JSON files to metadata dir
+    for (const file of jsonFiles) {
+      const srcPath = path.join(appStorageDir, file);
+      const destPath = path.join(metadataDir, file);
+      await fs.move(srcPath, destPath, { overwrite: true });
+    }
+    
+    // Handle trash directory if it exists in old format
+    const oldTrashPath = path.join(appStorageDir, '.trash');
+    if (await fs.pathExists(oldTrashPath)) {
+      const trashFiles = await fs.readdir(oldTrashPath);
+      
+      // Filter and move trash files
+      const trashMediaFiles = trashFiles.filter(file => {
+        const ext = path.extname(file).toLowerCase();
+        return (ext === '.png' || ext === '.mp4');
+      });
+      
+      const trashJsonFiles = trashFiles.filter(file => {
+        return path.extname(file).toLowerCase() === '.json';
+      });
+      
+      // Move trash media files
+      const trashImagesDir = path.join(trashDir, 'images');
+      for (const file of trashMediaFiles) {
+        const srcPath = path.join(oldTrashPath, file);
+        const destPath = path.join(trashImagesDir, file);
+        await fs.move(srcPath, destPath, { overwrite: true });
+      }
+      
+      // Move trash JSON files
+      const trashMetadataDir = path.join(trashDir, 'metadata');
+      for (const file of trashJsonFiles) {
+        const srcPath = path.join(oldTrashPath, file);
+        const destPath = path.join(trashMetadataDir, file);
+        await fs.move(srcPath, destPath, { overwrite: true });
+      }
+    }
+    
+    console.log("Migration to new directory structure completed successfully");
+  } catch (error) {
+    console.error("Error during file migration:", error);
+  }
 }
 
 app.whenReady().then(async () => {
@@ -352,14 +461,16 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
     }
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Save media file with correct extension
-    const filePath = path.join(appStorageDir, `${id}${fileExt}`);
+    // Save media file with correct extension in the images directory
+    const imagesDir = path.join(appStorageDir, 'images');
+    const filePath = path.join(imagesDir, `${id}${fileExt}`);
     await fs.writeFile(filePath, buffer);
 
     console.log(`Media saved to: ${filePath}`);
 
-    // Save metadata as separate JSON file
-    const metadataPath = path.join(appStorageDir, `${id}.json`);
+    // Save metadata as separate JSON file in the metadata directory
+    const metadataDir = path.join(appStorageDir, 'metadata');
+    const metadataPath = path.join(metadataDir, `${id}.json`);
     await fs.writeJson(metadataPath, {
       ...metadata,
       filePath: filePath, // Include actual file path in metadata
@@ -377,19 +488,21 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
 // Add the missing load-images handler
 ipcMain.handle('load-images', async () => {
   try {
-    const files = await fs.readdir(appStorageDir);
+    const metadataDir = path.join(appStorageDir, 'metadata');
+    const files = await fs.readdir(metadataDir);
     const jsonFiles = files.filter(file => file.endsWith('.json'));
 
     const images = await Promise.all(
       jsonFiles.map(async (file) => {
         const id = path.basename(file, '.json');
-        const metadataPath = path.join(appStorageDir, file);
+        const metadataPath = path.join(metadataDir, file);
 
         // Check if this is a video based on id prefix
         const isVideo = id.startsWith('vid_');
         // Use appropriate extension
         const fileExt = isVideo ? '.mp4' : '.png';
-        const mediaPath = path.join(appStorageDir, `${id}${fileExt}`);
+        const imagesDir = path.join(appStorageDir, 'images');
+        const mediaPath = path.join(imagesDir, `${id}${fileExt}`);
 
         try {
           // Check if both metadata and media file exist
@@ -437,10 +550,15 @@ ipcMain.handle('delete-image', async (event, id) => {
     const isVideo = id.startsWith('vid_');
     const fileExt = isVideo ? '.mp4' : '.png';
 
-    const mediaPath = path.join(appStorageDir, `${id}${fileExt}`);
-    const metadataPath = path.join(appStorageDir, `${id}.json`);
-    const trashMediaPath = path.join(trashDir, `${id}${fileExt}`);
-    const trashMetadataPath = path.join(trashDir, `${id}.json`);
+    const imagesDir = path.join(appStorageDir, 'images');
+    const metadataDir = path.join(appStorageDir, 'metadata');
+    const mediaPath = path.join(imagesDir, `${id}${fileExt}`);
+    const metadataPath = path.join(metadataDir, `${id}.json`);
+    
+    const trashImagesDir = path.join(trashDir, 'images');
+    const trashMetadataDir = path.join(trashDir, 'metadata');
+    const trashMediaPath = path.join(trashImagesDir, `${id}${fileExt}`);
+    const trashMetadataPath = path.join(trashMetadataDir, `${id}.json`);
 
     // Move files to trash instead of deleting
     await fs.move(mediaPath, trashMediaPath, { overwrite: true });
@@ -461,10 +579,15 @@ ipcMain.handle('restore-from-trash', async (event, id) => {
     const isVideo = id.startsWith('vid_');
     const fileExt = isVideo ? '.mp4' : '.png';
 
-    const mediaPath = path.join(appStorageDir, `${id}${fileExt}`);
-    const metadataPath = path.join(appStorageDir, `${id}.json`);
-    const trashMediaPath = path.join(trashDir, `${id}${fileExt}`);
-    const trashMetadataPath = path.join(trashDir, `${id}.json`);
+    const imagesDir = path.join(appStorageDir, 'images');
+    const metadataDir = path.join(appStorageDir, 'metadata');
+    const mediaPath = path.join(imagesDir, `${id}${fileExt}`);
+    const metadataPath = path.join(metadataDir, `${id}.json`);
+    
+    const trashImagesDir = path.join(trashDir, 'images');
+    const trashMetadataDir = path.join(trashDir, 'metadata');
+    const trashMediaPath = path.join(trashImagesDir, `${id}${fileExt}`);
+    const trashMetadataPath = path.join(trashMetadataDir, `${id}.json`);
 
     // Move files back from trash
     await fs.move(trashMediaPath, mediaPath, { overwrite: true });
@@ -481,7 +604,8 @@ ipcMain.handle('restore-from-trash', async (event, id) => {
 // Add empty-trash handler
 ipcMain.handle('empty-trash', async () => {
   try {
-    await fs.emptyDir(trashDir);
+    await fs.emptyDir(path.join(trashDir, 'images'));
+    await fs.emptyDir(path.join(trashDir, 'metadata'));
     console.log('Trash emptied successfully');
     return { success: true };
   } catch (error) {
@@ -493,16 +617,18 @@ ipcMain.handle('empty-trash', async () => {
 // Add list-trash handler
 ipcMain.handle('list-trash', async () => {
   try {
-    const files = await fs.readdir(trashDir);
+    const trashMetadataDir = path.join(trashDir, 'metadata');
+    const files = await fs.readdir(trashMetadataDir);
     const jsonFiles = files.filter(file => file.endsWith('.json'));
 
     const trashItems = await Promise.all(
       jsonFiles.map(async (file) => {
         const id = path.basename(file, '.json');
-        const metadataPath = path.join(trashDir, file);
+        const metadataPath = path.join(trashMetadataDir, file);
         const isVideo = id.startsWith('vid_');
         const fileExt = isVideo ? '.mp4' : '.png';
-        const mediaPath = path.join(trashDir, `${id}${fileExt}`);
+        const trashImagesDir = path.join(trashDir, 'images');
+        const mediaPath = path.join(trashImagesDir, `${id}${fileExt}`);
 
         try {
           if (!(await fs.pathExists(mediaPath))) {
@@ -563,7 +689,8 @@ ipcMain.handle('open-url', async (event, url) => {
 // Add update-metadata handler
 ipcMain.handle('update-metadata', async (event, { id, metadata }) => {
   try {
-    const metadataPath = path.join(appStorageDir, `${id}.json`);
+    const metadataDir = path.join(appStorageDir, 'metadata');
+    const metadataPath = path.join(metadataDir, `${id}.json`);
     await fs.writeJson(metadataPath, metadata);
     console.log(`Updated metadata at: ${metadataPath}`);
     return { success: true };
