@@ -6,6 +6,8 @@ import { useTheme } from "@/components/ThemeProvider";
 import { Moon, Sun, SunMoon } from "lucide-react";
 import { setOpenAIApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { getAnalyticsConsent, setAnalyticsConsent } from "@/services/analyticsService";
 import { toast } from "sonner";
 
 interface SettingsPanelProps {
@@ -24,6 +26,8 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
           <ThemeSelector />
           <div className="h-px bg-gray-200 dark:bg-zinc-800 my-8" aria-hidden="true" />
           <ApiKeySection isOpen={open} />
+          <div className="h-px bg-gray-200 dark:bg-zinc-800 my-8" aria-hidden="true" />
+          <AnalyticsSection />
         </div>
       </DialogContent>
     </Dialog>
@@ -70,6 +74,65 @@ const ThemeSelector = () => {
           <SunMoon className="h-3.5 w-3.5 mr-1.5" />
           Auto
         </button>
+      </div>
+    </section>
+  );
+};
+
+const AnalyticsSection = () => {
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load the current analytics consent status
+  useEffect(() => {
+    const checkAnalyticsConsent = async () => {
+      try {
+        setIsLoading(true);
+        const consent = await getAnalyticsConsent();
+        setAnalyticsEnabled(consent);
+      } catch (error) {
+        // Silent error
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAnalyticsConsent();
+  }, []);
+
+  // Handle toggle changes
+  const handleToggleChange = async (checked: boolean) => {
+    try {
+      const success = await setAnalyticsConsent(checked);
+      if (success) {
+        setAnalyticsEnabled(checked);
+      }
+    } catch (error) {
+      toast.error("Failed to update analytics settings");
+    }
+  };
+
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <label 
+            htmlFor="analytics-toggle" 
+            className="text-sm font-medium text-gray-800 dark:text-gray-200 select-none"
+          >
+            Send anonymous usage data
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 select-none">
+            Helps us understand usage. No personal data is collected.
+          </p>
+        </div>
+        <Switch
+          id="analytics-toggle"
+          checked={analyticsEnabled}
+          onCheckedChange={handleToggleChange}
+          disabled={isLoading}
+          className="data-[state=checked]:bg-gray-800 dark:data-[state=checked]:bg-gray-600"
+        />
       </div>
     </section>
   );

@@ -19,6 +19,50 @@ let appStorageDir;
 let trashDir;
 let mainWindow;
 
+// Analytics preferences store
+const analyticsPreferences = {
+  consentGiven: true, // Default to true (opt-out model)
+  
+  // Get the file path for storing analytics preferences
+  get filePath() {
+    return path.join(app.getPath('userData'), 'analytics-preferences.json');
+  },
+  
+  // Load preferences from disk
+  load() {
+    try {
+      if (fs.existsSync(this.filePath)) {
+        const data = fs.readFileSync(this.filePath, 'utf8');
+        const prefs = JSON.parse(data);
+        this.consentGiven = prefs.consentGiven ?? true;
+      }
+    } catch (error) {
+      // Silent error
+    }
+  },
+  
+  // Save preferences to disk
+  save() {
+    try {
+      fs.writeFileSync(this.filePath, JSON.stringify({ consentGiven: this.consentGiven }), 'utf8');
+    } catch (error) {
+      // Silent error
+    }
+  },
+  
+  // Get current consent status
+  getConsent() {
+    return this.consentGiven;
+  },
+  
+  // Update consent status
+  setConsent(consent) {
+    this.consentGiven = !!consent;
+    this.save();
+    return this.consentGiven;
+  }
+};
+
 // Simple API key storage with basic persistence
 const apiKeyStorage = {
   keys: new Map(),
@@ -232,7 +276,7 @@ async function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
+          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com https://*.telemetrydeck.com https://nom.telemetrydeck.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
         ]
       }
     });
@@ -488,7 +532,7 @@ function createApplicationMenu() {
   Menu.setApplicationMenu(menu);
 }
 
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
   // Register custom protocol to serve local files
   protocol.registerFileProtocol('local-file', (request, callback) => {
     const url = request.url.replace('local-file://', '');
@@ -500,18 +544,17 @@ app.whenReady().then(async () => {
     }
   });
 
-  await createWindow();
+  analyticsPreferences.load();
+  createWindow();
+  
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
 });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
-  }
-});
-
-app.on('activate', async () => {
-  if (mainWindow === null) {
-    await createWindow();
   }
 });
 
@@ -537,10 +580,10 @@ ipcMain.on('window-close', () => {
 // Add API key management handlers
 ipcMain.handle('set-api-key', async (event, { service, key }) => {
   try {
-    const result = apiKeyStorage.setApiKey(service, key);
-    return { success: result };
+    const success = apiKeyStorage.setApiKey(service, key);
+    return { success };
   } catch (error) {
-    console.error('Error setting API key:', error);
+    console.error('Error in set-api-key:', error);
     return { success: false, error: error.message };
   }
 });
@@ -858,5 +901,24 @@ ipcMain.handle('update-metadata', async (event, { id, metadata }) => {
   } catch (error) {
     console.error('Error updating metadata:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// Register IPC handlers for analytics consent management
+ipcMain.handle('get-analytics-consent', async () => {
+  try {
+    const consent = analyticsPreferences.getConsent();
+    return consent;
+  } catch (error) {
+    return false;
+  }
+});
+
+ipcMain.handle('set-analytics-consent', async (event, consent) => {
+  try {
+    const result = analyticsPreferences.setConsent(consent);
+    return result;
+  } catch (error) {
+    return false;
   }
 }); 

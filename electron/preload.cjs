@@ -36,6 +36,13 @@ contextBridge.exposeInMainWorld(
     getApiKey: (service) => ipcRenderer.invoke('get-api-key', { service }),
     hasApiKey: (service) => ipcRenderer.invoke('has-api-key', { service }),
     deleteApiKey: (service) => ipcRenderer.invoke('delete-api-key', { service }),
+    
+    // Analytics settings
+    getAnalyticsConsent: () => ipcRenderer.invoke('get-analytics-consent'),
+    setAnalyticsConsent: (consent) => ipcRenderer.invoke('set-analytics-consent', consent),
+
+    // App information
+    appVersion: require('../package.json').version,
 
     // Added methods
     convertImageToBase64: async (filePath) => {

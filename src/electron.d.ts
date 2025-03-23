@@ -26,6 +26,13 @@ interface IElectronAPI {
   hasApiKey?: (service: string) => Promise<{ success: boolean; hasKey: boolean; error?: string }>;
   deleteApiKey?: (service: string) => Promise<{ success: boolean; error?: string }>;
 
+  // Analytics settings
+  getAnalyticsConsent?: () => Promise<boolean>;
+  setAnalyticsConsent?: (consent: boolean) => Promise<boolean>;
+  
+  // App information
+  appVersion?: string;
+
   // Added methods
   convertImageToBase64?: (filePath: string) => Promise<string>;
   callOpenAI?: (payload: any) => Promise<any>;
