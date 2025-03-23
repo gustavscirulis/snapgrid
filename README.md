@@ -1,51 +1,49 @@
-# SnapGrid
-
 ## Project info
 
-SnapGrid is an open-source desktop application designed for collecting, organizing, and analyzing UI screenshots. It uses AI to automatically detect UI patterns and components, making it an invaluable tool for UI/UX designers, developers, and design system teams.
+SnapGrid is an open-source desktop app for collecting, organizing, and analyzing UI screenshots. It uses AI to automatically detect UI components and patterns, making it a powerful tool for UI/UX designers, developers, and design system teams.
 
-It's built by @gustavscirulis and all of the code is entirely AI-generated.
+It’s built by [@gustavscirulis](https://github.com/gustavscirulis), and all of the code is entirely AI-generated.
 
 ## Features
 
-- **Screenshot Management**: Collect and organize your UI screenshots in a visual grid layout
-- **AI-Powered Pattern Detection**: Automatically identify common UI components and patterns using OpenAI's Vision API
-- **Smart Organization**: Search and filter your screenshots based on detected UI patterns
-- **Drag & Drop Support**: Easily import screenshots via drag and drop or clipboard paste
-- **Cross-Platform**: Works on macOS, Windows, and Linux (primary focus on macOS)
-- **Local Storage**: All your screenshots and metadata are stored locally and can be synced using iCloud
-- **Dark Mode Support**: Beautiful dark and light themes for comfortable viewing
+- **Screenshot Management** – Collect and organize your UI screenshots in a visual grid layout  
+- **AI-Powered Pattern Detection** – Identify UI components and patterns using OpenAI’s Vision API  
+- **Smart Organization** – Search and filter your screenshots based on detected UI elements  
+- **Drag & Drop** – Import screenshots via drag and drop or paste from clipboard  
+- **Local Storage** – All screenshots and metadata are stored locally and can be synced with iCloud  
+- **Dark Mode** – Light and dark themes for comfortable viewing  
 
-### Installation
+## Installation
 
-Download the latest release for your platform from the [Releases](https://github.com/snapgrid/snapgrid/releases) page.
+Download the latest release for your platform from the [releases](https://github.com/snapgrid/snapgrid/releases) page.
 
-### Requirements
+## Requirements
 
-- **OpenAI API Key**: To use the AI pattern detection feature, you'll need to add your OpenAI API key in the settings. The app uses GPT-4o for vision analysis. The app can still be used without this feature.
+To use the AI pattern detection feature, you’ll need to add your OpenAI API key in the settings. The app uses GPT-4o for vision analysis.  
+You can still use the app without this feature — it just won’t detect patterns.
 
-
-## File Storage Structure
+## File storage
 
 SnapGrid stores files in the following locations:
 
-- **macOS**: `~/Documents/SnapGrid/`
-- **Other platforms**: In the app's user data directory
+- **macOS**: `~/Documents/SnapGrid/`  
+- **Other platforms**: in the app’s user data directory
 
-Within this directory:
-- `images/` - Contains all media files (PNG images and MP4 videos)
-- `metadata/` - Contains JSON metadata files for each media item
-- `.trash/` - Trash directory with the same structure (images/ and metadata/ subdirectories)
+Inside that folder:
+
+- `images/` – All media files (PNG screenshots and MP4 videos)  
+- `metadata/` – JSON metadata for each media item  
+- `.trash/` – Deleted items are moved here (same structure as above)
 
 ## Development
 
 SnapGrid is built with:
 
-- Electron
-- Vite
-- TypeScript
-- React
-- shadcn-ui
+- Electron  
+- Vite  
+- TypeScript  
+- React  
+- shadcn-ui  
 - Tailwind CSS
 
 ### Setting Up Development Environment
