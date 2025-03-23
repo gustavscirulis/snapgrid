@@ -118,7 +118,7 @@ const getAppStorageDir = () => {
   if (platform === 'darwin') {
     // On macOS, try to use Documents folder first for visibility
     const homeDir = os.homedir();
-    storageDir = path.join(homeDir, 'Documents', 'UIReferenceApp');
+    storageDir = path.join(homeDir, 'Documents', 'SnapGrid');
     console.log('Using Documents folder path:', storageDir);
 
     // Create a README file to help users find the folder
@@ -127,7 +127,7 @@ const getAppStorageDir = () => {
       fs.ensureDirSync(storageDir);
       fs.writeFileSync(
         readmePath, 
-        'This folder contains your UI Reference app images and data.\n' +
+        'This folder contains your SnapGrid app images and data.\n' +
         'Files are stored in the images/ directory with metadata in the metadata/ directory.\n\n' +
         'Storage location: ' + storageDir
       );
@@ -403,9 +403,7 @@ function createApplicationMenu() {
             mainWindow?.webContents.send('open-storage-location');
             await shell.openPath(appStorageDir);
           }
-        },
-        { type: 'separator' },
-        { role: 'quit' }
+        }
       ]
     },
     
@@ -479,7 +477,7 @@ function createApplicationMenu() {
         {
           label: 'Learn More',
           click: async () => {
-            await shell.openExternal('https://github.com/snapgrid-keeper');
+            await shell.openExternal('https://github.com/snapgrid');
           }
         }
       ]

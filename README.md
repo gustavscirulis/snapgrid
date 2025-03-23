@@ -64,7 +64,7 @@ This project is built with .
 
 The application stores files in a structured manner:
 
-- On macOS: `~/Documents/UIReferenceApp/`
+- On macOS: `~/Documents/SnapGrid/`
 - On other platforms: In the app's user data directory
 
 Within this directory:

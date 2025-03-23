@@ -1,6 +1,6 @@
 {
-  "appId": "com.uireference.app",
-  "productName": "UI Reference",
+  "appId": "com.snapgrid.app",
+  "productName": "SnapGrid",
   "directories": {
     "output": "release/"
   },
