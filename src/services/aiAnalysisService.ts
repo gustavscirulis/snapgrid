@@ -117,7 +117,6 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
       data = await window.electron.callOpenAI(payload);
     } else {
       // In web mode, use fetch with API key from localStorage
-      console.log("Using fetch API for OpenAI API call");
       const apiKey = await getApiKey();
       
       if (!apiKey) {

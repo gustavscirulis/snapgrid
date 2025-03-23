@@ -95,20 +95,11 @@ const Index = () => {
       typeof window.electron !== 'undefined' && 
       window.electron !== null;
       
-    console.log("Electron detection:", {
-      electronExists: typeof window.electron !== 'undefined',
-      electronValue: window.electron
-    });
-    
     setIsElectron(isRunningInElectron);
     
     if (isRunningInElectron) {
-      console.log("Running in Electron mode");
-      
       // Set up listeners for menu-triggered events
       const cleanupImportFiles = window.electron.onImportFiles(async (filePaths) => {
-        console.log(`Import files triggered:`, filePaths);
-        
         try {
           // Remove the toast that shows importing status
           
@@ -128,12 +119,10 @@ const Index = () => {
       });
       
       const cleanupOpenStorageLocation = window.electron.onOpenStorageLocation(() => {
-        console.log('Open storage location triggered');
         // Storage location is opened by the main process
       });
       
       const cleanupOpenSettings = window.electron.onOpenSettings(() => {
-        console.log('Open settings triggered');
         setSettingsOpen(true);
       });
       
@@ -144,7 +133,6 @@ const Index = () => {
         cleanupOpenSettings();
       };
     } else {
-      console.log("Running in browser mode. Electron APIs not available.");
       toast.warning("Running in browser mode. Local storage features are not available.");
     }
     

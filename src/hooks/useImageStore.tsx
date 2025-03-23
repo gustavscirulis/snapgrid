@@ -51,22 +51,15 @@ export function useImageStore() {
       typeof window.electron !== 'undefined' &&
       window.electron !== null;
 
-    console.log("useImageStore - Electron detection:", {
-      electronExists: typeof window.electron !== 'undefined',
-      electronValue: window.electron
-    });
-
     setIsElectron(isRunningInElectron);
 
     const loadImages = async () => {
       try {
         if (isRunningInElectron) {
-          console.log("Loading images from filesystem...");
           const [loadedImages, loadedTrashItems] = await Promise.all([
             window.electron.loadImages(),
             window.electron.listTrash()
           ]);
-          console.log("Loaded images:", loadedImages.length);
           // Sort by createdAt with newest first
           const sortedImages = [...(loadedImages || [])].sort((a, b) =>
             new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
@@ -126,7 +119,6 @@ export function useImageStore() {
       });
 
       if (result.success && result.path) {
-        console.log("Media saved successfully at:", result.path);
         return result.path;
       } else {
         throw new Error(result.error || "Unknown error");

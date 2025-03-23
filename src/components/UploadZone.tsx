@@ -29,7 +29,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     e.stopPropagation();
     dragCounter.current += 1;
     setIsDragging(true);
-    console.log("Drag enter, counter:", dragCounter.current);
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -45,9 +44,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     
     if (dragCounter.current === 0) {
       setIsDragging(false);
-      console.log("Drag leave, counter reset");
     }
-    console.log("Drag leave, counter:", dragCounter.current);
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -55,7 +52,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     e.stopPropagation();
     dragCounter.current = 0;
     setIsDragging(false);
-    console.log("Drop occurred, counter reset");
 
     if (isUploading) return;
 
