@@ -265,7 +265,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         ) : hasOpenAIKey ? (
           // API key is set - show drag and drop instructions
           <>
-            <div className="p-8">
+            <div className="p-8 select-none">
               <div className="rounded-full bg-gray-100 dark:bg-zinc-800 w-14 h-14 flex items-center justify-center mb-5">
                 <Upload className="h-7 w-7 text-gray-600 dark:text-gray-400" />
               </div>
@@ -276,7 +276,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 They will be automatically analysed for UI patterns and organised.
               </p>
             </div>
-            <div className="bg-gray-50 dark:bg-zinc-800/50 px-6 py-4 border-t border-gray-200 dark:border-zinc-800">
+            <div className="bg-gray-50 dark:bg-zinc-800/50 px-6 py-4 border-t border-gray-200 dark:border-zinc-800 select-none">
               <p className="text-xs text-gray-700 dark:text-gray-300">
                 You can also paste images from clipboard (⌘+V)
               </p>
@@ -285,7 +285,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         ) : (
           // No API key - show add API key card
           <>
-            <div className="p-8">
+            <div className="p-8 select-none">
               <div className="rounded-full bg-gray-100 dark:bg-zinc-800 w-14 h-14 flex items-center justify-center mb-5">
                 <Key className="h-7 w-7 text-gray-600 dark:text-gray-400" />
               </div>
@@ -304,7 +304,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 Add API Key
               </Button>
             </div>
-            <div className="bg-gray-50 dark:bg-zinc-800/50 px-6 py-4 border-t border-gray-200 dark:border-zinc-800">
+            <div className="bg-gray-50 dark:bg-zinc-800/50 px-6 py-4 border-t border-gray-200 dark:border-zinc-800 select-none">
               <p className="text-xs text-gray-700 dark:text-gray-300">
                 You can still upload and organize screenshots without an API key.
               </p>
@@ -324,7 +324,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         <div className="flex-1 flex items-stretch">
           {searchQuery ? (
             <div className="flex justify-center items-center w-full min-h-[50vh]">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground select-none">
                 Nothing found
               </p>
             </div>

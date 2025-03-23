@@ -18,7 +18,7 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[450px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm shadow-2xl z-[200]">
         <DialogHeader className="border-b border-gray-200 dark:border-zinc-800 pb-4 mb-4">
-          <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center h-8">Settings</DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center h-8 select-none">Settings</DialogTitle>
         </DialogHeader>
         <div className="py-1 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto pr-1 mac-scrollbar">
           <ThemeSelector />
@@ -35,11 +35,11 @@ const ThemeSelector = () => {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Appearance</h3>
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">Appearance</h3>
       <div className="flex w-full h-8 p-0.5 bg-gray-100 dark:bg-zinc-800 rounded-md overflow-hidden shadow-inner">
         <button
           onClick={() => setTheme("light")}
-          className={`flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
+          className={`select-none flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
             theme === "light" 
             ? "bg-gray-300 dark:bg-gray-600 shadow-sm text-gray-900 dark:text-gray-100" 
             : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -50,7 +50,7 @@ const ThemeSelector = () => {
         </button>
         <button
           onClick={() => setTheme("dark")}
-          className={`flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
+          className={`select-none flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
             theme === "dark" 
             ? "bg-gray-300 dark:bg-gray-600 shadow-sm text-gray-900 dark:text-gray-100" 
             : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -61,7 +61,7 @@ const ThemeSelector = () => {
         </button>
         <button
           onClick={() => setTheme("system")}
-          className={`flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
+          className={`select-none flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
             theme === "system" 
             ? "bg-gray-300 dark:bg-gray-600 shadow-sm text-gray-900 dark:text-gray-100" 
             : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -175,14 +175,14 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">OpenAI API Key</h3>
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">OpenAI API Key</h3>
       <div className="space-y-4">
         <div className="flex flex-col gap-1">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-gray-600 dark:text-gray-400 select-none">
             Required for image analysis. <a 
             href="https://platform.openai.com/api-keys" 
             onClick={handleOpenApiKeyUrl}
-            className="text-gray-800 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 underline font-medium"
+            className="text-gray-800 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 underline font-medium select-none"
           >
             Get an OpenAI API key
           </a>.
@@ -206,21 +206,21 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
             <Button 
               onClick={handleUpdateApiKey}
               disabled={isSubmitting || !apiKey.trim()}
-              className="rounded-md bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white border-0 text-xs font-medium"
+              className="rounded-md bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white border-0 text-xs font-medium select-none"
             >
               {isSubmitting ? "Updating..." : "Update"}
             </Button>
           </div>
         ) : (
           <div className="flex items-center justify-between bg-gray-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-gray-200 dark:border-zinc-800">
-            <p className="text-xs text-gray-600 dark:text-gray-400">
+            <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
               API key is currently set
             </p>
             <Button 
               variant="outline" 
               size="sm"
               onClick={handleDeleteApiKey}
-              className="text-xs rounded-md border-gray-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 font-medium"
+              className="text-xs rounded-md border-gray-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 font-medium select-none"
             >
               Remove Key
             </Button>
