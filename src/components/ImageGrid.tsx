@@ -321,9 +321,9 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       <div className="hidden">{`Images: ${images.length}, HasKey: ${hasOpenAIKey}, IsSearching: ${searchQuery !== ""}`}</div>
       
       {images.length === 0 ? (
-        <div className="flex-1">
+        <div className="flex-1 flex items-stretch">
           {searchQuery ? (
-            <div className="flex justify-center items-center h-full min-h-[50vh]">
+            <div className="flex justify-center items-center w-full min-h-[50vh]">
               <p className="text-sm text-muted-foreground">
                 Nothing found
               </p>
