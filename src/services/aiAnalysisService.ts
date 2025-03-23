@@ -95,7 +95,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
           content: [
             {
               type: "text",
-              text: "Review this UI design image and provide two things:\n1. Extract the top 10 recognizable UI components with confidence scores between 0 and 1.\n2. Include a brief description of what this screenshot shows (e.g., what type of product, website, or application).\n\nRespond with a strict, valid JSON array where each object contains 'pattern', 'confidence', and 'imageContext' fields. The 'imageContext' field should be the same in all objects and describe what the screenshot shows. Do not include markdown formatting, explanations, or code block symbols. Use title case."
+              text: "Review this UI design image and provide two things:\n1. Extract the top 10 recognizable UI components with confidence scores between 0 and 1.\n2. Include a brief description of what this screenshot shows (e.g., what type of product, website, or application).\n\nRespond with a strict, valid JSON array where each object contains 'pattern', 'confidence', and 'imageContext' fields. The 'imageContext' field should be the same in all objects and describe what the screenshot shows. Do not include markdown formatting, explanations, or code block symbols. Use title case. If you can't recognise any UI components describe the objects and scene instead."
             },
             {
               type: "image_url",
