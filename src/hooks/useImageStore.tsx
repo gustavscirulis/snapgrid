@@ -5,6 +5,13 @@ import { getVideoDimensions } from '../lib/videoUtils';
 
 export type ImageItemType = "image" | "video";
 
+// Helper function to get filename from a path
+const getFilenameFromPath = (filePath: string): string => {
+  // Handle both Windows and Unix paths
+  const parts = filePath.split(/[\\/]/);
+  return parts[parts.length - 1] || filePath;
+};
+
 export interface PatternTag {
   name: string;
   confidence: number;
@@ -218,10 +225,6 @@ export function useImageStore() {
         setImages(prevImages => [media, ...prevImages.filter(img => img.id !== media.id)]);
       }
 
-      // Set isUploading to false here after the upload is complete but before analysis
-      // This allows users to upload more images while the analysis is running
-      setIsUploading(false);
-
       // Analyze image if applicable
       if (media.type === "image") {
         media = { ...media, isAnalyzing: true };
@@ -294,15 +297,144 @@ export function useImageStore() {
     }
   }, [isElectron]);
 
+  // Add this function to handle importing files directly from the file system
+  // This will be used by the menu file import function
+  const importFromFilePath = async (filePath: string) => {
+    if (!isElectron || !window.electron) {
+      console.error("Cannot import file directly in browser mode");
+      toast.error("Cannot import file directly in browser mode");
+      return;
+    }
+    
+    try {
+      // For browser testing - this won't actually work in browser mode
+      if (!isElectron) return;
+      
+      // Get the file extension
+      const fileExt = filePath.toLowerCase().split('.').pop() || '';
+      
+      // Determine if this is a video or image based on extension
+      const isVideo = ['mp4', 'webm', 'mov', 'avi'].includes(fileExt);
+      const id = `${isVideo ? 'vid' : 'img'}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      
+      // Set a loading state for better UI feedback
+      setIsUploading(true);
+      
+      try {
+        // Create a local file URL we can use to get dimensions
+        const localFileUrl = `file://${filePath}`;
+        
+        // Create basic media item with defaults
+        let media: ImageItem = {
+          id,
+          type: isVideo ? "video" : "image",
+          url: localFileUrl, // Temporary URL
+          width: 0,
+          height: 0,
+          createdAt: new Date(),
+        };
+        
+        // Try to get dimensions if possible
+        if (isVideo) {
+          try {
+            // For videos, use the video utils
+            const videoData = await getVideoDimensions(localFileUrl);
+            media = { ...media, ...videoData };
+          } catch (dimError) {
+            console.error("Error getting video dimensions:", dimError);
+            // Continue with default dimensions
+          }
+        } else {
+          try {
+            // For images, convert to base64 to get dimensions
+            const base64 = await window.electron.convertImageToBase64(filePath);
+            const dimensions = await getImageDimensions(base64);
+            media = { ...media, ...dimensions };
+          } catch (dimError) {
+            console.error("Error getting image dimensions:", dimError);
+            // Continue with default dimensions
+          }
+        }
+        
+        // Save to disk directly using the file path
+        const result = await window.electron.saveImage({
+          id: media.id,
+          dataUrl: filePath, // Use the file path directly
+          metadata: {
+            width: media.width,
+            height: media.height,
+            createdAt: media.createdAt,
+            title: media.title || getFilenameFromPath(filePath), // Use filename as title
+            description: media.description,
+            type: media.type,
+            duration: media.duration,
+            posterUrl: media.posterUrl,
+            originalPath: filePath // Include the original path
+          }
+        });
+        
+        if (result.success && result.path) {
+          console.log("Media saved successfully at:", result.path);
+          media = {
+            ...media,
+            actualFilePath: result.path,
+            url: `local-file://${result.path}`,
+            useDirectPath: true
+          };
+          
+          // Add to image list
+          setImages(prevImages => [media, ...prevImages]);
+          
+          // Set isUploading to false here before starting analysis
+          // This allows users to upload more images while analysis is running
+          setIsUploading(false);
+          
+          // If it's an image, analyze it
+          if (!isVideo) {
+            media = { ...media, isAnalyzing: true };
+            setImages(prevImages => prevImages.map(img => img.id === media.id ? media : img));
+            
+            try {
+              // Convert to base64 for analysis
+              const base64 = await window.electron.convertImageToBase64(result.path);
+              const analyzedMedia = await analyzeAndUpdateImage(media, base64, result.path);
+              setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
+            } catch (analyzeError) {
+              console.error("Failed to analyze imported image:", analyzeError);
+              // Update the media item to show error state
+              const errorMedia = { ...media, isAnalyzing: false, error: 'Analysis failed' };
+              setImages(prevImages => prevImages.map(img => img.id === media.id ? errorMedia : img));
+            }
+          }
+          
+          // Remove success toast
+        } else {
+          throw new Error(result.error || "Unknown error");
+        }
+      } catch (error) {
+        console.error("Failed to import media:", error);
+        toast.error("Failed to import media");
+      } finally {
+        setIsUploading(false);
+      }
+    } catch (error) {
+      console.error("Error importing file:", error);
+      toast.error("Failed to import file: " + (error instanceof Error ? error.message : 'Unknown error'));
+      setIsUploading(false);
+    }
+  };
+
   return {
     images,
     trashItems,
     isUploading,
     isLoading,
-    canUndo: deletedItemsHistory.length > 0,
+    isElectron,
     addImage,
     removeImage,
-    undoDelete,
     emptyTrash,
+    undoDelete,
+    importFromFilePath,
+    canUndo: deletedItemsHistory.length > 0
   };
 }

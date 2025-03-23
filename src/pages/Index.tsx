@@ -11,8 +11,24 @@ import { Toaster, toast } from "sonner";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import WindowControls from "@/components/WindowControls";
 
+// Helper function to convert File URL to File object
+const urlToFile = async (url: string, filename: string): Promise<File> => {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new File([blob], filename, { type: blob.type });
+};
+
 const Index = () => {
-  const { images, isUploading, isLoading, addImage, removeImage, undoDelete, canUndo } = useImageStore();
+  const { 
+    images, 
+    isUploading, 
+    isLoading, 
+    addImage, 
+    removeImage, 
+    undoDelete, 
+    canUndo,
+    importFromFilePath 
+  } = useImageStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [isElectron, setIsElectron] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -88,6 +104,45 @@ const Index = () => {
     
     if (isRunningInElectron) {
       console.log("Running in Electron mode");
+      
+      // Set up listeners for menu-triggered events
+      const cleanupImportFiles = window.electron.onImportFiles(async (filePaths) => {
+        console.log(`Import files triggered:`, filePaths);
+        
+        try {
+          // Remove the toast that shows importing status
+          
+          for (const filePath of filePaths) {
+            try {
+              // Use direct file import method
+              await importFromFilePath(filePath);
+            } catch (error) {
+              console.error(`Error importing file ${filePath}:`, error);
+              toast.error(`Failed to import file: ${filePath.split(/[\\/]/).pop()}`);
+            }
+          }
+        } catch (error) {
+          console.error('Error processing import files:', error);
+          toast.error('Failed to import files');
+        }
+      });
+      
+      const cleanupOpenStorageLocation = window.electron.onOpenStorageLocation(() => {
+        console.log('Open storage location triggered');
+        // Storage location is opened by the main process
+      });
+      
+      const cleanupOpenSettings = window.electron.onOpenSettings(() => {
+        console.log('Open settings triggered');
+        setSettingsOpen(true);
+      });
+      
+      // Clean up listeners on component unmount
+      return () => {
+        cleanupImportFiles();
+        cleanupOpenStorageLocation();
+        cleanupOpenSettings();
+      };
     } else {
       console.log("Running in browser mode. Electron APIs not available.");
       toast.warning("Running in browser mode. Local storage features are not available.");
@@ -95,7 +150,7 @@ const Index = () => {
     
     // Initial loading of API key happens in the aiAnalysisService
     // No need to manually load from localStorage here as it's handled by the service
-  }, []);
+  }, [addImage, importFromFilePath]);
 
   const filteredImages = images.filter(image => {
     const query = searchQuery.toLowerCase();

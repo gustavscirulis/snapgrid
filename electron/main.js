@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, Menu } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs-extra';
@@ -247,6 +247,9 @@ async function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+  
+  // Create the application menu
+  createApplicationMenu();
 }
 
 // Function to migrate existing files from flat structure to new directory structure
@@ -342,6 +345,149 @@ async function migrateFilesToNewStructure() {
   } catch (error) {
     console.error("Error during file migration:", error);
   }
+}
+
+// Create the application menu with File browsing options
+function createApplicationMenu() {
+  const isMac = process.platform === 'darwin';
+  
+  const template = [
+    // App menu (macOS only)
+    ...(isMac ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { 
+          label: 'Preferences',
+          accelerator: 'CmdOrCtrl+,',
+          click: () => mainWindow?.webContents.send('open-settings')
+        },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    }] : []),
+    
+    // File menu
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Import Image',
+          accelerator: 'CmdOrCtrl+O',
+          click: async () => {
+            const result = await dialog.showOpenDialog(mainWindow, {
+              properties: ['openFile', 'multiSelections'],
+              filters: [
+                { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] },
+                { name: 'Videos', extensions: ['mp4', 'webm', 'mov'] },
+                { name: 'All Files', extensions: ['*'] }
+              ]
+            });
+            
+            if (!result.canceled && result.filePaths.length > 0) {
+              mainWindow?.webContents.send('import-files', result.filePaths);
+            }
+          }
+        },
+        {
+          label: 'Open Storage Location',
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: async () => {
+            mainWindow?.webContents.send('open-storage-location');
+            await shell.openPath(appStorageDir);
+          }
+        },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    },
+    
+    // Edit menu
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        ...(isMac ? [
+          { role: 'pasteAndMatchStyle' },
+          { role: 'delete' },
+          { role: 'selectAll' },
+          { type: 'separator' },
+          {
+            label: 'Speech',
+            submenu: [
+              { role: 'startSpeaking' },
+              { role: 'stopSpeaking' }
+            ]
+          }
+        ] : [
+          { role: 'delete' },
+          { type: 'separator' },
+          { role: 'selectAll' }
+        ])
+      ]
+    },
+    
+    // View menu
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    
+    // Window menu
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(isMac ? [
+          { type: 'separator' },
+          { role: 'front' },
+          { type: 'separator' },
+          { role: 'window' }
+        ] : [
+          { role: 'close' }
+        ])
+      ]
+    },
+    
+    // Help menu
+    {
+      role: 'help',
+      submenu: [
+        {
+          label: 'Learn More',
+          click: async () => {
+            await shell.openExternal('https://github.com/snapgrid-keeper');
+          }
+        }
+      ]
+    }
+  ];
+  
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 }
 
 app.whenReady().then(async () => {
@@ -452,19 +598,36 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
     // Choose the appropriate file extension
     const fileExt = isVideo ? '.mp4' : '.png';
 
-    // Strip data URL prefix to get base64 data
-    let base64Data;
-    if (isVideo) {
-      base64Data = dataUrl.replace(/^data:video\/\w+;base64,/, '');
-    } else {
-      base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-    }
-    const buffer = Buffer.from(base64Data, 'base64');
-
-    // Save media file with correct extension in the images directory
+    // Destination paths
     const imagesDir = path.join(appStorageDir, 'images');
     const filePath = path.join(imagesDir, `${id}${fileExt}`);
-    await fs.writeFile(filePath, buffer);
+    
+    // Check if dataUrl is a file path rather than a base64 data URL
+    const isFilePath = !dataUrl.startsWith('data:');
+    
+    if (isFilePath) {
+      // Copy the file directly instead of decoding base64
+      console.log(`Copying file directly from: ${dataUrl}`);
+      try {
+        await fs.copy(dataUrl, filePath);
+      } catch (copyError) {
+        console.error('Error copying file:', copyError);
+        throw new Error(`Failed to copy file: ${copyError.message}`);
+      }
+    } else {
+      // Process as base64 data URL
+      // Strip data URL prefix to get base64 data
+      let base64Data;
+      if (isVideo) {
+        base64Data = dataUrl.replace(/^data:video\/\w+;base64,/, '');
+      } else {
+        base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+      }
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      // Save media file with correct extension in the images directory
+      await fs.writeFile(filePath, buffer);
+    }
 
     console.log(`Media saved to: ${filePath}`);
 

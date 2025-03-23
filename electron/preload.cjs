@@ -37,23 +37,24 @@ contextBridge.exposeInMainWorld(
     hasApiKey: (service) => ipcRenderer.invoke('has-api-key', { service }),
     deleteApiKey: (service) => ipcRenderer.invoke('delete-api-key', { service }),
 
-    convertImageToBase64: async (fileUrl) => {
+    // Added methods
+    convertImageToBase64: async (filePath) => {
       try {
-        let filePath = fileUrl;
-        if (filePath.startsWith('local-file://')) {
-          filePath = filePath.replace('local-file://', '');
-        } else if (filePath.startsWith('file://')) {
-          filePath = filePath.replace('file://', '');
+        let fileUrl = filePath;
+        if (fileUrl.startsWith('local-file://')) {
+          fileUrl = fileUrl.replace('local-file://', '');
+        } else if (fileUrl.startsWith('file://')) {
+          fileUrl = fileUrl.replace('file://', '');
         }
 
         const imageBuffer = await new Promise((resolve, reject) => {
-          fs.readFile(filePath, (err, data) => {
+          fs.readFile(fileUrl, (err, data) => {
             if (err) reject(err);
             else resolve(data);
           });
         });
 
-        const ext = path.extname(filePath).toLowerCase();
+        const ext = path.extname(fileUrl).toLowerCase();
         let mimeType = 'image/png'; 
 
         if (ext === '.jpg' || ext === '.jpeg') {
@@ -73,60 +74,21 @@ contextBridge.exposeInMainWorld(
         throw error;
       }
     },
-
-    // Updated OpenAI API function to use secure storage
-    callOpenAI: async (payload) => {
-      try {
-        // Get API key securely from main process
-        const result = await ipcRenderer.invoke('get-api-key', { service: 'openai' });
-        if (!result.success || !result.key) {
-          throw new Error('OpenAI API key not found in secure storage');
-        }
-        
-        const apiKey = result.key;
-        
-        // This function runs in the Node.js context and can make network requests
-        const https = require('https');
-
-        return new Promise((resolve, reject) => {
-          const options = {
-            hostname: 'api.openai.com',
-            port: 443,
-            path: '/v1/chat/completions',
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`
-            }
-          };
-
-          const req = https.request(options, (res) => {
-            let data = '';
-
-            res.on('data', (chunk) => {
-              data += chunk;
-            });
-
-            res.on('end', () => {
-              if (res.statusCode >= 200 && res.statusCode < 300) {
-                resolve(JSON.parse(data));
-              } else {
-                reject(new Error(`API request failed with status ${res.statusCode}: ${data}`));
-              }
-            });
-          });
-
-          req.on('error', (error) => {
-            reject(error);
-          });
-
-          req.write(JSON.stringify(payload));
-          req.end();
-        });
-      } catch (error) {
-        console.error('Error calling OpenAI API:', error);
-        throw error;
-      }
+    
+    // Menu events - add event listeners for menu-triggered events
+    onImportFiles: (callback) => {
+      ipcRenderer.on('import-files', (_, filePaths) => callback(filePaths));
+      return () => ipcRenderer.removeAllListeners('import-files');
     },
+    
+    onOpenStorageLocation: (callback) => {
+      ipcRenderer.on('open-storage-location', () => callback());
+      return () => ipcRenderer.removeAllListeners('open-storage-location');
+    },
+    
+    onOpenSettings: (callback) => {
+      ipcRenderer.on('open-settings', () => callback());
+      return () => ipcRenderer.removeAllListeners('open-settings');
+    }
   }
 );

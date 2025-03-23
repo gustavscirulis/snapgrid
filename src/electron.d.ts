@@ -30,6 +30,11 @@ interface IElectronAPI {
   convertImageToBase64?: (filePath: string) => Promise<string>;
   callOpenAI?: (payload: any) => Promise<any>;
   saveMediaData?: (data: any) => Promise<any>;
+  
+  // Menu event handlers
+  onImportFiles?: (callback: (filePaths: string[]) => void) => () => void;
+  onOpenStorageLocation?: (callback: () => void) => () => void;
+  onOpenSettings?: (callback: () => void) => () => void;
 }
 
 // Define the protocol for local file access
