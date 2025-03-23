@@ -220,7 +220,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           return (
             <div key={index} className="masonry-item">
               <motion.div 
-                className="rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-800 w-full transition-all duration-300"
+                className="rounded-lg overflow-hidden bg-gray-200 dark:bg-zinc-800 w-full transition-all duration-300"
                 style={{ height: `${height}px` }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: isDragging ? 0.2 : 0.5 }}
@@ -316,7 +316,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   };
 
   return (
-    <div className={`w-full px-4 py-4 flex-1 flex flex-col ${images.length === 0 && !searchQuery ? 'overflow-hidden' : ''}`}>
+    <div className={`w-full px-4 py-4 flex-1 flex flex-col bg-white dark:bg-zinc-900 ${images.length === 0 && !searchQuery ? 'overflow-hidden' : ''}`}>
       {/* Debug info - remove in production */}
       <div className="hidden">{`Images: ${images.length}, HasKey: ${hasOpenAIKey}, IsSearching: ${searchQuery !== ""}`}</div>
       
@@ -331,7 +331,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           ) : (
             <>
               {/* Background masonry grid */}
-              <div className="absolute inset-0 pt-20 pb-4 px-4 overflow-hidden">
+              <div className="absolute inset-0 pt-20 pb-4 px-4 overflow-hidden bg-white dark:bg-zinc-900">
                 {renderEmptyStatePlaceholders()}
               </div>
               
@@ -372,7 +372,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                   <div key={image.id} className="masonry-item">
                     <div 
                       ref={ref}
-                      className="rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md relative group w-full"
+                      className="rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800 shadow-sm hover:shadow-md relative group w-full"
                       onClick={() => handleImageClick(image, ref)}
                       onMouseEnter={() => setHoveredImageId(image.id)}
                       onMouseLeave={() => setHoveredImageId(null)}

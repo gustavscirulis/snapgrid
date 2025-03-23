@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { getAnalyticsConsent, setAnalyticsConsent } from "@/services/analyticsService";
 import { toast } from "sonner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SettingsPanelProps {
   open: boolean;
@@ -18,15 +19,13 @@ interface SettingsPanelProps {
 export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm shadow-2xl z-[200]">
+      <DialogContent className="sm:max-w-[450px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-black backdrop-blur-none shadow-2xl z-[200]">
         <DialogHeader className="border-b border-gray-200 dark:border-zinc-800 pb-4 mb-4">
           <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center h-8 select-none">Settings</DialogTitle>
         </DialogHeader>
-        <div className="py-1 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto pr-1 mac-scrollbar">
+        <div className="py-1 space-y-8 max-h-[calc(100vh-200px)] overflow-y-auto pr-1 mac-scrollbar">
           <ThemeSelector />
-          <div className="h-px bg-gray-200 dark:bg-zinc-800 my-8" aria-hidden="true" />
           <ApiKeySection isOpen={open} />
-          <div className="h-px bg-gray-200 dark:bg-zinc-800 my-8" aria-hidden="true" />
           <AnalyticsSection />
         </div>
       </DialogContent>
@@ -39,42 +38,34 @@ const ThemeSelector = () => {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">Appearance</h3>
-      <div className="flex w-full h-8 p-0.5 bg-gray-100 dark:bg-zinc-800 rounded-md overflow-hidden shadow-inner">
-        <button
-          onClick={() => setTheme("light")}
-          className={`select-none flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
-            theme === "light" 
-            ? "bg-gray-300 dark:bg-gray-600 shadow-sm text-gray-900 dark:text-gray-100" 
-            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-          }`}
-        >
-          <Sun className="h-3.5 w-3.5 mr-1.5" />
-          Light
-        </button>
-        <button
-          onClick={() => setTheme("dark")}
-          className={`select-none flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
-            theme === "dark" 
-            ? "bg-gray-300 dark:bg-gray-600 shadow-sm text-gray-900 dark:text-gray-100" 
-            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-          }`}
-        >
-          <Moon className="h-3.5 w-3.5 mr-1.5" />
-          Dark
-        </button>
-        <button
-          onClick={() => setTheme("system")}
-          className={`select-none flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
-            theme === "system" 
-            ? "bg-gray-300 dark:bg-gray-600 shadow-sm text-gray-900 dark:text-gray-100" 
-            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-          }`}
-        >
-          <SunMoon className="h-3.5 w-3.5 mr-1.5" />
-          Auto
-        </button>
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">Appearance</h3>
       </div>
+      <Tabs defaultValue={theme} onValueChange={setTheme} className="w-full">
+        <TabsList className="w-full grid grid-cols-3 h-9 bg-gray-100/80 dark:bg-zinc-800/80 p-1 rounded-md">
+          <TabsTrigger 
+            value="light" 
+            className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
+          >
+            <Sun className="h-3.5 w-3.5" />
+            <span>Light</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="dark" 
+            className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
+          >
+            <Moon className="h-3.5 w-3.5" />
+            <span>Dark</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="system" 
+            className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
+          >
+            <SunMoon className="h-3.5 w-3.5" />
+            <span>Auto</span>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
     </section>
   );
 };
@@ -113,16 +104,11 @@ const AnalyticsSection = () => {
   };
 
   return (
-    <section className="space-y-2">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <label 
-            htmlFor="analytics-toggle" 
-            className="text-sm font-medium text-gray-800 dark:text-gray-200 select-none"
-          >
-            Send anonymous usage data
-          </label>
-          <p className="text-xs text-gray-500 dark:text-gray-400 select-none">
+    <section className="space-y-3">
+      <div className="flex justify-between items-center gap-4">
+        <div className="space-y-1 flex-1">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">Send anonymous usage data</h3>
+          <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
             Helps us understand usage. No personal data is collected.
           </p>
         </div>
@@ -238,19 +224,19 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">OpenAI API Key</h3>
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">OpenAI API Key</h3>
+        <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
+          Required for image analysis. <a 
+          href="https://platform.openai.com/api-keys" 
+          onClick={handleOpenApiKeyUrl}
+          className="text-gray-800 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 underline font-medium select-none"
+        >
+          Get an OpenAI API key
+        </a>.
+        </p>
+      </div>
       <div className="space-y-4">
-        <div className="flex flex-col gap-1">
-          <p className="text-sm text-gray-600 dark:text-gray-400 select-none">
-            Required for image analysis. <a 
-            href="https://platform.openai.com/api-keys" 
-            onClick={handleOpenApiKeyUrl}
-            className="text-gray-800 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 underline font-medium select-none"
-          >
-            Get an OpenAI API key
-          </a>.
-          </p>
-        </div>
         {!keyExists ? (
           <div className="flex gap-2 p-0.5">
             <Input
@@ -264,28 +250,29 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
                   handleUpdateApiKey();
                 }
               }}
-              className="rounded-md text-sm border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-700"
+              className="h-9 rounded-md text-sm border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-700"
             />
             <Button 
+              size="default"
               onClick={handleUpdateApiKey}
               disabled={isSubmitting || !apiKey.trim()}
-              className="rounded-md bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white border-0 text-xs font-medium select-none"
+              className="h-9 rounded-md bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white border-0 text-xs font-medium select-none"
             >
               {isSubmitting ? "Updating..." : "Update"}
             </Button>
           </div>
         ) : (
-          <div className="flex items-center justify-between bg-gray-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-gray-200 dark:border-zinc-800">
-            <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
+          <div className="flex gap-2 p-0.5">
+            <div className="flex-1 rounded-md border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50 flex items-center h-9 px-3 text-xs text-gray-600 dark:text-gray-400 select-none">
               API key is currently set
-            </p>
+            </div>
             <Button 
               variant="outline" 
-              size="sm"
+              size="default"
               onClick={handleDeleteApiKey}
-              className="text-xs rounded-md border-gray-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 font-medium select-none"
+              className="h-9 rounded-md text-xs border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 font-medium select-none"
             >
-              Remove Key
+              Remove
             </Button>
           </div>
         )}

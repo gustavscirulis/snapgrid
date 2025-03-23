@@ -221,18 +221,18 @@ const Index = () => {
     >
       <div className={`min-h-screen flex flex-col ${isEmpty ? 'overflow-hidden' : ''}`}>
         <Toaster />
-        <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border py-4 px-6 relative">
+        <header className="sticky top-0 z-10 bg-white/85 dark:bg-zinc-900/85 backdrop-blur-lg border-b border-gray-200 dark:border-zinc-700 py-4 px-6 relative">
           <div className="absolute inset-0 draggable"></div>
           <div className="relative mx-auto flex items-center">
             <div className="w-8 draggable"></div> {/* Left draggable area */}
             <div className="flex-1 flex justify-center">
               <div className="relative w-96 non-draggable">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400 pointer-events-none z-10" />
                 <Input
                   ref={searchInputRef}
                   placeholder="Search..."
                   type="search"
-                  className="pl-9"
+                  className="pl-9 bg-white dark:bg-zinc-900 focus:bg-gray-50 dark:focus:bg-zinc-800 focus:ring-0 focus:border-gray-300 dark:focus:border-zinc-700"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
