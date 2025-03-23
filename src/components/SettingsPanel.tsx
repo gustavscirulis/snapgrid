@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
@@ -16,14 +16,14 @@ interface SettingsPanelProps {
 export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] rounded-xl border-transparent bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl shadow-xl">
+      <DialogContent className="sm:max-w-[450px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm shadow-2xl z-[200]">
         <DialogHeader className="border-b border-gray-200 dark:border-zinc-800 pb-4 mb-4">
-          <DialogTitle className="text-xl font-medium leading-6 flex items-center h-8">Settings</DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center h-8">Settings</DialogTitle>
         </DialogHeader>
         <div className="py-1 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto pr-1 mac-scrollbar">
           <ThemeSelector />
           <div className="h-px bg-gray-200 dark:bg-zinc-800 my-8" aria-hidden="true" />
-          <ApiKeySection />
+          <ApiKeySection isOpen={open} />
         </div>
       </DialogContent>
     </Dialog>
@@ -35,14 +35,14 @@ const ThemeSelector = () => {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Appearance</h3>
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Appearance</h3>
       <div className="flex w-full h-8 p-0.5 bg-gray-100 dark:bg-zinc-800 rounded-md overflow-hidden shadow-inner">
         <button
           onClick={() => setTheme("light")}
           className={`flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
             theme === "light" 
-            ? "bg-gray-300 dark:bg-gray-600 shadow-sm" 
-            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            ? "bg-gray-300 dark:bg-gray-600 shadow-sm text-gray-900 dark:text-gray-100" 
+            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
           }`}
         >
           <Sun className="h-3.5 w-3.5 mr-1.5" />
@@ -52,8 +52,8 @@ const ThemeSelector = () => {
           onClick={() => setTheme("dark")}
           className={`flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
             theme === "dark" 
-            ? "bg-gray-400 dark:bg-gray-600 text-white shadow-sm" 
-            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            ? "bg-gray-300 dark:bg-gray-600 shadow-sm text-gray-900 dark:text-gray-100" 
+            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
           }`}
         >
           <Moon className="h-3.5 w-3.5 mr-1.5" />
@@ -63,8 +63,8 @@ const ThemeSelector = () => {
           onClick={() => setTheme("system")}
           className={`flex items-center justify-center flex-1 text-xs font-medium rounded-md transition-all focus:outline-none ${
             theme === "system" 
-            ? "bg-gray-400 dark:bg-gray-600 text-white shadow-sm" 
-            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            ? "bg-gray-300 dark:bg-gray-600 shadow-sm text-gray-900 dark:text-gray-100" 
+            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
           }`}
         >
           <SunMoon className="h-3.5 w-3.5 mr-1.5" />
@@ -75,10 +75,45 @@ const ThemeSelector = () => {
   );
 };
 
-const ApiKeySection = () => {
+interface ApiKeySectionProps {
+  isOpen: boolean;
+}
+
+const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
   const [apiKey, setApiKey] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [keyExists, setKeyExists] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Check if running in Electron
+  const isElectron = window && 
+    typeof window.electron !== 'undefined' && 
+    window.electron !== null;
+
+  // Auto-focus the input field when settings opens and no key exists
+  useEffect(() => {
+    if (isOpen && !keyExists) {
+      // Focus after a short delay to ensure the dialog is fully visible
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, keyExists]);
+
+  // Handle opening the API key URL in default browser
+  const handleOpenApiKeyUrl = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const url = "https://platform.openai.com/api-keys";
+    
+    if (isElectron && window.electron?.openUrl) {
+      // Use Electron's shell to open in default browser
+      window.electron.openUrl(url);
+    } else {
+      // Fallback for non-Electron environments
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
 
   // Check for API key when component mounts
   useEffect(() => {
@@ -140,14 +175,23 @@ const ApiKeySection = () => {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">OpenAI API Key</h3>
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">OpenAI API Key</h3>
       <div className="space-y-4">
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Required for image analysis
-        </p>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Required for image analysis. <a 
+            href="https://platform.openai.com/api-keys" 
+            onClick={handleOpenApiKeyUrl}
+            className="text-gray-800 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 underline font-medium"
+          >
+            Get an OpenAI API key
+          </a>.
+          </p>
+        </div>
         {!keyExists ? (
           <div className="flex gap-2 p-0.5">
             <Input
+              ref={inputRef}
               type="password"
               placeholder="sk-..."
               value={apiKey}
@@ -157,26 +201,26 @@ const ApiKeySection = () => {
                   handleUpdateApiKey();
                 }
               }}
-              className="rounded-md text-sm border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-600"
+              className="rounded-md text-sm border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-700"
             />
             <Button 
               onClick={handleUpdateApiKey}
               disabled={isSubmitting || !apiKey.trim()}
-              className="rounded-md bg-gray-600 dark:bg-gray-500 hover:bg-gray-700 dark:hover:bg-gray-600 text-white border-0 text-xs focus:outline-none focus:ring-0"
+              className="rounded-md bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white border-0 text-xs font-medium"
             >
               {isSubmitting ? "Updating..." : "Update"}
             </Button>
           </div>
         ) : (
           <div className="flex items-center justify-between bg-gray-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-gray-200 dark:border-zinc-800">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
               API key is currently set
             </p>
             <Button 
               variant="outline" 
               size="sm"
               onClick={handleDeleteApiKey}
-              className="text-xs rounded-md border-gray-300 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 focus:outline-none focus:ring-0"
+              className="text-xs rounded-md border-gray-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 font-medium"
             >
               Remove Key
             </Button>

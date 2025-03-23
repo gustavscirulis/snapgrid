@@ -36,6 +36,17 @@ const Index = () => {
     }
   });
 
+  // Prevent scrolling when in empty state
+  useEffect(() => {
+    const hasImages = images.length > 0;
+    document.body.style.overflow = hasImages ? 'auto' : 'hidden';
+    
+    return () => {
+      // Reset overflow when component unmounts
+      document.body.style.overflow = 'auto';
+    };
+  }, [images.length]);
+
   // Handle clipboard paste events
   useEffect(() => {
     const handlePaste = async (event: ClipboardEvent) => {
@@ -157,12 +168,15 @@ const Index = () => {
     removeImage(id);
   };
 
+  // Determine if we're in empty state
+  const isEmpty = images.length === 0;
+
   return (
     <UploadZone 
       onImageUpload={addImage} 
       isUploading={isUploading}
     >
-      <div className="min-h-screen flex flex-col">
+      <div className={`min-h-screen flex flex-col ${isEmpty ? 'overflow-hidden' : ''}`}>
         <Toaster />
         <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border py-4 px-6 relative">
           <div className="absolute inset-0 draggable"></div>
@@ -187,6 +201,7 @@ const Index = () => {
                 size="icon"
                 onClick={() => setSettingsOpen(true)}
                 className="h-8 w-8 non-draggable"
+                aria-label="Settings"
               >
                 <Settings className="h-5 w-5" />
                 <span className="sr-only">Settings</span>
@@ -196,7 +211,7 @@ const Index = () => {
           <WindowControls />
         </header>
 
-        <main className="mx-auto flex-1 flex flex-col min-h-0">
+        <main className={`mx-auto flex-1 flex flex-col min-h-0 w-full ${isEmpty ? 'overflow-hidden' : ''}`}>
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -208,6 +223,8 @@ const Index = () => {
                 onImageClick={handleImageClick} 
                 onImageDelete={handleDeleteImage}
                 searchQuery={searchQuery}
+                onOpenSettings={() => setSettingsOpen(true)}
+                settingsOpen={settingsOpen}
               />
             </>
           )}

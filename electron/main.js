@@ -548,6 +548,18 @@ ipcMain.handle('check-file-access', async (event, filePath) => {
   }
 });
 
+// Add open-url handler
+ipcMain.handle('open-url', async (event, url) => {
+  try {
+    await shell.openExternal(url);
+    console.log(`Opened URL in default browser: ${url}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening URL:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Add update-metadata handler
 ipcMain.handle('update-metadata', async (event, { id, metadata }) => {
   try {

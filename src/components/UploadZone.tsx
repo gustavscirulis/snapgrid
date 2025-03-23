@@ -1,7 +1,13 @@
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect, createContext, useContext } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { validateMediaFile } from "@/lib/imageUtils";
 import { ImagePlus } from "lucide-react";
+
+// Create a context for the drag state
+export const DragContext = createContext<{ isDragging: boolean }>({ isDragging: false });
+
+// Hook to use the drag context
+export const useDragContext = () => useContext(DragContext);
 
 interface UploadZoneProps {
   onImageUpload: (file: File) => void;
@@ -16,23 +22,40 @@ const UploadZone: React.FC<UploadZoneProps> = ({
 }) => {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = React.useRef(0);
+
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current += 1;
+    setIsDragging(true);
+    console.log("Drag enter, counter:", dragCounter.current);
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(true);
+    // Don't reset isDragging here
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+    dragCounter.current -= 1;
+    
+    if (dragCounter.current === 0) {
+      setIsDragging(false);
+      console.log("Drag leave, counter reset");
+    }
+    console.log("Drag leave, counter:", dragCounter.current);
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCounter.current = 0;
     setIsDragging(false);
+    console.log("Drop occurred, counter reset");
 
     if (isUploading) return;
 
@@ -52,12 +75,20 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     });
   }, [isUploading, onImageUpload, toast]);
 
+  // Reset drag counter on unmount
+  useEffect(() => {
+    return () => {
+      dragCounter.current = 0;
+    };
+  }, []);
+
   return (
-    <>
+    <DragContext.Provider value={{ isDragging }}>
       <div
         className={`min-h-screen w-full transition-all duration-300 ${
           isDragging ? "bg-primary/5 border-primary/30" : ""
         }`}
+        onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -65,9 +96,10 @@ const UploadZone: React.FC<UploadZoneProps> = ({
         {children}
         
         {isDragging && (
-          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 pointer-events-none">
-            <div className="bg-card p-6 rounded-lg shadow-lg flex flex-col items-center animate-float">
-              <ImagePlus className="w-12 h-12 text-primary" />
+          <div className="fixed inset-0 bg-background/40 backdrop-blur-sm flex items-center justify-center z-[150] pointer-events-none">
+            <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-2xl flex flex-col items-center animate-bounce-slow">
+              <ImagePlus className="w-16 h-16 text-gray-800 dark:text-gray-200 mb-4" />
+              <p className="text-xl font-medium text-gray-900 dark:text-gray-100">Drop your file here</p>
             </div>
           </div>
         )}
@@ -80,7 +112,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
           multiple
         />
       </div>
-    </>
+    </DragContext.Provider>
   );
 };
 

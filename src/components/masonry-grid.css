@@ -4,17 +4,22 @@
   width: 100%;
   margin-left: -8px;
   max-width: none;
+  min-height: 800px;
+  height: 100%;
+  overflow: hidden;
 }
 
 .my-masonry-grid_column {
   padding-left: 16px;
   background-clip: padding-box;
+  height: 100%;
 }
 
 /* Style your items */
 .masonry-item {
   margin-bottom: 16px;
   will-change: transform;
+  display: block;
 }
 
 /* Ensure images fill their container */
@@ -24,4 +29,9 @@
   width: 100%;
   height: auto;
   max-height: none;
+}
+
+/* Style for placeholder items in empty state */
+.masonry-item > div {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 } 
