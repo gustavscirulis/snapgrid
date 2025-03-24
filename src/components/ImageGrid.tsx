@@ -127,7 +127,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const handleAnimationComplete = (definition: string) => {
     if (definition === "exit") {
       setExitAnimationComplete(true);
-      // Reset all states immediately instead of using a timeout
       setIsAnimating(false);
       setClickedImageId(null);
     }
@@ -135,9 +134,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
   const closeModal = () => {
     setModalOpen(false);
-    // Make thumbnail immediately visible
-    setClickedImageId(null);
-    setExitAnimationComplete(true);
+    // Don't reset clickedImageId here - wait for animation to complete
+    // The thumbnail should stay hidden until handleAnimationComplete is called
   };
 
   const handleDeleteImage = (id: string) => {
@@ -383,10 +381,9 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                       onMouseEnter={() => setHoveredImageId(image.id)}
                       onMouseLeave={() => setHoveredImageId(null)}
                       style={{
-                        opacity: isSelected && !exitAnimationComplete ? 0 : 1,
-                        visibility: isSelected && !exitAnimationComplete ? 'hidden' : 'visible',
-                        pointerEvents: isAnimating ? 'none' : 'auto',
-                        transition: modalOpen ? 'opacity 0.3s ease-out, visibility 0.3s ease-out' : 'none'
+                        opacity: isSelected ? 0 : 1,
+                        visibility: isSelected ? 'hidden' : 'visible',
+                        pointerEvents: isAnimating ? 'none' : 'auto'
                       }}
                     >
                       <div className="relative">
