@@ -172,7 +172,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           .map((pattern, index) => (
           <span 
             key={index} 
-            className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md cursor-default"
+            className="text-xs bg-secondary/80 backdrop-blur-sm text-secondary-foreground px-2 py-0.5 rounded-md cursor-default"
             title={`Confidence: ${Math.round(pattern.confidence * 100)}%`}
           >
             {pattern.name}
