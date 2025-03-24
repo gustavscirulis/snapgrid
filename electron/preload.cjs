@@ -31,6 +31,17 @@ contextBridge.exposeInMainWorld(
     // Browser functionality
     openUrl: (url) => ipcRenderer.invoke('open-url', url),
 
+    // Update functionality
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    onUpdateAvailable: (callback) => {
+      ipcRenderer.on('update-available', (_, releaseInfo) => callback(releaseInfo));
+      return () => ipcRenderer.removeAllListeners('update-available');
+    },
+    onManualUpdateCheckCompleted: (callback) => {
+      ipcRenderer.on('manual-update-check-completed', () => callback());
+      return () => ipcRenderer.removeAllListeners('manual-update-check-completed');
+    },
+
     // Secure API key management
     setApiKey: (service, key) => ipcRenderer.invoke('set-api-key', { service, key }),
     getApiKey: (service) => ipcRenderer.invoke('get-api-key', { service }),

@@ -207,6 +207,44 @@ const getAppStorageDir = () => {
   return storageDir;
 };
 
+// Add this function before createWindow()
+async function checkForUpdates() {
+  try {
+    const packageJson = require('../package.json');
+    const currentVersion = packageJson.version;
+    const repoOwner = 'gustavscirulis'; // Repository owner
+    const repoName = 'snapgrid'; // Repository name
+    
+    console.log('Checking for updates. Current version:', currentVersion);
+    
+    const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`);
+    
+    if (!response.ok) {
+      console.error('Error checking for updates:', response.status);
+      return;
+    }
+    
+    const latestRelease = await response.json();
+    const latestVersion = latestRelease.tag_name.replace(/^v/, '');
+    
+    console.log('Latest version available:', latestVersion);
+    
+    // Compare versions (simple string comparison works for semver)
+    if (latestVersion > currentVersion) {
+      console.log('Update available!', latestRelease.name);
+      
+      // Notify renderer process about the update
+      if (mainWindow) {
+        mainWindow.webContents.send('update-available', latestRelease);
+      }
+    } else {
+      console.log('No updates available');
+    }
+  } catch (error) {
+    console.error('Failed to check for updates:', error);
+  }
+}
+
 async function createWindow() {
   appStorageDir = getAppStorageDir();
   console.log('App storage directory:', appStorageDir);
@@ -405,6 +443,16 @@ function createApplicationMenu() {
       label: app.name,
       submenu: [
         { role: 'about' },
+        { 
+          label: 'Check for Updates',
+          click: async () => {
+            await checkForUpdates();
+            // If no update was found, inform the user
+            if (mainWindow) {
+              mainWindow.webContents.send('manual-update-check-completed');
+            }
+          }
+        },
         { type: 'separator' },
         { 
           label: 'Preferences',
@@ -550,6 +598,9 @@ app.whenReady().then(() => {
 
   analyticsPreferences.load();
   createWindow();
+  
+  // Check for updates after window is created
+  checkForUpdates();
   
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -934,4 +985,10 @@ ipcMain.handle('set-analytics-consent', async (event, consent) => {
     console.error('Error setting analytics consent:', error);
     return false;
   }
+});
+
+// Add handler for manual update checks from renderer
+ipcMain.handle('check-for-updates', async () => {
+  await checkForUpdates();
+  return { success: true };
 }); 
