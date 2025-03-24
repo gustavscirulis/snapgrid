@@ -198,7 +198,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
           .map(p => ({
             name: p.pattern || p.name, // Map 'pattern' field to 'name' as expected by the UI
             confidence: Math.min(Math.max(p.confidence, 0), 1), // Ensure confidence is between 0 and 1
-            imageContext: p.imageContext || imageContext // Include the image context description
+            imageContext: imageContext // Keep the same context for all patterns for backward compatibility
           }))
           .sort((a, b) => b.confidence - a.confidence) // Sort by confidence score
           .slice(0, 10); // Keep up to 10 patterns for searching but only display top 5 in UI

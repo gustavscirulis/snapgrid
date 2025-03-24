@@ -15,7 +15,6 @@ const getFilenameFromPath = (filePath: string): string => {
 export interface PatternTag {
   name: string;
   confidence: number;
-  imageContext?: string;
 }
 
 export interface ImageItem {
@@ -36,6 +35,8 @@ export interface ImageItem {
   // Video specific props
   duration?: number;
   posterUrl?: string;
+  // Context description for the entire image
+  imageContext?: string;
 }
 
 export function useImageStore() {
@@ -138,6 +139,10 @@ export function useImageStore() {
 
     try {
       const analysis = await analyzeImage(dataUrl);
+      
+      // Extract the imageContext from the first pattern (should be the same for all patterns)
+      const imageContext = analysis[0]?.imageContext || '';
+      
       const patternTags = analysis
         .map(pattern => {
           const name = pattern.pattern || pattern.name;
@@ -146,12 +151,16 @@ export function useImageStore() {
           return { 
             name, 
             confidence: pattern.confidence,
-            imageContext: pattern.imageContext 
           } as PatternTag;
         })
         .filter((tag): tag is PatternTag => tag !== null);
 
-      const updatedMedia = { ...media, patterns: patternTags, isAnalyzing: false };
+      const updatedMedia = { 
+        ...media, 
+        patterns: patternTags, 
+        isAnalyzing: false,
+        imageContext: imageContext // Set imageContext at the image level
+      };
 
       if (isElectron && window.electron && savedFilePath) {
         try {

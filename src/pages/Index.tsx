@@ -161,10 +161,9 @@ const Index = () => {
         pattern.name.toLowerCase().includes(query)
       );
       
-      // Also search in imageContext if it exists
-      const contextMatch = image.patterns.some(pattern => 
-        pattern.imageContext && pattern.imageContext.toLowerCase().includes(query)
-      );
+      // Also search in imageContext if it exists at the image level
+      const contextMatch = image.imageContext ? 
+        image.imageContext.toLowerCase().includes(query) : false;
       
       return patternMatch || contextMatch;
     }
@@ -179,26 +178,32 @@ const Index = () => {
     
     // Find the highest confidence score for matching patterns in each image
     const aMaxConfidence = a.patterns?.reduce((max, pattern) => {
-      // Match in pattern name or imageContext
+      // Match in pattern name
       const matchesPattern = pattern.name.toLowerCase().includes(query);
-      const matchesContext = pattern.imageContext && pattern.imageContext.toLowerCase().includes(query);
       
-      if (matchesPattern || matchesContext) {
+      if (matchesPattern) {
         return Math.max(max, pattern.confidence);
       }
       return max;
     }, 0) || 0;
     
     const bMaxConfidence = b.patterns?.reduce((max, pattern) => {
-      // Match in pattern name or imageContext
+      // Match in pattern name
       const matchesPattern = pattern.name.toLowerCase().includes(query);
-      const matchesContext = pattern.imageContext && pattern.imageContext.toLowerCase().includes(query);
       
-      if (matchesPattern || matchesContext) {
+      if (matchesPattern) {
         return Math.max(max, pattern.confidence);
       }
       return max;
     }, 0) || 0;
+    
+    // If searching for context that matches, prioritize those images
+    if (query && a.imageContext && a.imageContext.toLowerCase().includes(query)) {
+      return -1; // a comes first
+    }
+    if (query && b.imageContext && b.imageContext.toLowerCase().includes(query)) {
+      return 1; // b comes first
+    }
     
     // Sort by confidence score (highest first)
     return bMaxConfidence - aMaxConfidence;
