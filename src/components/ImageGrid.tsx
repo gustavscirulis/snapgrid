@@ -245,9 +245,6 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         className={`bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm shadow-2xl rounded-xl w-full overflow-hidden pointer-events-auto border border-gray-200 dark:border-zinc-800 transition-all duration-300 ${
           isDragging ? 'opacity-80 blur-[1px]' : 'opacity-100'
         }`}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: isDragging ? 0.8 : 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.4 }}
       >
         {hasOpenAIKey === null ? (
           // Loading state
@@ -337,11 +334,20 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               
               {/* Fixed centered card */}
               <div className="fixed top-0 left-0 right-0 bottom-0 flex items-center justify-center pointer-events-none z-[100]" style={{ paddingTop: "20px" }}>
-                {!settingsOpen && (
-                  <div className="max-w-lg w-full mx-4 pointer-events-auto" style={{ marginTop: "-50px" }}>
-                    {renderEmptyStateCard()}
-                  </div>
-                )}
+                <AnimatePresence>
+                  {!settingsOpen && (
+                    <motion.div 
+                      className="max-w-lg w-full mx-4 pointer-events-auto"
+                      style={{ marginTop: "-50px" }}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 20 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      {renderEmptyStateCard()}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </>
           )}
