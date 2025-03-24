@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { X, AlertCircle, Loader2, Key, Upload } from "lucide-react";
+import { X, AlertCircle, Loader2, Key, Upload, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AnimatedImageModal from "./AnimatedImageModal";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,9 +18,10 @@ interface ImageGridProps {
   searchQuery?: string;
   onOpenSettings?: () => void;
   settingsOpen?: boolean;
+  retryAnalysis?: (imageId: string) => Promise<void>;
 }
 
-const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete, searchQuery = "", onOpenSettings, settingsOpen = false }) => {
+const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete, searchQuery = "", onOpenSettings, settingsOpen = false, retryAnalysis }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -154,8 +155,17 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       }
       if (item.error) {
         return (
-          <div className="flex items-center gap-1 text-xs text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-md">
-            <AlertCircle className="w-3 h-3" />
+          <div 
+            className="inline-flex items-center gap-1 text-xs text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-md cursor-pointer hover:bg-destructive transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (retryAnalysis) {
+                retryAnalysis(item.id);
+              }
+            }}
+            title="Click to retry analysis"
+          >
+            <AlertTriangle className="w-3 h-3" />
             <span>Analysis failed</span>
           </div>
         );

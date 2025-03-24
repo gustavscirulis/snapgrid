@@ -181,7 +181,25 @@ export function useImageStore() {
     } catch (error) {
       console.error('Image analysis failed:', error);
       toast.error("Image analysis failed: " + (error instanceof Error ? error.message : 'Unknown error'));
-      return { ...media, isAnalyzing: false, error: 'Analysis failed' };
+      
+      const updatedMedia = { ...media, isAnalyzing: false, error: 'Analysis failed' };
+      
+      // Make sure to save the error state in metadata
+      if (isElectron && window.electron && savedFilePath) {
+        try {
+          await window.electron.updateMetadata({
+            id: updatedMedia.id,
+            metadata: {
+              ...updatedMedia,
+              filePath: savedFilePath
+            }
+          });
+        } catch (metadataError) {
+          console.error("Failed to update error state metadata:", metadataError);
+        }
+      }
+      
+      return updatedMedia;
     }
   };
 
@@ -408,6 +426,21 @@ export function useImageStore() {
               // Update the media item to show error state
               const errorMedia = { ...media, isAnalyzing: false, error: 'Analysis failed' };
               setImages(prevImages => prevImages.map(img => img.id === media.id ? errorMedia : img));
+              
+              // Make sure the error state is saved to disk
+              if (window.electron) {
+                try {
+                  await window.electron.updateMetadata({
+                    id: errorMedia.id,
+                    metadata: {
+                      ...errorMedia,
+                      filePath: result.path
+                    }
+                  });
+                } catch (metadataError) {
+                  console.error("Failed to update error state metadata:", metadataError);
+                }
+              }
             }
           }
           
@@ -438,6 +471,65 @@ export function useImageStore() {
     emptyTrash,
     undoDelete,
     importFromFilePath,
-    canUndo: deletedItemsHistory.length > 0
+    canUndo: deletedItemsHistory.length > 0,
+    retryAnalysis: async (imageId: string) => {
+      // Find the image
+      const imageToAnalyze = images.find(img => img.id === imageId);
+      if (!imageToAnalyze || imageToAnalyze.type !== "image") {
+        console.error("Cannot retry analysis: Image not found or not an image type");
+        return;
+      }
+
+      // Set analyzing state
+      setImages(prevImages => prevImages.map(img => 
+        img.id === imageId ? { ...img, isAnalyzing: true, error: undefined } : img
+      ));
+
+      try {
+        // Get the data URL for analysis
+        let dataUrl;
+        
+        if (isElectron && imageToAnalyze.actualFilePath) {
+          // If in Electron mode and we have a file path, convert it to base64
+          dataUrl = await window.electron.convertImageToBase64(imageToAnalyze.actualFilePath);
+        } else if (imageToAnalyze.url) {
+          // Otherwise, use the URL directly (may be a data URL already)
+          dataUrl = imageToAnalyze.url;
+        } else {
+          throw new Error("No image data available for analysis");
+        }
+        
+        // Perform analysis
+        const analyzedMedia = await analyzeAndUpdateImage(imageToAnalyze, dataUrl, imageToAnalyze.actualFilePath);
+        
+        // Update image in the state
+        setImages(prevImages => prevImages.map(img => img.id === imageId ? analyzedMedia : img));
+      } catch (error) {
+        console.error("Retry analysis failed:", error);
+        
+        // Create the updated media with error
+        const errorMedia = { ...imageToAnalyze, isAnalyzing: false, error: 'Analysis failed' };
+        
+        // Update error state in UI
+        setImages(prevImages => prevImages.map(img => 
+          img.id === imageId ? errorMedia : img
+        ));
+        
+        // Persist error state to disk
+        if (isElectron && window.electron && imageToAnalyze.actualFilePath) {
+          try {
+            await window.electron.updateMetadata({
+              id: errorMedia.id,
+              metadata: {
+                ...errorMedia,
+                filePath: imageToAnalyze.actualFilePath
+              }
+            });
+          } catch (metadataError) {
+            console.error("Failed to update error state metadata:", metadataError);
+          }
+        }
+      }
+    }
   };
 }

@@ -27,7 +27,8 @@ const Index = () => {
     removeImage, 
     undoDelete, 
     canUndo,
-    importFromFilePath 
+    importFromFilePath,
+    retryAnalysis
   } = useImageStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [isElectron, setIsElectron] = useState(false);
@@ -282,6 +283,7 @@ const Index = () => {
                 searchQuery={searchQuery}
                 onOpenSettings={() => setSettingsOpen(true)}
                 settingsOpen={settingsOpen}
+                retryAnalysis={retryAnalysis}
               />
             </>
           )}
