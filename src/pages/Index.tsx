@@ -32,7 +32,15 @@ const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isElectron, setIsElectron] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [simulateEmptyState, setSimulateEmptyState] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Load developer settings on mount
+  useEffect(() => {
+    // Check if we should simulate empty state (only in dev mode)
+    const savedSetting = localStorage.getItem('dev_simulate_empty_state');
+    setSimulateEmptyState(savedSetting === 'true');
+  }, []);
 
   // Set up keyboard shortcuts
   useKeyboardShortcuts({
@@ -54,14 +62,15 @@ const Index = () => {
 
   // Prevent scrolling when in empty state
   useEffect(() => {
-    const hasImages = images.length > 0;
+    // Consider empty if there are no images OR we're simulating empty state
+    const hasImages = images.length > 0 && !simulateEmptyState;
     document.body.style.overflow = hasImages ? 'auto' : 'hidden';
     
     return () => {
       // Reset overflow when component unmounts
       document.body.style.overflow = 'auto';
     };
-  }, [images.length]);
+  }, [images.length, simulateEmptyState]);
 
   // Handle clipboard paste events
   useEffect(() => {
@@ -216,8 +225,8 @@ const Index = () => {
     removeImage(id);
   };
 
-  // Determine if we're in empty state
-  const isEmpty = images.length === 0;
+  // Determine if we're in empty state - consider both actual emptiness and simulated empty state
+  const isEmpty = images.length === 0 || simulateEmptyState;
 
   return (
     <UploadZone 
@@ -267,7 +276,7 @@ const Index = () => {
           ) : (
             <>
               <ImageGrid 
-                images={filteredImages} 
+                images={simulateEmptyState ? [] : filteredImages} 
                 onImageClick={handleImageClick} 
                 onImageDelete={handleDeleteImage}
                 searchQuery={searchQuery}
