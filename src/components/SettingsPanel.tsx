@@ -19,7 +19,7 @@ interface SettingsPanelProps {
 export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-black backdrop-blur-none shadow-2xl z-[200]">
+      <DialogContent className="sm:max-w-[450px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-black backdrop-blur-none shadow-2xl z-[200] focus:outline-none focus:ring-0">
         <DialogHeader className="border-b border-gray-200 dark:border-zinc-800 pb-4 mb-4">
           <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center h-8 select-none">Settings</DialogTitle>
         </DialogHeader>
