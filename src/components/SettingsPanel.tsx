@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { useTheme } from "@/components/ThemeProvider";
-import { Moon, Sun, SunMoon, Code } from "lucide-react";
+import { Moon, Sun, SunMoon, Code, X } from "lucide-react";
 import { setOpenAIApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -47,9 +47,13 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-black backdrop-blur-none shadow-2xl z-[200] focus:outline-none focus:ring-0">
-        <DialogHeader className="border-b border-gray-200 dark:border-zinc-800 pb-4 mb-4">
+      <DialogContent className="sm:max-w-[450px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-black backdrop-blur-none shadow-2xl z-[200] focus:outline-none focus:ring-0 pt-4">
+        <DialogHeader className="border-b border-gray-200 dark:border-zinc-800 pb-4 mb-4 -mx-6 px-6">
           <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center h-8 select-none">Settings</DialogTitle>
+          <DialogClose className="h-8 w-8 rounded-md text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-zinc-800 inline-flex items-center justify-center non-draggable transition-colors focus:outline-none focus:ring-0">
+            <X className="h-5 w-5" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
         </DialogHeader>
         <div className="py-1 space-y-8 max-h-[calc(100vh-200px)] overflow-y-auto pr-1 mac-scrollbar">
           <ThemeSelector />
