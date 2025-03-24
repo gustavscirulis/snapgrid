@@ -252,57 +252,41 @@ async function createWindow() {
   // Migrate existing files if needed
   await migrateFilesToNewStructure();
 
-  // Dynamically import electron-window-state
-  let windowStateKeeper;
+  // Import windowStateKeeper dynamically
+  let windowState;
   try {
-    if (isDev) {
-      // In dev mode, use the regular import
-      const windowStateModule = await import('electron-window-state');
-      windowStateKeeper = windowStateModule.default;
-    } else {
-      // In production, try to load from the extraResources path
-      const windowStateModule = await import(path.join(process.resourcesPath, 'node_modules', 'electron-window-state', 'index.js'));
-      windowStateKeeper = windowStateModule.default;
-    }
-  } catch (error) {
-    console.error('Failed to load electron-window-state:', error);
-    // Fallback if window state fails to load
-    windowStateKeeper = (opts) => ({
-      x: undefined,
-      y: undefined,
-      width: opts.defaultWidth,
-      height: opts.defaultHeight,
-      manage: () => {}
+    const windowStateKeeper = (await import('electron-window-state')).default;
+    windowState = windowStateKeeper({
+      defaultWidth: 1280,
+      defaultHeight: 800
     });
+  } catch (err) {
+    console.error('Failed to load electron-window-state:', err);
+    windowState = { x: undefined, y: undefined, width: 1280, height: 800, manage: () => {} };
   }
 
-  // Load the window state
-  const mainWindowState = windowStateKeeper({
-    defaultWidth: 1200,
-    defaultHeight: 800
-  });
-
+  // Create the browser window.
   mainWindow = new BrowserWindow({
-    x: mainWindowState.x,
-    y: mainWindowState.y,
-    width: mainWindowState.width,
-    height: mainWindowState.height,
-    minWidth: 520,
-    minHeight: 370,
-    frame: false,
-    titleBarStyle: "hidden",
-    titleBarOverlay: false,
+    x: windowState.x,
+    y: windowState.y,
+    width: windowState.width,
+    height: windowState.height,
+    minWidth: 800,
+    minHeight: 600,
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 13, y: 13 },
+    backgroundColor: '#10121A',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.cjs'),
-      webSecurity: true,
-      sandbox: false
+      sandbox: false  // Required for preload to access Node APIs
     },
+    icon: path.join(__dirname, '../assets/icons/icon.png')
   });
 
-  // Let mainWindowState manage the window state
-  mainWindowState.manage(mainWindow);
+  // Let windowState manage the window state
+  windowState.manage(mainWindow);
 
   // In production, use file protocol with the correct path
   // In development, use localhost server
