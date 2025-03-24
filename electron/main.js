@@ -35,9 +35,12 @@ const analyticsPreferences = {
         const data = fs.readFileSync(this.filePath, 'utf8');
         const prefs = JSON.parse(data);
         this.consentGiven = prefs.consentGiven ?? true;
+        console.log('Loaded analytics preferences, consent:', this.consentGiven);
+      } else {
+        console.log('No analytics preferences file found, using default consent:', this.consentGiven);
       }
     } catch (error) {
-      // Silent error
+      console.error('Error loading analytics preferences:', error);
     }
   },
   
@@ -45,8 +48,9 @@ const analyticsPreferences = {
   save() {
     try {
       fs.writeFileSync(this.filePath, JSON.stringify({ consentGiven: this.consentGiven }), 'utf8');
+      console.log('Saved analytics preferences, consent:', this.consentGiven);
     } catch (error) {
-      // Silent error
+      console.error('Error saving analytics preferences:', error);
     }
   },
   
@@ -276,7 +280,7 @@ async function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com https://*.telemetrydeck.com https://nom.telemetrydeck.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
+          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com https://*.telemetrydeck.com https://nom.telemetrydeck.com https://telemetrydeck.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
         ]
       }
     });
@@ -908,17 +912,26 @@ ipcMain.handle('update-metadata', async (event, { id, metadata }) => {
 ipcMain.handle('get-analytics-consent', async () => {
   try {
     const consent = analyticsPreferences.getConsent();
+    console.log('Get analytics consent request, returning:', consent);
     return consent;
   } catch (error) {
+    console.error('Error getting analytics consent:', error);
     return false;
   }
 });
 
 ipcMain.handle('set-analytics-consent', async (event, consent) => {
   try {
+    console.log('Setting analytics consent to:', consent);
     const result = analyticsPreferences.setConsent(consent);
+    console.log('Analytics consent set result:', result);
+    // Notify renderer of the change
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('analytics-consent-changed', result);
+    }
     return result;
   } catch (error) {
+    console.error('Error setting analytics consent:', error);
     return false;
   }
 }); 

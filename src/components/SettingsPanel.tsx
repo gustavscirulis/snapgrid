@@ -73,6 +73,7 @@ const ThemeSelector = () => {
 const AnalyticsSection = () => {
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const isElectron = window && typeof window.electron !== 'undefined' && window.electron !== null;
 
   // Load the current analytics consent status
   useEffect(() => {
@@ -89,17 +90,38 @@ const AnalyticsSection = () => {
     };
 
     checkAnalyticsConsent();
-  }, []);
+    
+    // Set up a listener for consent changes from the main process
+    if (isElectron && window.electron.onAnalyticsConsentChanged) {
+      const removeListener = window.electron.onAnalyticsConsentChanged((consent: boolean) => {
+        console.log('Received analytics consent change event:', consent);
+        setAnalyticsEnabled(consent);
+        // Only show toast if we're not actively toggling (already handled in handleToggleChange)
+        if (!isLoading) {
+          toast.success(consent ? "Analytics enabled" : "Analytics disabled");
+        }
+      });
+      
+      return () => {
+        // Clean up the listener when component unmounts
+        if (removeListener) removeListener();
+      };
+    }
+  }, [isElectron]);
 
   // Handle toggle changes
   const handleToggleChange = async (checked: boolean) => {
     try {
+      setIsLoading(true);
       const success = await setAnalyticsConsent(checked);
       if (success) {
         setAnalyticsEnabled(checked);
+        toast.success(checked ? "Analytics enabled" : "Analytics disabled");
       }
     } catch (error) {
       toast.error("Failed to update analytics settings");
+    } finally {
+      setIsLoading(false);
     }
   };
 

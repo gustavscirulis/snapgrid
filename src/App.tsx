@@ -19,45 +19,17 @@ const App = () => {
   useEffect(() => {
     const setupAnalytics = async () => {
       try {
-        // Check if TelemetryDeck endpoint is reachable
-        try {
-          await fetch('https://nom.telemetrydeck.com/healthz', { 
-            method: 'GET',
-            mode: 'no-cors' 
-          });
-        } catch (connectError) {
-          // Silently fail
-        }
-        
-        // First initialize
         await initializeAnalytics();
         
-        // Send test signals with timeout to ensure they fire after initialization
-        setTimeout(async () => {
-          try {
-            await sendAnalyticsEvent('app-loaded', { 
-              timestamp: new Date().toISOString(),
-              isElectron
-            });
-          } catch (signalError) {
-            // Silently fail
-          }
+        // Single app-ready event after initialization
+        setTimeout(() => {
+          sendAnalyticsEvent('app-ready', { 
+            floatValue: Date.now() / 1000,
+            isElectron: isElectron ? 'true' : 'false'
+          });
         }, 2000);
-        
-        // Try with different intervals in case there's a timing issue
-        setTimeout(async () => {
-          try {
-            await sendAnalyticsEvent('app-ready', { 
-              timestamp: new Date().toISOString(),
-              isElectron
-            });
-          } catch (signalError) {
-            // Silently fail
-          }
-        }, 5000);
-        
       } catch (error) {
-        // Analytics initialization failed, but we don't want to break the app
+        // Silent error in production
       }
     };
     

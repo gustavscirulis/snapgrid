@@ -40,7 +40,11 @@ export async function getAnalyticsConsent(): Promise<boolean> {
   }
   
   try {
-    const hasConsent = await window.electron.getAnalyticsConsent?.();
+    if (!window.electron?.getAnalyticsConsent) {
+      return false;
+    }
+    
+    const hasConsent = await window.electron.getAnalyticsConsent();
     return hasConsent ?? true; // Default to true if undefined
   } catch (error) {
     return false;
@@ -54,7 +58,11 @@ export async function setAnalyticsConsent(consent: boolean): Promise<boolean> {
   }
   
   try {
-    const success = await window.electron.setAnalyticsConsent?.(consent);
+    if (!window.electron?.setAnalyticsConsent) {
+      return false;
+    }
+    
+    const success = await window.electron.setAnalyticsConsent(consent);
     
     // Toggle analytics based on consent
     if (consent) {
@@ -64,6 +72,19 @@ export async function setAnalyticsConsent(consent: boolean): Promise<boolean> {
     }
     
     return success ?? false;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Check TelemetryDeck connectivity
+async function checkTelemetryDeckConnectivity(): Promise<boolean> {
+  try {
+    await fetch('https://nom.telemetrydeck.com/v1/collect', {
+      method: 'HEAD',
+      mode: 'no-cors'
+    });
+    return true;
   } catch (error) {
     return false;
   }
@@ -84,38 +105,35 @@ export async function initializeAnalytics(): Promise<void> {
       return;
     }
     
-    // Test mode detection is now more robust
-    const isTestMode = isDevelopmentMode();
+    // Check connectivity silently
+    await checkTelemetryDeckConnectivity();
     
+    // Test mode detection
+    const isTestMode = isDevelopmentMode();
     const clientId = getClientId();
     
-    // Get system information
-    const systemInfo = getSystemInfo();
-    
-    // The SDK requires you to create a new instance with the configuration
     try {
+      // Initialize the TelemetryDeck SDK
       telemetryInstance = new TelemetryDeck({
         appID: TELEMETRYDECK_APP_ID,
         clientUser: clientId,
-        testMode: isTestMode,
-        // Ensure we're using proper URL
-        target: 'https://nom.telemetrydeck.com/v1/collect'
+        testMode: isTestMode
       });
       
       isInitialized = true;
       
-      // Send an app start signal
-      await telemetryInstance.signal('app-started', systemInfo);
+      // Send initial app-started signal
+      setTimeout(async () => {
+        try {
+          if (telemetryInstance) {
+            await telemetryInstance.signal('app-started');
+          }
+        } catch (error) {
+          // Silent error in production
+        }
+      }, 1000);
       
-      // Add a test signal with a random number to easily identify if it's working
-      const randomValue = Math.floor(Math.random() * 1000);
-      await telemetryInstance.signal('debug-init', { 
-        ...systemInfo,
-        timestamp: new Date().toISOString(),
-        randomValue: randomValue
-      });
-      
-    } catch (initError) {
+    } catch (error) {
       isInitialized = false;
       telemetryInstance = null;
     }
@@ -137,7 +155,7 @@ export function disableAnalytics(): void {
     telemetryInstance = null;
     isInitialized = false;
   } catch (error) {
-    // Silently fail
+    // Silent error
   }
 }
 
@@ -148,17 +166,23 @@ export async function sendAnalyticsEvent(eventType: string, additionalData: Reco
   }
   
   try {
-    // Add a timestamp to every event for debugging
-    const payload = {
-      ...getSystemInfo(),
-      ...additionalData,
-      clientTimestamp: new Date().toISOString()
-    };
+    // Create a simple payload that matches the TelemetryDeck expected format
+    const payload: Record<string, any> = {};
     
-    // Use the proper signal method from the instance
+    // Add key info from additionalData (limited to 3 fields)
+    for (const [key, value] of Object.entries(additionalData).slice(0, 3)) {
+      payload[key] = value;
+    }
+    
+    // Add a floatValue if not present (for numeric analysis in TelemetryDeck)
+    if (!('floatValue' in payload)) {
+      payload.floatValue = Date.now() / 1000;
+    }
+    
+    // Send the signal
     await telemetryInstance.signal(eventType, payload);
   } catch (error) {
-    // Silently fail
+    // Silent error in production
   }
 }
 
@@ -176,43 +200,15 @@ function getClientId(): string {
   return clientId;
 }
 
-// Helper function to get system information
+// Helper function to get system information (kept for potential future use)
 function getSystemInfo(): Record<string, any> {
   const navigator = window.navigator;
-  
-  // Safely check for process variables
   const electronProcess = (window as any).process || {};
   
   return {
-    // Platform information
     platform: navigator.platform,
-    userAgent: navigator.userAgent,
-    
-    // Language settings that may help with geo-targeting
     language: navigator.language,
-    languages: navigator.languages ? navigator.languages.join(',') : '',
-    
-    // Screen information
-    screenWidth: window.screen.width,
-    screenHeight: window.screen.height,
-    
-    // Time zone might help with geo approximation
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    
-    // App version if available - avoid direct process.env access
     appVersion: isElectron ? (window.electron?.appVersion || 'unknown') : 'unknown',
-    
-    // Whether this is Electron
-    isElectron: isElectron,
-    
-    // Operating system info if available through Electron
-    // Access Electron info more safely
-    osInfo: isElectron ? 
-      {
-        platform: electronProcess.platform || navigator.platform,
-        arch: electronProcess.arch || navigator.userAgent,
-        // Avoid process.release which may not be available
-      } : 
-      'web'
+    isElectron: isElectron
   };
 } 

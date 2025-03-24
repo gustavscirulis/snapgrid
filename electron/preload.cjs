@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld(
     // Analytics settings
     getAnalyticsConsent: () => ipcRenderer.invoke('get-analytics-consent'),
     setAnalyticsConsent: (consent) => ipcRenderer.invoke('set-analytics-consent', consent),
+    onAnalyticsConsentChanged: (callback) => {
+      ipcRenderer.on('analytics-consent-changed', (_, consent) => callback(consent));
+      return () => ipcRenderer.removeAllListeners('analytics-consent-changed');
+    },
 
     // App information
     appVersion: require('../package.json').version,

@@ -29,6 +29,7 @@ interface IElectronAPI {
   // Analytics settings
   getAnalyticsConsent?: () => Promise<boolean>;
   setAnalyticsConsent?: (consent: boolean) => Promise<boolean>;
+  onAnalyticsConsentChanged?: (callback: (consent: boolean) => void) => () => void;
   
   // App information
   appVersion?: string;
