@@ -169,7 +169,16 @@ export async function sendAnalyticsEvent(eventType: string, additionalData: Reco
     // Create a simple payload that matches the TelemetryDeck expected format
     const payload: Record<string, any> = {};
     
-    // Add key info from additionalData (limited to 3 fields)
+    // Add system and app information
+    payload.appVersion = isElectron ? (window.electron?.appVersion || 'unknown') : 'unknown';
+    payload.platform = navigator.platform;
+    payload.isElectron = isElectron ? 'true' : 'false';
+    
+    // Add localization data
+    payload.language = navigator.language;
+    payload.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // Add key info from additionalData (limited to maintain payload simplicity)
     for (const [key, value] of Object.entries(additionalData).slice(0, 3)) {
       payload[key] = value;
     }

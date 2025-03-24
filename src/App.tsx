@@ -25,7 +25,7 @@ const App = () => {
         setTimeout(() => {
           sendAnalyticsEvent('app-ready', { 
             floatValue: Date.now() / 1000,
-            isElectron: isElectron ? 'true' : 'false'
+            startupTime: new Date().toISOString()
           });
         }, 2000);
       } catch (error) {
