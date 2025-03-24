@@ -6,12 +6,10 @@ It's built by [@gustavscirulis](https://github.com/gustavscirulis), and all of t
 
 ## Features
 
-- **Screenshot Management** – Collect and organize your UI screenshots in a visual grid layout  
+- **Screenshot Management** – Collect and organize your UI screenshots in a visual grid layout
 - **AI-Powered Pattern Detection** – Identify UI components and patterns using OpenAI's Vision API  
 - **Smart Organization** – Search and filter your screenshots based on detected UI elements  
-- **Drag & Drop** – Import screenshots via drag and drop or paste from clipboard  
-- **Local Storage** – All screenshots and metadata are stored locally and can be synced with iCloud  
-- **Dark Mode** – Light and dark themes for comfortable viewing  
+- **Fast Local Storage** – All screenshots and metadata are stored locally and can be synced with iCloud  
 
 ## Installation
 
@@ -19,14 +17,11 @@ Download the latest release for your platform from the [releases](https://github
 
 ## Requirements
 
-To use the AI pattern detection feature, you'll need to add your OpenAI API key in the settings. The app uses GPT-4o for vision analysis.  
-You can still use the app without this feature — it just won't detect patterns.
+To use the AI pattern detection feature, you'll need to add your OpenAI API key in the settings. The app uses GPT-4o for vision analysis. You can still use the app without this feature — it just won't detect patterns.
 
 ## Privacy
 
-SnapGrid collects anonymous usage data to help improve the application. This includes basic usage statistics and crash reports, but never your personal data or screenshots.
-
-You can opt out of anonymous tracking at any time through the app settings.
+SnapGrid collects anonymous usage data to help improve the application. This includes basic usage statistics and crash reports, but never your personal data or screenshots. You can opt out of anonymous tracking at any time through the app settings.
 
 ## File storage
 
@@ -79,18 +74,14 @@ npm run electron:build
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 
+- Thanks to [Cursor](https://cursor.com) and [Loveable](https://loveable.dev) teams for building the AI code generation tools that made this project possible
+- Thanks to [Midjourney](https://www.midjourney.com/) for the app icon
 - Thanks to OpenAI for their Vision API that powers the pattern detection
 - Built with [Electron](https://www.electronjs.org/) and [React](https://reactjs.org/)
 - UI components from [shadcn/ui](https://ui.shadcn.com/)
