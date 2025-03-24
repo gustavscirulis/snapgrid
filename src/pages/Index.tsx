@@ -258,7 +258,7 @@ const Index = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => setSettingsOpen(true)}
-                className="h-8 w-8 non-draggable"
+                className="h-8 w-8 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-zinc-800 non-draggable transition-colors"
                 aria-label="Settings"
               >
                 <Settings className="h-5 w-5" />
