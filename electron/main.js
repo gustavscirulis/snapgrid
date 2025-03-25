@@ -369,7 +369,7 @@ async function createWindow() {
 
   // In production, use file protocol with the correct path
   // In development, use localhost server with flexible port detection
-  const devPort = process.env.DEV_PORT || '8081'; // Default to 8081 since that's what Vite is using
+  const devPort = process.env.DEV_PORT || '8080'; // Default to 8080 to match Vite's configuration
   const startUrl = isDev 
     ? `http://localhost:${devPort}` 
     : `file://${path.join(__dirname, '../dist/index.html')}`;
