@@ -236,7 +236,7 @@ const Index = () => {
     >
       <div className={`min-h-screen flex flex-col ${isEmpty ? 'overflow-hidden' : ''}`}>
         <Toaster />
-        <header className="sticky top-0 z-10 bg-gray-100/90 dark:bg-zinc-800/90 backdrop-blur-lg border-b border-gray-200 dark:border-zinc-700 py-4 px-6 relative">
+        <header className="sticky top-0 z-10 bg-gray-100/90 dark:bg-zinc-900/90 backdrop-blur-lg py-4 px-6 relative">
           <div className="absolute inset-0 draggable"></div>
           <div className="relative mx-auto flex items-center">
             <div className="w-8 draggable"></div> {/* Left draggable area */}
