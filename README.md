@@ -2,7 +2,7 @@
 
 SnapGrid is an open-source desktop app for collecting, organizing, and analyzing UI screenshots. It uses AI to automatically detect UI components and patterns, making it a powerful tool for designers and developers.
 
-![SnapGrid Preview](preview.gif)
+![SnapGrid Preview](assets/preview.gif)
 
 It's built by [@gustavscirulis](https://github.com/gustavscirulis), and all of the code is entirely AI-generated.
 
