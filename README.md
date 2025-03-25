@@ -15,7 +15,7 @@ It's built by [@gustavscirulis](https://github.com/gustavscirulis), and all of t
 
 ## Installation
 
-Download the latest release for your platform from the [releases](https://github.com/snapgrid/snapgrid/releases) page.
+Download the latest release for your platform from the [releases](https://github.com/gustavscirulis/snapgrid/releases) page.
 
 ## Requirements
 
