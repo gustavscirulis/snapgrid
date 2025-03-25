@@ -215,3 +215,79 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
     throw error; // Rethrow to handle in the UI
   }
 }
+
+/**
+ * Analyzes multiple frames from a video and combines the results
+ * @param frameUrls Array of data URLs for video frames
+ * @returns Promise resolving to combined pattern matches
+ */
+export async function analyzeVideoFrames(frameUrls: string[]): Promise<PatternMatch[]> {
+  if (!frameUrls || frameUrls.length === 0) {
+    throw new Error("No frames provided for analysis");
+  }
+
+  // Check if API key exists
+  const hasKey = await hasApiKey();
+  if (!hasKey) {
+    throw new Error("OpenAI API key not set. Please set an API key to use video analysis.");
+  }
+
+  try {
+    // Analyze each frame separately
+    const frameAnalysisPromises = frameUrls.map(frameUrl => analyzeImage(frameUrl));
+    const frameResults = await Promise.all(frameAnalysisPromises);
+
+    // Combine results from all frames
+    const allPatterns: PatternMatch[] = [];
+    let combinedContext = '';
+
+    // First, collect all patterns from all frames
+    frameResults.forEach(framePatterns => {
+      framePatterns.forEach(pattern => {
+        allPatterns.push(pattern);
+        
+        // Collect context descriptions to combine later
+        if (pattern.imageContext && !combinedContext.includes(pattern.imageContext)) {
+          combinedContext += (combinedContext ? ' ' : '') + pattern.imageContext;
+        }
+      });
+    });
+
+    // If we don't have any patterns, return empty array
+    if (allPatterns.length === 0) {
+      return [];
+    }
+
+    // Group patterns by name and calculate average confidence
+    const patternMap = new Map<string, { count: number, totalConfidence: number }>();
+    
+    allPatterns.forEach(pattern => {
+      const name = pattern.name;
+      if (!name) return;
+      
+      if (!patternMap.has(name)) {
+        patternMap.set(name, { count: 0, totalConfidence: 0 });
+      }
+      
+      const current = patternMap.get(name)!;
+      current.count += 1;
+      current.totalConfidence += pattern.confidence;
+    });
+    
+    // Create final pattern list with averaged confidences
+    const combinedPatterns: PatternMatch[] = Array.from(patternMap.entries())
+      .map(([name, data]) => ({
+        name,
+        confidence: data.totalConfidence / data.count,
+        imageContext: combinedContext
+      }))
+      .sort((a, b) => b.confidence - a.confidence) // Sort by confidence score
+      .filter(p => p.confidence >= 0.7) // Keep only patterns with confidence >= 0.7
+      .slice(0, 10); // Keep only top 10 patterns
+      
+    return combinedPatterns;
+  } catch (error) {
+    console.error("Error analyzing video frames with OpenAI:", error);
+    throw error; // Rethrow to handle in the UI
+  }
+}

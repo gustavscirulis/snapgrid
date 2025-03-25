@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
-import { analyzeImage, hasApiKey } from "@/services/aiAnalysisService";
+import { analyzeImage, analyzeVideoFrames, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
-import { getVideoDimensions } from '../lib/videoUtils';
+import { getVideoDimensions, captureVideoFrames } from '../lib/videoUtils';
 
 export type ImageItemType = "image" | "video";
 
@@ -132,13 +132,34 @@ export function useImageStore() {
   };
 
   const analyzeAndUpdateImage = async (media: ImageItem, dataUrl: string, savedFilePath?: string) => {
-    if (media.type !== "image") return media;
-
+    // Early return if no API key available
     const hasKey = await hasApiKey();
     if (!hasKey) return media;
 
     try {
-      const analysis = await analyzeImage(dataUrl);
+      let analysis;
+      let isAnalyzingVideo = false;
+
+      // Handle different media types
+      if (media.type === "image") {
+        // For images, use the standard analysis
+        analysis = await analyzeImage(dataUrl);
+      } else if (media.type === "video") {
+        // For videos, capture frames and analyze them
+        isAnalyzingVideo = true;
+        try {
+          // Capture frames at 33% and 66% of the video duration
+          const frames = await captureVideoFrames(dataUrl);
+          // Analyze the captured frames
+          analysis = await analyzeVideoFrames(frames);
+        } catch (frameError) {
+          console.error("Failed to capture or analyze video frames:", frameError);
+          throw new Error("Failed to analyze video: " + (frameError instanceof Error ? frameError.message : 'Unknown error'));
+        }
+      } else {
+        // Unsupported media type
+        return media;
+      }
       
       // Extract the imageContext from the first pattern (should be the same for all patterns)
       const imageContext = analysis[0]?.imageContext || '';
@@ -173,14 +194,14 @@ export function useImageStore() {
           });
         } catch (error) {
           console.error("Failed to update metadata:", error);
-          toast.error("Failed to save pattern analysis");
+          toast.error(`Failed to save ${isAnalyzingVideo ? 'video' : 'image'} analysis`);
         }
       }
 
       return updatedMedia;
     } catch (error) {
-      console.error('Image analysis failed:', error);
-      toast.error("Image analysis failed: " + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('Media analysis failed:', error);
+      toast.error("Analysis failed: " + (error instanceof Error ? error.message : 'Unknown error'));
       
       const updatedMedia = { ...media, isAnalyzing: false, error: 'Analysis failed' };
       
@@ -247,14 +268,12 @@ export function useImageStore() {
         setImages(prevImages => [media, ...prevImages.filter(img => img.id !== media.id)]);
       }
 
-      // Analyze image if applicable - this can also happen in the background
-      if (media.type === "image") {
-        media = { ...media, isAnalyzing: true };
-        setImages(prevImages => prevImages.map(img => img.id === media.id ? media : img));
-        
-        const analyzedMedia = await analyzeAndUpdateImage(media, dataUrl, savedFilePath);
-        setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
-      }
+      // Analyze media if applicable (now works for both images and videos)
+      media = { ...media, isAnalyzing: true };
+      setImages(prevImages => prevImages.map(img => img.id === media.id ? media : img));
+      
+      const analyzedMedia = await analyzeAndUpdateImage(media, dataUrl, savedFilePath);
+      setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
     } catch (error) {
       console.error("Error adding media:", error);
       toast.error("Failed to add media: " + (error instanceof Error ? error.message : 'Unknown error'));
@@ -411,35 +430,40 @@ export function useImageStore() {
           // This allows users to upload more images while analysis is running
           setIsUploading(false);
           
-          // If it's an image, analyze it
-          if (!isVideo) {
-            media = { ...media, isAnalyzing: true };
-            setImages(prevImages => prevImages.map(img => img.id === media.id ? media : img));
-            
-            try {
-              // Convert to base64 for analysis
+          // Set analyzing state for both images and videos
+          media = { ...media, isAnalyzing: true };
+          setImages(prevImages => prevImages.map(img => img.id === media.id ? media : img));
+          
+          try {
+            // For images, convert to base64 for analysis
+            if (!isVideo) {
               const base64 = await window.electron.convertImageToBase64(result.path);
               const analyzedMedia = await analyzeAndUpdateImage(media, base64, result.path);
               setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
-            } catch (analyzeError) {
-              console.error("Failed to analyze imported image:", analyzeError);
-              // Update the media item to show error state
-              const errorMedia = { ...media, isAnalyzing: false, error: 'Analysis failed' };
-              setImages(prevImages => prevImages.map(img => img.id === media.id ? errorMedia : img));
-              
-              // Make sure the error state is saved to disk
-              if (window.electron) {
-                try {
-                  await window.electron.updateMetadata({
-                    id: errorMedia.id,
-                    metadata: {
-                      ...errorMedia,
-                      filePath: result.path
-                    }
-                  });
-                } catch (metadataError) {
-                  console.error("Failed to update error state metadata:", metadataError);
-                }
+            } else {
+              // For videos, use the local file URL
+              const localFileUrl = `file://${result.path}`;
+              const analyzedMedia = await analyzeAndUpdateImage(media, localFileUrl, result.path);
+              setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
+            }
+          } catch (analyzeError) {
+            console.error("Failed to analyze imported media:", analyzeError);
+            // Update the media item to show error state
+            const errorMedia = { ...media, isAnalyzing: false, error: 'Analysis failed' };
+            setImages(prevImages => prevImages.map(img => img.id === media.id ? errorMedia : img));
+            
+            // Make sure the error state is saved to disk
+            if (window.electron) {
+              try {
+                await window.electron.updateMetadata({
+                  id: errorMedia.id,
+                  metadata: {
+                    ...errorMedia,
+                    filePath: result.path
+                  }
+                });
+              } catch (metadataError) {
+                console.error("Failed to update error state metadata:", metadataError);
               }
             }
           }
@@ -473,10 +497,10 @@ export function useImageStore() {
     importFromFilePath,
     canUndo: deletedItemsHistory.length > 0,
     retryAnalysis: async (imageId: string) => {
-      // Find the image
-      const imageToAnalyze = images.find(img => img.id === imageId);
-      if (!imageToAnalyze || imageToAnalyze.type !== "image") {
-        console.error("Cannot retry analysis: Image not found or not an image type");
+      // Find the media
+      const mediaToAnalyze = images.find(img => img.id === imageId);
+      if (!mediaToAnalyze) {
+        console.error("Cannot retry analysis: Media not found");
         return;
       }
 
@@ -489,18 +513,23 @@ export function useImageStore() {
         // Get the data URL for analysis
         let dataUrl;
         
-        if (isElectron && imageToAnalyze.actualFilePath) {
-          // If in Electron mode and we have a file path, convert it to base64
-          dataUrl = await window.electron.convertImageToBase64(imageToAnalyze.actualFilePath);
-        } else if (imageToAnalyze.url) {
+        if (isElectron && mediaToAnalyze.actualFilePath) {
+          if (mediaToAnalyze.type === "image") {
+            // If in Electron mode and we have a file path, convert image to base64
+            dataUrl = await window.electron.convertImageToBase64(mediaToAnalyze.actualFilePath);
+          } else {
+            // For videos, use the file URL directly
+            dataUrl = `file://${mediaToAnalyze.actualFilePath}`;
+          }
+        } else if (mediaToAnalyze.url) {
           // Otherwise, use the URL directly (may be a data URL already)
-          dataUrl = imageToAnalyze.url;
+          dataUrl = mediaToAnalyze.url;
         } else {
-          throw new Error("No image data available for analysis");
+          throw new Error("No media data available for analysis");
         }
         
         // Perform analysis
-        const analyzedMedia = await analyzeAndUpdateImage(imageToAnalyze, dataUrl, imageToAnalyze.actualFilePath);
+        const analyzedMedia = await analyzeAndUpdateImage(mediaToAnalyze, dataUrl, mediaToAnalyze.actualFilePath);
         
         // Update image in the state
         setImages(prevImages => prevImages.map(img => img.id === imageId ? analyzedMedia : img));
@@ -508,7 +537,7 @@ export function useImageStore() {
         console.error("Retry analysis failed:", error);
         
         // Create the updated media with error
-        const errorMedia = { ...imageToAnalyze, isAnalyzing: false, error: 'Analysis failed' };
+        const errorMedia = { ...mediaToAnalyze, isAnalyzing: false, error: 'Analysis failed' };
         
         // Update error state in UI
         setImages(prevImages => prevImages.map(img => 
@@ -516,13 +545,13 @@ export function useImageStore() {
         ));
         
         // Persist error state to disk
-        if (isElectron && window.electron && imageToAnalyze.actualFilePath) {
+        if (isElectron && window.electron && mediaToAnalyze.actualFilePath) {
           try {
             await window.electron.updateMetadata({
               id: errorMedia.id,
               metadata: {
                 ...errorMedia,
-                filePath: imageToAnalyze.actualFilePath
+                filePath: mediaToAnalyze.actualFilePath
               }
             });
           } catch (metadataError) {
