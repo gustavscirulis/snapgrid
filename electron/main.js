@@ -253,9 +253,6 @@ async function createWindow() {
   appStorageDir = getAppStorageDir();
   console.log('App storage directory:', appStorageDir);
   
-  // Migrate existing files if needed
-  await migrateFilesToNewStructure();
-
   // Import windowStateKeeper dynamically
   let windowState;
   try {
@@ -264,12 +261,6 @@ async function createWindow() {
       defaultWidth: 1280,
       defaultHeight: 800,
       file: 'window-state.json'  // Explicitly specify the state file
-    });
-    console.log('Window state loaded:', {
-      x: windowState.x,
-      y: windowState.y,
-      width: windowState.width,
-      height: windowState.height
     });
   } catch (err) {
     console.error('Failed to load electron-window-state:', err);
@@ -342,101 +333,6 @@ async function createWindow() {
   
   // Create the application menu
   createApplicationMenu();
-}
-
-// Function to migrate existing files from flat structure to new directory structure
-async function migrateFilesToNewStructure() {
-  try {
-    // Check if migration is needed by looking for image files in the root directory
-    const allFiles = await fs.readdir(appStorageDir);
-    
-    // Filter for image/video and JSON files directly in the root directory
-    const mediaFiles = allFiles.filter(file => {
-      const ext = path.extname(file).toLowerCase();
-      return (ext === '.png' || ext === '.mp4') && !file.startsWith('.');
-    });
-    
-    const jsonFiles = allFiles.filter(file => {
-      return path.extname(file).toLowerCase() === '.json' && 
-             file !== 'README.txt' && 
-             !file.startsWith('.');
-    });
-    
-    // If no files to migrate, return early
-    if (mediaFiles.length === 0 && jsonFiles.length === 0) {
-      console.log("No files to migrate, using new directory structure");
-      return;
-    }
-    
-    console.log(`Found ${mediaFiles.length} media files and ${jsonFiles.length} JSON files to migrate`);
-    
-    // Create a backup directory
-    const backupDir = path.join(appStorageDir, '.backup-' + new Date().toISOString().replace(/:/g, '-'));
-    await fs.ensureDir(backupDir);
-    
-    // Copy all files to backup first (safety measure)
-    for (const file of [...mediaFiles, ...jsonFiles]) {
-      const srcPath = path.join(appStorageDir, file);
-      const destPath = path.join(backupDir, file);
-      await fs.copy(srcPath, destPath);
-    }
-    
-    console.log(`Backed up ${mediaFiles.length + jsonFiles.length} files to ${backupDir}`);
-    
-    // Now move files to their new locations
-    const imagesDir = path.join(appStorageDir, 'images');
-    const metadataDir = path.join(appStorageDir, 'metadata');
-    
-    // Move media files to images dir
-    for (const file of mediaFiles) {
-      const srcPath = path.join(appStorageDir, file);
-      const destPath = path.join(imagesDir, file);
-      await fs.move(srcPath, destPath, { overwrite: true });
-    }
-    
-    // Move JSON files to metadata dir
-    for (const file of jsonFiles) {
-      const srcPath = path.join(appStorageDir, file);
-      const destPath = path.join(metadataDir, file);
-      await fs.move(srcPath, destPath, { overwrite: true });
-    }
-    
-    // Handle trash directory if it exists in old format
-    const oldTrashPath = path.join(appStorageDir, '.trash');
-    if (await fs.pathExists(oldTrashPath)) {
-      const trashFiles = await fs.readdir(oldTrashPath);
-      
-      // Filter and move trash files
-      const trashMediaFiles = trashFiles.filter(file => {
-        const ext = path.extname(file).toLowerCase();
-        return (ext === '.png' || ext === '.mp4');
-      });
-      
-      const trashJsonFiles = trashFiles.filter(file => {
-        return path.extname(file).toLowerCase() === '.json';
-      });
-      
-      // Move trash media files
-      const trashImagesDir = path.join(trashDir, 'images');
-      for (const file of trashMediaFiles) {
-        const srcPath = path.join(oldTrashPath, file);
-        const destPath = path.join(trashImagesDir, file);
-        await fs.move(srcPath, destPath, { overwrite: true });
-      }
-      
-      // Move trash JSON files
-      const trashMetadataDir = path.join(trashDir, 'metadata');
-      for (const file of trashJsonFiles) {
-        const srcPath = path.join(oldTrashPath, file);
-        const destPath = path.join(trashMetadataDir, file);
-        await fs.move(srcPath, destPath, { overwrite: true });
-      }
-    }
-    
-    console.log("Migration to new directory structure completed successfully");
-  } catch (error) {
-    console.error("Error during file migration:", error);
-  }
 }
 
 // Create the application menu with File browsing options
