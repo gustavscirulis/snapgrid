@@ -38,7 +38,7 @@ const App = () => {
   }, [isElectron]);
   
   return (
-    <ThemeProvider defaultTheme="system" storageKey="ui-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
