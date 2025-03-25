@@ -38,6 +38,7 @@ interface IElectronAPI {
   
   // App information
   appVersion?: string;
+  isDevelopmentMode?: () => boolean;
 
   // Added methods
   convertImageToBase64?: (filePath: string) => Promise<string>;

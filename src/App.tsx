@@ -24,10 +24,15 @@ const App = () => {
         
         // Single app-ready event after initialization
         setTimeout(() => {
-          sendAnalyticsEvent('app-ready', { 
-            floatValue: Date.now() / 1000,
-            startupTime: new Date().toISOString()
-          });
+          try {
+            sendAnalyticsEvent('app-ready', { 
+              floatValue: Date.now() / 1000,
+              startupTime: new Date().toISOString(),
+              isElectron: isElectron ? 'true' : 'false'
+            });
+          } catch (analyticsError) {
+            // Silent error in production
+          }
         }, 2000);
       } catch (error) {
         // Silent error in production

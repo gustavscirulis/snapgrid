@@ -14,22 +14,15 @@ const isElectron = window &&
   typeof window.electron !== 'undefined' && 
   window.electron !== null;
 
-// Determine if we're in development mode (more robust than relying on process.env)
+// Determine if we're in development mode using only Electron API
 const isDevelopmentMode = () => {
-  // Check for common development indicators
-  if (window.location.hostname === 'localhost' || 
-      window.location.hostname === '127.0.0.1' ||
-      window.location.port === '8080' || 
-      window.location.port === '3000') {
-    return true;
+  // Only use Electron API to detect development mode
+  if (isElectron && window.electron?.isDevelopmentMode) {
+    const isDevMode = window.electron.isDevelopmentMode();
+    return isDevMode;
   }
   
-  // In Electron, check if we have dev tools available
-  if (isElectron && (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__) {
-    return true;
-  }
-  
-  // Default to production mode
+  // Default to production mode if not in Electron or API not available
   return false;
 };
 
@@ -80,7 +73,7 @@ export async function setAnalyticsConsent(consent: boolean): Promise<boolean> {
 // Check TelemetryDeck connectivity
 async function checkTelemetryDeckConnectivity(): Promise<boolean> {
   try {
-    await fetch('https://nom.telemetrydeck.com/v1/collect', {
+    const response = await fetch('https://nom.telemetrydeck.com/v1/collect', {
       method: 'HEAD',
       mode: 'no-cors'
     });
@@ -106,7 +99,7 @@ export async function initializeAnalytics(): Promise<void> {
     }
     
     // Check connectivity silently
-    await checkTelemetryDeckConnectivity();
+    const isConnected = await checkTelemetryDeckConnectivity();
     
     // Test mode detection
     const isTestMode = isDevelopmentMode();

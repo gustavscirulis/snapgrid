@@ -58,6 +58,11 @@ contextBridge.exposeInMainWorld(
 
     // App information
     appVersion: require('../package.json').version,
+    // Development mode check
+    isDevelopmentMode: () => {
+      // Check for isDev from main process through IPC
+      return process.env.NODE_ENV === 'development' || !/[\\/]app\.asar[\\/]/.test(__dirname);
+    },
 
     // Added methods
     convertImageToBase64: async (filePath) => {
