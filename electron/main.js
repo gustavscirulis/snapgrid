@@ -210,8 +210,12 @@ const getAppStorageDir = () => {
 // Add this function before createWindow()
 async function checkForUpdates() {
   try {
-    const packageJson = require('../package.json');
+    // Read package.json using fs instead of require
+    const packageJsonPath = path.join(path.dirname(__dirname), 'package.json');
+    const packageJsonContent = await fs.readFile(packageJsonPath, 'utf-8');
+    const packageJson = JSON.parse(packageJsonContent);
     const currentVersion = packageJson.version;
+    
     const repoOwner = 'gustavscirulis'; // Repository owner
     const repoName = 'snapgrid'; // Repository name
     
@@ -258,7 +262,14 @@ async function createWindow() {
     const windowStateKeeper = (await import('electron-window-state')).default;
     windowState = windowStateKeeper({
       defaultWidth: 1280,
-      defaultHeight: 800
+      defaultHeight: 800,
+      file: 'window-state.json'  // Explicitly specify the state file
+    });
+    console.log('Window state loaded:', {
+      x: windowState.x,
+      y: windowState.y,
+      width: windowState.width,
+      height: windowState.height
     });
   } catch (err) {
     console.error('Failed to load electron-window-state:', err);
@@ -288,10 +299,21 @@ async function createWindow() {
   // Let windowState manage the window state
   windowState.manage(mainWindow);
 
+  // Register listeners for window state saving
+  ['resize', 'move', 'close'].forEach(event => {
+    mainWindow.on(event, () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        // This will trigger saving of window bounds
+        windowState.saveState(mainWindow);
+      }
+    });
+  });
+
   // In production, use file protocol with the correct path
-  // In development, use localhost server
+  // In development, use localhost server with flexible port detection
+  const devPort = process.env.DEV_PORT || '8081'; // Default to 8081 since that's what Vite is using
   const startUrl = isDev 
-    ? 'http://localhost:8080' 
+    ? `http://localhost:${devPort}` 
     : `file://${path.join(__dirname, '../dist/index.html')}`;
 
   console.log('Loading application from:', startUrl);
