@@ -256,15 +256,80 @@ async function createWindow() {
   // Import windowStateKeeper dynamically
   let windowState;
   try {
-    const windowStateKeeper = (await import('electron-window-state')).default;
+    // When using dynamic import in production builds, the module resolution might be different
+    // Add more robust error handling and logging
+    console.log('Attempting to load electron-window-state...');
+    let windowStateKeeper;
+    try {
+      windowStateKeeper = (await import('electron-window-state')).default;
+    } catch (importError) {
+      console.error('Error importing electron-window-state:', importError);
+      // Try alternative import method for production
+      const windowStateModule = await import('electron-window-state');
+      windowStateKeeper = windowStateModule.default || windowStateModule;
+      console.log('Using alternative import method for electron-window-state');
+    }
+    
+    if (!windowStateKeeper || typeof windowStateKeeper !== 'function') {
+      throw new Error('electron-window-state module did not return a valid function');
+    }
+    
+    // Use an absolute path for the file in userData to ensure it works in production
+    const userDataPath = app.getPath('userData');
+    console.log('Using userData path for window state:', userDataPath);
+    
     windowState = windowStateKeeper({
       defaultWidth: 1280,
       defaultHeight: 800,
-      file: 'window-state.json'  // Explicitly specify the state file
+      file: path.join(userDataPath, 'window-state.json')
     });
+    
+    console.log('Window state initialized successfully');
   } catch (err) {
-    console.error('Failed to load electron-window-state:', err);
-    windowState = { x: undefined, y: undefined, width: 1280, height: 800, manage: () => {} };
+    console.error('Failed to load or initialize electron-window-state:', err);
+    // Provide a complete fallback with manual state persistence
+    const stateFilePath = path.join(app.getPath('userData'), 'window-state.json');
+    let savedState = { width: 1280, height: 800, x: undefined, y: undefined };
+    
+    // Try to load saved state from file
+    try {
+      if (fs.existsSync(stateFilePath)) {
+        const data = fs.readFileSync(stateFilePath, 'utf8');
+        const loadedState = JSON.parse(data);
+        savedState = { ...savedState, ...loadedState };
+        console.log('Loaded window state from fallback file:', savedState);
+      }
+    } catch (loadError) {
+      console.error('Error loading window state from fallback file:', loadError);
+    }
+    
+    // Create a full fallback implementation
+    windowState = { 
+      ...savedState,
+      manage: () => {}, 
+      saveState: (win) => {
+        // Manual implementation of state saving
+        try {
+          if (!win || win.isDestroyed()) return;
+          
+          const bounds = win.getBounds();
+          const isMaximized = win.isMaximized();
+          const isFullScreen = win.isFullScreen();
+          
+          const stateToSave = {
+            ...bounds,
+            isMaximized,
+            isFullScreen
+          };
+          
+          fs.writeFileSync(stateFilePath, JSON.stringify(stateToSave), 'utf8');
+          console.log('Saved window state using fallback method:', stateToSave);
+        } catch (saveError) {
+          console.error('Error saving window state in fallback method:', saveError);
+        }
+      }
+    };
+    console.log('Using fallback window state implementation');
   }
 
   // Create the browser window.
@@ -288,13 +353,15 @@ async function createWindow() {
   });
 
   // Let windowState manage the window state
-  windowState.manage(mainWindow);
+  if (typeof windowState.manage === 'function') {
+    windowState.manage(mainWindow);
+  }
 
   // Register listeners for window state saving
   ['resize', 'move', 'close'].forEach(event => {
     mainWindow.on(event, () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        // This will trigger saving of window bounds
+      if (mainWindow && !mainWindow.isDestroyed() && typeof windowState.saveState === 'function') {
+        // Only call saveState if it's a function
         windowState.saveState(mainWindow);
       }
     });
