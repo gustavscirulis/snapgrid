@@ -172,7 +172,7 @@ const AnalyticsSection = () => {
           checked={analyticsEnabled}
           onCheckedChange={handleToggleChange}
           disabled={isLoading}
-          className="data-[state=checked]:bg-gray-800 dark:data-[state=checked]:bg-gray-600"
+          className="data-[state=checked]:bg-gray-800 dark:data-[state=checked]:bg-zinc-700 data-[state=checked]:text-gray-100"
         />
       </div>
     </section>
