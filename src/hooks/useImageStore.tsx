@@ -278,12 +278,16 @@ export function useImageStore() {
         });
       }
 
-      // Analyze media if applicable (now works for both images and videos)
-      media = { ...media, isAnalyzing: true };
-      setImages(prevImages => prevImages.map(img => img.id === media.id ? media : img));
-      
-      const analyzedMedia = await analyzeAndUpdateImage(media, dataUrl, savedFilePath);
-      setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
+      // Check if API key exists before attempting analysis
+      const hasKey = await hasApiKey();
+      if (hasKey) {
+        // Only set analyzing state and attempt analysis if API key exists
+        media = { ...media, isAnalyzing: true };
+        setImages(prevImages => prevImages.map(img => img.id === media.id ? media : img));
+        
+        const analyzedMedia = await analyzeAndUpdateImage(media, dataUrl, savedFilePath);
+        setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
+      }
     } catch (error) {
       console.error("Error adding media:", error);
       toast.error("Failed to add media: " + (error instanceof Error ? error.message : 'Unknown error'));
@@ -449,40 +453,44 @@ export function useImageStore() {
           // This allows users to upload more images while analysis is running
           setIsUploading(false);
           
-          // Set analyzing state for both images and videos
-          media = { ...media, isAnalyzing: true };
-          setImages(prevImages => prevImages.map(img => img.id === media.id ? media : img));
+          // Check if API key exists before attempting analysis
+          const hasKey = await hasApiKey();
+          if (hasKey) {
+            // Only set analyzing state and attempt analysis if API key exists
+            media = { ...media, isAnalyzing: true };
+            setImages(prevImages => prevImages.map(img => img.id === media.id ? media : img));
           
-          try {
-            // For images, convert to base64 for analysis
-            if (!isVideo) {
-              const base64 = await window.electron.convertImageToBase64(result.path);
-              const analyzedMedia = await analyzeAndUpdateImage(media, base64, result.path);
-              setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
-            } else {
-              // For videos, use the local file URL
-              const localFileUrl = `file://${result.path}`;
-              const analyzedMedia = await analyzeAndUpdateImage(media, localFileUrl, result.path);
-              setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
-            }
-          } catch (analyzeError) {
-            console.error("Failed to analyze imported media:", analyzeError);
-            // Update the media item to show error state
-            const errorMedia = { ...media, isAnalyzing: false, error: 'Analysis failed' };
-            setImages(prevImages => prevImages.map(img => img.id === media.id ? errorMedia : img));
-            
-            // Make sure the error state is saved to disk
-            if (window.electron) {
-              try {
-                await window.electron.updateMetadata({
-                  id: errorMedia.id,
-                  metadata: {
-                    ...errorMedia,
-                    filePath: result.path
-                  }
-                });
-              } catch (metadataError) {
-                console.error("Failed to update error state metadata:", metadataError);
+            try {
+              // For images, convert to base64 for analysis
+              if (!isVideo) {
+                const base64 = await window.electron.convertImageToBase64(result.path);
+                const analyzedMedia = await analyzeAndUpdateImage(media, base64, result.path);
+                setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
+              } else {
+                // For videos, use the local file URL
+                const localFileUrl = `file://${result.path}`;
+                const analyzedMedia = await analyzeAndUpdateImage(media, localFileUrl, result.path);
+                setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
+              }
+            } catch (analyzeError) {
+              console.error("Failed to analyze imported media:", analyzeError);
+              // Update the media item to show error state
+              const errorMedia = { ...media, isAnalyzing: false, error: 'Analysis failed' };
+              setImages(prevImages => prevImages.map(img => img.id === media.id ? errorMedia : img));
+              
+              // Make sure the error state is saved to disk
+              if (window.electron) {
+                try {
+                  await window.electron.updateMetadata({
+                    id: errorMedia.id,
+                    metadata: {
+                      ...errorMedia,
+                      filePath: result.path
+                    }
+                  });
+                } catch (metadataError) {
+                  console.error("Failed to update error state metadata:", metadataError);
+                }
               }
             }
           }
@@ -518,6 +526,13 @@ export function useImageStore() {
       const mediaToAnalyze = images.find(img => img.id === imageId);
       if (!mediaToAnalyze) {
         console.error("Cannot retry analysis: Media not found");
+        return;
+      }
+
+      // Check if API key exists before attempting retry
+      const hasKey = await hasApiKey();
+      if (!hasKey) {
+        toast.error("OpenAI API key not set. Please set an API key to use image analysis.");
         return;
       }
 

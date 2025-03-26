@@ -30,6 +30,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [exitAnimationComplete, setExitAnimationComplete] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [hasOpenAIKey, setHasOpenAIKey] = useState<boolean | null>(null);
+  const [previousKeyStatus, setPreviousKeyStatus] = useState<boolean | null>(null);
   
   // Image refs for animations
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
@@ -68,6 +69,35 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       checkApiKey();
     }
   }, [settingsOpen]);
+  
+  // Analyze all unanalyzed images when API key is newly set
+  useEffect(() => {
+    // Check if key status changed from false/null to true
+    if (previousKeyStatus !== true && hasOpenAIKey === true && retryAnalysis) {
+      // Find all images that don't have patterns and aren't analyzing
+      const imagesToAnalyze = images.filter(img => 
+        (!img.patterns || img.patterns.length === 0) && 
+        !img.isAnalyzing && 
+        !img.error
+      );
+      
+      if (imagesToAnalyze.length > 0) {
+        // Create a queue of images to analyze
+        const analyzeQueue = async () => {
+          for (const image of imagesToAnalyze) {
+            await retryAnalysis(image.id);
+            // Small delay to avoid overwhelming the API
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
+        };
+        
+        analyzeQueue();
+      }
+    }
+    
+    // Update previous key status for next comparison
+    setPreviousKeyStatus(hasOpenAIKey);
+  }, [hasOpenAIKey, images, retryAnalysis, previousKeyStatus]);
   
   // Prevent scrolling when in empty state
   useEffect(() => {
@@ -409,7 +439,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                           {hoveredImageId === image.id && (
                             <motion.div 
                               id={`pattern-tags-${image.id}`}
-                              className={`absolute bottom-0 left-0 right-0 p-2 ${image.type === 'image' ? 'bg-gradient-to-t from-black/50 to-transparent' : ''}`}
+                              className={`absolute bottom-0 left-0 right-0 p-2 ${(image.type === 'image' && image.patterns && image.patterns.length > 0) ? 'bg-gradient-to-t from-black/50 to-transparent' : ''}`}
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: 10 }}
