@@ -76,6 +76,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@electron/notarize": "^3.0.1",
     "@eslint/js": "^9.9.0",
     "@tailwindcss/typography": "^0.5.15",
     "@types/node": "^22.5.5",
@@ -83,9 +84,11 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.20",
+    "dotenv": "^16.4.7",
     "electron": "^35.0.0",
     "electron-builder": "^25.1.8",
     "electron-is-dev": "^3.0.1",
+    "electron-notarize": "^1.2.2",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
