@@ -23,12 +23,24 @@ const App = () => {
         await initializeAnalytics();
         
         // Single app-ready event after initialization
-        setTimeout(() => {
+        setTimeout(async () => {
           try {
+            // Get the number of files if running in Electron
+            let fileCount = 0;
+            if (isElectron && window.electron?.loadImages) {
+              try {
+                const loadedImages = await window.electron.loadImages();
+                fileCount = Array.isArray(loadedImages) ? loadedImages.length : 0;
+              } catch (countError) {
+                console.error("Error counting files:", countError);
+              }
+            }
+            
             sendAnalyticsEvent('app-ready', { 
               floatValue: Date.now() / 1000,
               startupTime: new Date().toISOString(),
-              isElectron: isElectron ? 'true' : 'false'
+              isElectron: isElectron ? 'true' : 'false',
+              fileCount: fileCount
             });
           } catch (analyticsError) {
             // Silent error in production

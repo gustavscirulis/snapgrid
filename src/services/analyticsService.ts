@@ -115,17 +115,6 @@ export async function initializeAnalytics(): Promise<void> {
       
       isInitialized = true;
       
-      // Send initial app-started signal
-      setTimeout(async () => {
-        try {
-          if (telemetryInstance) {
-            await telemetryInstance.signal('app-started');
-          }
-        } catch (error) {
-          // Silent error in production
-        }
-      }, 1000);
-      
     } catch (error) {
       isInitialized = false;
       telemetryInstance = null;

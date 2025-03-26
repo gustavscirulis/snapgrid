@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { analyzeImage, analyzeVideoFrames, hasApiKey } from "@/services/aiAnalysisService";
 import { toast } from "sonner";
 import { getVideoDimensions, captureVideoFrames } from '../lib/videoUtils';
+import { sendAnalyticsEvent } from "@/services/analyticsService";
 
 export type ImageItemType = "image" | "video";
 
@@ -266,6 +267,15 @@ export function useImageStore() {
           useDirectPath: true
         };
         setImages(prevImages => [media, ...prevImages.filter(img => img.id !== media.id)]);
+
+        // Send analytics event for file added
+        sendAnalyticsEvent('file-added', {
+          type: media.type,
+          width: media.width,
+          height: media.height,
+          fileSize: file.size,
+          source: 'drag-drop'
+        });
       }
 
       // Analyze media if applicable (now works for both images and videos)
@@ -425,6 +435,15 @@ export function useImageStore() {
           
           // Add to image list
           setImages(prevImages => [media, ...prevImages]);
+
+          // Send analytics event for file added
+          sendAnalyticsEvent('file-added', {
+            type: media.type,
+            width: media.width,
+            height: media.height,
+            source: 'file-system',
+            originalPath: filePath
+          });
           
           // Set isUploading to false here before starting analysis
           // This allows users to upload more images while analysis is running
@@ -467,8 +486,6 @@ export function useImageStore() {
               }
             }
           }
-          
-          // Remove success toast
         } else {
           throw new Error(result.error || "Unknown error");
         }

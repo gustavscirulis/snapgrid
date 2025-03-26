@@ -1,4 +1,5 @@
 // A service to identify UI patterns in images using OpenAI's Vision API
+import { sendAnalyticsEvent } from "@/services/analyticsService";
 
 interface PatternMatch {
   pattern?: string;
@@ -13,10 +14,20 @@ export async function setOpenAIApiKey(key: string): Promise<boolean> {
     if (window.electron && window.electron.setApiKey) {
       // Use secure storage in Electron
       const result = await window.electron.setApiKey('openai', key);
+      
+      if (result.success) {
+        // Send analytics event when key is added successfully
+        sendAnalyticsEvent('api-key-added', { service: 'openai' });
+      }
+      
       return result.success;
     } else {
       // Fallback to localStorage for web version
       localStorage.setItem("openai-api-key", key);
+      
+      // Send analytics event when key is added successfully
+      sendAnalyticsEvent('api-key-added', { service: 'openai' });
+      
       return true;
     }
   } catch (error) {
@@ -62,10 +73,20 @@ export async function deleteApiKey(): Promise<boolean> {
     if (window.electron && window.electron.deleteApiKey) {
       // Delete from secure storage in Electron
       const result = await window.electron.deleteApiKey('openai');
+      
+      if (result.success) {
+        // Send analytics event when key is removed successfully
+        sendAnalyticsEvent('api-key-removed', { service: 'openai' });
+      }
+      
       return result.success;
     } else {
       // Fallback to localStorage for web version
       localStorage.removeItem("openai-api-key");
+      
+      // Send analytics event when key is removed successfully
+      sendAnalyticsEvent('api-key-removed', { service: 'openai' });
+      
       return true;
     }
   } catch (error) {
