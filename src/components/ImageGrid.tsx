@@ -439,7 +439,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                           {hoveredImageId === image.id && (
                             <motion.div 
                               id={`pattern-tags-${image.id}`}
-                              className={`absolute bottom-0 left-0 right-0 p-2 ${(image.type === 'image' && image.patterns && image.patterns.length > 0) ? 'bg-gradient-to-t from-black/50 to-transparent' : ''}`}
+                              className={`absolute bottom-0 left-0 right-0 p-2 pointer-events-none ${(image.type === 'image' && image.patterns && image.patterns.length > 0) ? 'bg-gradient-to-t from-black/50 to-transparent' : ''}`}
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: 10 }}
