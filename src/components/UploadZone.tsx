@@ -66,7 +66,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
       } else {
         toast({
           title: "Invalid file",
-          description: "Please upload images or videos only.",
+          description: "Please upload images (jpg, png, gif, etc.) or videos (mp4, webm, ogg) only.",
           variant: "destructive",
         });
       }

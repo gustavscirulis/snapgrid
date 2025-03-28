@@ -164,7 +164,7 @@ export function ImageRenderer({
             />
           ) : (
             // Fallback if no poster is available
-            <div className={`flex items-center justify-center bg-gray-200 ${className}`}>
+            <div className={`flex items-center justify-center bg-gray-300 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 ${className}`} style={{ minHeight: '200px' }}>
               <span>Video thumbnail not available</span>
             </div>
           )}
