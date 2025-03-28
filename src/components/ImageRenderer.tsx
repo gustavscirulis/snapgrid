@@ -71,7 +71,6 @@ export function ImageRenderer({
   // Handle media loading errors
   const handleError = (error: any) => {
     console.error('Error loading media:', error);
-    // Handle errors for local files
     if (mediaUrl?.startsWith('local-file://') && image.type === 'video' && isElectron) {
       console.error('Error loading video with local-file:// protocol:', error);
     }
@@ -167,6 +166,9 @@ export function ImageRenderer({
                 muted
                 loop
                 playsInline
+                crossOrigin="anonymous"
+                preload="metadata"
+                poster={image.posterUrl || undefined}
                 onLoadedMetadata={handleLoad}
                 onError={(e) => {
                   // If there's an error playing the video on hover, just hide the video
@@ -228,6 +230,7 @@ export function ImageRenderer({
         playsInline
         controlsList="nodownload"
         preload="auto"
+        crossOrigin="anonymous"
       />
     );
   }

@@ -558,8 +558,28 @@ app.whenReady().then(() => {
   protocol.registerFileProtocol('local-file', (request, callback) => {
     const url = request.url.replace('local-file://', '');
     try {
-      // Return the file path
-      return callback(decodeURI(url));
+      const filePath = decodeURI(url);
+      const ext = path.extname(filePath).toLowerCase();
+      
+      // Set appropriate MIME type based on file extension
+      let mimeType = 'application/octet-stream';
+      if (ext === '.mp4') {
+        mimeType = 'video/mp4';
+      } else if (ext === '.webm') {
+        mimeType = 'video/webm';
+      } else if (ext === '.png') {
+        mimeType = 'image/png';
+      } else if (ext === '.jpg' || ext === '.jpeg') {
+        mimeType = 'image/jpeg';
+      }
+      
+      return callback({
+        path: filePath,
+        headers: {
+          'Content-Type': mimeType,
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
     } catch (error) {
       console.error('Error with protocol handler:', error);
     }
