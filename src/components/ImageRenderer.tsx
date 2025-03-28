@@ -51,6 +51,7 @@ export function ImageRenderer({
   }
 
   // In browser development mode, we can't use local-file:// protocol for security reasons
+  // IMPORTANT: Always use local-file:// protocol for local files. file:// protocol does not work locally.
   if (isLocalFileProtocol && !isElectron) {
     // For videos, use the poster image instead of trying to load the video
     if (image.type === 'video') {
@@ -68,28 +69,14 @@ export function ImageRenderer({
   const shouldUsePoster = image.type === 'video' && !controls && image.posterUrl;
   
   // Handle media loading errors
-  const handleError = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLImageElement>) => {
-    const target = e.target as HTMLVideoElement | HTMLImageElement;
-
-    if (target instanceof HTMLVideoElement && target.error) {
-      console.log(`Video error details:`, target.error);
+  const handleError = (error: any) => {
+    console.error('Error loading media:', error);
+    // Handle errors for local files
+    if (mediaUrl?.startsWith('local-file://') && image.type === 'video' && isElectron) {
+      console.error('Error loading video with local-file:// protocol:', error);
     }
-
-    console.error(`Failed to load media: ${image.url}`, e);
     setLoadError(true);
-
-    // Try to recover from error in Electron by using file:// protocol
-    if (mediaUrl.startsWith('local-file://') && image.type === 'video' && isElectron) {
-      try {
-        const fixedSrc = mediaUrl.replace('local-file://', 'file://');
-        if (videoRef.current) {
-          videoRef.current.src = fixedSrc;
-        }
-      } catch (err) {
-        console.error("Error applying video URL fix:", err);
-      }
-    }
-  }, [image.url, mediaUrl, image.type, isElectron]);
+  };
 
   // Handle media load success
   const handleLoad = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLImageElement>) => {

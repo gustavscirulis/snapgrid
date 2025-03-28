@@ -376,8 +376,8 @@ export function useImageStore() {
       setIsUploading(true);
       
       try {
-        // Create a local file URL we can use to get dimensions
-        const localFileUrl = `file://${filePath}`;
+        // IMPORTANT: Always use local-file:// protocol for local files. file:// protocol does not work locally.
+        const localFileUrl = `local-file://${filePath}`;
         
         // Create basic media item with defaults
         let media: ImageItem = {
@@ -468,7 +468,7 @@ export function useImageStore() {
                 setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
               } else {
                 // For videos, use the local file URL
-                const localFileUrl = `file://${result.path}`;
+                const localFileUrl = `local-file://${result.path}`;
                 const analyzedMedia = await analyzeAndUpdateImage(media, localFileUrl, result.path);
                 setImages(prevImages => prevImages.map(img => img.id === media.id ? analyzedMedia : img));
               }
@@ -551,7 +551,7 @@ export function useImageStore() {
             dataUrl = await window.electron.convertImageToBase64(mediaToAnalyze.actualFilePath);
           } else {
             // For videos, use the file URL directly
-            dataUrl = `file://${mediaToAnalyze.actualFilePath}`;
+            dataUrl = `local-file://${mediaToAnalyze.actualFilePath}`;
           }
         } else if (mediaToAnalyze.url) {
           // Otherwise, use the URL directly (may be a data URL already)
