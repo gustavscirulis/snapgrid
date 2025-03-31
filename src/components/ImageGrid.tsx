@@ -439,7 +439,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                           {hoveredImageId === image.id && (
                             <motion.div 
                               id={`pattern-tags-${image.id}`}
-                              className={`absolute bottom-0 left-0 right-0 p-2 pointer-events-none ${(image.type === 'image' && image.patterns && image.patterns.length > 0) ? 'bg-gradient-to-t from-black/50 to-transparent' : ''}`}
+                              className="absolute bottom-0 left-0 right-0 p-2 pointer-events-none bg-gradient-to-t from-black/50 to-transparent"
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: 10 }}
@@ -451,6 +451,15 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                             </motion.div>
                           )}
                         </AnimatePresence>
+                        
+                        {/* Video indicator icon */}
+                        {image.type === 'video' && (
+                          <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs z-10">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
+                            </svg>
+                          </div>
+                        )}
                         
                         {onImageDelete && (
                           <Button
