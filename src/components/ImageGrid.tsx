@@ -186,7 +186,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       if (item.error) {
         return (
           <div 
-            className="inline-flex items-center gap-1 text-xs text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-md cursor-pointer hover:bg-destructive transition-colors"
+            className="inline-flex items-center gap-1 text-xs text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-md hover:bg-destructive transition-all duration-200 hover:shadow-sm active:bg-destructive/90"
             onClick={(e) => {
               e.stopPropagation();
               if (retryAnalysis) {
@@ -439,15 +439,18 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                           {hoveredImageId === image.id && (
                             <motion.div 
                               id={`pattern-tags-${image.id}`}
-                              className="absolute bottom-0 left-0 right-0 p-2 pointer-events-none bg-gradient-to-t from-black/50 to-transparent"
+                              className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent"
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: 10 }}
                               style={{ 
-                                bottom: '-2px'
+                                bottom: '-2px',
+                                pointerEvents: 'none'
                               }}
                             >
-                              {renderPatternTags(image)}
+                              <div className="pointer-events-auto">
+                                {renderPatternTags(image)}
+                              </div>
                             </motion.div>
                           )}
                         </AnimatePresence>
