@@ -17,13 +17,22 @@ It's built by [@gustavscirulis](https://github.com/gustavscirulis), and all of t
 
 Download the latest release for your platform from the [releases](https://github.com/gustavscirulis/snapgrid/releases) page.
 
+### macOS Users
+- If you have an Intel Mac (2020 or earlier), download `SnapGrid.dmg`
+- If you have an Apple Silicon Mac (M1/M2/M3), download `SnapGrid-arm64.dmg`
+- Not sure? Click Apple menu () > About This Mac. Under "Chip" or "Processor", you'll see which type you have
+
 ## Requirements
 
 To use the AI pattern detection feature, you'll need to add your OpenAI API key in the settings. The app uses GPT-4o for vision analysis. You can still use the app without this feature — it just won't detect patterns.
 
 ## Privacy
 
-SnapGrid collects anonymous usage data to help improve the application. This includes basic usage statistics and crash reports, but never your personal data or screenshots. You can opt out of anonymous tracking at any time through the app settings.
+SnapGrid is built with privacy in mind:
+
+- **Local-first by design**: All screenshots, metadata, and app data are stored locally on your device. Nothing is uploaded or stored remotely.
+- **Optional AI analysis**: If enabled, screenshots are temporarily sent to OpenAI’s Vision API for pattern detection. This feature is optional and can be turned off at any time in the settings.
+- **Anonymous usage analytics**: SnapGrid collects basic, anonymous usage stats and crash reports to help improve the app. No personal data or screenshots are ever collected. You can opt out of tracking in the settings.
 
 ## File storage
 

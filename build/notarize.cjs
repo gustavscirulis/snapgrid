@@ -1,7 +1,4 @@
-// Common JS module format
-const { notarize } = require('@electron/notarize');
-
-async function notarizing(context) {
+module.exports = async function notarizing(context) {
   const { electronPlatformName, appOutDir } = context;
   
   // Only notarize macOS builds
@@ -15,6 +12,7 @@ async function notarizing(context) {
   const appPath = `${appOutDir}/${appName}.app`;
   
   try {
+    const { notarize } = await import('@electron/notarize');
     await notarize({
       tool: 'notarytool',
       appPath,
@@ -27,6 +25,4 @@ async function notarizing(context) {
     console.error('Notarization failed:', error);
     throw error;
   }
-}
-
-module.exports = notarizing; 
+}; 

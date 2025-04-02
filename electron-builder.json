@@ -27,7 +27,14 @@
   "mac": {
     "category": "public.app-category.developer-tools",
     "target": [
-      "dmg"
+      {
+        "target": "dmg",
+        "arch": "x64"
+      },
+      {
+        "target": "dmg",
+        "arch": "arm64"
+      }
     ],
     "icon": "assets/icons/icon.icns",
     "hardenedRuntime": true,
