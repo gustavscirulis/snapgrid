@@ -2,10 +2,16 @@
 import { sendAnalyticsEvent } from "@/services/analyticsService";
 
 interface PatternMatch {
-  pattern?: string;
-  name?: string;
+  name: string;
   confidence: number;
-  imageContext?: string; // Add this field to store the context description
+  imageContext: string;
+  imageSummary: string;
+}
+
+interface AnalysisResponse {
+  imageContext: string;
+  imageSummary: string;
+  patterns: Omit<PatternMatch, 'imageContext' | 'imageSummary'>[];
 }
 
 // API key handling functions
@@ -104,19 +110,48 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
 
   try {
     // Prepare the request payload
+    const prompt = `You are an expert AI in analyzing images. Your task is to analyze the content of images and provide appropriate descriptions based on whether they contain UI interfaces or general scenes.
+    
+    Provide your response in the following JSON format:
+    {
+      "imageContext": "Detailed description of the entire image, including its purpose and main characteristics",
+      "imageSummary": "Very brief summary (1-3 words) of the main content or purpose",
+      "patterns": [
+        {
+          "name": "Specific UI component/pattern name OR main object/subject",
+          "confidence": 0.95
+        }
+      ]
+    }
+
+    Guidelines:
+      1. The "imageSummary" should be a very brief (1-3 words) description of what the image shows
+      2. The "imageContext" should provide detailed information about the entire image
+      3. For UI images:
+         - List specific UI design components and UX patterns
+         - Use technical UI/UX terminology
+      4. For non-UI images:
+         - List main objects, subjects, or elements
+         - Focus on what is visually prominent
+         - Use descriptive, non-technical language
+      5. Include confidence scores between 0.8 and 1.0
+      6. List patterns in order of confidence/importance
+      7. Ensure that the patterns are unique and not duplicates of each other and imageSummary
+      7. Provide exactly 6 patterns, ordered by confidence`;
+
     const payload = {
       model: "gpt-4o", // Using GPT-4o which supports vision
       messages: [
         {
           role: "system",
-          content: "You are an expert AI in UI/UX design pattern recognition. Your task is to analyze visual interfaces and identify commonly used UI design patterns based on layout, components, and design structure. Additionally, provide a brief contextual description of what the screenshot shows (e.g., e-commerce product page, admin dashboard, mobile app, etc.)."
+          content: prompt
         },
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: "Review this UI design image and provide two things:\n1. Extract the top 10 recognizable UI components with confidence scores between 0 and 1.\n2. Include a brief description of what this screenshot shows (e.g., what type of product, website, or application).\n\nRespond with a strict, valid JSON array where each object contains 'pattern', 'confidence', and 'imageContext' fields. The 'imageContext' field should be the same in all objects and describe what the screenshot shows. Do not include markdown formatting, explanations, or code block symbols. Use title case. If you can't recognise any UI components describe the objects and scene instead."
+              text: "Analyze this image and provide a detailed breakdown of its content. If it's a UI screenshot, focus on UI patterns and components. If it's a general scene, focus on objects and subjects. Respond with a strict, valid JSON object in the format specified in the system prompt. Do not include markdown formatting, explanations, or code block symbols. Use title case for pattern/object names. Provide up to 6 patterns/objects, ordered by confidence."
             },
             {
               type: "image_url",
@@ -178,55 +213,55 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
         } else if (content.includes('```')) {
           jsonString = content.split('```')[1].split('```')[0].trim();
         }
+        
+        const response = JSON.parse(jsonString) as AnalysisResponse;
+        
+        // Validate and clean up the response
+        if (response.patterns && Array.isArray(response.patterns)) {
+          // Get all patterns for search (up to 6)
+          const allPatterns = response.patterns
+            .filter(p => p && p.name && typeof p.confidence === 'number' && p.confidence >= 0.7)
+            .map(p => ({
+              name: p.name,
+              confidence: Math.min(Math.max(p.confidence, 0), 1),
+              imageContext: response.imageContext,
+              imageSummary: response.imageSummary
+            }))
+            .sort((a, b) => b.confidence - a.confidence)
+            .slice(0, 6); // Keep all 6 patterns for search
 
-        // Handle potential truncated JSON by checking and fixing incomplete items
-        const lastBraceIndex = jsonString.lastIndexOf('}');
-        const lastBracketIndex = jsonString.lastIndexOf(']');
-        
-        if (lastBraceIndex > lastBracketIndex) {
-          // JSON might be truncated - fix by adding closing bracket
-          jsonString = jsonString.substring(0, lastBraceIndex + 1) + ']';
+          return allPatterns;
         }
-        
-        patterns = JSON.parse(jsonString);
+        throw new Error('Invalid response format from OpenAI');
       } catch (parseError) {
         // Try a more aggressive cleanup approach
         let jsonString = content.replace(/```/g, '').replace(/json/g, '').trim();
         
-        // Remove any non-JSON text before or after the array
-        const arrayMatch = jsonString.match(/\[\s*\{.*\}\s*\]/s);
-        if (arrayMatch) {
-          jsonString = arrayMatch[0];
-        } else {
-          // Handle truncated JSON by finding the last complete object
-          const matches = jsonString.match(/\{[^{}]*\}/g);
-          if (matches && matches.length > 0) {
-            jsonString = '[' + matches.join(',') + ']';
-          }
+        // Remove any non-JSON text before or after the object
+        const objectMatch = jsonString.match(/\{[\s\S]*\}/);
+        if (objectMatch) {
+          jsonString = objectMatch[0];
         }
         
-        patterns = JSON.parse(jsonString);
-      }
-
-
-      // Validate and clean up the response
-      if (Array.isArray(patterns)) {
-        // Extract the imageContext from the first item (should be the same in all)
-        const imageContext = patterns[0]?.imageContext || '';
+        const response = JSON.parse(jsonString) as AnalysisResponse;
         
-        patterns = patterns
-          .filter(p => p && (p.pattern || p.name) && typeof p.confidence === 'number' && p.confidence >= 0.7)
-          .map(p => ({
-            name: p.pattern || p.name, // Map 'pattern' field to 'name' as expected by the UI
-            confidence: Math.min(Math.max(p.confidence, 0), 1), // Ensure confidence is between 0 and 1
-            imageContext: imageContext // Keep the same context for all patterns for backward compatibility
-          }))
-          .sort((a, b) => b.confidence - a.confidence) // Sort by confidence score
-          .slice(0, 10); // Keep up to 10 patterns for searching but only display top 5 in UI
+        if (response.patterns && Array.isArray(response.patterns)) {
+          // Get all patterns for search (up to 6)
+          const allPatterns = response.patterns
+            .filter(p => p && p.name && typeof p.confidence === 'number' && p.confidence >= 0.7)
+            .map(p => ({
+              name: p.name,
+              confidence: Math.min(Math.max(p.confidence, 0), 1),
+              imageContext: response.imageContext,
+              imageSummary: response.imageSummary
+            }))
+            .sort((a, b) => b.confidence - a.confidence)
+            .slice(0, 6); // Keep all 6 patterns for search
 
-        return patterns;
+          return allPatterns;
+        }
+        throw new Error('Invalid response format from OpenAI');
       }
-      throw new Error('Invalid response format from OpenAI');
     } catch (e) {
       console.error("Failed to parse OpenAI response:", e, content);
       throw new Error('Failed to parse response from OpenAI');
@@ -300,7 +335,8 @@ export async function analyzeVideoFrames(frameUrls: string[]): Promise<PatternMa
       .map(([name, data]) => ({
         name,
         confidence: data.totalConfidence / data.count,
-        imageContext: combinedContext
+        imageContext: combinedContext,
+        imageSummary: allPatterns[0]?.imageSummary || ''
       }))
       .sort((a, b) => b.confidence - a.confidence) // Sort by confidence score
       .filter(p => p.confidence >= 0.7) // Keep only patterns with confidence >= 0.7

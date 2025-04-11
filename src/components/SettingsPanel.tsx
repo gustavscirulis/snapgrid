@@ -339,6 +339,7 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
 // Developer section component only shown in dev mode
 const DeveloperSection = () => {
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
+  const [enablePillClickAnalysis, setEnablePillClickAnalysis] = useState(false);
   const isElectron = window && typeof window.electron !== 'undefined' && window.electron !== null;
 
   // Function to update the app's global state to simulate empty state
@@ -351,11 +352,21 @@ const DeveloperSection = () => {
     window.location.reload();
   };
 
+  // Function to handle pill click analysis toggle
+  const handleTogglePillClickAnalysis = (checked: boolean) => {
+    setEnablePillClickAnalysis(checked);
+    localStorage.setItem('dev_enable_pill_click_analysis', checked ? 'true' : 'false');
+  };
+
   // Load the simulation setting on mount
   useEffect(() => {
-    const savedSetting = localStorage.getItem('dev_simulate_empty_state');
-    if (savedSetting === 'true') {
+    const savedEmptyState = localStorage.getItem('dev_simulate_empty_state');
+    const savedPillClickAnalysis = localStorage.getItem('dev_enable_pill_click_analysis');
+    if (savedEmptyState === 'true') {
       setSimulateEmptyState(true);
+    }
+    if (savedPillClickAnalysis === 'true') {
+      setEnablePillClickAnalysis(true);
     }
   }, []);
 
@@ -382,6 +393,21 @@ const DeveloperSection = () => {
           id="empty-state-toggle"
           checked={simulateEmptyState}
           onCheckedChange={handleToggleEmptyState}
+          className="data-[state=checked]:bg-rose-600 dark:data-[state=checked]:bg-rose-700"
+        />
+      </div>
+
+      <div className="flex justify-between items-center gap-4">
+        <div className="space-y-1 flex-1">
+          <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100 select-none">Enable Pill Click Analysis</h4>
+          <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
+            Click on pattern pills to refresh AI analysis
+          </p>
+        </div>
+        <Switch
+          id="pill-click-analysis-toggle"
+          checked={enablePillClickAnalysis}
+          onCheckedChange={handleTogglePillClickAnalysis}
           className="data-[state=checked]:bg-rose-600 dark:data-[state=checked]:bg-rose-700"
         />
       </div>

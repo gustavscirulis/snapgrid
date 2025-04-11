@@ -203,15 +203,60 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       return null;
     }
 
+    // Check if pill click analysis is enabled
+    const isPillClickAnalysisEnabled = localStorage.getItem('dev_enable_pill_click_analysis') === 'true';
+
+    // If analyzing, show loading state for all pills
+    if (item.isAnalyzing) {
+      return (
+        <div className="flex flex-wrap gap-1">
+          <div className="inline-flex items-center gap-1 text-xs text-primary-background bg-secondary px-2 py-1 rounded-md">
+            <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+            <span className="text-shine">Analyzing...</span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-wrap gap-1">
+        {/* Show image summary as the first pill */}
+        {item.patterns[0]?.imageSummary && (
+          <span 
+            className={`text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md cursor-default ${
+              isPillClickAnalysisEnabled ? 'hover:bg-secondary/90 transition-colors' : ''
+            }`}
+            title={item.patterns[0]?.imageContext || "Type of interface"}
+            onClick={(e) => {
+              if (isPillClickAnalysisEnabled) {
+                e.stopPropagation();
+                if (retryAnalysis) {
+                  retryAnalysis(item.id);
+                }
+              }
+            }}
+          >
+            {item.patterns[0]?.imageSummary}
+          </span>
+        )}
+        {/* Show top 3 patterns after the summary */}
         {item.patterns
-          .slice(0, 5) // Only display top 5 patterns (already sorted by confidence in aiAnalysisService.ts)
+          .slice(0, 4) // Only display top 4 patterns
           .map((pattern, index) => (
           <span 
             key={index} 
-            className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md cursor-default"
+            className={`text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md cursor-default ${
+              isPillClickAnalysisEnabled ? 'hover:bg-secondary/90 transition-colors' : ''
+            }`}
             title={`Confidence: ${Math.round(pattern.confidence * 100)}%`}
+            onClick={(e) => {
+              if (isPillClickAnalysisEnabled) {
+                e.stopPropagation();
+                if (retryAnalysis) {
+                  retryAnalysis(item.id);
+                }
+              }
+            }}
           >
             {pattern.name}
           </span>

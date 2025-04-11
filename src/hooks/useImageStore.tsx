@@ -16,6 +16,8 @@ const getFilenameFromPath = (filePath: string): string => {
 export interface PatternTag {
   name: string;
   confidence: number;
+  imageContext?: string;
+  imageSummary?: string;
 }
 
 export interface ImageItem {
@@ -173,6 +175,8 @@ export function useImageStore() {
           return { 
             name, 
             confidence: pattern.confidence,
+            imageContext: pattern.imageContext,
+            imageSummary: pattern.imageSummary
           } as PatternTag;
         })
         .filter((tag): tag is PatternTag => tag !== null);
