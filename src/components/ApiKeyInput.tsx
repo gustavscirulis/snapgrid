@@ -124,7 +124,7 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
               <p className="text-sm text-red-500">{error}</p>
             )}
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              You'll need an OpenAI API key with access to GPT-4 Vision models. 
+              You'll need an OpenAI API key with access to GPT-4.1-mini. 
               <a 
                 href="https://platform.openai.com/api-keys" 
                 target="_blank" 
@@ -135,7 +135,7 @@ export function ApiKeyInput({ inSettingsPanel = false }: ApiKeyInputProps) {
               </a>
             </p>
             <div className="text-sm bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 p-3 rounded-md">
-              <strong>Note:</strong> Image analysis requires the gpt-4o model access. Make sure your API key has access to the latest GPT-4o model.
+              <strong>Note:</strong> Image analysis requires access to the gpt-4.1-mini model.
             </div>
           </div>
 

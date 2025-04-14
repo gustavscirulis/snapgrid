@@ -24,7 +24,7 @@ Download the latest release for your platform from the [releases](https://github
 
 ## Requirements
 
-To use the AI pattern detection feature, you'll need to add your OpenAI API key in the settings. The app uses GPT-4o for vision analysis. You can still use the app without this feature — it just won't detect patterns.
+To use the AI pattern detection feature, you'll need to add your OpenAI API key in the settings. The app uses GPT-4.1-mini for vision analysis. You can still use the app without this feature — it just won't detect patterns.
 
 ## Privacy
 

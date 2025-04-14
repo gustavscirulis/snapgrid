@@ -140,7 +140,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
       7. Provide exactly 6 patterns, ordered by confidence`;
 
     const payload = {
-      model: "gpt-4o", // Using GPT-4o which supports vision
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
