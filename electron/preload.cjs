@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld(
     // File storage operations
     loadImages: () => ipcRenderer.invoke('load-images'),
     saveImage: (data) => ipcRenderer.invoke('save-image', data),
+    downloadImage: (url, filename) => ipcRenderer.invoke('download-image', { url, filename }),
     updateMetadata: (data) => ipcRenderer.invoke('update-metadata', data),
     deleteImage: (id) => ipcRenderer.invoke('delete-image', id),
     restoreFromTrash: (id) => ipcRenderer.invoke('restore-from-trash', id),
@@ -30,6 +31,9 @@ contextBridge.exposeInMainWorld(
 
     // Browser functionality
     openUrl: (url) => ipcRenderer.invoke('open-url', url),
+
+    // Link preview fetcher
+    fetchLinkPreview: (url) => ipcRenderer.invoke('fetch-link-preview', url),
 
     // Update functionality
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),

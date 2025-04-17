@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import AnimatedImageModal from "./AnimatedImageModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageRenderer } from "@/components/ImageRenderer";
+import { LinkCard } from "@/components/LinkCard";
 import Masonry from 'react-masonry-css';
 import './masonry-grid.css'; // We'll create this CSS file
 import './text-shine.css'; // Import the text shine animation CSS
@@ -22,6 +23,7 @@ interface ImageGridProps {
 }
 
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete, searchQuery = "", onOpenSettings, settingsOpen = false, retryAnalysis }) => {
+  const [deletedLinkIds, setDeletedLinkIds] = useState<string[]>([]);
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -170,6 +172,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   };
 
   const handleDeleteImage = (id: string) => {
+    setDeletedLinkIds((prev) => [...prev, id]);
     onImageDelete?.(id);
   };
 
@@ -448,7 +451,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
               className="my-masonry-grid"
               columnClassName="my-masonry-grid_column"
             >
-              {images.map((image) => {
+              {images.filter((image) => !deletedLinkIds.includes(image.id)).map((image) => {
                 let ref = imageRefs.current.get(image.id);
                 if (!ref) {
                   ref = React.createRef<HTMLDivElement>();
@@ -459,71 +462,72 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 
                 return (
                   <div key={image.id} className="masonry-item">
-                    <div 
-                      ref={ref}
-                      className="rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800 shadow-sm hover:shadow-md relative group w-full"
-                      onClick={() => handleImageClick(image, ref)}
-                      onMouseEnter={() => setHoveredImageId(image.id)}
-                      onMouseLeave={() => setHoveredImageId(null)}
-                      style={{
-                        opacity: isSelected ? 0 : 1,
-                        visibility: isSelected ? 'hidden' : 'visible',
-                        pointerEvents: isAnimating ? 'none' : 'auto'
-                      }}
-                    >
-                      <div className="relative">
-                        <ImageRenderer 
-                          image={image}
-                          alt="UI Screenshot"
-                          className="w-full h-auto object-cover rounded-t-lg"
-                          controls={false}
-                          autoPlay={false}
-                        />
-                        
-                        <AnimatePresence>
-                          {hoveredImageId === image.id && (
-                            <motion.div 
-                              id={`pattern-tags-${image.id}`}
-                              className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent"
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: 10 }}
-                              style={{ 
-                                bottom: '-2px',
-                                pointerEvents: 'none'
+                    {image.type === 'link' ? (
+                      <LinkCard item={image} onDelete={onImageDelete} />
+                    ) : (
+                      <div 
+                        ref={ref}
+                        className="rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800 shadow-sm hover:shadow-md relative group w-full"
+                        onClick={() => handleImageClick(image, ref)}
+                        onMouseEnter={() => setHoveredImageId(image.id)}
+                        onMouseLeave={() => setHoveredImageId(null)}
+                        style={{
+                          opacity: isSelected ? 0 : 1,
+                          visibility: isSelected ? 'hidden' : 'visible',
+                          pointerEvents: isAnimating ? 'none' : 'auto'
+                        }}
+                      >
+                        <div className="relative">
+                          <ImageRenderer 
+                            image={image}
+                            alt="UI Screenshot"
+                            className="w-full h-auto object-cover rounded-t-lg"
+                            controls={false}
+                            autoPlay={false}
+                          />
+                          <AnimatePresence>
+                            {hoveredImageId === image.id && (
+                              <motion.div 
+                                id={`pattern-tags-${image.id}`}
+                                className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                style={{ 
+                                  bottom: '-2px',
+                                  pointerEvents: 'none'
+                                }}
+                              >
+                                <div className="pointer-events-auto">
+                                  {renderPatternTags(image)}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                          {/* Video indicator icon */}
+                          {image.type === 'video' && (
+                            <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs z-10">
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
+                              </svg>
+                            </div>
+                          )}
+                          {onImageDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full h-6 w-6 bg-black/60 text-white hover:text-white hover:bg-black/80"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteImage(image.id);
                               }}
                             >
-                              <div className="pointer-events-auto">
-                                {renderPatternTags(image)}
-                              </div>
-                            </motion.div>
+                              <X className="h-3 w-3" />
+                            </Button>
                           )}
-                        </AnimatePresence>
-                        
-                        {/* Video indicator icon */}
-                        {image.type === 'video' && (
-                          <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs z-10">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
-                            </svg>
-                          </div>
-                        )}
-                        
-                        {onImageDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full h-6 w-6 bg-black/60 text-white hover:text-white hover:bg-black/80"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteImage(image.id);
-                            }}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}

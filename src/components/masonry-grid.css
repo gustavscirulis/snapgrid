@@ -22,7 +22,6 @@
 .masonry-item video {
   display: block;
   width: 100%;
-  height: auto;
   max-height: none;
 }
 

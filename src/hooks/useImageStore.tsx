@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { getVideoDimensions, captureVideoFrames } from '../lib/videoUtils';
 import { sendAnalyticsEvent } from "@/services/analyticsService";
 
-export type ImageItemType = "image" | "video";
+export type ImageItemType = "image" | "video" | "link"; // Added 'link' type
 
 // Helper function to get filename from a path
 const getFilenameFromPath = (filePath: string): string => {
@@ -40,7 +40,13 @@ export interface ImageItem {
   posterUrl?: string;
   // Context description for the entire image
   imageContext?: string;
+  // Link-specific preview fields
+  ogImageUrl?: string;
+  faviconUrl?: string;
 }
+
+
+import { fetchLinkPreview } from "@/lib/linkPreview";
 
 export function useImageStore() {
   const [images, setImages] = useState<ImageItem[]>([]);
@@ -73,7 +79,6 @@ export function useImageStore() {
         } else {
           setImages([]);
           setTrashItems([]);
-          toast.warning("Running in browser mode. Images will not be saved permanently.");
         }
       } catch (error) {
         console.error("Error loading images:", error);
@@ -84,6 +89,8 @@ export function useImageStore() {
 
     loadImages();
   }, []);
+
+
 
   const readFileAsDataURL = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -119,6 +126,10 @@ export function useImageStore() {
           type: media.type,
           duration: media.duration,
           posterUrl: media.posterUrl,
+          // Ensure these are included for link cards
+          ogImageUrl: media.ogImageUrl,
+          faviconUrl: media.faviconUrl,
+          url: media.url,
         }
       });
 
@@ -332,7 +343,10 @@ export function useImageStore() {
         window.electron.loadImages(),
         window.electron.listTrash()
       ]);
-      setImages(loadedImages);
+      const sortedImages = [...(loadedImages || [])].sort((a, b) =>
+  new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+);
+setImages(sortedImages);
       setTrashItems(loadedTrashItems);
       // Remove the last item from history
       setDeletedItemsHistory(prev => prev.slice(0, -1));
@@ -513,23 +527,100 @@ export function useImageStore() {
     }
   };
 
+  const addLink = async (url: string) => {
+    setIsUploading(true);
+    const now = new Date();
+    const id = `${now.getTime()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Insert temporary loading card
+    const tempLinkItem: ImageItem = {
+      id,
+      type: "link",
+      url,
+      width: 400,
+      height: 200,
+      createdAt: now,
+      title: url,
+      isAnalyzing: true,
+    };
+    setImages(prev => [tempLinkItem, ...prev]);
+    try {
+      // Fetch preview info
+      const preview = await fetchLinkPreview(url);
+      let ogImageUrl = preview.ogImageUrl;
+      let faviconUrl = preview.faviconUrl;
+      if (isElectron && window.electron) {
+        // Download thumbnails to disk and use local paths
+        if (ogImageUrl) {
+          const ogFilename = `${id}-og.png`;
+          const ogRes = await window.electron.downloadImage(ogImageUrl, ogFilename);
+          if (ogRes.success) {
+            ogImageUrl = `local-file://${ogRes.filePath}`;
+          }
+        }
+        if (faviconUrl) {
+          const favFilename = `${id}-favicon.png`;
+          const favRes = await window.electron.downloadImage(faviconUrl, favFilename);
+          if (favRes.success) {
+            faviconUrl = `local-file://${favRes.filePath}`;
+          }
+        }
+      }
+      const linkItem: ImageItem = {
+        id,
+        type: "link",
+        url,
+        width: 400,
+        height: 200,
+        createdAt: now,
+        ogImageUrl,
+        faviconUrl,
+        title: preview.title,
+        description: preview.description,
+        isAnalyzing: false,
+      };
+      setImages(prev => prev.map(img => img.id === id ? linkItem : img));
+      // Persist link card in Electron mode
+      if (isElectron && window.electron) {
+        await saveMediaToDisk(linkItem, "");
+      }
+      toast.success("Link saved to library");
+    } catch (e) {
+      setImages(prev => prev.filter(img => img.id !== id));
+      toast.error("Failed to fetch link preview");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+
+  // Persist link cards to localStorage in browser mode
+  useEffect(() => {
+    if (!isElectron) {
+      const linkCards = images.filter(img => img.type === 'link');
+      localStorage.setItem('snapgrid_link_cards', JSON.stringify(linkCards));
+    }
+  }, [images, isElectron]);
+
   return {
     images,
-    trashItems,
     isUploading,
     isLoading,
-    isElectron,
     addImage,
+    addLink,
     removeImage,
-    emptyTrash,
     undoDelete,
-    importFromFilePath,
     canUndo: deletedItemsHistory.length > 0,
+    importFromFilePath,
     retryAnalysis: async (imageId: string) => {
       // Find the media
       const mediaToAnalyze = images.find(img => img.id === imageId);
       if (!mediaToAnalyze) {
         console.error("Cannot retry analysis: Media not found");
+        return;
+      }
+
+      // Skip analysis for link cards
+      if (mediaToAnalyze.type === 'link') {
         return;
       }
 

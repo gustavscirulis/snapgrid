@@ -382,7 +382,7 @@ async function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com https://*.telemetrydeck.com https://nom.telemetrydeck.com https://telemetrydeck.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
+          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com https://*.telemetrydeck.com https://nom.telemetrydeck.com https://telemetrydeck.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data: https: http:;"
         ]
       }
     });
@@ -553,7 +553,18 @@ function createApplicationMenu() {
   Menu.setApplicationMenu(menu);
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  appStorageDir = getAppStorageDir(); // This sets trashDir
+  // Automatically empty trash on app start
+  if (trashDir) {
+    try {
+      await fs.emptyDir(path.join(trashDir, 'images'));
+      await fs.emptyDir(path.join(trashDir, 'metadata'));
+      console.log('Trash emptied on app start');
+    } catch (error) {
+      console.error('Error emptying trash on app start:', error);
+    }
+  }
   // Register custom protocol to serve local files
   protocol.registerFileProtocol('local-file', (request, callback) => {
     const url = request.url.replace('local-file://', '');
@@ -594,6 +605,18 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on('before-quit', async (event) => {
+  if (trashDir) {
+    try {
+      await fs.emptyDir(path.join(trashDir, 'images'));
+      await fs.emptyDir(path.join(trashDir, 'metadata'));
+      console.log('Trash emptied on app quit');
+    } catch (error) {
+      console.error('Error emptying trash on app quit:', error);
+    }
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -662,6 +685,24 @@ ipcMain.handle('delete-api-key', async (event, { service }) => {
   }
 });
 
+// Download an image from a URL and save to images dir
+import fetch from 'node-fetch';
+ipcMain.handle('download-image', async (event, { url, filename }) => {
+  try {
+    const imagesDir = path.join(appStorageDir, 'images');
+    await fs.ensureDir(imagesDir);
+    const filePath = path.join(imagesDir, filename);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+    const buffer = await res.buffer();
+    await fs.writeFile(filePath, buffer);
+    return { success: true, filePath };
+  } catch (error) {
+    console.error('Error downloading image:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // IPC handlers for file system operations
 ipcMain.handle('get-app-storage-dir', () => {
   return appStorageDir;
@@ -677,6 +718,19 @@ ipcMain.handle('open-storage-dir', () => {
 
 ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
   try {
+    if (metadata.type === 'link') {
+      // Only save metadata for link cards, no file operations
+      const metadataDir = path.join(appStorageDir, 'metadata');
+      const metadataPath = path.join(metadataDir, `${id}.json`);
+      await fs.writeJson(metadataPath, {
+        ...metadata,
+        filePath: null,
+        type: 'link'
+      });
+      console.log(`Saved link card metadata: ${metadataPath}`);
+      return { success: true, path: metadataPath };
+    }
+
     // Determine if this is a video or image based on the ID prefix or metadata
     const isVideo = id.startsWith('vid_') || metadata.type === 'video';
 
@@ -745,37 +799,40 @@ ipcMain.handle('load-images', async () => {
         const id = path.basename(file, '.json');
         const metadataPath = path.join(metadataDir, file);
 
-        // Check if this is a video based on id prefix
-        const isVideo = id.startsWith('vid_');
-        // Use appropriate extension
-        const fileExt = isVideo ? '.mp4' : '.png';
-        const imagesDir = path.join(appStorageDir, 'images');
-        const mediaPath = path.join(imagesDir, `${id}${fileExt}`);
-
         try {
-          // Check if both metadata and media file exist
+          const metadata = await fs.readJson(metadataPath);
+
+          // If it's a link card, just return the metadata (no file check)
+          if (metadata.type === 'link') {
+            return {
+              ...metadata,
+              id,
+              type: 'link',
+              filePath: null,
+            };
+          }
+
+          // For images and videos, check for the media file
+          const isVideo = id.startsWith('vid_') || metadata.type === 'video';
+          const fileExt = isVideo ? '.mp4' : '.png';
+          const imagesDir = path.join(appStorageDir, 'images');
+          const mediaPath = path.join(imagesDir, `${id}${fileExt}`);
+
           if (!(await fs.pathExists(mediaPath))) {
             console.warn(`Media file not found: ${mediaPath}`);
             return null;
           }
 
-          // Load metadata
-          const metadata = await fs.readJson(metadataPath);
-
-          // Use the local-file protocol for both images and videos
           const localFileUrl = `local-file://${mediaPath}`;
 
-          // Construct the media object with correct paths
-          const mediaObject = {
+          return {
             ...metadata,
             id,
             url: localFileUrl,
             type: isVideo ? 'video' : metadata.type || 'image',
             actualFilePath: mediaPath,
-            useDirectPath: true // Flag to indicate this is a direct file path
+            useDirectPath: true
           };
-
-          return mediaObject;
         } catch (err) {
           console.error(`Error loading image ${id}:`, err);
           return null;
@@ -809,11 +866,49 @@ ipcMain.handle('delete-image', async (event, id) => {
     const trashMetadataPath = path.join(trashMetadataDir, `${id}.json`);
 
     // Move files to trash instead of deleting
-    await fs.move(mediaPath, trashMediaPath, { overwrite: true });
-    await fs.move(metadataPath, trashMetadataPath, { overwrite: true });
+    let movedAny = false;
+    if (await fs.pathExists(mediaPath)) {
+      await fs.move(mediaPath, trashMediaPath, { overwrite: true });
+      movedAny = true;
+    } else {
+      console.warn(`Media file not found for deletion: ${mediaPath}`);
+    }
+    if (await fs.pathExists(metadataPath)) {
+      // Read metadata to check for ogImageUrl and faviconUrl
+      try {
+        const metadata = await fs.readJson(metadataPath);
+        // For link cards, check for ogImageUrl and faviconUrl
+        for (const key of ['ogImageUrl', 'faviconUrl']) {
+          const fileUrl = metadata[key];
+          if (fileUrl && typeof fileUrl === 'string' && fileUrl.startsWith('local-file://')) {
+            const localPath = fileUrl.replace('local-file://', '');
+            const filename = path.basename(localPath);
+            const trashPath = path.join(trashImagesDir, filename);
+            if (await fs.pathExists(localPath)) {
+              await fs.move(localPath, trashPath, { overwrite: true });
+              console.log(`Moved ${key} to trash: ${trashPath}`);
+              movedAny = true;
+            } else {
+              console.warn(`${key} not found for deletion: ${localPath}`);
+            }
+          }
+        }
+      } catch (metaErr) {
+        console.warn(`Could not read metadata for og/fav cleanup: ${metaErr}`);
+      }
+      await fs.move(metadataPath, trashMetadataPath, { overwrite: true });
+      movedAny = true;
+    } else {
+      console.warn(`Metadata file not found for deletion: ${metadataPath}`);
+    }
 
-    console.log(`Moved media to trash: ${trashMediaPath}`);
-    return { success: true };
+    if (movedAny) {
+      console.log(`Moved media, metadata, and/or preview images to trash for id: ${id}`);
+      return { success: true };
+    } else {
+      console.warn(`No files found to move to trash for id: ${id}`);
+      return { success: false, error: 'No files found to delete.' };
+    }
   } catch (error) {
     console.error('Error moving image to trash:', error);
     return { success: false, error: error.message };
@@ -837,11 +932,50 @@ ipcMain.handle('restore-from-trash', async (event, id) => {
     const trashMediaPath = path.join(trashImagesDir, `${id}${fileExt}`);
     const trashMetadataPath = path.join(trashMetadataDir, `${id}.json`);
 
-    // Move files back from trash
-    await fs.move(trashMediaPath, mediaPath, { overwrite: true });
-    await fs.move(trashMetadataPath, metadataPath, { overwrite: true });
+    // --- Restore ogImageUrl and faviconUrl for link cards ---
+    // Read metadata from the trash (before moving it back)
+    let linkPreviewFilesRestored = false;
+    if (await fs.pathExists(trashMetadataPath)) {
+      try {
+        const metadata = await fs.readJson(trashMetadataPath);
+        for (const key of ['ogImageUrl', 'faviconUrl']) {
+          const fileUrl = metadata[key];
+          if (fileUrl && typeof fileUrl === 'string' && fileUrl.startsWith('local-file://')) {
+            const localPath = fileUrl.replace('local-file://', '');
+            const filename = path.basename(localPath);
+            const trashPreviewPath = path.join(trashImagesDir, filename);
+            const restoredPreviewPath = path.join(imagesDir, filename);
+            if (await fs.pathExists(trashPreviewPath)) {
+              await fs.move(trashPreviewPath, restoredPreviewPath, { overwrite: true });
+              console.log(`Restored ${key} from trash: ${restoredPreviewPath}`);
+              linkPreviewFilesRestored = true;
+            } else {
+              console.warn(`${key} not found in trash for restore: ${trashPreviewPath}`);
+            }
+          }
+        }
+      } catch (metaErr) {
+        console.warn(`Could not read trashed metadata for og/fav restore: ${metaErr}`);
+      }
+    }
 
-    console.log(`Restored media from trash: ${mediaPath}`);
+    // Move main media file back from trash if it exists (for images/videos)
+    let mediaRestored = false;
+    if (await fs.pathExists(trashMediaPath)) {
+      await fs.move(trashMediaPath, mediaPath, { overwrite: true });
+      mediaRestored = true;
+    } else {
+      console.warn(`Media file not found in trash for restore: ${trashMediaPath}`);
+    }
+
+    // Always move metadata JSON back from trash (for both images and links)
+    if (await fs.pathExists(trashMetadataPath)) {
+      await fs.move(trashMetadataPath, metadataPath, { overwrite: true });
+    } else {
+      console.warn(`Metadata file not found in trash for restore: ${trashMetadataPath}`);
+    }
+
+    console.log(`Restored${mediaRestored ? ' media,' : ''} metadata${linkPreviewFilesRestored ? ', and preview images' : ''} from trash for id: ${id}`);
     return { success: true };
   } catch (error) {
     console.error('Error restoring from trash:', error);
@@ -923,6 +1057,35 @@ ipcMain.handle('check-file-access', async (event, filePath) => {
 });
 
 // Add open-url handler
+import https from 'https';
+import { parse } from 'node-html-parser';
+
+// ...
+ipcMain.handle('fetch-link-preview', async (event, url) => {
+  try {
+    // Fetch HTML
+    const html = await new Promise((resolve, reject) => {
+      https.get(url, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => resolve(data));
+      }).on('error', reject);
+    });
+    // Parse HTML
+    const root = parse(html);
+    const ogImage = root.querySelector('meta[property="og:image"]')?.getAttribute('content');
+    let favicon = root.querySelector('link[rel~="icon"]')?.getAttribute('href');
+    if (favicon && !favicon.startsWith('http')) {
+      try { favicon = new URL(favicon, url).href; } catch {}
+    }
+    const title = root.querySelector('title')?.innerText || root.querySelector('meta[property="og:title"]')?.getAttribute('content');
+    const description = root.querySelector('meta[property="og:description"]')?.getAttribute('content');
+    return { ogImageUrl: ogImage, faviconUrl: favicon, title, description };
+  } catch (e) {
+    return {};
+  }
+});
+
 ipcMain.handle('open-url', async (event, url) => {
   try {
     await shell.openExternal(url);

@@ -24,6 +24,7 @@ const Index = () => {
     isUploading, 
     isLoading, 
     addImage, 
+    addLink, // <-- Import addLink from useImageStore
     removeImage, 
     undoDelete, 
     canUndo,
@@ -79,6 +80,7 @@ const Index = () => {
       const items = event.clipboardData?.items;
       if (!items) return;
 
+      let handled = false;
       for (const item of items) {
         if (item.type.startsWith('image/')) {
           event.preventDefault();
@@ -91,7 +93,22 @@ const Index = () => {
               toast.error("Failed to paste image");
             }
           }
+          handled = true;
           break;
+        }
+      }
+
+      // If not handled as image, check for URL/text
+      if (!handled) {
+        const text = event.clipboardData?.getData('text/plain');
+        if (text) {
+          // Simple URL regex
+          const urlPattern = /^(https?:\/\/[^\s]+)$/i;
+          if (urlPattern.test(text.trim())) {
+            event.preventDefault();
+            await addLink(text.trim());
+            handled = true;
+          }
         }
       }
     };
