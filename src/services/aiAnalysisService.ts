@@ -115,7 +115,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
     Provide your response in the following JSON format:
     {
       "imageContext": "Detailed description of the entire image, including its purpose and main characteristics",
-      "imageSummary": "Very brief summary (1-3 words) of the main content or purpose",
+      "imageSummary": "Very brief summary (1-2 words) of the main content or purpose",
       "patterns": [
         {
           "name": "Specific UI component/pattern name OR main object/subject",
@@ -125,11 +125,12 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
     }
 
     Guidelines:
-      1. The "imageSummary" should be a very brief (1-3 words) description of what the image shows
+      1. The "imageSummary" should be a very brief (1-2 words) description of what the image shows
       2. The "imageContext" should provide detailed information about the entire image
       3. For UI images:
          - List specific UI design components and UX patterns
          - Use technical UI/UX terminology
+         - Each pattern should be 1-2 words maximum, not duplicative of imageSummary
       4. For non-UI images:
          - List main objects, subjects, or elements
          - Focus on what is visually prominent
