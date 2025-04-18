@@ -44,14 +44,26 @@ export const LinkCard: React.FC<LinkCardProps> = ({ item, onDelete }) => {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {item.ogImageUrl || item.faviconUrl ? (
+        {item.ogImageUrl ? (
           <img
-            src={previewImg}
+            src={item.ogImageUrl}
             alt={item.title || item.url}
             className="object-cover w-full h-full"
           />
         ) : (
-          <div className="w-full h-full absolute inset-0 bg-gray-300 dark:bg-zinc-700" />
+          <div className="w-full h-full absolute inset-0 bg-gray-300 dark:bg-zinc-700 flex flex-col items-center justify-center">
+            {item.faviconUrl && (
+              <img
+                src={item.faviconUrl}
+                alt="Favicon"
+                className="mb-2"
+                style={{ width: 16, height: 16 }}
+              />
+            )}
+            <span className="text-center text-xs font-medium text-black dark:text-white px-2 truncate w-full" title={item.title || item.url}>
+              {item.title || item.url}
+            </span>
+          </div>
         )}
         {item.isAnalyzing && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20">
@@ -60,7 +72,7 @@ export const LinkCard: React.FC<LinkCardProps> = ({ item, onDelete }) => {
         )}
         {/* Overlay: Title & Description on hover above a gradient */}
         <AnimatePresence>
-          {isHovered && (
+          {isHovered && item.ogImageUrl && (
             <motion.div
               className="absolute inset-0 pointer-events-none"
               initial={{ opacity: 0, y: 10 }}
@@ -111,12 +123,7 @@ export const LinkCard: React.FC<LinkCardProps> = ({ item, onDelete }) => {
           </Button>
         )}
       </div>
-      {/* Only show favicon in overlay if no thumbnail (not on hover) */}
-      {!hasThumbnail && item.faviconUrl && (
-        <div className="absolute top-2 left-2 z-10">
-          <img src={item.faviconUrl} alt="favicon" className="w-4 h-4 rounded bg-white/80" />
-        </div>
-      )}
+
     </Card>
   );
 };
