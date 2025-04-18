@@ -60,7 +60,7 @@ export const LinkCard: React.FC<LinkCardProps> = ({ item, onDelete }) => {
                 style={{ width: 16, height: 16 }}
               />
             )}
-            <span className="text-center text-xs font-medium text-black dark:text-white px-2 truncate w-full" title={item.title || item.url}>
+            <span className="text-center text-sm font-medium text-black dark:text-white px-2 truncate w-full" title={item.title || item.url}>
               {item.title || item.url}
             </span>
           </div>
@@ -84,7 +84,7 @@ export const LinkCard: React.FC<LinkCardProps> = ({ item, onDelete }) => {
                 <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent z-0" />
                 <div className="relative z-10 flex flex-col gap-1">
                   {!item.isAnalyzing && (
-                    <span className="text-white text-base font-medium truncate drop-shadow" title={item.title || item.url}>
+                    <span className="text-white text-sm font-medium truncate drop-shadow" title={item.title || item.url}>
                       {item.title || item.url}
                     </span>
                   )}
