@@ -327,13 +327,30 @@ export function useImageStore() {
       const lastDeletedItem = deletedItemsHistory[deletedItemsHistory.length - 1];
       await window.electron.restoreFromTrash(lastDeletedItem.id);
       
-      // Reload images and trash items
-      const [loadedImages, loadedTrashItems] = await Promise.all([
-        window.electron.loadImages(),
-        window.electron.listTrash()
+      // Get the restored image
+      const [loadedImages] = await Promise.all([
+        window.electron.loadImages()
       ]);
-      setImages(loadedImages);
-      setTrashItems(loadedTrashItems);
+      
+      // Find the restored image in the loaded images
+      const restoredImage = loadedImages.find(img => img.id === lastDeletedItem.id);
+      if (!restoredImage) {
+        throw new Error('Failed to find restored image');
+      }
+
+      // Insert the restored image back into its original position
+      setImages(prevImages => {
+        const newImages = [...prevImages];
+        // Find the position where this image should be inserted
+        const insertIndex = prevImages.findIndex(img => 
+          new Date(img.createdAt).getTime() < new Date(restoredImage.createdAt).getTime()
+        );
+        // If no position found (should be at end), use length
+        const position = insertIndex === -1 ? prevImages.length : insertIndex;
+        newImages.splice(position, 0, restoredImage);
+        return newImages;
+      });
+
       // Remove the last item from history
       setDeletedItemsHistory(prev => prev.slice(0, -1));
     } catch (error) {

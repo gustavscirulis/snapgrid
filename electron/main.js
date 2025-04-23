@@ -159,7 +159,7 @@ const apiKeyStorage = {
 };
 
 // Determine app storage directory in iCloud or local folder
-const getAppStorageDir = () => {
+const getAppStorageDir = async () => {
   const platform = process.platform;
   let storageDir;
 
@@ -203,6 +203,11 @@ const getAppStorageDir = () => {
   const trashMetadataDir = path.join(trashDir, 'metadata');
   fs.ensureDirSync(trashImagesDir);
   fs.ensureDirSync(trashMetadataDir);
+
+  // Empty trash on startup
+  await fs.emptyDir(trashImagesDir);
+  await fs.emptyDir(trashMetadataDir);
+  console.log('Trash emptied on startup');
 
   return storageDir;
 };
@@ -250,7 +255,7 @@ async function checkForUpdates() {
 }
 
 async function createWindow() {
-  appStorageDir = getAppStorageDir();
+  appStorageDir = await getAppStorageDir();
   console.log('App storage directory:', appStorageDir);
   
   // Import windowStateKeeper dynamically
@@ -880,7 +885,7 @@ ipcMain.handle('list-trash', async () => {
 
         try {
           if (!(await fs.pathExists(mediaPath))) {
-            console.warn(`Trash media file not found: ${mediaPath}`);
+            // Skip missing files silently
             return null;
           }
 
@@ -896,7 +901,7 @@ ipcMain.handle('list-trash', async () => {
             useDirectPath: true
           };
         } catch (err) {
-          console.error(`Error loading trash item ${id}:`, err);
+          // Skip files that can't be loaded
           return null;
         }
       })
