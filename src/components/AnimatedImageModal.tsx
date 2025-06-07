@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
-import { ImageRenderer } from "@/components/ImageRenderer";
+import { ZoomableImageWrapper } from "@/components/ZoomableImageWrapper";
 import { isElectron } from "@/utils/electron";
 
 interface AnimatedImageModalProps {
@@ -380,7 +380,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           <div 
             className="fixed inset-0 z-50 flex justify-center" 
             style={{ 
-              overflow: 'auto',
+              overflow: 'visible', // Allow zoomed content to extend beyond
               paddingTop: 0,
               paddingBottom: selectedImage.height > selectedImage.width * 2 ? '40px' : '20px'
             }}
@@ -406,8 +406,8 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               animate="open"
               exit="exit"
               onClick={(e) => {
-                // Allow clicks to propagate to parent for closing
-                handleClose();
+                // Don't close modal when clicking on the image content during zoom interactions
+                e.stopPropagation();
               }}
               onAnimationComplete={(definition) => {
                 if (definition === "exit") {
@@ -417,7 +417,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 }
               }}
             >
-              <ImageRenderer
+              <ZoomableImageWrapper
                 image={selectedImage}
                 alt={selectedImage.title || "Selected media"}
                 className={`w-full h-full ${selectedImage.height > selectedImage.width * 2 ? 'object-cover object-top' : 'object-contain'} rounded-xl shadow-xl`}
@@ -426,6 +426,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 muted={false}
                 currentTime={videoCurrentTime}
                 onLoad={(e) => {}}
+                onClose={handleClose}
               />
             </motion.div>
           </div>
