@@ -985,4 +985,97 @@ ipcMain.handle('set-analytics-consent', async (event, consent) => {
 ipcMain.handle('check-for-updates', async () => {
   await checkForUpdates();
   return { success: true };
+});
+
+// Add handlers for user preferences (thumbnail size, etc.)
+const userPreferences = {
+  prefs: new Map(),
+  initialized: false,
+  
+  // Storage file path
+  get filePath() {
+    return path.join(app.getPath('userData'), 'user-preferences.json');
+  },
+  
+  // Load stored preferences from disk
+  init() {
+    if (this.initialized) return;
+    
+    try {
+      if (fs.existsSync(this.filePath)) {
+        const data = fs.readFileSync(this.filePath, 'utf8');
+        const prefData = JSON.parse(data);
+        
+        // Convert back from object to Map
+        Object.entries(prefData).forEach(([key, value]) => {
+          this.prefs.set(key, value);
+        });
+        
+        console.log('User preferences loaded from disk');
+      }
+    } catch (error) {
+      console.error('Error loading user preferences from disk:', error);
+    }
+    
+    this.initialized = true;
+  },
+  
+  // Save preferences to disk
+  save() {
+    try {
+      // Convert Map to object for JSON serialization
+      const prefData = {};
+      this.prefs.forEach((value, key) => {
+        prefData[key] = value;
+      });
+      
+      fs.writeFileSync(this.filePath, JSON.stringify(prefData, null, 2), 'utf8');
+    } catch (error) {
+      console.error('Error saving user preferences to disk:', error);
+    }
+  },
+  
+  setPreference(key, value) {
+    if (!key) return false;
+    try {
+      this.init();
+      this.prefs.set(key, value);
+      this.save();
+      return true;
+    } catch (error) {
+      console.error(`Error storing preference ${key}:`, error);
+      return false;
+    }
+  },
+  
+  getPreference(key, defaultValue = null) {
+    if (!key) return defaultValue;
+    try {
+      this.init();
+      return this.prefs.get(key) || defaultValue;
+    } catch (error) {
+      console.error(`Error retrieving preference ${key}:`, error);
+      return defaultValue;
+    }
+  }
+};
+
+ipcMain.handle('set-user-preference', async (event, { key, value }) => {
+  try {
+    const success = userPreferences.setPreference(key, value);
+    return { success };
+  } catch (error) {
+    console.error('Error in set-user-preference:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-user-preference', async (event, { key, defaultValue }) => {
+  try {
+    const value = userPreferences.getPreference(key, defaultValue);
+    return { success: true, value };
+  } catch (error) {
+    console.error('Error getting user preference:', error);
+    return { success: false, error: error.message };
+  }
 }); 

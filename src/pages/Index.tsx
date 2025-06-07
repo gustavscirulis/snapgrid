@@ -34,14 +34,34 @@ const Index = () => {
   const [isElectron, setIsElectron] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
+  const [thumbnailSize, setThumbnailSize] = useState<'small' | 'medium' | 'large' | 'xl'>('medium');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Load developer settings on mount
+  // Load saved preferences on mount
   useEffect(() => {
     // Check if we should simulate empty state (only in dev mode)
     const savedSetting = localStorage.getItem('dev_simulate_empty_state');
     setSimulateEmptyState(savedSetting === 'true');
-  }, []);
+
+    // Load saved thumbnail size from Electron preferences
+    if (isElectron && window.electron?.getUserPreference) {
+      window.electron.getUserPreference('thumbnailSize', 'medium').then((result) => {
+        if (result.success && result.value) {
+          const size = result.value;
+          if (size === 'small' || size === 'medium' || size === 'large' || size === 'xl') {
+            setThumbnailSize(size);
+          }
+        }
+      }).catch(console.error);
+    }
+  }, [isElectron]);
+
+  // Save thumbnail size changes to Electron preferences
+  useEffect(() => {
+    if (isElectron && window.electron?.setUserPreference) {
+      window.electron.setUserPreference('thumbnailSize', thumbnailSize).catch(console.error);
+    }
+  }, [thumbnailSize, isElectron]);
 
   // Set up keyboard shortcuts
   useKeyboardShortcuts({
@@ -58,6 +78,22 @@ const Index = () => {
     },
     onOpenSettings: () => {
       setSettingsOpen(true);
+    },
+    onZoomIn: () => {
+      setThumbnailSize(current => {
+        if (current === 'small') return 'medium';
+        if (current === 'medium') return 'large';
+        if (current === 'large') return 'xl';
+        return 'xl'; // Already at largest
+      });
+    },
+    onZoomOut: () => {
+      setThumbnailSize(current => {
+        if (current === 'xl') return 'large';
+        if (current === 'large') return 'medium';
+        if (current === 'medium') return 'small';
+        return 'small'; // Already at smallest
+      });
     }
   });
 
@@ -284,6 +320,7 @@ const Index = () => {
                 onOpenSettings={() => setSettingsOpen(true)}
                 settingsOpen={settingsOpen}
                 retryAnalysis={retryAnalysis}
+                thumbnailSize={thumbnailSize}
               />
             </>
           )}

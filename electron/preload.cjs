@@ -56,6 +56,10 @@ contextBridge.exposeInMainWorld(
       return () => ipcRenderer.removeAllListeners('analytics-consent-changed');
     },
 
+    // User preferences
+    setUserPreference: (key, value) => ipcRenderer.invoke('set-user-preference', { key, value }),
+    getUserPreference: (key, defaultValue) => ipcRenderer.invoke('get-user-preference', { key, defaultValue }),
+
     // App information
     appVersion: require('../package.json').version,
     // Development mode check

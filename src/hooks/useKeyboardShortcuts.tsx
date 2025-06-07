@@ -5,13 +5,17 @@ interface KeyboardShortcutsProps {
   onFocusSearch: () => void;
   onUnfocusSearch: () => void;
   onOpenSettings?: () => void;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
 }
 
 export function useKeyboardShortcuts({ 
   onUndo, 
   onFocusSearch, 
   onUnfocusSearch,
-  onOpenSettings 
+  onOpenSettings,
+  onZoomIn,
+  onZoomOut
 }: KeyboardShortcutsProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -40,9 +44,20 @@ export function useKeyboardShortcuts({
       if (event.key === 'Escape') {
         onUnfocusSearch();
       }
+
+      // Check for Command+Plus (Cmd+=) or Command+Minus (Cmd+-) for thumbnail sizing
+      if ((event.metaKey || event.ctrlKey) && (event.key === '=' || event.key === '+')) {
+        event.preventDefault(); // Prevent default browser zoom behavior
+        onZoomIn?.();
+      }
+      
+      if ((event.metaKey || event.ctrlKey) && event.key === '-') {
+        event.preventDefault(); // Prevent default browser zoom behavior
+        onZoomOut?.();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onUndo, onFocusSearch, onUnfocusSearch, onOpenSettings]);
+  }, [onUndo, onFocusSearch, onUnfocusSearch, onOpenSettings, onZoomIn, onZoomOut]);
 } 

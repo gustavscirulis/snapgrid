@@ -20,9 +20,10 @@ interface ImageGridProps {
   onOpenSettings?: () => void;
   settingsOpen?: boolean;
   retryAnalysis?: (imageId: string) => Promise<void>;
+  thumbnailSize?: 'small' | 'medium' | 'large' | 'xl';
 }
 
-const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete, searchQuery = "", onOpenSettings, settingsOpen = false, retryAnalysis }) => {
+const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete, searchQuery = "", onOpenSettings, settingsOpen = false, retryAnalysis, thumbnailSize = 'medium' }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -121,15 +122,59 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     };
   }, [images.length, searchQuery]);
   
-  // Responsive breakpoints for the masonry grid - fewer columns for bigger thumbnails
-  const breakpointColumnsObj = {
-    default: 4, // Default column count (large screens) - reduced from 5 to 4
-    1536: 4,    // 2xl breakpoint - reduced from 5 to 4
-    1280: 3,    // xl breakpoint - reduced from 4 to 3
-    1024: 2,    // lg breakpoint - reduced from 3 to 2
-    640: 1,     // sm breakpoint - reduced from 2 to 1
-    480: 1      // xs/mobile
+
+  // Dynamic responsive breakpoints based on thumbnail size
+  const getBreakpointColumnsObj = () => {
+    switch (thumbnailSize) {
+      case 'small':
+        return {
+          default: 6, // More columns for smaller thumbnails
+          1536: 6,
+          1280: 5,
+          1024: 4,
+          640: 3,
+          480: 2
+        };
+      case 'medium':
+        return {
+          default: 4, // Default size
+          1536: 4,
+          1280: 3,
+          1024: 2,
+          640: 1,
+          480: 1
+        };
+      case 'large':
+        return {
+          default: 3, // Fewer columns for larger thumbnails
+          1536: 3,
+          1280: 2,
+          1024: 2,
+          640: 1,
+          480: 1
+        };
+      case 'xl':
+        return {
+          default: 2, // Very few columns for extra large thumbnails
+          1536: 2,
+          1280: 2,
+          1024: 1,
+          640: 1,
+          480: 1
+        };
+      default:
+        return {
+          default: 4,
+          1536: 4,
+          1280: 3,
+          1024: 2,
+          640: 1,
+          480: 1
+        };
+    }
   };
+
+  const breakpointColumnsObj = getBreakpointColumnsObj();
   
   // Initialize image refs and setup intersection observer
   useEffect(() => {
