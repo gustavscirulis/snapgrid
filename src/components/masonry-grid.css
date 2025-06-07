@@ -17,13 +17,31 @@
   will-change: transform;
 }
 
-/* Ensure images fill their container */
+/* Ensure images fill their container with maximum performance */
 .masonry-item img, 
 .masonry-item video {
   display: block;
   width: 100%;
   height: auto;
   max-height: none;
+  
+  /* GPU acceleration */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  
+  /* Rendering optimizations */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  
+  /* Performance hints */
+  will-change: auto;
+  contain: layout style paint;
+  
+  /* Prevent layout shifts */
+  object-fit: cover;
+  object-position: center;
 }
 
 /* Style for placeholder items in empty state */

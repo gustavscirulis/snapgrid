@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ImageItem } from '@/hooks/useImageStore';
+import { useImagePreloader } from '@/hooks/useImagePreloader';
 
 interface ImageRendererProps {
   image: ImageItem;
@@ -11,9 +12,10 @@ interface ImageRendererProps {
   loop?: boolean;
   onLoad?: (event: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => void;
   currentTime?: number;
+  preloader?: ReturnType<typeof useImagePreloader>;
 }
 
-export function ImageRenderer({
+export const ImageRenderer = React.memo(function ImageRenderer({
   image,
   className = "",
   alt = "",
@@ -22,10 +24,15 @@ export function ImageRenderer({
   muted = true,
   loop = false,
   onLoad,
-  currentTime
+  currentTime,
+  preloader
 }: ImageRendererProps) {
   const [loadError, setLoadError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // Video thumbnail state (moved to top level)
+  const [isHovering, setIsHovering] = useState(false);
+  const [thumbnailTime, setThumbnailTime] = useState(0);
 
   // Set video current time when it's ready
   useEffect(() => {
@@ -69,7 +76,7 @@ export function ImageRenderer({
   const shouldUsePoster = image.type === 'video' && !controls && image.posterUrl;
   
   // Handle media loading errors
-  const handleError = (error: any) => {
+  const handleError = (error: unknown) => {
     console.error('Error loading media:', error);
     if (mediaUrl?.startsWith('local-file://') && image.type === 'video' && isElectron) {
       console.error('Error loading video with local-file:// protocol:', error);
@@ -83,6 +90,30 @@ export function ImageRenderer({
       onLoad(e);
     }
   }, [onLoad]);
+
+  // Check if image is preloaded/cached
+  const isImageCached = preloader?.isImageCached(image.url) || false;
+  const isPosterCached = image.posterUrl ? (preloader?.isImageCached(image.posterUrl) || false) : false;
+  
+  // Use cached image if available - optimized for speed
+  const getCachedImageSrc = useCallback((url: string) => {
+    if (preloader?.isImageCached(url)) {
+      const cachedImg = preloader.getCachedImage(url);
+      if (cachedImg?.src) {
+        return cachedImg.src;
+      }
+    }
+    return url;
+  }, [preloader]);
+
+  // Check if we should use object URL for better performance
+  const getOptimizedImageSrc = useCallback((url: string) => {
+    // For local files, return as-is since they're already optimized
+    if (url.startsWith('local-file://')) {
+      return url;
+    }
+    return getCachedImageSrc(url);
+  }, [getCachedImageSrc]);
 
   // Display error state if media failed to load
   if (loadError) {
@@ -121,9 +152,6 @@ export function ImageRenderer({
   if (image.type === "video") {
     // In thumbnail view (grid)
     if (!controls) {
-      const [isHovering, setIsHovering] = useState(false);
-      const [thumbnailTime, setThumbnailTime] = useState(0);
-      
       // If we're in a browser and it's a local file, don't try to play the video on hover
       const canPlayOnHover = !(isLocalFileProtocol && !isElectron);
       
@@ -142,10 +170,13 @@ export function ImageRenderer({
           {/* Always render the poster image as the base layer */}
           {image.posterUrl ? (
             <img 
-              src={image.posterUrl} 
+              src={getOptimizedImageSrc(image.posterUrl)} 
               alt={`Video thumbnail ${image.id}`}
               className={`w-full h-auto object-cover ${className}`}
               style={{ minHeight: '120px' }}
+              loading="eager"
+              decoding="async"
+              fetchpriority="high"
               onLoad={handleLoad}
             />
           ) : (
@@ -242,9 +273,12 @@ export function ImageRenderer({
     return (
       <div className="relative w-full aspect-[1/2] overflow-hidden">
         <img 
-          src={mediaUrl} 
+          src={getOptimizedImageSrc(mediaUrl)} 
           alt={alt || `Image ${image.id}`} 
           className={`absolute inset-0 w-full h-full object-cover ${className}`}
+          loading="eager"
+          decoding="async"
+          fetchpriority="high"
           onError={handleError}
           onLoad={handleLoad}
         />
@@ -254,11 +288,14 @@ export function ImageRenderer({
   
   return (
     <img 
-      src={mediaUrl} 
+      src={getOptimizedImageSrc(mediaUrl)} 
       alt={alt || `Image ${image.id}`} 
       className={className}
+      loading="eager"
+      decoding="async"
+      fetchpriority="high"
       onError={handleError}
       onLoad={handleLoad}
     />
   );
-}
+});

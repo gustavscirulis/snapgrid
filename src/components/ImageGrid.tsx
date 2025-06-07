@@ -10,6 +10,7 @@ import './masonry-grid.css'; // We'll create this CSS file
 import './text-shine.css'; // Import the text shine animation CSS
 import { hasApiKey } from "@/services/aiAnalysisService";
 import { useDragContext } from "./UploadZone";
+import { useImagePreloader } from "@/hooks/useImagePreloader";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -34,6 +35,13 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   
   // Image refs for animations
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
+  
+  // Initialize image preloader - preloads everything so settings are less critical
+  const preloader = useImagePreloader(images, {
+    rootMargin: '1000px', 
+    threshold: 0.1,
+    preloadDistance: 5 // Reduced since everything gets preloaded anyway
+  });
   
   // Get drag context with fallback for when context is not available
   const dragContext = { isDragging: false };
@@ -123,16 +131,36 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     480: 1      // xs/mobile
   };
   
-  // Initialize image refs
+  // Initialize image refs and setup intersection observer
   useEffect(() => {
     images.forEach(image => {
       if (!imageRefs.current.has(image.id)) {
         const ref = React.createRef<HTMLDivElement>();
-        console.log('Creating ref for image:', image.id);
         imageRefs.current.set(image.id, ref);
       }
     });
-  }, [images]);
+
+    // Setup intersection observer for existing refs
+    const timeoutId = setTimeout(() => {
+      imageRefs.current.forEach((ref, imageId) => {
+        if (ref.current) {
+          preloader.observeElement(ref.current, imageId);
+        }
+      });
+    }, 0);
+
+    // Cleanup observers for removed images
+    return () => {
+      clearTimeout(timeoutId);
+      const currentImageIds = new Set(images.map(img => img.id));
+      for (const [imageId] of imageRefs.current) {
+        if (!currentImageIds.has(imageId)) {
+          preloader.unobserveElement(imageId);
+          imageRefs.current.delete(imageId);
+        }
+      }
+    };
+  }, [images, preloader]);
   
   // Reset exitAnimationComplete after a delay
   useEffect(() => {
@@ -478,6 +506,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                           className="w-full h-auto object-cover rounded-t-lg"
                           controls={false}
                           autoPlay={false}
+                          preloader={preloader}
                         />
                         
                         <AnimatePresence>
