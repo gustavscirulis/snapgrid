@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ImageItem } from '@/hooks/useImageStore';
 import { useImagePreloader } from '@/hooks/useImagePreloader';
+import { useDragContext } from './UploadZone';
 
 interface ImageRendererProps {
   image: ImageItem;
@@ -29,6 +30,9 @@ export const ImageRenderer = React.memo(function ImageRenderer({
 }: ImageRendererProps) {
   const [loadError, setLoadError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // Get drag context for internal drag detection
+  const dragContext = useDragContext();
   
   // Video thumbnail state (moved to top level)
   const [isHovering, setIsHovering] = useState(false);
@@ -91,6 +95,20 @@ export const ImageRenderer = React.memo(function ImageRenderer({
     }
   }, [onLoad]);
 
+  // Handle drag start - mark as internal drag operation
+  const handleDragStart = useCallback(() => {
+    if (dragContext?.setInternalDragActive) {
+      dragContext.setInternalDragActive(true);
+    }
+  }, [dragContext]);
+
+  // Handle drag end - reset internal drag flag
+  const handleDragEnd = useCallback(() => {
+    if (dragContext?.setInternalDragActive) {
+      dragContext.setInternalDragActive(false);
+    }
+  }, [dragContext]);
+
   // Check if image is preloaded/cached
   const isImageCached = preloader?.isImageCached(image.url) || false;
   const isPosterCached = image.posterUrl ? (preloader?.isImageCached(image.posterUrl) || false) : false;
@@ -126,6 +144,8 @@ export const ImageRenderer = React.memo(function ImageRenderer({
             alt={`Video thumbnail ${image.id}`}
             className={`w-full h-auto object-cover ${className}`}
             style={{ minHeight: '120px' }}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
           />
           <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white p-4">
             <div className="text-center">
@@ -178,6 +198,8 @@ export const ImageRenderer = React.memo(function ImageRenderer({
               decoding="async"
               fetchpriority="high"
               onLoad={handleLoad}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
             />
           ) : (
             // Fallback if no poster is available
@@ -229,6 +251,8 @@ export const ImageRenderer = React.memo(function ImageRenderer({
               src={image.posterUrl} 
               alt={`Video thumbnail ${image.id}`}
               className="w-full h-full object-contain opacity-30"
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
             />
           )}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
@@ -281,6 +305,8 @@ export const ImageRenderer = React.memo(function ImageRenderer({
           fetchpriority="high"
           onError={handleError}
           onLoad={handleLoad}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
         />
       </div>
     );
@@ -296,6 +322,8 @@ export const ImageRenderer = React.memo(function ImageRenderer({
       fetchpriority="high"
       onError={handleError}
       onLoad={handleLoad}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
     />
   );
 });

@@ -4,7 +4,13 @@ import { validateMediaFile } from "@/lib/imageUtils";
 import { ImagePlus } from "lucide-react";
 
 // Create a context for the drag state
-export const DragContext = createContext<{ isDragging: boolean }>({ isDragging: false });
+export const DragContext = createContext<{ 
+  isDragging: boolean;
+  setInternalDragActive: (active: boolean) => void;
+}>({ 
+  isDragging: false,
+  setInternalDragActive: () => {}
+});
 
 // Hook to use the drag context
 export const useDragContext = () => useContext(DragContext);
@@ -22,14 +28,19 @@ const UploadZone: React.FC<UploadZoneProps> = ({
 }) => {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
+  const [isInternalDragActive, setIsInternalDragActive] = useState(false);
   const dragCounter = React.useRef(0);
 
   const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounter.current += 1;
-    setIsDragging(true);
-  }, []);
+    
+    // Only set isDragging if this is not an internal drag operation
+    if (!isInternalDragActive) {
+      setIsDragging(true);
+    }
+  }, [isInternalDragActive]);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -53,6 +64,11 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     dragCounter.current = 0;
     setIsDragging(false);
 
+    // If this is an internal drag operation, don't process as file upload
+    if (isInternalDragActive) {
+      return;
+    }
+
     if (isUploading) {
       return;
     }
@@ -71,7 +87,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
         });
       }
     });
-  }, [isUploading, onImageUpload, toast]);
+  }, [isUploading, onImageUpload, toast, isInternalDragActive]);
 
   // Reset drag counter on unmount
   useEffect(() => {
@@ -81,7 +97,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
   }, []);
 
   return (
-    <DragContext.Provider value={{ isDragging }}>
+    <DragContext.Provider value={{ isDragging, setInternalDragActive: setIsInternalDragActive }}>
       <div
         className={`min-h-screen w-full transition-all duration-300 ${
           isDragging ? "bg-primary/5 border-primary/30" : ""
