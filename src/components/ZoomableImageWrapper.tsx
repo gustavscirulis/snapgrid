@@ -13,6 +13,7 @@ interface ZoomableImageWrapperProps {
   onLoad?: (event: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => void;
   onClose?: () => void;
   onZoomStateChange?: (scale: number, position: { x: number; y: number }) => void;
+  disableZoom?: boolean;
 }
 
 export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
@@ -25,7 +26,8 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
   currentTime,
   onLoad,
   onClose,
-  onZoomStateChange
+  onZoomStateChange,
+  disableZoom = false
 }) => {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -106,6 +108,9 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
   }, [animateMomentum]);
 
   const handleWheel = useCallback((e: WheelEvent) => {
+    // Don't handle zoom if disabled
+    if (disableZoom) return;
+    
     // Only zoom if Cmd (Meta) or Ctrl is pressed
     if (!e.metaKey && !e.ctrlKey) return;
     
@@ -123,7 +128,7 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     } else {
       onZoomStateChange?.(newScale, position);
     }
-  }, [scale]);
+  }, [scale, disableZoom]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (hasDragged) return; // Don't handle clicks if user just dragged
@@ -154,6 +159,15 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
       clickTimeoutRef.current = null;
     }
     
+    // Don't handle zoom if disabled
+    if (disableZoom) {
+      // For disabled zoom, double-click just closes the modal
+      if (onClose) {
+        onClose();
+      }
+      return;
+    }
+    
     if (scale === 1) {
       // Zoom in to 2x
       setScale(2);
@@ -165,10 +179,10 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
       setPosition({ x: 0, y: 0 });
       onZoomStateChange?.(1, { x: 0, y: 0 });
     }
-  }, [scale, onZoomStateChange]);
+  }, [scale, onZoomStateChange, disableZoom, onClose]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (scale <= 1) return; // Only allow dragging when zoomed in
+    if (disableZoom || scale <= 1) return; // Only allow dragging when zoomed in and zoom is enabled
     
     e.preventDefault();
     
@@ -188,10 +202,10 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     // Initialize velocity tracking
     lastMoveTime.current = Date.now();
     lastPosition.current = { x: e.clientX, y: e.clientY };
-  }, [scale, position]);
+  }, [scale, position, disableZoom]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging || scale <= 1) return;
+    if (disableZoom || !isDragging || scale <= 1) return;
     
     e.preventDefault();
     setHasDragged(true); // Mark that user has dragged
@@ -220,19 +234,19 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     const constrainedPos = constrainPosition(newX, newY);
     setPosition(constrainedPos);
     onZoomStateChange?.(scale, constrainedPos);
-  }, [isDragging, dragStart, scale, constrainPosition]);
+  }, [isDragging, dragStart, scale, constrainPosition, disableZoom]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     
-    // Start momentum animation if there's sufficient velocity
-    if (scale > 1 && (Math.abs(velocity.x) > MIN_VELOCITY || Math.abs(velocity.y) > MIN_VELOCITY)) {
+    // Start momentum animation if there's sufficient velocity and zoom is enabled
+    if (!disableZoom && scale > 1 && (Math.abs(velocity.x) > MIN_VELOCITY || Math.abs(velocity.y) > MIN_VELOCITY)) {
       startMomentum(velocity.x, velocity.y);
     }
     
     // Reset hasDragged after a short delay to allow click handler to check it
     setTimeout(() => setHasDragged(false), 10);
-  }, [scale, velocity, startMomentum]);
+  }, [scale, velocity, startMomentum, disableZoom]);
 
   // Add wheel event listener with passive: false
   useEffect(() => {
@@ -277,7 +291,7 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
           transform,
           transition: (isDragging || isAnimating) ? 'none' : 'transform 0.2s ease-out',
           transformOrigin: 'center center',
-          cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+          cursor: disableZoom ? 'default' : (scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'),
           userSelect: 'none'
         }}
       >

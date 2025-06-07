@@ -397,7 +397,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           <div 
             className="fixed inset-0 z-50 flex justify-center" 
             style={{ 
-              overflow: 'visible', // Allow zoomed content to extend beyond
+              overflow: selectedImage.height > selectedImage.width * 2 ? 'auto' : 'visible', // Enable scrolling for tall images
               paddingTop: 0,
               paddingBottom: selectedImage.height > selectedImage.width * 2 ? '40px' : '20px'
             }}
@@ -445,6 +445,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 onLoad={(e) => {}}
                 onClose={handleClose}
                 onZoomStateChange={(scale, position) => setZoomState({ scale, position })}
+                disableZoom={selectedImage.height > selectedImage.width * 2}
               />
             </motion.div>
           </div>
