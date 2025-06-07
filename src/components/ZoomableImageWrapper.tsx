@@ -110,10 +110,38 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     
     e.preventDefault();
     setHasDragged(true); // Mark that user has dragged
-    setPosition({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y
-    });
+    
+    const newX = e.clientX - dragStart.x;
+    const newY = e.clientY - dragStart.y;
+    
+    // Calculate bounds to prevent image from moving completely out of view
+    if (containerRef.current) {
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const containerWidth = containerRect.width;
+      const containerHeight = containerRect.height;
+      
+      // Calculate the scaled image dimensions
+      const scaledWidth = containerWidth * scale;
+      const scaledHeight = containerHeight * scale;
+      
+      // Calculate maximum allowed offset (keep at least 50% of image visible)
+      const minVisibleRatio = 0.5;
+      const minVisibleWidth = scaledWidth * minVisibleRatio;
+      const minVisibleHeight = scaledHeight * minVisibleRatio;
+      const maxOffsetX = (scaledWidth - minVisibleWidth) / scale;
+      const maxOffsetY = (scaledHeight - minVisibleHeight) / scale;
+      
+      // Constrain the position
+      const constrainedX = Math.max(-maxOffsetX, Math.min(maxOffsetX, newX));
+      const constrainedY = Math.max(-maxOffsetY, Math.min(maxOffsetY, newY));
+      
+      setPosition({
+        x: constrainedX,
+        y: constrainedY
+      });
+    } else {
+      setPosition({ x: newX, y: newY });
+    }
   }, [isDragging, dragStart, scale]);
 
   const handleMouseUp = useCallback(() => {
