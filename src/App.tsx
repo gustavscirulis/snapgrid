@@ -6,7 +6,6 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useEffect } from "react";
 import { initializeAnalytics, sendAnalyticsEvent } from "@/services/analyticsService";
-import UpdateNotification from "@/components/UpdateNotification";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
@@ -60,8 +59,6 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          {/* Update notification component */}
-          <UpdateNotification />
           {/* Use HashRouter for better Electron compatibility */}
           <HashRouter>
             <Routes>

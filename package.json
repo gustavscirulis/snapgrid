@@ -1,7 +1,7 @@
 {
   "name": "SnapGrid",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "SnapGrid is an open-source desktop app for collecting, organizing, and analyzing UI screenshots. It uses AI to automatically detect UI components and patterns, making it a powerful tool for designers and developers.",
   "author": {
     "name": "Gustavs Cirulis",
@@ -57,6 +57,7 @@
     "crypto-js": "^4.2.0",
     "date-fns": "^3.6.0",
     "electron-store": "^10.0.1",
+    "electron-updater": "^6.6.2",
     "electron-window-state": "^5.0.3",
     "embla-carousel-react": "^8.3.0",
     "framer-motion": "^12.4.10",

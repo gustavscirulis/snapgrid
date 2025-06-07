@@ -1,4 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, protocol, Menu } from 'electron';
+import pkg from 'electron-updater';
+const { autoUpdater } = pkg;
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs-extra';
@@ -212,51 +214,46 @@ const getAppStorageDir = async () => {
   return storageDir;
 };
 
-// Add this function before createWindow()
-async function checkForUpdates() {
-  try {
-    // Read package.json using fs instead of require
-    const packageJsonPath = path.join(path.dirname(__dirname), 'package.json');
-    const packageJsonContent = await fs.readFile(packageJsonPath, 'utf-8');
-    const packageJson = JSON.parse(packageJsonContent);
-    const currentVersion = packageJson.version;
-    
-    const repoOwner = 'gustavscirulis'; // Repository owner
-    const repoName = 'snapgrid'; // Repository name
-    
-    console.log('Checking for updates. Current version:', currentVersion);
-    
-    const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`);
-    
-    if (!response.ok) {
-      console.error('Error checking for updates:', response.status);
-      return;
-    }
-    
-    const latestRelease = await response.json();
-    const latestVersion = latestRelease.tag_name.replace(/^v/, '');
-    
-    console.log('Latest version available:', latestVersion);
-    
-    // Compare versions (simple string comparison works for semver)
-    if (latestVersion > currentVersion) {
-      console.log('Update available!', latestRelease.name);
-      
-      // Notify renderer process about the update
-      if (mainWindow) {
-        mainWindow.webContents.send('update-available', latestRelease);
-      }
-    } else {
-      console.log('No updates available');
-    }
-  } catch (error) {
-    console.error('Failed to check for updates:', error);
-  }
+// Configure electron-updater with built-in notifications
+function setupAutoUpdater() {
+  // Use built-in notifications instead of custom UI
+  autoUpdater.checkForUpdatesAndNotify();
+  
+  // Detailed logging for debugging
+  autoUpdater.on('checking-for-update', () => {
+    console.log('🔍 Checking for update...');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('✅ Update available:', info.version);
+    console.log('📄 Release notes:', info.releaseNotes);
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('❌ Update not available - you have the latest version');
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('💥 Error in auto-updater:', err.message);
+    console.error('Full error:', err);
+  });
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    console.log(`📥 Download progress: ${Math.round(progressObj.percent)}% (${Math.round(progressObj.bytesPerSecond / 1024)} KB/s)`);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('✅ Update downloaded:', info.version);
+    console.log('🔄 Ready to install - restart the app');
+  });
 }
 
 async function createWindow() {
   appStorageDir = await getAppStorageDir();
   console.log('App storage directory:', appStorageDir);
+  
+  // Set up auto-updater
+  setupAutoUpdater();
   
   // Import windowStateKeeper dynamically
   let windowState;
@@ -421,10 +418,6 @@ function createApplicationMenu() {
           label: 'Check for Updates',
           click: async () => {
             await checkForUpdates();
-            // If no update was found, inform the user
-            if (mainWindow) {
-              mainWindow.webContents.send('manual-update-check-completed');
-            }
           }
         },
         { type: 'separator' },
@@ -592,9 +585,6 @@ app.whenReady().then(() => {
 
   analyticsPreferences.load();
   createWindow();
-  
-  // Check for updates after window is created
-  checkForUpdates();
   
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -981,10 +971,14 @@ ipcMain.handle('set-analytics-consent', async (event, consent) => {
   }
 });
 
-// Add handler for manual update checks from renderer
+// Simple handler for manual update checks from menu
 ipcMain.handle('check-for-updates', async () => {
-  await checkForUpdates();
-  return { success: true };
+  try {
+    await autoUpdater.checkForUpdatesAndNotify();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
 
 // Add handlers for user preferences (thumbnail size, etc.)

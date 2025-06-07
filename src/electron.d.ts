@@ -20,10 +20,8 @@ interface IElectronAPI {
   // Browser functionality
   openUrl?: (url: string) => void;
   
-  // Update functionality
-  checkForUpdates?: () => Promise<{ success: boolean }>;
-  onUpdateAvailable?: (callback: (releaseInfo: any) => void) => () => void;
-  onManualUpdateCheckCompleted?: (callback: () => void) => () => void;
+  // Update functionality (simplified)
+  checkForUpdates?: () => Promise<{ success: boolean; error?: string }>;
   
   // Secure API key management
   setApiKey?: (service: string, key: string) => Promise<{ success: boolean; error?: string }>;

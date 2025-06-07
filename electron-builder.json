@@ -23,6 +23,12 @@
     "main": "electron/main.js",
     "type": "module"
   },
+  "publish": {
+    "provider": "github",
+    "owner": "gustavscirulis",
+    "repo": "snapgrid",
+    "releaseType": "release"
+  },
   "afterSign": "build/notarize.cjs",
   "mac": {
     "category": "public.app-category.developer-tools",
@@ -33,6 +39,14 @@
       },
       {
         "target": "dmg",
+        "arch": "arm64"
+      },
+      {
+        "target": "zip",
+        "arch": "x64"
+      },
+      {
+        "target": "zip",
         "arch": "arm64"
       }
     ],
