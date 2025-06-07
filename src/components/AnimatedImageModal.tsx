@@ -125,6 +125,9 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     left: number;
   } | null>(null);
 
+  // Track zoom state for exit animation
+  const [zoomState, setZoomState] = useState({ scale: 1, position: { x: 0, y: 0 } });
+
   // Add ref to track if we're currently animating
   const isAnimatingRef = useRef(false);
 
@@ -140,6 +143,8 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setMediaLoadError(false);
+      // Reset zoom state when modal closes
+      setZoomState({ scale: 1, position: { x: 0, y: 0 } });
     }
   }, [isOpen, selectedImage]);
 
@@ -340,7 +345,19 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         x: initialX,
         y: initialY,
         borderRadius: "0.5rem",
-        transition: {
+        // Only apply inverse transforms when actually zoomed in
+        ...(zoomState.scale > 1 ? {
+          scale: 1 / zoomState.scale,
+          translateX: -zoomState.position.x / zoomState.scale,
+          translateY: -zoomState.position.y / zoomState.scale,
+        } : {}),
+        transition: zoomState.scale > 1 ? {
+          // Slower transition when zoomed in
+          type: "spring",
+          damping: 25,
+          stiffness: 200
+        } : {
+          // Normal speed when not zoomed
           type: "spring",
           damping: 30,
           stiffness: 300
@@ -349,7 +366,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     };
 
     return variants;
-  }, [initialPosition, optimalDimensions, fallbackDimensions]);
+  }, [initialPosition, optimalDimensions, fallbackDimensions, zoomState]);
 
   // Log animation variants
   useEffect(() => {}, [modalVariants]);
@@ -427,6 +444,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 currentTime={videoCurrentTime}
                 onLoad={(e) => {}}
                 onClose={handleClose}
+                onZoomStateChange={(scale, position) => setZoomState({ scale, position })}
               />
             </motion.div>
           </div>

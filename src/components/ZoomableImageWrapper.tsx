@@ -12,6 +12,7 @@ interface ZoomableImageWrapperProps {
   currentTime?: number;
   onLoad?: (event: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => void;
   onClose?: () => void;
+  onZoomStateChange?: (scale: number, position: { x: number; y: number }) => void;
 }
 
 export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
@@ -23,7 +24,8 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
   muted = false,
   currentTime,
   onLoad,
-  onClose
+  onClose,
+  onZoomStateChange
 }) => {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -117,6 +119,9 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     // If zooming out to 1 or below, reset position to center
     if (newScale <= 1) {
       setPosition({ x: 0, y: 0 });
+      onZoomStateChange?.(newScale, { x: 0, y: 0 });
+    } else {
+      onZoomStateChange?.(newScale, position);
     }
   }, [scale]);
 
@@ -133,12 +138,12 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     
     // Set a timeout for single click
     clickTimeoutRef.current = setTimeout(() => {
-      // Single click - close modal
+      // Single click - close modal directly (let parent handle zoom state in exit animation)
       if (onClose) {
         onClose();
       }
     }, 200); // 200ms delay to wait for potential double click
-  }, [hasDragged, onClose]);
+  }, [hasDragged, onClose, scale, position]);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent event bubbling
@@ -153,12 +158,14 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
       // Zoom in to 2x
       setScale(2);
       setPosition({ x: 0, y: 0 }); // Keep centered
+      onZoomStateChange?.(2, { x: 0, y: 0 });
     } else {
       // Zoom out to fit
       setScale(1);
       setPosition({ x: 0, y: 0 });
+      onZoomStateChange?.(1, { x: 0, y: 0 });
     }
-  }, [scale]);
+  }, [scale, onZoomStateChange]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (scale <= 1) return; // Only allow dragging when zoomed in
@@ -212,6 +219,7 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     // Use the constrain function
     const constrainedPos = constrainPosition(newX, newY);
     setPosition(constrainedPos);
+    onZoomStateChange?.(scale, constrainedPos);
   }, [isDragging, dragStart, scale, constrainPosition]);
 
   const handleMouseUp = useCallback(() => {
