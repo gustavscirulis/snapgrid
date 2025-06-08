@@ -6,6 +6,13 @@ module.exports = async function notarizing(context) {
     return;
   }
 
+  // Load environment variables from .env file
+  try {
+    require('dotenv').config();
+  } catch (error) {
+    console.log('dotenv not available, using system environment variables');
+  }
+
   console.log('Notarizing macOS application...');
 
   const appName = context.packager.appInfo.productFilename;
