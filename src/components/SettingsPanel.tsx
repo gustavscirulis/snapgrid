@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { Button } from "@/components/ui/button";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { useTheme } from "@/components/ThemeProvider";
-import { Moon, Sun, SunMoon, Code, X } from "lucide-react";
+import { Moon, Sun, SunMoon, Code, X, Smartphone } from "lucide-react";
 import { setOpenAIApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -58,6 +58,7 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
         <div className="py-1 space-y-8 max-h-[calc(100vh-200px)] overflow-y-auto pr-1 mac-scrollbar">
           <ThemeSelector />
           <ApiKeySection isOpen={open} />
+          <QueueSection />
           <AnalyticsSection />
           {isDevMode && <DeveloperSection />}
         </div>
@@ -106,7 +107,6 @@ const ThemeSelector = () => {
 const AnalyticsSection = () => {
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
-  const isElectron = window && typeof window.electron !== 'undefined' && window.electron !== null;
 
   // Load the current analytics consent status
   useEffect(() => {
@@ -125,7 +125,7 @@ const AnalyticsSection = () => {
     checkAnalyticsConsent();
     
     // Set up a listener for consent changes from the main process
-    if (isElectron && window.electron.onAnalyticsConsentChanged) {
+    if (window.electron.onAnalyticsConsentChanged) {
       const removeListener = window.electron.onAnalyticsConsentChanged((consent: boolean) => {
         console.log('Received analytics consent change event:', consent);
         setAnalyticsEnabled(consent);
@@ -140,7 +140,7 @@ const AnalyticsSection = () => {
         if (removeListener) removeListener();
       };
     }
-  }, [isElectron]);
+  }, []);
 
   // Handle toggle changes
   const handleToggleChange = async (checked: boolean) => {
@@ -188,11 +188,6 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [keyExists, setKeyExists] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  
-  // Check if running in Electron
-  const isElectron = window && 
-    typeof window.electron !== 'undefined' && 
-    window.electron !== null;
 
   // Auto-focus the input field when settings opens and no key exists
   useEffect(() => {
@@ -210,7 +205,7 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
     e.preventDefault();
     const url = "https://platform.openai.com/api-keys";
     
-    if (isElectron && window.electron?.openUrl) {
+    if (window.electron?.openUrl) {
       // Use Electron's shell to open in default browser
       window.electron.openUrl(url);
     } else {
@@ -336,11 +331,37 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
   );
 };
 
+const QueueSection = () => {
+
+  return (
+    <section className="space-y-3">
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">
+            Mobile Import
+          </h3>
+          <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
+            Save images from your phone to the queue folder and they'll automatically import when you open SnapGrid.
+          </p>
+        </div>
+        
+        <div className="space-y-2">
+          <div className="text-xs text-gray-600 dark:text-gray-400 select-none">
+            <p>Queue folder location:</p>
+            <code className="block text-[11px] bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded text-gray-800 dark:text-gray-200 font-mono mt-1">
+              iCloud Drive/Documents/SnapGrid/queue/
+            </code>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 // Developer section component only shown in dev mode
 const DeveloperSection = () => {
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
   const [enablePillClickAnalysis, setEnablePillClickAnalysis] = useState(false);
-  const isElectron = window && typeof window.electron !== 'undefined' && window.electron !== null;
 
   // Function to update the app's global state to simulate empty state
   const handleToggleEmptyState = (checked: boolean) => {

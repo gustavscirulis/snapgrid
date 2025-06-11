@@ -31,7 +31,6 @@ const Index = () => {
     retryAnalysis
   } = useImageStore();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isElectron, setIsElectron] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
   const [thumbnailSize, setThumbnailSize] = useState<'small' | 'medium' | 'large' | 'xl'>('medium');
@@ -44,7 +43,7 @@ const Index = () => {
     setSimulateEmptyState(savedSetting === 'true');
 
     // Load saved thumbnail size from Electron preferences
-    if (isElectron && window.electron?.getUserPreference) {
+    if (window.electron?.getUserPreference) {
       window.electron.getUserPreference('thumbnailSize', 'medium').then((result) => {
         if (result.success && result.value) {
           const size = result.value;
@@ -54,14 +53,14 @@ const Index = () => {
         }
       }).catch(console.error);
     }
-  }, [isElectron]);
+  }, []);
 
   // Save thumbnail size changes to Electron preferences
   useEffect(() => {
-    if (isElectron && window.electron?.setUserPreference) {
+    if (window.electron?.setUserPreference) {
       window.electron.setUserPreference('thumbnailSize', thumbnailSize).catch(console.error);
     }
-  }, [thumbnailSize, isElectron]);
+  }, [thumbnailSize]);
 
   // Set up keyboard shortcuts
   useKeyboardShortcuts({
@@ -137,50 +136,40 @@ const Index = () => {
   }, [addImage]);
 
   useEffect(() => {
-    const isRunningInElectron = window && 
-      typeof window.electron !== 'undefined' && 
-      window.electron !== null;
-      
-    setIsElectron(isRunningInElectron);
-    
-    if (isRunningInElectron) {
-      // Set up listeners for menu-triggered events
-      const cleanupImportFiles = window.electron.onImportFiles(async (filePaths) => {
-        try {
-          // Remove the toast that shows importing status
-          
-          for (const filePath of filePaths) {
-            try {
-              // Use direct file import method
-              await importFromFilePath(filePath);
-            } catch (error) {
-              console.error(`Error importing file ${filePath}:`, error);
-              toast.error(`Failed to import file: ${filePath.split(/[\\/]/).pop()}`);
-            }
+    // Set up listeners for menu-triggered events
+    const cleanupImportFiles = window.electron.onImportFiles(async (filePaths) => {
+      try {
+        // Remove the toast that shows importing status
+        
+        for (const filePath of filePaths) {
+          try {
+            // Use direct file import method
+            await importFromFilePath(filePath);
+          } catch (error) {
+            console.error(`Error importing file ${filePath}:`, error);
+            toast.error(`Failed to import file: ${filePath.split(/[\\/]/).pop()}`);
           }
-        } catch (error) {
-          console.error('Error processing import files:', error);
-          toast.error('Failed to import files');
         }
-      });
-      
-      const cleanupOpenStorageLocation = window.electron.onOpenStorageLocation(() => {
-        // Storage location is opened by the main process
-      });
-      
-      const cleanupOpenSettings = window.electron.onOpenSettings(() => {
-        setSettingsOpen(true);
-      });
-      
-      // Clean up listeners on component unmount
-      return () => {
-        cleanupImportFiles();
-        cleanupOpenStorageLocation();
-        cleanupOpenSettings();
-      };
-    } else {
-      toast.warning("Running in browser mode. Local storage features are not available.");
-    }
+      } catch (error) {
+        console.error('Error processing import files:', error);
+        toast.error('Failed to import files');
+      }
+    });
+    
+    const cleanupOpenStorageLocation = window.electron.onOpenStorageLocation(() => {
+      // Storage location is opened by the main process
+    });
+    
+    const cleanupOpenSettings = window.electron.onOpenSettings(() => {
+      setSettingsOpen(true);
+    });
+    
+    // Clean up listeners on component unmount
+    return () => {
+      cleanupImportFiles();
+      cleanupOpenStorageLocation();
+      cleanupOpenSettings();
+    };
     
     // Initial loading of API key happens in the aiAnalysisService
     // No need to manually load from localStorage here as it's handled by the service

@@ -3,6 +3,7 @@ import { analyzeImage, analyzeVideoFrames, hasApiKey } from "@/services/aiAnalys
 import { toast } from "sonner";
 import { getVideoDimensions, captureVideoFrames } from '../lib/videoUtils';
 import { sendAnalyticsEvent } from "@/services/analyticsService";
+import { queueService } from "@/services/queueService";
 
 export type ImageItemType = "image" | "video";
 
@@ -47,34 +48,21 @@ export function useImageStore() {
   const [trashItems, setTrashItems] = useState<ImageItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isElectron, setIsElectron] = useState(false);
   const [deletedItemsHistory, setDeletedItemsHistory] = useState<ImageItem[]>([]);
 
   useEffect(() => {
-    const isRunningInElectron = window &&
-      typeof window.electron !== 'undefined' &&
-      window.electron !== null;
-
-    setIsElectron(isRunningInElectron);
-
     const loadImages = async () => {
       try {
-        if (isRunningInElectron) {
-          const [loadedImages, loadedTrashItems] = await Promise.all([
-            window.electron.loadImages(),
-            window.electron.listTrash()
-          ]);
-          // Sort by createdAt with newest first
-          const sortedImages = [...(loadedImages || [])].sort((a, b) =>
-            new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-          );
-          setImages(sortedImages);
-          setTrashItems(loadedTrashItems || []);
-        } else {
-          setImages([]);
-          setTrashItems([]);
-          toast.warning("Running in browser mode. Images will not be saved permanently.");
-        }
+        const [loadedImages, loadedTrashItems] = await Promise.all([
+          window.electron.loadImages(),
+          window.electron.listTrash()
+        ]);
+        // Sort by createdAt with newest first
+        const sortedImages = [...(loadedImages || [])].sort((a, b) =>
+          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+        setImages(sortedImages);
+        setTrashItems(loadedTrashItems || []);
       } catch (error) {
         console.error("Error loading images:", error);
         toast.error("Failed to load images");
@@ -83,6 +71,25 @@ export function useImageStore() {
     };
 
     loadImages();
+
+    // Initialize queue service
+    queueService.startWatching();
+
+    // Listen for queue import events
+    const handleQueueImport = (event: CustomEvent) => {
+      const { filePath } = event.detail;
+      importFromFilePath(filePath).then(() => {
+        // Remove the processed file from queue
+        queueService.removeFile(filePath);
+      });
+    };
+
+    window.addEventListener('queue-import-file', handleQueueImport as EventListener);
+    
+    return () => {
+      queueService.stopWatching();
+      window.removeEventListener('queue-import-file', handleQueueImport as EventListener);
+    };
   }, []);
 
   const readFileAsDataURL = (file: File): Promise<string> => {
@@ -104,8 +111,6 @@ export function useImageStore() {
   };
 
   const saveMediaToDisk = async (media: ImageItem, dataUrl: string): Promise<string | undefined> => {
-    if (!isElectron || !window.electron) return undefined;
-
     try {
       const result = await window.electron.saveImage({
         id: media.id,
@@ -188,7 +193,7 @@ export function useImageStore() {
         imageContext: imageContext // Set imageContext at the image level
       };
 
-      if (isElectron && window.electron && savedFilePath) {
+      if (window.electron && savedFilePath) {
         try {
           await window.electron.updateMetadata({
             id: updatedMedia.id,
@@ -211,7 +216,7 @@ export function useImageStore() {
       const updatedMedia = { ...media, isAnalyzing: false, error: 'Analysis failed' };
       
       // Make sure to save the error state in metadata
-      if (isElectron && window.electron && savedFilePath) {
+      if (window.electron && savedFilePath) {
         try {
           await window.electron.updateMetadata({
             id: updatedMedia.id,
@@ -297,19 +302,17 @@ export function useImageStore() {
       toast.error("Failed to add media: " + (error instanceof Error ? error.message : 'Unknown error'));
       setIsUploading(false); // Make sure to reset on error
     }
-  }, [isElectron]);
+  }, []);
 
   const removeImage = useCallback(async (id: string) => {
     try {
       const itemToDelete = images.find(img => img.id === id);
       if (!itemToDelete) return;
 
-      if (isElectron) {
-        await window.electron.deleteImage(id);
-        // Update trash items list
-        const updatedTrashItems = await window.electron.listTrash();
-        setTrashItems(updatedTrashItems);
-      }
+      await window.electron.deleteImage(id);
+      // Update trash items list
+      const updatedTrashItems = await window.electron.listTrash();
+      setTrashItems(updatedTrashItems);
       setImages(prevImages => prevImages.filter(img => img.id !== id));
       // Add to history
       setDeletedItemsHistory(prev => [...prev, itemToDelete]);
@@ -317,10 +320,10 @@ export function useImageStore() {
       console.error("Failed to delete image:", error);
       toast.error("Failed to delete image");
     }
-  }, [isElectron, images]);
+  }, [images]);
 
   const undoDelete = useCallback(async () => {
-    if (deletedItemsHistory.length === 0 || !isElectron) return;
+    if (deletedItemsHistory.length === 0) return;
 
     try {
       // Get the last deleted item
@@ -357,11 +360,9 @@ export function useImageStore() {
       console.error("Failed to restore image:", error);
       toast.error("Failed to restore image");
     }
-  }, [deletedItemsHistory, isElectron]);
+  }, [deletedItemsHistory]);
 
   const emptyTrash = useCallback(async () => {
-    if (!isElectron) return;
-
     try {
       await window.electron.emptyTrash();
       setTrashItems([]);
@@ -371,20 +372,12 @@ export function useImageStore() {
       console.error("Failed to empty trash:", error);
       toast.error("Failed to empty trash");
     }
-  }, [isElectron]);
+  }, []);
 
   // Add this function to handle importing files directly from the file system
   // This will be used by the menu file import function
   const importFromFilePath = async (filePath: string) => {
-    if (!isElectron || !window.electron) {
-      console.error("Cannot import file directly in browser mode");
-      toast.error("Cannot import file directly in browser mode");
-      return;
-    }
-    
     try {
-      // For browser testing - this won't actually work in browser mode
-      if (!isElectron) return;
       
       // Get the file extension
       const fileExt = filePath.toLowerCase().split('.').pop() || '';
@@ -535,13 +528,14 @@ export function useImageStore() {
     trashItems,
     isUploading,
     isLoading,
-    isElectron,
     addImage,
     removeImage,
     emptyTrash,
     undoDelete,
     importFromFilePath,
     canUndo: deletedItemsHistory.length > 0,
+    // Queue management
+    queueService,
     retryAnalysis: async (imageId: string) => {
       // Find the media
       const mediaToAnalyze = images.find(img => img.id === imageId);
@@ -566,9 +560,9 @@ export function useImageStore() {
         // Get the data URL for analysis
         let dataUrl;
         
-        if (isElectron && mediaToAnalyze.actualFilePath) {
+        if (mediaToAnalyze.actualFilePath) {
           if (mediaToAnalyze.type === "image") {
-            // If in Electron mode and we have a file path, convert image to base64
+            // If we have a file path, convert image to base64
             dataUrl = await window.electron.convertImageToBase64(mediaToAnalyze.actualFilePath);
           } else {
             // For videos, use the file URL directly
@@ -598,7 +592,7 @@ export function useImageStore() {
         ));
         
         // Persist error state to disk
-        if (isElectron && window.electron && mediaToAnalyze.actualFilePath) {
+        if (window.electron && mediaToAnalyze.actualFilePath) {
           try {
             await window.electron.updateMetadata({
               id: errorMedia.id,

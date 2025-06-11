@@ -120,6 +120,17 @@ contextBridge.exposeInMainWorld(
     onOpenSettings: (callback) => {
       ipcRenderer.on('open-settings', () => callback());
       return () => ipcRenderer.removeAllListeners('open-settings');
+    },
+
+    // Queue management
+    queueStartWatching: () => ipcRenderer.invoke('queue:start-watching'),
+    queueStopWatching: () => ipcRenderer.invoke('queue:stop-watching'),
+    queueListFiles: () => ipcRenderer.invoke('queue:list-files'),
+    queueProcessFile: (filePath) => ipcRenderer.invoke('queue:process-file', filePath),
+    queueRemoveFile: (filePath) => ipcRenderer.invoke('queue:remove-file', filePath),
+    onQueueNewFile: (callback) => {
+      ipcRenderer.on('queue:new-file', (_, filePath) => callback(filePath));
+      return () => ipcRenderer.removeAllListeners('queue:new-file');
     }
   }
 );

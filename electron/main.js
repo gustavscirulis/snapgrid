@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs-extra';
 import os from 'os';
 import {promises as fsPromises} from 'fs'; // Import fsPromises
+import chokidar from 'chokidar';
 // We'll use dynamic import for electron-window-state instead
 // import windowStateKeeper from 'electron-window-state';
 
@@ -208,6 +209,11 @@ const getAppStorageDir = async () => {
   await fs.emptyDir(trashImagesDir);
   await fs.emptyDir(trashMetadataDir);
   console.log('Trash emptied on startup');
+
+  // Create queue directory for mobile imports
+  const queueDir = path.join(storageDir, 'queue');
+  await fs.ensureDir(queueDir);
+  console.log('Queue directories created');
 
   return storageDir;
 };
@@ -1074,6 +1080,135 @@ ipcMain.handle('get-user-preference', async (event, { key, defaultValue }) => {
     return { success: true, value };
   } catch (error) {
     console.error('Error getting user preference:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Queue management variables
+let queueWatcher = null;
+let queueProcessingActive = false;
+
+// Start watching the queue folder for new images
+ipcMain.handle('queue:start-watching', async () => {
+  try {
+    if (queueWatcher) {
+      console.log('Queue watcher already running');
+      return { success: true, message: 'Already watching' };
+    }
+
+    const queueDir = path.join(appStorageDir, 'queue');
+    
+    queueWatcher = chokidar.watch(queueDir, {
+      ignored: /(^|[\/\\])\../, // ignore dotfiles
+      persistent: true,
+      ignoreInitial: false
+    });
+
+    queueWatcher.on('add', (filePath) => {
+      console.log('New file detected in queue:', filePath);
+      // Notify renderer about new queued file
+      if (mainWindow) {
+        mainWindow.webContents.send('queue:new-file', filePath);
+      }
+    });
+
+    queueWatcher.on('error', (error) => {
+      console.error('Queue watcher error:', error);
+    });
+
+    console.log('Started watching queue directory:', queueDir);
+    return { success: true, message: 'Queue watching started' };
+  } catch (error) {
+    console.error('Error starting queue watcher:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Stop watching the queue folder
+ipcMain.handle('queue:stop-watching', async () => {
+  try {
+    if (queueWatcher) {
+      await queueWatcher.close();
+      queueWatcher = null;
+      console.log('Queue watcher stopped');
+    }
+    return { success: true, message: 'Queue watching stopped' };
+  } catch (error) {
+    console.error('Error stopping queue watcher:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get list of files in queue
+ipcMain.handle('queue:list-files', async () => {
+  try {
+    const queueDir = path.join(appStorageDir, 'queue');
+    const files = await fs.readdir(queueDir);
+    const imageFiles = files.filter(file => 
+      /\.(jpg|jpeg|png|gif|webp|bmp|tiff)$/i.test(file)
+    );
+    
+    return { 
+      success: true, 
+      files: imageFiles.map(file => path.join(queueDir, file))
+    };
+  } catch (error) {
+    console.error('Error listing queue files:', error);
+    return { success: false, error: error.message, files: [] };
+  }
+});
+
+// Process a single queued file (move it to main library)
+ipcMain.handle('queue:process-file', async (event, filePath) => {
+  try {
+    const queueDir = path.join(appStorageDir, 'queue');
+    
+    // Check if file is in queue directory
+    if (!filePath.startsWith(queueDir)) {
+      throw new Error('File is not in queue directory');
+    }
+
+    // Check if file exists
+    if (!await fs.pathExists(filePath)) {
+      throw new Error('File does not exist');
+    }
+
+    // Get file stats for the import
+    const stats = await fs.stat(filePath);
+    const fileName = path.basename(filePath);
+    
+    console.log('Processing queued file:', fileName);
+    
+    // Return file info for processing by renderer
+    return {
+      success: true,
+      filePath,
+      fileName,
+      size: stats.size,
+      modified: stats.mtime.toISOString()
+    };
+  } catch (error) {
+    console.error('Error processing queued file:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Remove processed file from queue
+ipcMain.handle('queue:remove-file', async (event, filePath) => {
+  try {
+    const queueDir = path.join(appStorageDir, 'queue');
+    
+    // Check if file is in queue directory
+    if (!filePath.startsWith(queueDir)) {
+      throw new Error('File is not in queue directory');
+    }
+
+    await fs.remove(filePath);
+    console.log('Removed processed file from queue:', path.basename(filePath));
+    
+    return { success: true, message: 'File removed from queue' };
+  } catch (error) {
+    console.error('Error removing file from queue:', error);
     return { success: false, error: error.message };
   }
 }); 
