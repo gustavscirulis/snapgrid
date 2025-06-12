@@ -338,10 +338,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     );
   };
 
-  // Empty state placeholder masonry
-  const renderEmptyStatePlaceholders = () => {
-    const { isDragging } = dragContext;
-    
+  // Memoize placeholder heights to prevent constant re-rendering
+  const placeholderHeights = React.useMemo(() => {
     // Define possible height ranges
     const heightRanges = [
       { min: 150, max: 250 },  // Short
@@ -349,17 +347,17 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       { min: 350, max: 450 }   // Tall
     ];
     
-    // Shuffle array function to randomize order
-    const shuffleArray = (array: number[]) => {
-      for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-      }
-      return array;
-    };
-    
-    // Create array of indexes and shuffle them
-    const indexes = shuffleArray([...Array(12)].map((_, i) => i));
+    // Generate fixed heights for placeholders
+    return Array.from({ length: 12 }).map((_, index) => {
+      const heightIndex = index % 3;
+      const range = heightRanges[heightIndex];
+      return range.min + Math.floor(Math.random() * (range.max - range.min));
+    });
+  }, []); // Empty dependency array ensures this only runs once
+
+  // Empty state placeholder masonry
+  const renderEmptyStatePlaceholders = () => {
+    const { isDragging } = dragContext;
     
     return (
       <Masonry
@@ -367,26 +365,19 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         className={`my-masonry-grid ${isDragging ? 'opacity-30 blur-[1px]' : 'opacity-50'} transition-all duration-300`}
         columnClassName="my-masonry-grid_column"
       >
-        {Array.from({ length: 12 }).map((_, index) => {
-          // Use the shuffled index to get more randomized heights
-          const heightIndex = indexes[index] % 3;
-          const range = heightRanges[heightIndex];
-          const height = range.min + Math.floor(Math.random() * (range.max - range.min));
-          
-          return (
-            <div key={index} className="masonry-item">
-              <motion.div 
-                className="rounded-lg overflow-hidden bg-gray-300 dark:bg-zinc-800 w-full transition-all duration-300"
-                style={{ height: `${height}px` }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: isDragging ? 0.2 : 0.5 }}
-                transition={{ 
-                  opacity: { duration: 0.5, delay: index * 0.05 }
-                }}
-              />
-            </div>
-          );
-        })}
+        {placeholderHeights.map((height, index) => (
+          <div key={index} className="masonry-item">
+            <motion.div 
+              className="rounded-lg overflow-hidden bg-gray-300 dark:bg-zinc-800 w-full transition-all duration-300"
+              style={{ height: `${height}px` }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: isDragging ? 0.2 : 0.5 }}
+              transition={{ 
+                opacity: { duration: 0.5, delay: index * 0.05 }
+              }}
+            />
+          </div>
+        ))}
       </Masonry>
     );
   };
