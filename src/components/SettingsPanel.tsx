@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { useTheme } from "@/components/ThemeProvider";
 import { Moon, Sun, SunMoon, Code, X, Smartphone } from "lucide-react";
 import { setOpenAIApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";

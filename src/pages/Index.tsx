@@ -6,17 +6,10 @@ import ImageGrid from "@/components/ImageGrid";
 import { Search, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { setOpenAIApiKey } from "@/services/aiAnalysisService";
 import { Toaster, toast } from "sonner";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import WindowControls from "@/components/WindowControls";
 
-// Helper function to convert File URL to File object
-const urlToFile = async (url: string, filename: string): Promise<File> => {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  return new File([blob], filename, { type: blob.type });
-};
 
 const Index = () => {
   const { 
