@@ -4,16 +4,17 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
 import { Moon, Sun, SunMoon, Code, X, Check, Plus, Trash2, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { setOpenAIApiKey, setAnthropicApiKey, setGeminiApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
+import { setOpenAIApiKey, setAnthropicApiKey, setGeminiApiKey, setOpenRouterApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAnalyticsConsent, setAnalyticsConsent } from "@/services/analyticsService";
 import {
-  fetchVisionModels, fetchClaudeModels, fetchGeminiModels,
+  fetchVisionModels, fetchClaudeModels, fetchGeminiModels, fetchOpenRouterModels,
   getSelectedModel, setSelectedModel,
   getSelectedClaudeModel, setSelectedClaudeModel,
   getSelectedGeminiModel, setSelectedGeminiModel,
+  getSelectedOpenRouterModel, setSelectedOpenRouterModel,
   getActiveProvider, setActiveProvider,
   clearModelCache, AUTO_MODEL_VALUE,
   type AIProvider,
@@ -224,23 +225,29 @@ const ThemeSelector = () => {
   );
 };
 
+const PROVIDER_LABELS: Record<AIProvider, string> = {
+  openai: "OpenAI",
+  anthropic: "Claude",
+  gemini: "Gemini",
+  openrouter: "OpenRouter",
+};
+
 const ProviderSelector = ({ provider, onProviderChange }: { provider: AIProvider; onProviderChange: (p: AIProvider) => void }) => {
   return (
     <div className="flex items-center justify-between">
       <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Provider</span>
-      <Tabs value={provider} onValueChange={(v) => onProviderChange(v as AIProvider)}>
-        <TabsList className="grid grid-cols-3 h-8 bg-gray-100/80 dark:bg-zinc-800/80 p-0.5 rounded-md">
-          <TabsTrigger value="openai" className={tabTriggerClass + " px-3"}>
-            OpenAI
-          </TabsTrigger>
-          <TabsTrigger value="anthropic" className={tabTriggerClass + " px-3"}>
-            Claude
-          </TabsTrigger>
-          <TabsTrigger value="gemini" className={tabTriggerClass + " px-3"}>
-            Gemini
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <Select value={provider} onValueChange={(v) => onProviderChange(v as AIProvider)}>
+        <SelectTrigger className="w-[160px] h-8 rounded-md text-sm border-gray-200 dark:border-zinc-700/50 bg-gray-50 dark:bg-zinc-800 focus:outline-none focus:ring-0 focus:border-gray-300 dark:focus:border-zinc-600">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {(Object.keys(PROVIDER_LABELS) as AIProvider[]).map((key) => (
+            <SelectItem key={key} value={key}>
+              {PROVIDER_LABELS[key]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 };
@@ -340,6 +347,13 @@ const PROVIDER_CONFIG = {
     placeholder: "AIza...",
     setKey: setGeminiApiKey,
   },
+  openrouter: {
+    linkText: "Get an API key",
+    url: "https://openrouter.ai/settings/keys",
+    prefix: "sk-or-",
+    placeholder: "sk-or-...",
+    setKey: setOpenRouterApiKey,
+  },
 } as const;
 
 const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) => {
@@ -382,7 +396,7 @@ const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) =>
     }
 
     if (!apiKey.trim().startsWith(config.prefix)) {
-      const providerNames: Record<AIProvider, string> = { openai: "OpenAI", anthropic: "Anthropic", gemini: "Google AI Studio" };
+      const providerNames: Record<AIProvider, string> = { openai: "OpenAI", anthropic: "Anthropic", gemini: "Google AI Studio", openrouter: "OpenRouter" };
       toast.error(`Invalid API key format. ${providerNames[provider]} API keys start with '${config.prefix}'`);
       return;
     }
@@ -482,7 +496,7 @@ const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) =>
 };
 
 const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; provider: AIProvider; keyVersion: number }) => {
-  const [models, setModels] = useState<Array<{ id: string }>>([]);
+  const [models, setModels] = useState<Array<{ id: string; display_name?: string }>>([]);
   const [selectedModelValue, setSelectedModelValue] = useState<string>(AUTO_MODEL_VALUE);
   const [isLoading, setIsLoading] = useState(false);
   const [keyExists, setKeyExists] = useState(false);
@@ -490,9 +504,11 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
 
   useEffect(() => {
     if (!isOpen) return;
+    let stale = false;
 
     const load = async () => {
       const exists = await hasApiKey(provider);
+      if (stale) return;
       setKeyExists(exists);
       if (!exists) {
         setModels([]);
@@ -501,12 +517,14 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
 
       setIsLoading(true);
       setError(null);
+      setModels([]);
       try {
         if (provider === 'gemini') {
           const [pref, modelList] = await Promise.all([
             getSelectedGeminiModel(),
             fetchGeminiModels(),
           ]);
+          if (stale) return;
           setSelectedModelValue(pref);
           setModels(modelList);
         } else if (provider === 'anthropic') {
@@ -514,6 +532,15 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
             getSelectedClaudeModel(),
             fetchClaudeModels(),
           ]);
+          if (stale) return;
+          setSelectedModelValue(pref);
+          setModels(modelList);
+        } else if (provider === 'openrouter') {
+          const [pref, modelList] = await Promise.all([
+            getSelectedOpenRouterModel(),
+            fetchOpenRouterModels(),
+          ]);
+          if (stale) return;
           setSelectedModelValue(pref);
           setModels(modelList);
         } else {
@@ -521,17 +548,19 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
             getSelectedModel(),
             fetchVisionModels(),
           ]);
+          if (stale) return;
           setSelectedModelValue(pref);
           setModels(modelList);
         }
       } catch {
-        setError("Could not load models");
+        if (!stale) setError("Could not load models");
       } finally {
-        setIsLoading(false);
+        if (!stale) setIsLoading(false);
       }
     };
 
     load();
+    return () => { stale = true; };
   }, [isOpen, provider, keyVersion]);
 
   if (!keyExists) return null;
@@ -542,6 +571,8 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
       await setSelectedGeminiModel(value);
     } else if (provider === 'anthropic') {
       await setSelectedClaudeModel(value);
+    } else if (provider === 'openrouter') {
+      await setSelectedOpenRouterModel(value);
     } else {
       await setSelectedModel(value);
     }
@@ -553,6 +584,7 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
     );
   };
 
+  const showAutoOption = provider !== 'openrouter';
   const latestModelName = models.length > 0 ? models[0].id : "...";
 
   return (
@@ -563,13 +595,17 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
           <SelectValue placeholder={isLoading ? "Loading models..." : "Select model..."} />
         </SelectTrigger>
         <SelectContent side="bottom" sideOffset={4} avoidCollisions={false} className="max-h-52">
-          <SelectItem value={AUTO_MODEL_VALUE}>
-            Use latest ({latestModelName})
-          </SelectItem>
-          {models.length > 0 && <SelectSeparator />}
+          {showAutoOption && (
+            <>
+              <SelectItem value={AUTO_MODEL_VALUE}>
+                Use latest ({latestModelName})
+              </SelectItem>
+              {models.length > 0 && <SelectSeparator />}
+            </>
+          )}
           {models.map((m) => (
             <SelectItem key={m.id} value={m.id}>
-              {m.id}
+              {m.display_name || m.id}
             </SelectItem>
           ))}
         </SelectContent>

@@ -97,10 +97,15 @@ export async function setGeminiApiKey(key: string): Promise<boolean> {
   return setApiKeyForService('gemini', key);
 }
 
+export async function setOpenRouterApiKey(key: string): Promise<boolean> {
+  return setApiKeyForService('openrouter', key);
+}
+
 export async function hasApiKey(provider?: AIProvider): Promise<boolean> {
   const p = provider ?? await getActiveProvider();
   if (p === 'anthropic') return hasApiKeyForService('anthropic');
   if (p === 'gemini') return hasApiKeyForService('gemini');
+  if (p === 'openrouter') return hasApiKeyForService('openrouter');
   return hasApiKeyForService('openai');
 }
 
@@ -116,10 +121,15 @@ export async function getGeminiApiKey(): Promise<string | null> {
   return getApiKeyForService('gemini');
 }
 
+export async function getOpenRouterApiKey(): Promise<string | null> {
+  return getApiKeyForService('openrouter');
+}
+
 export async function deleteApiKey(provider?: AIProvider): Promise<boolean> {
   const p = provider ?? await getActiveProvider();
   if (p === 'anthropic') return deleteApiKeyForService('anthropic');
   if (p === 'gemini') return deleteApiKeyForService('gemini');
+  if (p === 'openrouter') return deleteApiKeyForService('openrouter');
   return deleteApiKeyForService('openai');
 }
 
@@ -155,6 +165,10 @@ const USER_TEXT = "Analyze this image and provide a detailed breakdown of its co
 // ── Response parsing (shared by both providers) ────────────────────
 
 function parseAnalysisResponse(content: string): PatternMatch[] {
+  if (!content || typeof content !== 'string' || content.trim().length === 0) {
+    throw new Error('Empty response from AI model — the model may not support this image format or the response was truncated');
+  }
+
   try {
     let jsonString = content;
 
@@ -379,12 +393,77 @@ async function analyzeImageWithGemini(imageUrl: string, modelId: string, systemP
   return parseAnalysisResponse(content);
 }
 
+// ── OpenRouter analysis ──────────────────────────────────────────
+
+async function analyzeImageWithOpenRouter(imageUrl: string, modelId: string, systemPrompt: string): Promise<PatternMatch[]> {
+  const payload = {
+    model: modelId,
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt
+      },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: USER_TEXT },
+          { type: "image_url", image_url: { url: imageUrl } }
+        ]
+      }
+    ],
+    max_tokens: 1200
+  };
+
+  let data;
+
+  if (window.electron && window.electron.callOpenRouter) {
+    data = await window.electron.callOpenRouter(payload);
+  } else {
+    const apiKey = await getOpenRouterApiKey();
+    if (!apiKey) throw new Error("OpenRouter API key not found");
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://snapgrid.app',
+        'X-Title': 'SnapGrid'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`OpenRouter API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    data = await response.json();
+  }
+
+  // OpenRouter may return an error object inside a 200 response
+  if (data.error) {
+    throw new Error(`OpenRouter model error: ${data.error.message || JSON.stringify(data.error)}`);
+  }
+
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    const finishReason = data.choices?.[0]?.finish_reason;
+    throw new Error(
+      `Model returned empty response${finishReason ? ` (finish_reason: ${finishReason})` : ''}. ` +
+      'This model may not support image analysis or the request format.'
+    );
+  }
+  return parseAnalysisResponse(content);
+}
+
 // ── Public API ─────────────────────────────────────────────────────
 
 const PROVIDER_NAMES: Record<string, string> = {
   openai: "OpenAI",
   anthropic: "Anthropic",
   gemini: "Google Gemini",
+  openrouter: "OpenRouter",
 };
 
 export async function analyzeImage(imageUrl: string, systemPrompt?: string): Promise<PatternMatch[]> {
@@ -404,6 +483,9 @@ export async function analyzeImage(imageUrl: string, systemPrompt?: string): Pro
     }
     if (provider === 'gemini') {
       return await analyzeImageWithGemini(imageUrl, modelId, prompt);
+    }
+    if (provider === 'openrouter') {
+      return await analyzeImageWithOpenRouter(imageUrl, modelId, prompt);
     }
     return await analyzeImageWithOpenAI(imageUrl, modelId, prompt);
   } catch (error) {

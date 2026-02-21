@@ -64,6 +64,12 @@ interface IElectronAPI {
     models?: Array<{ id: string; display_name: string }>;
     error?: string;
   }>;
+  callOpenRouter?: (payload: any) => Promise<any>;
+  listOpenRouterModels?: () => Promise<{
+    success: boolean;
+    models?: Array<{ id: string; display_name: string }>;
+    error?: string;
+  }>;
   saveMediaData?: (data: any) => Promise<any>;
   
   // Export iOS Shortcut

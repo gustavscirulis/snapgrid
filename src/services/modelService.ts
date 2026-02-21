@@ -5,7 +5,7 @@ import { getApiKey } from "@/services/aiAnalysisService";
 
 // ── Provider type ──────────────────────────────────────────────────
 
-export type AIProvider = "openai" | "anthropic" | "gemini";
+export type AIProvider = "openai" | "anthropic" | "gemini" | "openrouter";
 
 const PROVIDER_PREFERENCE_KEY = "ai-provider";
 
@@ -78,6 +78,7 @@ export function clearModelCache(): void {
   cachedOpenAIModels = null;
   cachedClaudeModels = null;
   cachedGeminiModels = null;
+  cachedOpenRouterModels = null;
 }
 
 export function isVisionCapable(modelId: string): boolean {
@@ -352,6 +353,72 @@ export async function setSelectedGeminiModel(modelId: string): Promise<void> {
   }
 }
 
+// ── OpenRouter ────────────────────────────────────────────────────
+
+export interface OpenRouterModel {
+  id: string;
+  display_name: string;
+}
+
+const OPENROUTER_PREFERENCE_KEY = "openrouter-model";
+const OPENROUTER_FALLBACK_MODEL = "anthropic/claude-sonnet-4.6";
+
+let cachedOpenRouterModels: OpenRouterModel[] | null = null;
+
+export async function fetchOpenRouterModels(): Promise<OpenRouterModel[]> {
+  if (cachedOpenRouterModels) return cachedOpenRouterModels;
+
+  let allModels: OpenRouterModel[];
+
+  if (window.electron?.listOpenRouterModels) {
+    const result = await window.electron.listOpenRouterModels();
+    if (!result.success || !result.models) {
+      throw new Error(result.error || "Failed to fetch OpenRouter models");
+    }
+    allModels = result.models;
+  } else {
+    const response = await fetch("https://openrouter.ai/api/v1/models");
+    if (!response.ok) throw new Error("Failed to fetch OpenRouter models");
+    const data = await response.json();
+    allModels = (data.data || [])
+      .filter((m: { architecture?: { input_modalities?: string[] } }) => {
+        const modalities = m.architecture?.input_modalities;
+        return Array.isArray(modalities) && modalities.includes("image");
+      })
+      .map((m: { id: string; name?: string }) => ({
+        id: m.id,
+        display_name: m.name || m.id,
+      }));
+  }
+
+  cachedOpenRouterModels = allModels.sort(
+    (a, b) => a.display_name.localeCompare(b.display_name)
+  );
+
+  return cachedOpenRouterModels;
+}
+
+export async function getSelectedOpenRouterModel(): Promise<string> {
+  if (window.electron?.getUserPreference) {
+    const result = await window.electron.getUserPreference(
+      OPENROUTER_PREFERENCE_KEY,
+      OPENROUTER_FALLBACK_MODEL
+    );
+    const value = result.success ? result.value : OPENROUTER_FALLBACK_MODEL;
+    return value === AUTO_MODEL_VALUE ? OPENROUTER_FALLBACK_MODEL : value || OPENROUTER_FALLBACK_MODEL;
+  }
+  const stored = localStorage.getItem(OPENROUTER_PREFERENCE_KEY);
+  return (!stored || stored === AUTO_MODEL_VALUE) ? OPENROUTER_FALLBACK_MODEL : stored;
+}
+
+export async function setSelectedOpenRouterModel(modelId: string): Promise<void> {
+  if (window.electron?.setUserPreference) {
+    await window.electron.setUserPreference(OPENROUTER_PREFERENCE_KEY, modelId);
+  } else {
+    localStorage.setItem(OPENROUTER_PREFERENCE_KEY, modelId);
+  }
+}
+
 // ── Unified resolution ─────────────────────────────────────────────
 
 // Resolve which model ID to actually use for analysis, based on active provider
@@ -382,6 +449,10 @@ export async function resolveModel(): Promise<string> {
       }
     }
     return preference;
+  }
+
+  if (provider === "openrouter") {
+    return await getSelectedOpenRouterModel();
   }
 
   // OpenAI path (default)

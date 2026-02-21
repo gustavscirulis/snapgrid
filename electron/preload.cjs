@@ -59,7 +59,11 @@ contextBridge.exposeInMainWorld(
     // Google Gemini API proxy
     callGemini: (payload) => ipcRenderer.invoke('call-gemini', payload),
     listGeminiModels: () => ipcRenderer.invoke('list-gemini-models'),
-    
+
+    // OpenRouter API proxy
+    callOpenRouter: (payload) => ipcRenderer.invoke('call-openrouter', payload),
+    listOpenRouterModels: () => ipcRenderer.invoke('list-openrouter-models'),
+
     // Analytics settings
     getAnalyticsConsent: () => ipcRenderer.invoke('get-analytics-consent'),
     setAnalyticsConsent: (consent) => ipcRenderer.invoke('set-analytics-consent', consent),
