@@ -31,6 +31,8 @@ export interface ImageItem {
   // Video specific props
   duration?: number;
   posterUrl?: string;
+  // Thumbnail for grid display (JPG, smaller than original)
+  thumbnailUrl?: string;
   // Context description for the entire image
   imageContext?: string;
 }

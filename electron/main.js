@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, Menu, nativeImage } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs-extra';
@@ -14,6 +14,78 @@ const __dirname = path.dirname(__filename);
 
 // Detect development mode without using electron-is-dev
 const isDev = process.env.NODE_ENV === 'development' || !/[\\/]app\.asar[\\/]/.test(__dirname);
+
+// Thumbnail generation constants
+const THUMB_MAX_WIDTH = 800;
+const THUMB_JPEG_QUALITY = 90;
+
+/**
+ * Generates a JPEG thumbnail from an image buffer.
+ * Resizes to max THUMB_MAX_WIDTH wide (preserving aspect ratio) and compresses as JPEG.
+ * @param {Buffer} sourceBuffer - The original image buffer
+ * @param {string} destPath - Where to write the thumbnail
+ */
+async function generateThumbnail(sourceBuffer, destPath) {
+  if (!sourceBuffer || sourceBuffer.length === 0) {
+    throw new Error('Empty or missing source buffer');
+  }
+
+  const image = nativeImage.createFromBuffer(sourceBuffer);
+  if (image.isEmpty()) {
+    throw new Error(`nativeImage could not decode buffer (${sourceBuffer.length} bytes)`);
+  }
+
+  const { width, height } = image.getSize();
+  let resized = image;
+
+  if (width > THUMB_MAX_WIDTH) {
+    const newHeight = Math.round((THUMB_MAX_WIDTH / width) * height);
+    resized = image.resize({ width: THUMB_MAX_WIDTH, height: newHeight, quality: 'best' });
+  }
+
+  const jpegBuffer = resized.toJPEG(THUMB_JPEG_QUALITY);
+  await fs.writeFile(destPath, jpegBuffer);
+}
+
+/**
+ * Generates missing thumbnails for existing images on startup.
+ * Idempotent: skips images that already have thumbnails.
+ */
+async function generateMissingThumbnails(storageDir) {
+  const imagesDir = path.join(storageDir, 'images');
+  const thumbnailsDir = path.join(storageDir, 'thumbnails');
+
+  try {
+    const files = await fs.readdir(imagesDir);
+    const imageFiles = files.filter(f => !f.startsWith('vid_') && !f.startsWith('.'));
+
+    let generated = 0;
+    let skipped = 0;
+    for (const file of imageFiles) {
+      const id = path.basename(file, path.extname(file));
+      const thumbnailPath = path.join(thumbnailsDir, `${id}.jpg`);
+
+      if (await fs.pathExists(thumbnailPath)) continue;
+
+      try {
+        const filePath = path.join(imagesDir, file);
+        const sourceBuffer = await fs.readFile(filePath);
+        await generateThumbnail(sourceBuffer, thumbnailPath);
+        generated++;
+      } catch (err) {
+        // nativeImage can't decode WebP or other unsupported formats — skip silently
+        // These files will use the original as their grid image (no thumbnail)
+        skipped++;
+      }
+    }
+
+    if (generated > 0 || skipped > 0) {
+      console.log(`Thumbnails: ${generated} generated, ${skipped} skipped (unsupported format)`);
+    }
+  } catch (error) {
+    console.error('Error generating missing thumbnails:', error);
+  }
+}
 
 // Global storage path that will be exposed to the renderer
 let appStorageDir;
@@ -190,20 +262,24 @@ const getAppStorageDir = async () => {
   // Ensure main directory exists
   fs.ensureDirSync(storageDir);
 
-  // Create images and metadata subdirectories
+  // Create images, metadata, and thumbnails subdirectories
   const imagesDir = path.join(storageDir, 'images');
   const metadataDir = path.join(storageDir, 'metadata');
+  const thumbnailsDir = path.join(storageDir, 'thumbnails');
   fs.ensureDirSync(imagesDir);
   fs.ensureDirSync(metadataDir);
+  fs.ensureDirSync(thumbnailsDir);
 
   // Create trash directory
   trashDir = path.join(storageDir, '.trash');
   fs.ensureDirSync(trashDir);
-  // Create trash subdirectories for images and metadata
+  // Create trash subdirectories for images, metadata, and thumbnails
   const trashImagesDir = path.join(trashDir, 'images');
   const trashMetadataDir = path.join(trashDir, 'metadata');
+  const trashThumbnailsDir = path.join(trashDir, 'thumbnails');
   fs.ensureDirSync(trashImagesDir);
   fs.ensureDirSync(trashMetadataDir);
+  fs.ensureDirSync(trashThumbnailsDir);
 
   // Empty trash on startup
   await fs.emptyDir(trashImagesDir);
@@ -262,6 +338,7 @@ async function checkForUpdates() {
 
 async function createWindow() {
   appStorageDir = await getAppStorageDir();
+  await generateMissingThumbnails(appStorageDir);
   console.log('App storage directory:', appStorageDir);
   
   
@@ -791,8 +868,23 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
       type: isVideo ? 'video' : 'image' // Ensure type is correctly set
     });
 
+    // Generate thumbnail for images (not videos)
+    let thumbnailPath = null;
+    if (!isVideo) {
+      try {
+        const thumbnailsDir = path.join(appStorageDir, 'thumbnails');
+        thumbnailPath = path.join(thumbnailsDir, `${id}.jpg`);
+        const imageBuffer = await fs.readFile(filePath);
+        await generateThumbnail(imageBuffer, thumbnailPath);
+        console.log(`Thumbnail generated: ${thumbnailPath}`);
+      } catch (thumbError) {
+        console.error('Error generating thumbnail:', thumbError);
+        thumbnailPath = null; // Fall back to original if thumbnail generation fails
+      }
+    }
+
     console.log(`File is accessible`);
-    return { success: true, path: filePath };
+    return { success: true, path: filePath, thumbnailPath };
   } catch (error) {
     console.error('Error saving image:', error);
     return { success: false, error: error.message };
@@ -831,6 +923,11 @@ ipcMain.handle('load-images', async () => {
           // Use the local-file protocol for both images and videos
           const localFileUrl = `local-file://${mediaPath}`;
 
+          // Check for thumbnail
+          const thumbnailsDir = path.join(appStorageDir, 'thumbnails');
+          const thumbnailPath = path.join(thumbnailsDir, `${id}.jpg`);
+          const hasThumbnail = !isVideo && await fs.pathExists(thumbnailPath);
+
           // Construct the media object with correct paths
           const mediaObject = {
             ...metadata,
@@ -838,7 +935,8 @@ ipcMain.handle('load-images', async () => {
             url: localFileUrl,
             type: isVideo ? 'video' : metadata.type || 'image',
             actualFilePath: mediaPath,
-            useDirectPath: true // Flag to indicate this is a direct file path
+            useDirectPath: true,
+            ...(hasThumbnail ? { thumbnailUrl: `local-file://${thumbnailPath}` } : {})
           };
 
           return mediaObject;
@@ -878,6 +976,13 @@ ipcMain.handle('delete-image', async (event, id) => {
     await fs.move(mediaPath, trashMediaPath, { overwrite: true });
     await fs.move(metadataPath, trashMetadataPath, { overwrite: true });
 
+    // Also move thumbnail if it exists
+    const thumbnailPath = path.join(appStorageDir, 'thumbnails', `${id}.jpg`);
+    const trashThumbnailPath = path.join(trashDir, 'thumbnails', `${id}.jpg`);
+    if (await fs.pathExists(thumbnailPath)) {
+      await fs.move(thumbnailPath, trashThumbnailPath, { overwrite: true });
+    }
+
     console.log(`Moved media to trash: ${trashMediaPath}`);
     return { success: true };
   } catch (error) {
@@ -907,6 +1012,13 @@ ipcMain.handle('restore-from-trash', async (event, id) => {
     await fs.move(trashMediaPath, mediaPath, { overwrite: true });
     await fs.move(trashMetadataPath, metadataPath, { overwrite: true });
 
+    // Also restore thumbnail if it exists in trash
+    const trashThumbnailPath = path.join(trashDir, 'thumbnails', `${id}.jpg`);
+    const thumbnailPath = path.join(appStorageDir, 'thumbnails', `${id}.jpg`);
+    if (await fs.pathExists(trashThumbnailPath)) {
+      await fs.move(trashThumbnailPath, thumbnailPath, { overwrite: true });
+    }
+
     console.log(`Restored media from trash: ${mediaPath}`);
     return { success: true };
   } catch (error) {
@@ -920,6 +1032,7 @@ ipcMain.handle('empty-trash', async () => {
   try {
     await fs.emptyDir(path.join(trashDir, 'images'));
     await fs.emptyDir(path.join(trashDir, 'metadata'));
+    await fs.emptyDir(path.join(trashDir, 'thumbnails'));
     console.log('Trash emptied successfully');
     return { success: true };
   } catch (error) {
@@ -953,13 +1066,18 @@ ipcMain.handle('list-trash', async () => {
           const metadata = await fs.readJson(metadataPath);
           const localFileUrl = `local-file://${mediaPath}`;
 
+          // Check for thumbnail in trash
+          const trashThumbnailPath = path.join(trashDir, 'thumbnails', `${id}.jpg`);
+          const hasThumbnail = !isVideo && await fs.pathExists(trashThumbnailPath);
+
           return {
             ...metadata,
             id,
             url: localFileUrl,
             type: isVideo ? 'video' : metadata.type || 'image',
             actualFilePath: mediaPath,
-            useDirectPath: true
+            useDirectPath: true,
+            ...(hasThumbnail ? { thumbnailUrl: `local-file://${trashThumbnailPath}` } : {})
           };
         } catch (err) {
           // Skip files that can't be loaded

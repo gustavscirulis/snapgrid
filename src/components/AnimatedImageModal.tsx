@@ -2,15 +2,16 @@ import React, { useEffect, useState, useMemo, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ZoomableImageWrapper } from "@/components/ZoomableImageWrapper";
-import { isElectron } from "@/utils/electron";
 
 interface AnimatedImageModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedImage: ImageItem | null;
   selectedImageRef: React.RefObject<HTMLDivElement> | null;
+  initialPosition?: { top: number; left: number; width: number; height: number } | null;
   patternElements: React.ReactNode | null;
   onAnimationComplete?: (definition: string) => void;
+  onModalImageReady?: () => void;
 }
 
 // Function to calculate optimal dimensions
@@ -96,20 +97,36 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   onClose,
   selectedImage,
   selectedImageRef,
+  initialPosition: initialPositionProp,
   onAnimationComplete,
+  onModalImageReady,
 }) => {
-  const [initialPosition, setInitialPosition] = useState<{
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-  } | null>(null);
-  
-  // Add a ref to access the video element
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  
-  // Add state to store actual video dimensions
-  const [actualVideoDimensions, setActualVideoDimensions] = useState<{width: number, height: number} | null>(null);
+  // Use the synchronously-captured position from the click handler directly.
+  // This eliminates the 1-2 frame gap where the thumbnail is hidden but the modal hasn't rendered.
+  const initialPosition = initialPositionProp ?? null;
+
+  // Track whether the modal's image content has loaded.
+  // The spring animation is held at "initial" (thumbnail position) until the image
+  // is ready, preventing a blank/empty div from animating across the screen.
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Reset when a new image is selected
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [selectedImage?.id]);
+
+  // Safety fallback: start animation after 400ms even if image hasn't loaded
+  useEffect(() => {
+    if (isOpen && !imageLoaded) {
+      const timeout = setTimeout(() => setImageLoaded(true), 400);
+      return () => clearTimeout(timeout);
+    }
+  }, [isOpen, imageLoaded]);
+
+  const handleImageLoaded = useCallback(() => {
+    setImageLoaded(true);
+    onModalImageReady?.();
+  }, [onModalImageReady]);
 
   // Add state to track media loading errors
   const [mediaLoadError, setMediaLoadError] = useState(false);
@@ -147,12 +164,6 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  // Handle media load error
-  const handleMediaError = useCallback(() => {
-    setMediaLoadError(true);
-  }, []);
-
   // Reset error state when modal closes or image changes
   useEffect(() => {
     if (!isOpen) {
@@ -163,24 +174,15 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   }, [isOpen, selectedImage]);
 
   // Calculate optimal dimensions using the new function
+  // Uses metadata dimensions only — never update mid-animation from the <video> element,
+  // as that causes the spring animation target to change and produces a visible bounce.
   const optimalDimensions = useMemo(() => {
     if (!selectedImage) {
       return null;
     }
 
-    // If we have actual video dimensions from the video element, use those instead
-    if (selectedImage.type === 'video' && actualVideoDimensions) {
-      const updatedImage = {
-        ...selectedImage,
-        width: actualVideoDimensions.width,
-        height: actualVideoDimensions.height
-      };
-
-      return calculateOptimalDimensions(updatedImage, windowSize.width, windowSize.height);
-    }
-
     return calculateOptimalDimensions(selectedImage, windowSize.width, windowSize.height);
-  }, [selectedImage, windowSize.width, windowSize.height, actualVideoDimensions]);
+  }, [selectedImage, windowSize.width, windowSize.height]);
 
   // Calculate fallback dimensions when needed
   useEffect(() => {
@@ -197,29 +199,15 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   }, [selectedImage, initialPosition, optimalDimensions, windowSize]);
 
-  // Get initial position from thumbnail
+  // Clean up animation state after modal closes
   useEffect(() => {
-    if (isOpen && selectedImageRef?.current) {
-      try {
-        const rect = selectedImageRef.current.getBoundingClientRect();
-        const position = {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        };
-        setInitialPosition(position);
-      } catch (error) {
-        console.error('Error getting initial position:', error);
-      }
-    } else if (!isOpen) {
-      // Ensure we clean up after the exit animation
-      setTimeout(() => {
-        setInitialPosition(null);
+    if (!isOpen) {
+      const timeout = setTimeout(() => {
         isAnimatingRef.current = false;
       }, 300);
+      return () => clearTimeout(timeout);
     }
-  }, [isOpen, selectedImageRef]);
+  }, [isOpen]);
 
   // Handle close with debounce
   const handleClose = useCallback(() => {
@@ -257,43 +245,6 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
       isClosingRef.current = false;
     };
   }, [isOpen, selectedImage, handleClose]);
-
-  // Get video dimensions
-  useEffect(() => {
-    if (!isOpen || selectedImage?.type !== 'video') return;
-
-    let listenerCleanup: (() => void) | undefined;
-
-    const setupVideoElement = () => {
-      const videoElement = document.querySelector('video');
-      if (videoElement && selectedImage?.type === 'video') {
-        videoRef.current = videoElement;
-
-        const updateDimensions = () => {
-          const width = videoElement.videoWidth;
-          const height = videoElement.videoHeight;
-          if (width && height) {
-            setActualVideoDimensions({ width, height });
-          }
-        };
-
-        if (videoElement.readyState >= 1) {
-          updateDimensions();
-        } else {
-          videoElement.addEventListener('loadedmetadata', updateDimensions);
-          listenerCleanup = () => videoElement.removeEventListener('loadedmetadata', updateDimensions);
-        }
-      }
-    };
-
-    setupVideoElement();
-    const timeoutId = setTimeout(setupVideoElement, 500);
-
-    return () => {
-      clearTimeout(timeoutId);
-      listenerCleanup?.();
-    };
-  }, [isOpen, selectedImage]);
 
   // Get video current time from thumbnail when modal opens
   useEffect(() => {
@@ -433,7 +384,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               }}
               variants={modalVariants}
               initial="initial"
-              animate="open"
+              animate={imageLoaded ? "open" : "initial"}
               exit="exit"
               onClick={(e) => {
                 // Don't close modal when clicking on the image content during zoom interactions
@@ -455,7 +406,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 autoPlay={selectedImage.type === "video"}
                 muted={false}
                 currentTime={videoCurrentTime}
-                onLoad={(e) => {}}
+                onLoad={handleImageLoaded}
                 onClose={handleClose}
                 onZoomStateChange={(scale, position) => setZoomState({ scale, position })}
                 disableZoom={selectedImage.height > selectedImage.width * 2}

@@ -96,6 +96,14 @@ interface UseImagePreloaderOptions {
   preloadDistance?: number; // Number of items ahead to preload
 }
 
+// Get the URL to preload for an image (prefer thumbnail for grid performance)
+function getPreloadUrl(image: ImageItem): string {
+  if (image.type === 'image' && image.thumbnailUrl) {
+    return image.thumbnailUrl;
+  }
+  return image.url;
+}
+
 export function useImagePreloader(
   images: ImageItem[],
   options: UseImagePreloaderOptions = {}
@@ -170,11 +178,11 @@ export function useImagePreloader(
             if (image.type === 'video') {
               preloadVideoPoster(image, 15);
             } else {
-              preloadImage(image.url, 15);
+              preloadImage(getPreloadUrl(image), 15);
             }
 
             // Mark as loaded if cached
-            if (image.type === 'image' && isImageCached(image.url)) {
+            if (image.type === 'image' && isImageCached(getPreloadUrl(image))) {
               newLoadedImages.add(imageId);
             } else if (image.type === 'video' && image.posterUrl && isImageCached(image.posterUrl)) {
               newLoadedImages.add(imageId);
@@ -227,7 +235,7 @@ export function useImagePreloader(
       const newLoadedImages = new Set<string>();
       
       images.forEach(image => {
-        if (image.type === 'image' && isImageCached(image.url)) {
+        if (image.type === 'image' && isImageCached(getPreloadUrl(image))) {
           newLoadedImages.add(image.id);
         } else if (image.type === 'video' && image.posterUrl && isImageCached(image.posterUrl)) {
           newLoadedImages.add(image.id);
@@ -256,7 +264,7 @@ export function useImagePreloader(
         if (image.type === 'video') {
           preloadVideoPoster(image, priority);
         } else {
-          preloadImage(image.url, priority);
+          preloadImage(getPreloadUrl(image), priority);
         }
       });
     };
@@ -270,7 +278,7 @@ export function useImagePreloader(
 
   // Clear cache when images change significantly
   useEffect(() => {
-    const currentImageUrls = new Set(images.map(img => img.url));
+    const currentImageUrls = new Set(images.map(img => getPreloadUrl(img)));
     
     // Remove cached images that are no longer in the list
     for (const [url] of imageCache) {

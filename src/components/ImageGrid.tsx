@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -160,22 +160,83 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     }
   }, [exitAnimationComplete]);
   
+  // Store the initial position of the clicked thumbnail for the modal animation
+  const [initialModalPosition, setInitialModalPosition] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  // Refs for coordinating thumbnail hide with modal image load
+  const pendingHideImageIdRef = useRef<string | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleImageClick = (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
     if (isAnimating) return; // Prevent clicks during animation
-    
+
+    // Capture thumbnail position SYNCHRONOUSLY before any state updates
+    // This ensures the modal has position data on its very first render
+    let position = null;
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      position = {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      };
+    }
+
     setIsAnimating(true);
     setSelectedImage(image);
     setSelectedImageRef(ref);
+    setInitialModalPosition(position);
     setModalOpen(true);
-    setClickedImageId(image.id);
     onImageClick(image);
+
+    // Don't hide the grid thumbnail yet — wait for the modal's image to load
+    // (handleModalImageReady will be called when the modal's <img> fires onLoad)
+    pendingHideImageIdRef.current = image.id;
+
+    // Safety fallback: hide after 500ms even if onLoad never fires (e.g. load error)
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    hideTimeoutRef.current = setTimeout(() => {
+      if (pendingHideImageIdRef.current) {
+        setClickedImageId(pendingHideImageIdRef.current);
+        pendingHideImageIdRef.current = null;
+      }
+    }, 500);
   };
+
+  // Called when the modal's image has loaded — safe to hide the grid thumbnail
+  const handleModalImageReady = useCallback(() => {
+    // Clear the safety timeout
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+
+    // Wait one frame for the browser to paint the loaded image, then hide
+    requestAnimationFrame(() => {
+      if (pendingHideImageIdRef.current) {
+        setClickedImageId(pendingHideImageIdRef.current);
+        pendingHideImageIdRef.current = null;
+      }
+    });
+  }, []);
 
   const handleAnimationComplete = (definition: string) => {
     if (definition === "exit") {
       setExitAnimationComplete(true);
       setIsAnimating(false);
       setClickedImageId(null);
+      setInitialModalPosition(null);
+      pendingHideImageIdRef.current = null;
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+        hideTimeoutRef.current = null;
+      }
     }
   };
 
@@ -350,8 +411,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
             onClose={closeModal}
             selectedImage={selectedImage}
             selectedImageRef={selectedImageRef}
+            initialPosition={initialModalPosition}
             patternElements={null}
             onAnimationComplete={handleAnimationComplete}
+            onModalImageReady={handleModalImageReady}
           />
         </>
       )}

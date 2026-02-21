@@ -76,6 +76,33 @@ export const ImageRenderer = React.memo(function ImageRenderer({
 
   // For videos in thumbnail view, always use the poster if available
   const shouldUsePoster = image.type === 'video' && !controls && image.posterUrl;
+
+  // Progressive loading: start with thumbnail, swap to original when loaded (for modal view)
+  const [fullResLoaded, setFullResLoaded] = useState(false);
+  const hasThumbnail = image.type === 'image' && !!image.thumbnailUrl && image.thumbnailUrl !== mediaUrl;
+  const displayUrl = hasThumbnail
+    ? (controls && fullResLoaded ? mediaUrl : image.thumbnailUrl!)
+    : mediaUrl;
+
+  useEffect(() => {
+    if (controls && hasThumbnail) {
+      setFullResLoaded(false);
+      const img = new window.Image();
+      img.onload = async () => {
+        try {
+          // Ensure the image is fully decoded before swapping the visible src.
+          // Without this, the <img> element may blank briefly when its src changes,
+          // especially with custom protocols (local-file://) that lack cache headers.
+          await img.decode();
+        } catch {
+          // decode() failed but onload succeeded — proceed anyway
+        }
+        setFullResLoaded(true);
+      };
+      img.src = mediaUrl;
+      return () => { img.onload = null; };
+    }
+  }, [controls, mediaUrl, hasThumbnail]);
   
   // Handle media loading errors
   const handleError = (error: unknown) => {
@@ -294,9 +321,9 @@ export const ImageRenderer = React.memo(function ImageRenderer({
   if (isTallImage && !controls) {
     return (
       <div className="relative w-full aspect-[1/2] overflow-hidden">
-        <img 
-          src={getOptimizedImageSrc(mediaUrl)} 
-          alt={alt || `Image ${image.id}`} 
+        <img
+          src={getOptimizedImageSrc(displayUrl)}
+          alt={alt || `Image ${image.id}`}
           className={`absolute inset-0 w-full h-full object-cover ${className}`}
           loading="eager"
           decoding="async"
@@ -309,11 +336,11 @@ export const ImageRenderer = React.memo(function ImageRenderer({
       </div>
     );
   }
-  
+
   return (
-    <img 
-      src={getOptimizedImageSrc(mediaUrl)} 
-      alt={alt || `Image ${image.id}`} 
+    <img
+      src={getOptimizedImageSrc(displayUrl)}
+      alt={alt || `Image ${image.id}`}
       className={className}
       loading="eager"
       decoding="async"
