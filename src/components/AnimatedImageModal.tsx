@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState, useMemo, useRef, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
@@ -10,6 +10,7 @@ interface AnimatedImageModalProps {
   onClose: () => void;
   selectedImage: ImageItem | null;
   selectedImageRef: React.RefObject<HTMLDivElement> | null;
+  initialRect: { top: number; left: number; width: number; height: number } | null;
   patternElements: React.ReactNode | null;
   onAnimationComplete?: (definition: string) => void;
 }
@@ -19,30 +20,30 @@ const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, scree
   // Account for padding in available height
   const verticalPadding = 40; // 20px top + 20px bottom
   const availableHeight = screenHeight - verticalPadding;
-  
+
   // For videos, use maximum screen space while respecting original dimensions
   if (image.type === 'video') {
     // Calculate maximum available space (95% of screen)
     const maxWidth = screenWidth * 0.95;
     const maxHeight = availableHeight * 0.95;
-    
+
     // Get original dimensions, with fallbacks
     const originalWidth = image.width || 800;
     const originalHeight = image.height || 600;
-    
+
     // Calculate scaling factors to fit within screen
     const widthScale = maxWidth / originalWidth;
     const heightScale = maxHeight / originalHeight;
-    
+
     // Use the smaller scaling factor to ensure both dimensions fit
     // If scale > 1, it means we can fit the video at larger than original size,
     // but we'll cap at 1 to avoid quality loss
     const scale = Math.min(widthScale, heightScale);
-    
+
     // Calculate final dimensions - never exceed original dimensions
     const width = originalWidth * Math.min(scale, 1);
     const height = originalHeight * Math.min(scale, 1);
-    
+
     return {
       width,
       height,
@@ -50,40 +51,42 @@ const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, scree
       left: (screenWidth - width) / 2
     };
   }
-  
+
   // For images, ensure we never exceed original dimensions
   const originalWidth = image.width || 800;
   const originalHeight = image.height || 600;
-  
+
   // Calculate maximum available space (95% of screen)
   const maxWidth = screenWidth * 0.95;
   const maxHeight = availableHeight * 0.95;
-  
+
   // Check if image is tall (height > 2x width)
   const isTallImage = originalHeight > originalWidth * 2;
-  
+
   if (isTallImage) {
-    // For tall images, fit to width and top-align
+    // For tall images, fit to width and cap height to viewport.
+    // The full image is revealed via scrolling inside the motion div after animation.
     const width = Math.min(originalWidth, maxWidth);
-    const height = (width / originalWidth) * originalHeight;
-    
+    const naturalHeight = (width / originalWidth) * originalHeight;
+    const height = Math.min(naturalHeight, screenHeight - 80);
+
     return {
       width,
       height,
-      top: 40, // Fixed padding that's consistent with the design
+      top: 40,
       left: (screenWidth - width) / 2
     };
   }
-  
+
   // For regular images, use the smaller scaling factor to ensure both dimensions fit
   const widthScale = maxWidth / originalWidth;
   const heightScale = maxHeight / originalHeight;
   const scale = Math.min(widthScale, heightScale);
-  
+
   // Calculate final dimensions - never exceed original dimensions
   const width = originalWidth * Math.min(scale, 1);
   const height = originalHeight * Math.min(scale, 1);
-  
+
   return {
     width,
     height,
@@ -97,18 +100,24 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   onClose,
   selectedImage,
   selectedImageRef,
+  initialRect,
   onAnimationComplete,
 }) => {
-  const [initialPosition, setInitialPosition] = useState<{
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-  } | null>(null);
-  
+  // Use initialRect directly — measured in the click handler before the thumbnail
+  // was hidden, so it's available on the very first render (no delay).
+  // NOT gated on isOpen: initialRect must persist during exit animation so
+  // AnimatePresence can play the shrink-back transition before unmounting.
+  const initialPosition = initialRect;
+
+  // Track whether the opening animation has completed (enables scroll for tall images)
+  const [openAnimComplete, setOpenAnimComplete] = useState(false);
+
+  // Ref to the motion div so we can scroll-to-top before exit animation
+  const motionDivRef = useRef<HTMLDivElement>(null);
+
   // Add a ref to access the video element
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  
+
   // Add state to store actual video dimensions
   const [actualVideoDimensions, setActualVideoDimensions] = useState<{width: number, height: number} | null>(null);
 
@@ -154,29 +163,32 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     setMediaLoadError(true);
   }, []);
 
-  // Reset error state when modal closes or image changes
+  // Reset state when modal closes or image changes
   useEffect(() => {
     if (!isOpen) {
       setMediaLoadError(false);
-      // Reset zoom state when modal closes
       setZoomState({ scale: 1, position: { x: 0, y: 0 } });
+      setOpenAnimComplete(false);
     }
   }, [isOpen, selectedImage]);
 
-  // Calculate optimal dimensions using the new function
+  // Calculate optimal dimensions.
+  // Video dimensions are now pre-measured from the thumbnail <video> element in the
+  // click handler, so selectedImage.width/height is accurate from the first render.
+  // actualVideoDimensions serves as a late fallback only if the thumbnail hadn't loaded.
   const optimalDimensions = useMemo(() => {
     if (!selectedImage) {
       return null;
     }
 
-    // If we have actual video dimensions from the video element, use those instead
-    if (selectedImage.type === 'video' && actualVideoDimensions) {
+    // Use actualVideoDimensions only if selectedImage still has missing/fallback values
+    if (selectedImage.type === 'video' && actualVideoDimensions &&
+        (!selectedImage.width || !selectedImage.height)) {
       const updatedImage = {
         ...selectedImage,
         width: actualVideoDimensions.width,
         height: actualVideoDimensions.height
       };
-
       return calculateOptimalDimensions(updatedImage, windowSize.width, windowSize.height);
     }
 
@@ -198,52 +210,33 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   }, [selectedImage, initialPosition, optimalDimensions, windowSize]);
 
-  // Get initial position from thumbnail — useLayoutEffect so the measurement
-  // and subsequent re-render happen before the browser paints, preventing
-  // a visible flash where the thumbnail is hidden but the modal hasn't appeared.
-  useLayoutEffect(() => {
-    if (isOpen && selectedImageRef?.current) {
-      try {
-        const rect = selectedImageRef.current.getBoundingClientRect();
-        const position = {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        };
-        setInitialPosition(position);
-      } catch (error) {
-        console.error('Error getting initial position:', error);
-      }
-    } else if (!isOpen) {
-      // Cleanup is handled by onExitComplete; this is a safety fallback
-      // in case the exit animation never completes (e.g. if the component
-      // was never visible). Use a generous timeout so it never races
-      // against the spring animation.
+  // Reset animation ref after modal closes
+  useEffect(() => {
+    if (!isOpen) {
       const id = setTimeout(() => {
-        setInitialPosition(null);
         isAnimatingRef.current = false;
-      }, 2000);
+      }, 300);
       return () => clearTimeout(id);
     }
-  }, [isOpen, selectedImageRef]);
+  }, [isOpen]);
 
   // Handle close with debounce
   const handleClose = useCallback(() => {
     if (isClosingRef.current) return;
     isClosingRef.current = true;
+    // Scroll to top and disable overflow before exit animation
+    if (motionDivRef.current) {
+      motionDivRef.current.scrollTop = 0;
+    }
+    setOpenAnimComplete(false);
     onClose();
   }, [onClose]);
 
   // Handle body overflow and keyboard events
   useEffect(() => {
     if (isOpen) {
-      // Allow scrolling for tall images
-      if (selectedImage?.height > (selectedImage?.width || 0) * 2) {
-        // Tall image - keep scrolling enabled
-      } else {
-        document.body.style.overflow = "hidden";
-      }
+      // Always hide body overflow — tall image scrolling is handled inside the motion div
+      document.body.style.overflow = "hidden";
       isAnimatingRef.current = true;
       isClosingRef.current = false;
     } else {
@@ -312,7 +305,9 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   }, [isOpen, selectedImage]);
 
-  // Create modal variants
+  // Create modal variants — animates width/height (layout) on this isolated overlay surface.
+  // FLIP (scale-based) is not viable here because thumbnail uses object-cover (cropped)
+  // while modal uses object-contain (full image), so content differs at each size.
   const modalVariants = useMemo(() => {
     if (!initialPosition) {
       return null;
@@ -338,9 +333,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     // For tall images, keep top alignment with 40px padding
     // For regular images, add moderate top padding (20px)
     const finalY = isTallImage ? 40 : Math.max(20, (windowSize.height - finalDimensions.height) / 2);
-    
-    // For the position-absolute scrollable layout, we only need width and height
-    // The position is handled by the scrollable container
+
     const variants = {
       initial: {
         width: initialPosition.width,
@@ -375,12 +368,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           translateY: -zoomState.position.y / zoomState.scale,
         } : {}),
         transition: zoomState.scale > 1 ? {
-          // Slower transition when zoomed in
           type: "spring",
           damping: 25,
           stiffness: 200
         } : {
-          // Normal speed when not zoomed
           type: "spring",
           damping: 30,
           stiffness: 300
@@ -396,12 +387,13 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     return null;
   }
 
+  const isTallImage = selectedImage.height > selectedImage.width * 2;
+
   // Portal to document.body so the modal escapes any parent CSS transforms
   // (e.g. the carousel's translateX) that would break position:fixed
   return createPortal(
     <AnimatePresence onExitComplete={() => {
       onAnimationComplete && onAnimationComplete("exit");
-      setInitialPosition(null);
       isAnimatingRef.current = false;
       isClosingRef.current = false;
     }}>
@@ -416,30 +408,33 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             onClick={handleClose}
           />
 
-          {/* Scrollable wrapper - fixed position but allows scrolling */}
+          {/* Fixed wrapper - scrolling for tall images is handled by the motion div */}
           <div
             className="fixed inset-0 z-50 flex justify-center"
             style={{
-              overflow: selectedImage.height > selectedImage.width * 2 ? 'auto' : 'visible', // Enable scrolling for tall images
+              overflow: 'hidden',
               paddingTop: 0,
-              paddingBottom: selectedImage.height > selectedImage.width * 2 ? '40px' : '20px'
+              paddingBottom: isTallImage ? '40px' : '20px'
             }}
             onClick={handleClose}
           >
             {/* Image container with animation */}
             <motion.div
+              ref={motionDivRef}
               className="rounded-lg flex justify-center"
               style={{
                 position: 'relative',
                 alignSelf: 'flex-start',
                 marginTop: 0,
                 marginBottom: 0,
-                paddingBottom: selectedImage.height > selectedImage.width * 2 ? '30px' : 0,
+                paddingBottom: isTallImage ? '30px' : 0,
                 height: 'fit-content',
                 width: 'fit-content',
                 minWidth: initialPosition.width,
                 minHeight: initialPosition.height,
-                transformOrigin: 'center center'
+                transformOrigin: 'center center',
+                overflowY: isTallImage && openAnimComplete ? 'auto' : 'hidden',
+                overflowX: 'hidden',
               }}
               variants={modalVariants}
               initial="initial"
@@ -450,7 +445,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 e.stopPropagation();
               }}
               onAnimationComplete={(definition) => {
-                if (definition === "exit") {
+                if (definition === "open") {
+                  isAnimatingRef.current = false;
+                  setOpenAnimComplete(true);
+                } else if (definition === "exit") {
                   onAnimationComplete && onAnimationComplete("exit");
                   isAnimatingRef.current = false;
                   isClosingRef.current = false;
@@ -460,7 +458,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               <ZoomableImageWrapper
                 image={selectedImage}
                 alt={selectedImage.title || "Selected media"}
-                className={`w-full h-full ${selectedImage.height > selectedImage.width * 2 ? 'object-cover object-top' : 'object-contain'} rounded-xl shadow-xl`}
+                className={`w-full ${isTallImage ? '' : 'h-full object-contain'} rounded-xl shadow-xl`}
                 controls={true}
                 autoPlay={selectedImage.type === "video"}
                 muted={false}
@@ -468,7 +466,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 onLoad={(e) => {}}
                 onClose={handleClose}
                 onZoomStateChange={(scale, position) => setZoomState({ scale, position })}
-                disableZoom={selectedImage.height > selectedImage.width * 2}
+                disableZoom={isTallImage}
               />
             </motion.div>
           </div>

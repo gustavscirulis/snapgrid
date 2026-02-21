@@ -3,32 +3,39 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
 import { Moon, Sun, SunMoon, Code, X, Smartphone } from "lucide-react";
-import { setOpenAIApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
+import { setOpenAIApiKey, setAnthropicApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAnalyticsConsent, setAnalyticsConsent } from "@/services/analyticsService";
-import { fetchVisionModels, getSelectedModel, setSelectedModel, clearModelCache, AUTO_MODEL_VALUE, type OpenAIModel } from "@/services/modelService";
+import {
+  fetchVisionModels, fetchClaudeModels,
+  getSelectedModel, setSelectedModel,
+  getSelectedClaudeModel, setSelectedClaudeModel,
+  getActiveProvider, setActiveProvider,
+  clearModelCache, AUTO_MODEL_VALUE,
+  type OpenAIModel, type ClaudeModel, type AIProvider,
+} from "@/services/modelService";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Helper to detect development mode
 const isDevelopmentMode = () => {
   // Check for common development indicators
-  if (window.location.hostname === 'localhost' || 
+  if (window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1' ||
-      window.location.port === '8080' || 
+      window.location.port === '8080' ||
       window.location.port === '3000') {
     return true;
   }
-  
+
   // In Electron, check if we have dev tools available
-  if (window && typeof window.electron !== 'undefined' && 
-      window.electron !== null && 
+  if (window && typeof window.electron !== 'undefined' &&
+      window.electron !== null &&
       (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__) {
     return true;
   }
-  
+
   // Default to production mode
   return false;
 };
@@ -40,12 +47,29 @@ interface SettingsPanelProps {
 
 export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
   const [isDevMode, setIsDevMode] = useState(false);
-  
+  const [activeProvider, setActiveProviderState] = useState<AIProvider>("openai");
+  // Bumped when the API key is added or removed, so ModelSelector can react
+  const [keyVersion, setKeyVersion] = useState(0);
+
   // Check for development mode on mount
   useEffect(() => {
     setIsDevMode(isDevelopmentMode());
   }, []);
-  
+
+  // Load provider preference when dialog opens
+  useEffect(() => {
+    if (open) {
+      getActiveProvider().then(setActiveProviderState);
+    }
+  }, [open]);
+
+  const handleProviderChange = async (provider: AIProvider) => {
+    setActiveProviderState(provider);
+    await setActiveProvider(provider);
+  };
+
+  const handleKeyChange = () => setKeyVersion((v) => v + 1);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[450px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-black backdrop-blur-none shadow-2xl z-[200] focus:outline-none focus:ring-0 pt-4">
@@ -58,8 +82,9 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
         </DialogHeader>
         <div className="py-1 space-y-8 max-h-[calc(100vh-200px)] overflow-y-auto pr-1 mac-scrollbar">
           <ThemeSelector />
-          <ApiKeySection isOpen={open} />
-          <ModelSelector isOpen={open} />
+          <ProviderSelector provider={activeProvider} onProviderChange={handleProviderChange} />
+          <ApiKeySection isOpen={open} provider={activeProvider} onKeyChange={handleKeyChange} />
+          <ModelSelector isOpen={open} provider={activeProvider} keyVersion={keyVersion} />
           <QueueSection />
           <AnalyticsSection />
           {isDevMode && <DeveloperSection />}
@@ -79,26 +104,55 @@ const ThemeSelector = () => {
       </div>
       <Tabs defaultValue={theme} onValueChange={setTheme} className="w-full">
         <TabsList className="w-full grid grid-cols-3 h-9 bg-gray-100/80 dark:bg-zinc-800/80 p-1 rounded-md">
-          <TabsTrigger 
-            value="light" 
+          <TabsTrigger
+            value="light"
             className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
           >
             <Sun className="h-3.5 w-3.5" />
             <span>Light</span>
           </TabsTrigger>
-          <TabsTrigger 
-            value="dark" 
+          <TabsTrigger
+            value="dark"
             className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
           >
             <Moon className="h-3.5 w-3.5" />
             <span>Dark</span>
           </TabsTrigger>
-          <TabsTrigger 
-            value="system" 
+          <TabsTrigger
+            value="system"
             className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
           >
             <SunMoon className="h-3.5 w-3.5" />
             <span>Auto</span>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+    </section>
+  );
+};
+
+const ProviderSelector = ({ provider, onProviderChange }: { provider: AIProvider; onProviderChange: (p: AIProvider) => void }) => {
+  return (
+    <section className="space-y-3">
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">AI Provider</h3>
+        <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
+          Choose which AI service to use for image analysis.
+        </p>
+      </div>
+      <Tabs value={provider} onValueChange={(v) => onProviderChange(v as AIProvider)} className="w-full">
+        <TabsList className="w-full grid grid-cols-2 h-9 bg-gray-100/80 dark:bg-zinc-800/80 p-1 rounded-md">
+          <TabsTrigger
+            value="openai"
+            className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
+          >
+            OpenAI
+          </TabsTrigger>
+          <TabsTrigger
+            value="anthropic"
+            className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
+          >
+            Claude
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -125,7 +179,7 @@ const AnalyticsSection = () => {
     };
 
     checkAnalyticsConsent();
-    
+
     // Set up a listener for consent changes from the main process
     if (window.electron.onAnalyticsConsentChanged) {
       const removeListener = window.electron.onAnalyticsConsentChanged((consent: boolean) => {
@@ -136,7 +190,7 @@ const AnalyticsSection = () => {
           toast.success(consent ? "Analytics enabled" : "Analytics disabled");
         }
       });
-      
+
       return () => {
         // Clean up the listener when component unmounts
         if (removeListener) removeListener();
@@ -183,18 +237,50 @@ const AnalyticsSection = () => {
 
 interface ApiKeySectionProps {
   isOpen: boolean;
+  provider: AIProvider;
+  onKeyChange: () => void;
 }
 
-const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
-  const [apiKey, setApiKey] = useState("");
+const PROVIDER_CONFIG = {
+  openai: {
+    title: "OpenAI API Key",
+    description: "Required for image analysis with OpenAI models.",
+    linkText: "Get an OpenAI API key",
+    url: "https://platform.openai.com/api-keys",
+    prefix: "sk-",
+    placeholder: "sk-...",
+    setKey: setOpenAIApiKey,
+  },
+  anthropic: {
+    title: "Anthropic API Key",
+    description: "Required for image analysis with Claude models.",
+    linkText: "Get an Anthropic API key",
+    url: "https://console.anthropic.com/settings/keys",
+    prefix: "sk-ant-",
+    placeholder: "sk-ant-...",
+    setKey: setAnthropicApiKey,
+  },
+} as const;
+
+const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) => {
+  const [apiKey, setApiKeyValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [keyExists, setKeyExists] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const config = PROVIDER_CONFIG[provider];
+
+  // Check if key exists whenever provider or dialog state changes
+  useEffect(() => {
+    const checkKey = async () => {
+      const exists = await hasApiKey(provider);
+      setKeyExists(exists);
+    };
+    checkKey();
+  }, [provider, isOpen]);
 
   // Auto-focus the input field when settings opens and no key exists
   useEffect(() => {
     if (isOpen && !keyExists) {
-      // Focus after a short delay to ensure the dialog is fully visible
       const timer = setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
@@ -205,47 +291,33 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
   // Handle opening the API key URL in default browser
   const handleOpenApiKeyUrl = (e: React.MouseEvent) => {
     e.preventDefault();
-    const url = "https://platform.openai.com/api-keys";
-    
     if (window.electron?.openUrl) {
-      // Use Electron's shell to open in default browser
-      window.electron.openUrl(url);
+      window.electron.openUrl(config.url);
     } else {
-      // Fallback for non-Electron environments
-      window.open(url, "_blank", "noopener,noreferrer");
+      window.open(config.url, "_blank", "noopener,noreferrer");
     }
   };
-
-  // Check for API key when component mounts
-  useEffect(() => {
-    const checkApiKey = async () => {
-      const exists = await hasApiKey();
-      setKeyExists(exists);
-    };
-    
-    checkApiKey();
-  }, []);
 
   const handleUpdateApiKey = async () => {
     if (!apiKey.trim()) {
       toast.error("Please enter an API key");
       return;
     }
-    
-    if (!apiKey.trim().startsWith("sk-")) {
-      toast.error("Invalid API key format. OpenAI API keys start with 'sk-'");
+
+    if (!apiKey.trim().startsWith(config.prefix)) {
+      toast.error(`Invalid API key format. ${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API keys start with '${config.prefix}'`);
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // Save the API key securely
-      const success = await setOpenAIApiKey(apiKey.trim());
-      
+      const success = await config.setKey(apiKey.trim());
+
       if (success) {
         toast.success("API key updated successfully");
-        setApiKey("");
+        setApiKeyValue("");
         setKeyExists(true);
+        onKeyChange();
       } else {
         throw new Error("Failed to update API key");
       }
@@ -260,10 +332,11 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
   const handleDeleteApiKey = async () => {
     if (window.confirm("Are you sure you want to remove your API key?")) {
       try {
-        const success = await deleteApiKey();
+        const success = await deleteApiKey(provider);
         if (success) {
           toast.success("API key removed");
           setKeyExists(false);
+          onKeyChange();
         } else {
           throw new Error("Failed to remove API key");
         }
@@ -277,14 +350,14 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
   return (
     <section className="space-y-3">
       <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">OpenAI API Key</h3>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">{config.title}</h3>
         <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
-          Required for image analysis. <a 
-          href="https://platform.openai.com/api-keys" 
+          {config.description} <a
+          href={config.url}
           onClick={handleOpenApiKeyUrl}
           className="text-gray-800 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 underline font-medium select-none"
         >
-          Get an OpenAI API key
+          {config.linkText}
         </a>.
         </p>
       </div>
@@ -294,9 +367,9 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
             <Input
               ref={inputRef}
               type="password"
-              placeholder="sk-..."
+              placeholder={config.placeholder}
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              onChange={(e) => setApiKeyValue(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleUpdateApiKey();
@@ -304,7 +377,7 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
               }}
               className="h-9 rounded-md text-sm border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-700"
             />
-            <Button 
+            <Button
               size="default"
               onClick={handleUpdateApiKey}
               disabled={isSubmitting || !apiKey.trim()}
@@ -318,8 +391,8 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
             <div className="flex-1 rounded-md border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50 flex items-center h-9 px-3 text-xs text-gray-600 dark:text-gray-400 select-none">
               API key is currently set
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="default"
               onClick={handleDeleteApiKey}
               className="h-9 rounded-md text-xs border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 font-medium select-none"
@@ -333,8 +406,8 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
   );
 };
 
-const ModelSelector = ({ isOpen }: { isOpen: boolean }) => {
-  const [models, setModels] = useState<OpenAIModel[]>([]);
+const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; provider: AIProvider; keyVersion: number }) => {
+  const [models, setModels] = useState<Array<{ id: string }>>([]);
   const [selectedModelValue, setSelectedModelValue] = useState<string>(AUTO_MODEL_VALUE);
   const [isLoading, setIsLoading] = useState(false);
   const [keyExists, setKeyExists] = useState(false);
@@ -344,19 +417,31 @@ const ModelSelector = ({ isOpen }: { isOpen: boolean }) => {
     if (!isOpen) return;
 
     const load = async () => {
-      const exists = await hasApiKey();
+      const exists = await hasApiKey(provider);
       setKeyExists(exists);
-      if (!exists) return;
+      if (!exists) {
+        setModels([]);
+        return;
+      }
 
       setIsLoading(true);
       setError(null);
       try {
-        const [pref, modelList] = await Promise.all([
-          getSelectedModel(),
-          fetchVisionModels(),
-        ]);
-        setSelectedModelValue(pref);
-        setModels(modelList);
+        if (provider === 'anthropic') {
+          const [pref, modelList] = await Promise.all([
+            getSelectedClaudeModel(),
+            fetchClaudeModels(),
+          ]);
+          setSelectedModelValue(pref);
+          setModels(modelList);
+        } else {
+          const [pref, modelList] = await Promise.all([
+            getSelectedModel(),
+            fetchVisionModels(),
+          ]);
+          setSelectedModelValue(pref);
+          setModels(modelList);
+        }
       } catch {
         setError("Could not load models");
       } finally {
@@ -365,13 +450,17 @@ const ModelSelector = ({ isOpen }: { isOpen: boolean }) => {
     };
 
     load();
-  }, [isOpen]);
+  }, [isOpen, provider, keyVersion]);
 
   if (!keyExists) return null;
 
   const handleModelChange = async (value: string) => {
     setSelectedModelValue(value);
-    await setSelectedModel(value);
+    if (provider === 'anthropic') {
+      await setSelectedClaudeModel(value);
+    } else {
+      await setSelectedModel(value);
+    }
     clearModelCache();
     toast.success(
       value === AUTO_MODEL_VALUE
@@ -430,7 +519,7 @@ const QueueSection = () => {
             Save images from your phone to the queue folder and they'll automatically import when you open SnapGrid.
           </p>
         </div>
-        
+
         <div className="space-y-2">
           <div className="text-xs text-gray-600 dark:text-gray-400 select-none">
             <p>Queue folder location:</p>
@@ -454,7 +543,7 @@ const DeveloperSection = () => {
     setSimulateEmptyState(checked);
     // Store the setting in localStorage so it persists across reloads
     localStorage.setItem('dev_simulate_empty_state', checked ? 'true' : 'false');
-    
+
     // Force a refresh to apply the change
     window.location.reload();
   };
@@ -488,7 +577,7 @@ const DeveloperSection = () => {
           These options are only available in development mode.
         </p>
       </div>
-      
+
       <div className="flex justify-between items-center gap-4">
         <div className="space-y-1 flex-1">
           <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100 select-none">Simulate Empty State</h4>

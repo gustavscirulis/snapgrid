@@ -14,31 +14,24 @@
 /* Style your items */
 .masonry-item {
   margin-bottom: 16px;
-  will-change: transform;
 }
 
 /* Ensure images fill their container with maximum performance */
-.masonry-item img, 
+.masonry-item img,
 .masonry-item video {
   display: block;
   width: 100%;
   height: auto;
   max-height: none;
-  
-  /* GPU acceleration */
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  perspective: 1000px;
-  
+
   /* Rendering optimizations */
   image-rendering: -webkit-optimize-contrast;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
-  
-  /* Performance hints */
-  will-change: auto;
+
+  /* Containment for isolation without forced layer promotion */
   contain: layout style paint;
-  
+
   /* Prevent layout shifts */
   object-fit: cover;
   object-position: center;

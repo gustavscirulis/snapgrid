@@ -51,6 +51,10 @@ contextBridge.exposeInMainWorld(
     // OpenAI API proxy (avoids CORS by routing through main process)
     callOpenAI: (payload) => ipcRenderer.invoke('call-openai', payload),
     listOpenAIModels: () => ipcRenderer.invoke('list-openai-models'),
+
+    // Anthropic Claude API proxy
+    callClaude: (payload) => ipcRenderer.invoke('call-claude', payload),
+    listClaudeModels: () => ipcRenderer.invoke('list-claude-models'),
     
     // Analytics settings
     getAnalyticsConsent: () => ipcRenderer.invoke('get-analytics-consent'),

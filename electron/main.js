@@ -471,7 +471,7 @@ async function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com https://*.telemetrydeck.com https://nom.telemetrydeck.com https://telemetrydeck.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
+          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com https://api.anthropic.com https://*.telemetrydeck.com https://nom.telemetrydeck.com https://telemetrydeck.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
         ]
       }
     });
@@ -801,6 +801,65 @@ ipcMain.handle('list-openai-models', async () => {
     return { success: true, models: data.data };
   } catch (error) {
     console.error('Error listing OpenAI models:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Proxy Anthropic Claude API calls through the main process to avoid CORS
+ipcMain.handle('call-claude', async (event, payload) => {
+  try {
+    const apiKey = apiKeyStorage.getApiKey('anthropic');
+    if (!apiKey) {
+      throw new Error('Anthropic API key not found');
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Anthropic API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error calling Claude:', error);
+    throw error;
+  }
+});
+
+// List available Anthropic Claude models (for model selection in settings)
+ipcMain.handle('list-claude-models', async () => {
+  try {
+    const apiKey = apiKeyStorage.getApiKey('anthropic');
+    if (!apiKey) {
+      throw new Error('Anthropic API key not found');
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/models?limit=1000', {
+      method: 'GET',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Anthropic API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    return { success: true, models: data.data };
+  } catch (error) {
+    console.error('Error listing Claude models:', error);
     return { success: false, error: error.message };
   }
 });
