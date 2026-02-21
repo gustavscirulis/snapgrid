@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import { useSpaces, resolvePromptForSpace } from "@/hooks/useSpaces";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -201,7 +201,7 @@ const Index = () => {
   }, [addImageToActiveSpace, importToActiveSpace]);
 
   // Search filter applicable to any set of images
-  const filterBySearch = (baseImages: ImageItem[]): ImageItem[] => {
+  const filterBySearch = useCallback((baseImages: ImageItem[]): ImageItem[] => {
     if (simulateEmptyState) return [];
     return baseImages.filter(image => {
       const query = searchQuery.toLowerCase();
@@ -238,7 +238,21 @@ const Index = () => {
 
       return bMaxConfidence - aMaxConfidence;
     });
-  };
+  }, [searchQuery, simulateEmptyState]);
+
+  // Pre-compute filtered results so they aren't recalculated on unrelated re-renders
+  const allFilteredImages = useMemo(
+    () => filterBySearch(images),
+    [filterBySearch, images]
+  );
+
+  const spaceFilteredImages = useMemo(
+    () => new Map(spaces.map(space => [
+      space.id,
+      filterBySearch(images.filter(img => img.spaceId === space.id))
+    ])),
+    [filterBySearch, images, spaces]
+  );
 
   const handleImageClick = (image: ImageItem) => {
   };
@@ -337,25 +351,9 @@ const Index = () => {
             >
               {/* "All" page */}
               <div className="w-full flex-shrink-0 overflow-y-auto h-full relative flex flex-col bg-gray-100 dark:bg-zinc-900 pt-[117px]">
-                <ImageGrid
-                  images={filterBySearch(images)}
-                  onImageClick={handleImageClick}
-                  onImageDelete={handleDeleteImage}
-                  searchQuery={searchQuery}
-                  onOpenSettings={() => setSettingsOpen(true)}
-                  settingsOpen={settingsOpen}
-                  retryAnalysis={handleRetryAnalysis}
-                  thumbnailSize={thumbnailSize}
-                  spaces={spaces}
-                  activeSpaceId={null}
-                  onAssignToSpace={handleAssignImageToSpace}
-                />
-              </div>
-              {/* Space pages */}
-              {spaces.map(space => (
-                <div key={space.id} className="w-full flex-shrink-0 overflow-y-auto h-full relative flex flex-col bg-gray-100 dark:bg-zinc-900 pt-[117px]">
+                {activeIndex <= 1 ? (
                   <ImageGrid
-                    images={filterBySearch(images.filter(img => img.spaceId === space.id))}
+                    images={allFilteredImages}
                     onImageClick={handleImageClick}
                     onImageDelete={handleDeleteImage}
                     searchQuery={searchQuery}
@@ -364,12 +362,41 @@ const Index = () => {
                     retryAnalysis={handleRetryAnalysis}
                     thumbnailSize={thumbnailSize}
                     spaces={spaces}
-                    activeSpaceId={space.id}
+                    activeSpaceId={null}
                     onAssignToSpace={handleAssignImageToSpace}
-                    onRemoveFromSpace={handleRemoveFromSpace}
                   />
-                </div>
-              ))}
+                ) : (
+                  <div className="flex-1" />
+                )}
+              </div>
+              {/* Space pages — only mount active page and immediate neighbors for smooth spring transitions */}
+              {spaces.map((space, index) => {
+                const spaceIndex = index + 1; // +1 because "All" is at index 0
+                const isNearActive = Math.abs(spaceIndex - activeIndex) <= 1;
+
+                return (
+                  <div key={space.id} className="w-full flex-shrink-0 overflow-y-auto h-full relative flex flex-col bg-gray-100 dark:bg-zinc-900 pt-[117px]">
+                    {isNearActive ? (
+                      <ImageGrid
+                        images={spaceFilteredImages.get(space.id) || []}
+                        onImageClick={handleImageClick}
+                        onImageDelete={handleDeleteImage}
+                        searchQuery={searchQuery}
+                        onOpenSettings={() => setSettingsOpen(true)}
+                        settingsOpen={settingsOpen}
+                        retryAnalysis={handleRetryAnalysis}
+                        thumbnailSize={thumbnailSize}
+                        spaces={spaces}
+                        activeSpaceId={space.id}
+                        onAssignToSpace={handleAssignImageToSpace}
+                        onRemoveFromSpace={handleRemoveFromSpace}
+                      />
+                    ) : (
+                      <div className="flex-1" />
+                    )}
+                  </div>
+                );
+              })}
             </motion.div>
           )}
         </main>

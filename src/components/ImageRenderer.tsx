@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { ImageItem } from '@/hooks/useImageStore';
 import { useImagePreloader } from '@/hooks/useImagePreloader';
-import { useDragContext } from './UploadZone';
+
 
 interface ImageRendererProps {
   image: ImageItem;
@@ -30,9 +30,6 @@ export const ImageRenderer = React.memo(function ImageRenderer({
 }: ImageRendererProps) {
   const [loadError, setLoadError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  
-  // Get drag context for internal drag detection
-  const dragContext = useDragContext();
   
   // Video thumbnail state (moved to top level)
   const [isHovering, setIsHovering] = useState(false);
