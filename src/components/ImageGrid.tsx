@@ -31,6 +31,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImageRef, setSelectedImageRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
+  const [initialRect, setInitialRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
   const [clickedImageId, setClickedImageId] = useState<string | null>(null);
   const [exitAnimationComplete, setExitAnimationComplete] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -161,11 +162,27 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   }, [exitAnimationComplete]);
   
   const handleImageClick = (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
-    if (isAnimating) return; // Prevent clicks during animation
-    
+    if (isAnimating) return;
+
+    // Measure thumbnail rect BEFORE any state changes hide it.
+    // This lets the modal render in the same paint frame.
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    // For videos, read actual dimensions from the thumbnail <video> element
+    // so the modal can target the correct size from frame 1 (no mid-animation redirect).
+    let imageWithDimensions = image;
+    if (image.type === 'video') {
+      const videoEl = ref.current?.querySelector('video');
+      if (videoEl instanceof HTMLVideoElement && videoEl.videoWidth && videoEl.videoHeight) {
+        imageWithDimensions = { ...image, width: videoEl.videoWidth, height: videoEl.videoHeight };
+      }
+    }
+
     setIsAnimating(true);
-    setSelectedImage(image);
+    setSelectedImage(imageWithDimensions);
     setSelectedImageRef(ref);
+    setInitialRect({ top: rect.top, left: rect.left, width: rect.width, height: rect.height });
     setModalOpen(true);
     setClickedImageId(image.id);
     onImageClick(image);
@@ -350,6 +367,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
             onClose={closeModal}
             selectedImage={selectedImage}
             selectedImageRef={selectedImageRef}
+            initialRect={initialRect}
             patternElements={null}
             onAnimationComplete={handleAnimationComplete}
           />
