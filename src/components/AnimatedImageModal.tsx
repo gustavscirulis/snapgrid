@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ZoomableImageWrapper } from "@/components/ZoomableImageWrapper";
+import { useDragContext } from "./UploadZone";
 import { isElectron } from "@/utils/electron";
 
 interface AnimatedImageModalProps {
@@ -144,6 +145,25 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   // Add ref to track if we're currently closing
   const isClosingRef = useRef(false);
 
+  // Drag-to-export from fullscreen (same pattern as ImageGrid)
+  const dragContext = useDragContext();
+  const justExportDraggedRef = useRef(false);
+  const customDragRef = useRef<{
+    startX: number;
+    startY: number;
+    isDragging: boolean;
+    nativeDragStarted: boolean;
+    previewEl: HTMLDivElement | null;
+    cleanupTimer: ReturnType<typeof setTimeout> | null;
+  } | null>(null);
+  // Stable refs so document-level listeners always see the latest values
+  const selectedImageRef2 = useRef(selectedImage);
+  selectedImageRef2.current = selectedImage;
+  const zoomStateRef = useRef(zoomState);
+  zoomStateRef.current = zoomState;
+  const setInternalDragActiveRef = useRef(dragContext.setInternalDragActive);
+  setInternalDragActiveRef.current = dragContext.setInternalDragActive;
+
   // Track window size reactively so layout recalculates on resize
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
@@ -220,9 +240,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   }, [isOpen]);
 
-  // Handle close with debounce
+  // Handle close with debounce — skip if an export drag just occurred
   const handleClose = useCallback(() => {
     if (isClosingRef.current) return;
+    if (justExportDraggedRef.current) return;
     isClosingRef.current = true;
     // Scroll to top and disable overflow before exit animation
     if (motionDivRef.current) {
@@ -231,6 +252,151 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     setOpenAnimComplete(false);
     onClose();
   }, [onClose]);
+
+  // Drag-to-export: mousedown on the image starts potential drag
+  const handleExportMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    if (zoomStateRef.current.scale > 1) return; // let ZoomableImageWrapper handle zoom-pan
+    if ((e.target as HTMLElement).closest('button, input, a, video[controls]')) return;
+
+    customDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      isDragging: false,
+      nativeDragStarted: false,
+      previewEl: null,
+      cleanupTimer: null,
+    };
+  }, []);
+
+  // Document-level mousemove/mouseup for export drag
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const cleanupDrag = () => {
+      const state = customDragRef.current;
+      if (!state) return;
+      if (state.previewEl) state.previewEl.remove();
+      if (state.cleanupTimer) clearTimeout(state.cleanupTimer);
+      if (state.isDragging) {
+        setInternalDragActiveRef.current(false);
+      }
+      document.body.style.cursor = '';
+      customDragRef.current = null;
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const state = customDragRef.current;
+      if (!state) return;
+
+      // After native drag handed off to OS, detect completion
+      if (state.nativeDragStarted) {
+        if (e.buttons === 0) {
+          cleanupDrag();
+          justExportDraggedRef.current = false;
+        }
+        return;
+      }
+
+      if (!state.isDragging) {
+        const dx = e.clientX - state.startX;
+        const dy = e.clientY - state.startY;
+        if (dx * dx + dy * dy < 25) return; // 5px threshold
+
+        state.isDragging = true;
+        justExportDraggedRef.current = true;
+        setInternalDragActiveRef.current(true);
+        document.body.style.cursor = 'grabbing';
+
+        // Create floating thumbnail preview
+        const image = selectedImageRef2.current;
+        if (image) {
+          const preview = document.createElement('div');
+          preview.style.cssText =
+            'position:fixed;pointer-events:none;width:96px;border-radius:8px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.25);transform:rotate(2deg);z-index:99999;opacity:0.7;';
+          const img = document.createElement('img');
+          img.src = image.thumbnailUrl || image.posterUrl || image.url || '';
+          img.style.cssText = 'width:100%;height:auto;display:block;';
+          img.draggable = false;
+          preview.appendChild(img);
+          document.body.appendChild(preview);
+          state.previewEl = preview;
+        }
+      }
+
+      if (state.previewEl) {
+        state.previewEl.style.left = `${e.clientX + 12}px`;
+        state.previewEl.style.top = `${e.clientY + 8}px`;
+      }
+
+      // Near window edge → trigger native drag for desktop export
+      const margin = 20;
+      const nearEdge =
+        e.clientX < margin ||
+        e.clientX > window.innerWidth - margin ||
+        e.clientY < margin ||
+        e.clientY > window.innerHeight - margin;
+
+      if (nearEdge && state.isDragging && window.electron?.startDrag) {
+        const image = selectedImageRef2.current;
+        if (!image) return;
+        const filePath = image.actualFilePath || image.url?.replace('local-file://', '');
+        if (filePath) {
+          state.nativeDragStarted = true;
+          if (state.previewEl) {
+            state.previewEl.remove();
+            state.previewEl = null;
+          }
+          document.body.style.cursor = '';
+
+          const iconUrl = image.thumbnailUrl || image.posterUrl || '';
+          const iconPath = iconUrl.replace('local-file://', '');
+          const displayName =
+            image.title || image.imageContext?.substring(0, 60) || undefined;
+          window.electron.startDrag(filePath, iconPath, displayName);
+
+          state.cleanupTimer = setTimeout(() => {
+            cleanupDrag();
+            justExportDraggedRef.current = false;
+          }, 10000);
+        }
+      }
+
+      if (state.isDragging) {
+        e.preventDefault();
+      }
+    };
+
+    const handleMouseUp = () => {
+      const state = customDragRef.current;
+      if (!state) return;
+      if (state.nativeDragStarted) return;
+
+      if (state.isDragging) {
+        // Let justExportDraggedRef stay true briefly to block click-to-close
+        setTimeout(() => {
+          justExportDraggedRef.current = false;
+        }, 300);
+      } else {
+        justExportDraggedRef.current = false;
+      }
+      cleanupDrag();
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      // Clean up any active drag on unmount
+      const state = customDragRef.current;
+      if (state) {
+        if (state.previewEl) state.previewEl.remove();
+        if (state.cleanupTimer) clearTimeout(state.cleanupTimer);
+      }
+      customDragRef.current = null;
+    };
+  }, [isOpen]);
 
   // Handle body overflow and keyboard events
   useEffect(() => {
@@ -440,6 +606,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               initial="initial"
               animate="open"
               exit="exit"
+              onMouseDown={handleExportMouseDown}
               onClick={(e) => {
                 // Don't close modal when clicking on the image content during zoom interactions
                 e.stopPropagation();

@@ -297,6 +297,7 @@ const Index = () => {
             onCreateSpace={createSpace}
             onRenameSpace={renameSpace}
             onDeleteSpace={deleteSpace}
+            onAssignToSpace={assignImageToSpace}
           />
         </div>
 

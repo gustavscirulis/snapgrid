@@ -40,4 +40,22 @@
 /* Style for placeholder items in empty state */
 .masonry-item > div {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Highlight space tab during custom drag hover */
+[data-space-tab-id][data-drag-over="true"] {
+  background-color: rgb(0 0 0 / 0.05);
+  border-radius: 0.375rem;
+}
+[data-space-tab-id][data-drag-over="true"] span {
+  color: rgb(75 85 99) !important;
+  font-weight: 500;
+}
+@media (prefers-color-scheme: dark) {
+  [data-space-tab-id][data-drag-over="true"] {
+    background-color: rgb(255 255 255 / 0.07);
+  }
+  [data-space-tab-id][data-drag-over="true"] span {
+    color: rgb(209 213 219) !important;
+  }
 } 
