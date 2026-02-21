@@ -700,6 +700,34 @@ ipcMain.handle('call-openai', async (event, payload) => {
   }
 });
 
+// List available OpenAI models (for model selection in settings)
+ipcMain.handle('list-openai-models', async () => {
+  try {
+    const apiKey = apiKeyStorage.getApiKey('openai');
+    if (!apiKey) {
+      throw new Error('OpenAI API key not found');
+    }
+
+    const response = await fetch('https://api.openai.com/v1/models', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    return { success: true, models: data.data };
+  } catch (error) {
+    console.error('Error listing OpenAI models:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // IPC handlers for file system operations
 ipcMain.handle('get-app-storage-dir', () => {
   return appStorageDir;

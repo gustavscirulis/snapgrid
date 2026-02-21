@@ -1,5 +1,6 @@
 // A service to identify UI patterns in images using OpenAI's Vision API
 import { sendAnalyticsEvent } from "@/services/analyticsService";
+import { resolveModel } from "@/services/modelService";
 
 interface PatternMatch {
   name: string;
@@ -140,8 +141,9 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
       7. Ensure that the patterns are unique and not duplicates of each other and imageSummary
       7. Provide exactly 6 patterns, ordered by confidence`;
 
+    const modelId = await resolveModel();
     const payload = {
-      model: "gpt-4.1-mini",
+      model: modelId,
       messages: [
         {
           role: "system",
@@ -163,7 +165,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
           ]
         }
       ],
-      max_tokens: 800
+      max_completion_tokens: 800
     };
 
     let data;
