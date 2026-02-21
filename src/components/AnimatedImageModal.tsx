@@ -9,6 +9,7 @@ interface AnimatedImageModalProps {
   onClose: () => void;
   selectedImage: ImageItem | null;
   selectedImageRef: React.RefObject<HTMLDivElement> | null;
+  initialRect: { top: number; left: number; width: number; height: number } | null;
   patternElements: React.ReactNode | null;
   onAnimationComplete?: (definition: string) => void;
 }
@@ -96,14 +97,14 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   onClose,
   selectedImage,
   selectedImageRef,
+  initialRect,
   onAnimationComplete,
 }) => {
-  const [initialPosition, setInitialPosition] = useState<{
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-  } | null>(null);
+  // Use initialRect directly — measured in the click handler before the thumbnail
+  // was hidden, so it's available on the very first render (no delay).
+  // NOT gated on isOpen: initialRect must persist during exit animation so
+  // AnimatePresence can play the shrink-back transition before unmounting.
+  const initialPosition = initialRect;
   
   // Add a ref to access the video element
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -153,29 +154,31 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     setMediaLoadError(true);
   }, []);
 
-  // Reset error state when modal closes or image changes
+  // Reset state when modal closes or image changes
   useEffect(() => {
     if (!isOpen) {
       setMediaLoadError(false);
-      // Reset zoom state when modal closes
       setZoomState({ scale: 1, position: { x: 0, y: 0 } });
     }
   }, [isOpen, selectedImage]);
 
-  // Calculate optimal dimensions using the new function
+  // Calculate optimal dimensions.
+  // Video dimensions are now pre-measured from the thumbnail <video> element in the
+  // click handler, so selectedImage.width/height is accurate from the first render.
+  // actualVideoDimensions serves as a late fallback only if the thumbnail hadn't loaded.
   const optimalDimensions = useMemo(() => {
     if (!selectedImage) {
       return null;
     }
 
-    // If we have actual video dimensions from the video element, use those instead
-    if (selectedImage.type === 'video' && actualVideoDimensions) {
+    // Use actualVideoDimensions only if selectedImage still has missing/fallback values
+    if (selectedImage.type === 'video' && actualVideoDimensions &&
+        (!selectedImage.width || !selectedImage.height)) {
       const updatedImage = {
         ...selectedImage,
         width: actualVideoDimensions.width,
         height: actualVideoDimensions.height
       };
-
       return calculateOptimalDimensions(updatedImage, windowSize.width, windowSize.height);
     }
 
@@ -197,29 +200,15 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   }, [selectedImage, initialPosition, optimalDimensions, windowSize]);
 
-  // Get initial position from thumbnail
+  // Reset animation ref after modal closes
   useEffect(() => {
-    if (isOpen && selectedImageRef?.current) {
-      try {
-        const rect = selectedImageRef.current.getBoundingClientRect();
-        const position = {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        };
-        setInitialPosition(position);
-      } catch (error) {
-        console.error('Error getting initial position:', error);
-      }
-    } else if (!isOpen) {
-      // Ensure we clean up after the exit animation
-      setTimeout(() => {
-        setInitialPosition(null);
+    if (!isOpen) {
+      const id = setTimeout(() => {
         isAnimatingRef.current = false;
       }, 300);
+      return () => clearTimeout(id);
     }
-  }, [isOpen, selectedImageRef]);
+  }, [isOpen]);
 
   // Handle close with debounce
   const handleClose = useCallback(() => {
@@ -305,7 +294,9 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   }, [isOpen, selectedImage]);
 
-  // Create modal variants
+  // Create modal variants — animates width/height (layout) on this isolated overlay surface.
+  // FLIP (scale-based) is not viable here because thumbnail uses object-cover (cropped)
+  // while modal uses object-contain (full image), so content differs at each size.
   const modalVariants = useMemo(() => {
     if (!initialPosition) {
       return null;
@@ -331,9 +322,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     // For tall images, keep top alignment with 40px padding
     // For regular images, add moderate top padding (20px)
     const finalY = isTallImage ? 40 : Math.max(20, (windowSize.height - finalDimensions.height) / 2);
-    
-    // For the position-absolute scrollable layout, we only need width and height
-    // The position is handled by the scrollable container
+
     const variants = {
       initial: {
         width: initialPosition.width,
@@ -368,12 +357,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           translateY: -zoomState.position.y / zoomState.scale,
         } : {}),
         transition: zoomState.scale > 1 ? {
-          // Slower transition when zoomed in
           type: "spring",
           damping: 25,
           stiffness: 200
         } : {
-          // Normal speed when not zoomed
           type: "spring",
           damping: 30,
           stiffness: 300
@@ -419,7 +406,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             {/* Image container with animation */}
             <motion.div
               className="rounded-lg flex justify-center"
-              style={{ 
+              style={{
                 position: 'relative',
                 alignSelf: 'flex-start',
                 marginTop: 0,
@@ -440,7 +427,9 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 e.stopPropagation();
               }}
               onAnimationComplete={(definition) => {
-                if (definition === "exit") {
+                if (definition === "open") {
+                  isAnimatingRef.current = false;
+                } else if (definition === "exit") {
                   onAnimationComplete && onAnimationComplete("exit");
                   isAnimatingRef.current = false;
                   isClosingRef.current = false;

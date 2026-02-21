@@ -37,75 +37,84 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
   const [velocity, setVelocity] = useState({ x: 0, y: 0 });
   const [isAnimating, setIsAnimating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastMoveTime = useRef<number>(0);
   const lastPosition = useRef({ x: 0, y: 0 });
   const animationRef = useRef<number>();
 
+  // Refs for animation loop (bypass React re-renders during momentum)
+  const velRef = useRef({ x: 0, y: 0 });
+  const posRef = useRef({ x: 0, y: 0 });
+  const cachedBoundsRef = useRef({ width: 0, height: 0 });
+
   const MIN_SCALE = 1;
   const MAX_SCALE = 4;
-  const FRICTION = 0.95; // Deceleration factor
-  const MIN_VELOCITY = 0.5; // Stop animation when velocity is below this
+  const FRICTION = 0.95;
+  const MIN_VELOCITY = 0.5;
 
-  // Constrain position within bounds
-  const constrainPosition = useCallback((x: number, y: number) => {
-    if (!containerRef.current) return { x, y };
-    
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const containerWidth = containerRect.width;
-    const containerHeight = containerRect.height;
-    
-    const scaledWidth = containerWidth * scale;
-    const scaledHeight = containerHeight * scale;
-    
+  // Constrain position within bounds using cached dimensions
+  const constrainPosition = useCallback((x: number, y: number, containerWidth?: number, containerHeight?: number) => {
+    const w = containerWidth ?? cachedBoundsRef.current.width;
+    const h = containerHeight ?? cachedBoundsRef.current.height;
+    if (!w || !h) return { x, y };
+
+    const scaledWidth = w * scale;
+    const scaledHeight = h * scale;
+
     const minVisibleRatio = 0.5;
-    const minVisibleWidth = scaledWidth * minVisibleRatio;
-    const minVisibleHeight = scaledHeight * minVisibleRatio;
-    const maxOffsetX = (scaledWidth - minVisibleWidth) / scale;
-    const maxOffsetY = (scaledHeight - minVisibleHeight) / scale;
-    
+    const maxOffsetX = (scaledWidth - scaledWidth * minVisibleRatio) / scale;
+    const maxOffsetY = (scaledHeight - scaledHeight * minVisibleRatio) / scale;
+
     return {
       x: Math.max(-maxOffsetX, Math.min(maxOffsetX, x)),
       y: Math.max(-maxOffsetY, Math.min(maxOffsetY, y))
     };
   }, [scale]);
 
-  // Momentum animation
+  // Momentum animation — writes directly to DOM, no React state during loop
   const animateMomentum = useCallback(() => {
-    setVelocity(currentVelocity => {
-      const newVelX = currentVelocity.x * FRICTION;
-      const newVelY = currentVelocity.y * FRICTION;
-      
-      // Stop animation if velocity is too low
-      if (Math.abs(newVelX) < MIN_VELOCITY && Math.abs(newVelY) < MIN_VELOCITY) {
-        setIsAnimating(false);
-        return { x: 0, y: 0 };
-      }
-      
-      // Update position with constrained bounds
-      setPosition(currentPos => {
-        const newPos = constrainPosition(
-          currentPos.x + newVelX,
-          currentPos.y + newVelY
-        );
-        return newPos;
-      });
-      
-      // Continue animation
-      animationRef.current = requestAnimationFrame(animateMomentum);
-      return { x: newVelX, y: newVelY };
-    });
-  }, [constrainPosition]);
+    velRef.current.x *= FRICTION;
+    velRef.current.y *= FRICTION;
+
+    if (Math.abs(velRef.current.x) < MIN_VELOCITY && Math.abs(velRef.current.y) < MIN_VELOCITY) {
+      // Sync final position to React state once
+      setPosition({ ...posRef.current });
+      setVelocity({ x: 0, y: 0 });
+      setIsAnimating(false);
+      return;
+    }
+
+    const newPos = constrainPosition(
+      posRef.current.x + velRef.current.x,
+      posRef.current.y + velRef.current.y
+    );
+    posRef.current = newPos;
+
+    // Write directly to DOM — no React re-render
+    if (innerRef.current) {
+      innerRef.current.style.transform =
+        `scale(${scale}) translate(${newPos.x / scale}px, ${newPos.y / scale}px)`;
+    }
+
+    animationRef.current = requestAnimationFrame(animateMomentum);
+  }, [constrainPosition, scale]);
 
   // Start momentum animation
   const startMomentum = useCallback((velX: number, velY: number) => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
-    setVelocity({ x: velX, y: velY });
+    // Cache container dimensions once before the loop
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      cachedBoundsRef.current = { width: rect.width, height: rect.height };
+    }
+    velRef.current = { x: velX, y: velY };
+    posRef.current = { ...position };
     setIsAnimating(true);
     animationRef.current = requestAnimationFrame(animateMomentum);
-  }, [animateMomentum]);
+  }, [animateMomentum, position]);
 
   const handleWheel = useCallback((e: WheelEvent) => {
     // Don't handle zoom if disabled
@@ -206,35 +215,38 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (disableZoom || !isDragging || scale <= 1) return;
-    
+
     e.preventDefault();
-    setHasDragged(true); // Mark that user has dragged
-    
+    setHasDragged(true);
+
     const newX = e.clientX - dragStart.x;
     const newY = e.clientY - dragStart.y;
-    
+
     // Track velocity for momentum
     const now = Date.now();
     const timeDelta = now - lastMoveTime.current;
     if (timeDelta > 0) {
       const deltaX = e.clientX - lastPosition.current.x;
       const deltaY = e.clientY - lastPosition.current.y;
-      
-      // Calculate velocity (pixels per millisecond, scaled up)
-      const velocityX = (deltaX / timeDelta) * 16; // Scale for smooth animation
+
+      const velocityX = (deltaX / timeDelta) * 16;
       const velocityY = (deltaY / timeDelta) * 16;
-      
+
       setVelocity({ x: velocityX, y: velocityY });
     }
-    
+
     lastMoveTime.current = now;
     lastPosition.current = { x: e.clientX, y: e.clientY };
-    
-    // Use the constrain function
+
+    // Use cached bounds for constrain during drag
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      cachedBoundsRef.current = { width: rect.width, height: rect.height };
+    }
     const constrainedPos = constrainPosition(newX, newY);
     setPosition(constrainedPos);
     onZoomStateChange?.(scale, constrainedPos);
-  }, [isDragging, dragStart, scale, constrainPosition, disableZoom]);
+  }, [isDragging, dragStart, scale, constrainPosition, disableZoom, onZoomStateChange]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -287,6 +299,7 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
       onMouseLeave={handleMouseUp}
     >
       <div
+        ref={innerRef}
         style={{
           transform,
           transition: (isDragging || isAnimating) ? 'none' : 'transform 0.2s ease-out',
