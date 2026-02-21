@@ -123,10 +123,30 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   }, [isOpen, imageLoaded]);
 
+  // For videos, preload the poster image so the animation doesn't start
+  // until there's actual visual content to show. The <video> element's
+  // onLoadedMetadata fires when metadata (duration/dimensions) is known,
+  // which is long before the poster or first frame is painted.
+  useEffect(() => {
+    if (isOpen && selectedImage?.type === 'video' && selectedImage.posterUrl) {
+      const img = new window.Image();
+      img.onload = async () => {
+        try { await img.decode(); } catch {}
+        setImageLoaded(true);
+        onModalImageReady?.();
+      };
+      img.src = selectedImage.posterUrl;
+      return () => { img.onload = null; };
+    }
+  }, [isOpen, selectedImage?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleImageLoaded = useCallback(() => {
+    // For videos with posters, imageLoaded is set via the poster-preload
+    // effect above — skip the duplicate call from onLoadedMetadata.
+    if (selectedImage?.type === 'video' && selectedImage.posterUrl) return;
     setImageLoaded(true);
     onModalImageReady?.();
-  }, [onModalImageReady]);
+  }, [onModalImageReady, selectedImage?.type, selectedImage?.posterUrl]);
 
   // Add state to track media loading errors
   const [mediaLoadError, setMediaLoadError] = useState(false);
