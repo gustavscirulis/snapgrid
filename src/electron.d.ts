@@ -60,6 +60,9 @@ interface IElectronAPI {
   }>;
   saveMediaData?: (data: any) => Promise<any>;
   
+  // Native drag support
+  startDrag?: (filePath: string, iconPath: string, displayName?: string) => void;
+
   // Menu event handlers
   onImportFiles?: (callback: (filePaths: string[]) => void) => () => void;
   onOpenStorageLocation?: (callback: () => void) => () => void;

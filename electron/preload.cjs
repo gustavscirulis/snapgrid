@@ -139,6 +139,9 @@ contextBridge.exposeInMainWorld(
     onQueueNewFile: (callback) => {
       ipcRenderer.on('queue:new-file', (_, filePath) => callback(filePath));
       return () => ipcRenderer.removeAllListeners('queue:new-file');
-    }
+    },
+
+    // Native drag support (drag files out of app)
+    startDrag: (filePath, iconPath, displayName) => ipcRenderer.send('start-drag', { filePath, iconPath, displayName }),
   }
 );

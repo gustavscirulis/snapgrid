@@ -707,6 +707,60 @@ ipcMain.on('window-close', () => {
   if (mainWindow) mainWindow.close();
 });
 
+// Handle drag-out-of-app: initiate native file drag
+ipcMain.on('start-drag', (event, { filePath, iconPath, displayName }) => {
+  try {
+    // If a display name is provided, copy to a temp file with that name
+    let dragFilePath = filePath;
+    if (displayName) {
+      const ext = path.extname(filePath);
+      const sanitized = displayName.replace(/[/\\?%*:|"<>]/g, '-').substring(0, 100);
+      const tempDir = path.join(os.tmpdir(), 'snapgrid-drag');
+      fs.ensureDirSync(tempDir);
+      const tempPath = path.join(tempDir, sanitized + ext);
+      try {
+        // Remove any old file/symlink at the destination first
+        fs.removeSync(tempPath);
+        // Use native copy to create a real file (not symlink/alias)
+        fs.copyFileSync(filePath, tempPath);
+        dragFilePath = tempPath;
+      } catch (copyErr) {
+        console.error('Error creating temp file for drag:', copyErr);
+      }
+    }
+
+    let icon;
+    if (iconPath) {
+      icon = nativeImage.createFromPath(iconPath);
+      const size = icon.getSize();
+      if (size.width > 200) {
+        icon = icon.resize({ width: 200, height: Math.round((200 / size.width) * size.height) });
+      }
+    }
+
+    if (!icon || icon.isEmpty()) {
+      icon = nativeImage.createFromPath(filePath);
+      if (!icon.isEmpty()) {
+        const size = icon.getSize();
+        if (size.width > 200) {
+          icon = icon.resize({ width: 200, height: Math.round((200 / size.width) * size.height) });
+        }
+      }
+    }
+
+    if (!icon || icon.isEmpty()) {
+      icon = nativeImage.createEmpty();
+    }
+
+    event.sender.startDrag({
+      file: dragFilePath,
+      icon: icon,
+    });
+  } catch (error) {
+    console.error('Error starting drag:', error);
+  }
+});
+
 // Add API key management handlers
 ipcMain.handle('set-api-key', async (event, { service, key }) => {
   try {

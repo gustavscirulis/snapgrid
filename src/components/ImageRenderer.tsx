@@ -120,19 +120,14 @@ export const ImageRenderer = React.memo(function ImageRenderer({
     }
   }, [onLoad]);
 
-  // Handle drag start - mark as internal drag operation
-  const handleDragStart = useCallback(() => {
-    if (dragContext?.setInternalDragActive) {
-      dragContext.setInternalDragActive(true);
-    }
-  }, [dragContext]);
+  // Prevent native img/video drag — the parent ImageGrid card handles dragging
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
 
-  // Handle drag end - reset internal drag flag
   const handleDragEnd = useCallback(() => {
-    if (dragContext?.setInternalDragActive) {
-      dragContext.setInternalDragActive(false);
-    }
-  }, [dragContext]);
+    // No-op — parent handles drag end
+  }, []);
 
   // Check if image is preloaded/cached
   const isImageCached = preloader?.isImageCached(image.url) || false;
@@ -214,14 +209,15 @@ export const ImageRenderer = React.memo(function ImageRenderer({
         >
           {/* Always render the poster image as the base layer */}
           {image.posterUrl ? (
-            <img 
-              src={getOptimizedImageSrc(image.posterUrl)} 
+            <img
+              src={getOptimizedImageSrc(image.posterUrl)}
               alt={`Video thumbnail ${image.id}`}
               className={`w-full h-auto object-cover ${className}`}
               style={{ minHeight: '120px' }}
               loading="eager"
               decoding="async"
               fetchpriority="high"
+              draggable={false}
               onLoad={handleLoad}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
@@ -328,6 +324,7 @@ export const ImageRenderer = React.memo(function ImageRenderer({
           loading="eager"
           decoding="async"
           fetchpriority="high"
+          draggable={false}
           onError={handleError}
           onLoad={handleLoad}
           onDragStart={handleDragStart}
@@ -345,6 +342,7 @@ export const ImageRenderer = React.memo(function ImageRenderer({
       loading="eager"
       decoding="async"
       fetchpriority="high"
+      draggable={false}
       onError={handleError}
       onLoad={handleLoad}
       onDragStart={handleDragStart}
