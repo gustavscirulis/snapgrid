@@ -50,6 +50,7 @@ interface SettingsPanelProps {
   onDeleteSpace: (id: string) => Promise<void>;
   onUpdateSpacePrompt: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
   onUpdateAllSpacePrompt: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  onShuffleImages?: () => void;
 }
 
 export function SettingsPanel({
@@ -63,6 +64,7 @@ export function SettingsPanel({
   onDeleteSpace,
   onUpdateSpacePrompt,
   onUpdateAllSpacePrompt,
+  onShuffleImages,
 }: SettingsPanelProps) {
   const [isDevMode, setIsDevMode] = useState(false);
   const [activeProvider, setActiveProviderState] = useState<AIProvider>("openai");
@@ -182,7 +184,7 @@ export function SettingsPanel({
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <DeveloperSection />
+                  <DeveloperSection onShuffleImages={onShuffleImages} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -689,7 +691,7 @@ const QueueSection = () => {
   );
 };
 
-const DeveloperSection = () => {
+const DeveloperSection = ({ onShuffleImages }: { onShuffleImages?: () => void }) => {
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
   const [enablePillClickAnalysis, setEnablePillClickAnalysis] = useState(false);
 
@@ -740,6 +742,21 @@ const DeveloperSection = () => {
           onCheckedChange={handleTogglePillClickAnalysis}
           className="data-[state=checked]:bg-rose-600 dark:data-[state=checked]:bg-rose-700"
         />
+      </div>
+
+      <div className="flex justify-between items-center gap-4">
+        <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Shuffle grid order</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            onShuffleImages?.();
+            toast.success("Grid order shuffled for this session.");
+          }}
+          className="h-7 text-xs border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+        >
+          Shuffle
+        </Button>
       </div>
 
       <div className="flex justify-between items-center gap-4">
