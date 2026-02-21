@@ -9,7 +9,7 @@ export interface UseImageFileSystemReturn {
   setIsUploading: React.Dispatch<React.SetStateAction<boolean>>;
   readFileAsDataURL: (file: File) => Promise<string>;
   getImageDimensions: (dataUrl: string) => Promise<{ width: number; height: number }>;
-  saveMediaToDisk: (media: ImageItem, dataUrl: string) => Promise<string | undefined>;
+  saveMediaToDisk: (media: ImageItem, dataUrl: string) => Promise<{ path: string; thumbnailPath?: string } | undefined>;
   addImageFromFile: (
     file: File,
     onAddToCollection: (media: ImageItem) => void,
@@ -50,7 +50,7 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
     });
   }, []);
 
-  const saveMediaToDisk = useCallback(async (media: ImageItem, dataUrl: string): Promise<string | undefined> => {
+  const saveMediaToDisk = useCallback(async (media: ImageItem, dataUrl: string): Promise<{ path: string; thumbnailPath?: string } | undefined> => {
     try {
       const result = await window.electron.saveImage({
         id: media.id,
@@ -68,7 +68,7 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
       });
 
       if (result.success && result.path) {
-        return result.path;
+        return { path: result.path, thumbnailPath: result.thumbnailPath };
       } else {
         throw new Error(result.error || "Unknown error");
       }
@@ -116,14 +116,15 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
       setIsUploading(false);
 
       // Save to disk if in Electron - this can continue in the background
-      const savedFilePath = await saveMediaToDisk(media, dataUrl);
-      if (savedFilePath) {
+      const saveResult = await saveMediaToDisk(media, dataUrl);
+      if (saveResult) {
         media = {
           ...media,
-          actualFilePath: savedFilePath,
-          url: `local-file://${savedFilePath}`,
+          actualFilePath: saveResult.path,
+          url: `local-file://${saveResult.path}`,
+          thumbnailUrl: saveResult.thumbnailPath ? `local-file://${saveResult.thumbnailPath}` : undefined,
           useDirectPath: true,
-          isAnalyzing: true // Set analyzing state here to combine with URL update (one render instead of two)
+          isAnalyzing: true
         };
         onAddToCollection(media);
 
@@ -139,7 +140,7 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
 
       // Trigger analysis
       try {
-        const analyzedMedia = await onAnalyze(media, dataUrl, savedFilePath);
+        const analyzedMedia = await onAnalyze(media, dataUrl, saveResult?.path);
         onAddToCollection(analyzedMedia);
       } catch (error) {
         console.error("Analysis failed:", error);
@@ -226,8 +227,9 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
             ...media,
             actualFilePath: result.path,
             url: `local-file://${result.path}`,
+            thumbnailUrl: result.thumbnailPath ? `local-file://${result.thumbnailPath}` : undefined,
             useDirectPath: true,
-            isAnalyzing: true // Set analyzing state here to combine with URL update (one render instead of two)
+            isAnalyzing: true
           };
 
           // Add to image list
