@@ -1,30 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { X, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import AnimatedImageModal from "./AnimatedImageModal";
 import { motion, AnimatePresence } from "framer-motion";
-import { ImageRenderer } from "@/components/ImageRenderer";
 import Masonry from 'react-masonry-css';
 import './masonry-grid.css';
 import './text-shine.css';
 import { useDragContext } from "./UploadZone";
 import { useImagePreloader } from "@/hooks/useImagePreloader";
 import { useApiKeyWatcher } from "@/hooks/useApiKeyWatcher";
-import PatternTags from "./PatternTags";
 import EmptyStateCard from "./EmptyStateCard";
 import EmptyStatePlaceholders from "./EmptyStatePlaceholders";
 import { Space } from "@/hooks/useSpaces";
-import {
-  ContextMenu,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubTrigger,
-  ContextMenuSubContent,
-} from "@/components/ui/context-menu";
+import ImageCard from "./ImageCard";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -42,7 +29,6 @@ interface ImageGridProps {
 }
 
 const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete, searchQuery = "", onOpenSettings, settingsOpen = false, retryAnalysis, thumbnailSize = 'medium', spaces = [], activeSpaceId, onAssignToSpace, onRemoveFromSpace }) => {
-  const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImageRef, setSelectedImageRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
@@ -85,57 +71,20 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   
 
   // Dynamic responsive breakpoints based on thumbnail size
-  const getBreakpointColumnsObj = () => {
+  const breakpointColumnsObj = useMemo(() => {
     switch (thumbnailSize) {
       case 'small':
-        return {
-          default: 6, // More columns for smaller thumbnails
-          1536: 6,
-          1280: 5,
-          1024: 4,
-          640: 3,
-          480: 2
-        };
+        return { default: 6, 1536: 6, 1280: 5, 1024: 4, 640: 3, 480: 2 };
       case 'medium':
-        return {
-          default: 4, // Default size
-          1536: 4,
-          1280: 3,
-          1024: 2,
-          640: 1,
-          480: 1
-        };
+        return { default: 4, 1536: 4, 1280: 3, 1024: 2, 640: 1, 480: 1 };
       case 'large':
-        return {
-          default: 3, // Fewer columns for larger thumbnails
-          1536: 3,
-          1280: 2,
-          1024: 2,
-          640: 1,
-          480: 1
-        };
+        return { default: 3, 1536: 3, 1280: 2, 1024: 2, 640: 1, 480: 1 };
       case 'xl':
-        return {
-          default: 2, // Very few columns for extra large thumbnails
-          1536: 2,
-          1280: 2,
-          1024: 1,
-          640: 1,
-          480: 1
-        };
+        return { default: 2, 1536: 2, 1280: 2, 1024: 1, 640: 1, 480: 1 };
       default:
-        return {
-          default: 4,
-          1536: 4,
-          1280: 3,
-          1024: 2,
-          640: 1,
-          480: 1
-        };
+        return { default: 4, 1536: 4, 1280: 3, 1024: 2, 640: 1, 480: 1 };
     }
-  };
-
-  const breakpointColumnsObj = getBreakpointColumnsObj();
+  }, [thumbnailSize]);
   
   // Initialize image refs and setup intersection observer
   useEffect(() => {
@@ -178,8 +127,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     }
   }, [exitAnimationComplete]);
   
-  const handleImageClick = (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
-    if (isAnimating || justDraggedRef.current) return;
+  // Use ref for isAnimating so handleImageClick doesn't need it as a dependency
+  const isAnimatingRef = useRef(isAnimating);
+  isAnimatingRef.current = isAnimating;
+
+  const handleImageClick = useCallback((image: ImageItem, ref: React.RefObject<HTMLDivElement>) => {
+    if (isAnimatingRef.current || justDraggedRef.current) return;
 
     // Measure thumbnail rect BEFORE any state changes hide it.
     // This lets the modal render in the same paint frame.
@@ -203,25 +156,25 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     setModalOpen(true);
     setClickedImageId(image.id);
     onImageClick(image);
-  };
+  }, [onImageClick]);
 
-  const handleAnimationComplete = (definition: string) => {
+  const handleAnimationComplete = useCallback((definition: string) => {
     if (definition === "exit") {
       setExitAnimationComplete(true);
       setIsAnimating(false);
       setClickedImageId(null);
     }
-  };
+  }, []);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setModalOpen(false);
     // Don't reset clickedImageId here - wait for animation to complete
     // The thumbnail should stay hidden until handleAnimationComplete is called
-  };
+  }, []);
 
-  const handleDeleteImage = (id: string) => {
+  const handleDeleteImage = useCallback((id: string) => {
     onImageDelete?.(id);
-  };
+  }, [onImageDelete]);
 
   // Custom mouse-based drag system for drag-to-space and drag-out-of-app.
   // We avoid HTML5 drag because Electron's startDrag (needed for desktop export)
@@ -518,138 +471,24 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                   imageRefs.current.set(image.id, ref);
                 }
 
-                const isSelected = clickedImageId === image.id;
-
-                const isDragged = dragContext.draggedImageId === image.id;
-
-                const imageCard = (
-                  <div
-                    ref={ref}
-                    draggable={false}
-                    onMouseDown={(e) => handleImageMouseDown(e, image)}
-                    className="rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800 shadow-sm hover:shadow-md relative group w-full transition-opacity duration-150"
-                    onClick={() => handleImageClick(image, ref)}
-                    onMouseEnter={() => setHoveredImageId(image.id)}
-                    onMouseLeave={() => setHoveredImageId(null)}
-                    style={{
-                      opacity: isSelected ? 0 : (isDragged ? 0.4 : 1),
-                      visibility: isSelected ? 'hidden' : 'visible',
-                      pointerEvents: isAnimating ? 'none' : 'auto',
-                      cursor: 'default',
-                    }}
-                  >
-                    <div className="relative">
-                      <ImageRenderer
-                        image={image}
-                        alt="UI Screenshot"
-                        className="w-full h-auto object-cover rounded-t-lg"
-                        controls={false}
-                        autoPlay={false}
-                        preloader={preloader}
-                      />
-
-                      <AnimatePresence>
-                        {hoveredImageId === image.id && (
-                          <motion.div
-                            id={`pattern-tags-${image.id}`}
-                            className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 10 }}
-                            style={{
-                              bottom: '-2px',
-                              pointerEvents: 'none'
-                            }}
-                          >
-                            <div className="pointer-events-auto">
-                              <PatternTags item={image} retryAnalysis={retryAnalysis} />
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      {/* Video indicator icon */}
-                      {image.type === 'video' && (
-                        <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
-                          </svg>
-                        </div>
-                      )}
-
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1.5">
-                        {activeSpaceId && onRemoveFromSpace && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="p-1 rounded-full h-6 w-6 bg-black/60 text-white hover:text-white hover:bg-black/80"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRemoveFromSpace(image.id);
-                            }}
-                            title="Remove from space"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        )}
-                        {onImageDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="p-1 rounded-full h-6 w-6 bg-black/60 text-white hover:text-white hover:bg-red-600/90"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteImage(image.id);
-                            }}
-                            title="Delete"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-
                 return (
-                  <div key={image.id} className="masonry-item">
-                    {onAssignToSpace && spaces.length > 0 ? (
-                      <ContextMenu>
-                        <ContextMenuTrigger asChild>
-                          {imageCard}
-                        </ContextMenuTrigger>
-                        <ContextMenuContent>
-                          <ContextMenuSub>
-                            <ContextMenuSubTrigger>Move to</ContextMenuSubTrigger>
-                            <ContextMenuSubContent>
-                              {spaces.map(space => (
-                                <ContextMenuItem
-                                  key={space.id}
-                                  onClick={() => onAssignToSpace(image.id, space.id)}
-                                  className={image.spaceId === space.id ? "font-medium" : ""}
-                                >
-                                  {space.name}
-                                  {image.spaceId === space.id && (
-                                    <span className="ml-auto text-xs text-gray-400">current</span>
-                                  )}
-                                </ContextMenuItem>
-                              ))}
-                            </ContextMenuSubContent>
-                          </ContextMenuSub>
-                          {activeSpaceId && image.spaceId && (
-                            <>
-                              <ContextMenuSeparator />
-                              <ContextMenuItem onClick={() => onAssignToSpace(image.id, null)}>
-                                Remove from Space
-                              </ContextMenuItem>
-                            </>
-                          )}
-                        </ContextMenuContent>
-                      </ContextMenu>
-                    ) : (
-                      imageCard
-                    )}
-                  </div>
+                  <ImageCard
+                    key={image.id}
+                    image={image}
+                    imageRef={ref}
+                    isSelected={clickedImageId === image.id}
+                    isDragged={dragContext.draggedImageId === image.id}
+                    isAnimating={isAnimating}
+                    preloader={preloader}
+                    retryAnalysis={retryAnalysis}
+                    activeSpaceId={activeSpaceId}
+                    spaces={spaces}
+                    onImageClick={handleImageClick}
+                    onImageDelete={handleDeleteImage}
+                    onMouseDown={handleImageMouseDown}
+                    onAssignToSpace={onAssignToSpace}
+                    onRemoveFromSpace={onRemoveFromSpace}
+                  />
                 );
               })}
             </Masonry>
