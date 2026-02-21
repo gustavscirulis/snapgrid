@@ -134,6 +134,20 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   // Add ref to track if we're currently closing
   const isClosingRef = useRef(false);
 
+  // Track window size reactively so layout recalculates on resize
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Handle media load error
   const handleMediaError = useCallback(() => {
     setMediaLoadError(true);
@@ -153,38 +167,35 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     if (!selectedImage) {
       return null;
     }
-    
+
     // If we have actual video dimensions from the video element, use those instead
     if (selectedImage.type === 'video' && actualVideoDimensions) {
-      // Create a copy of the selectedImage with updated dimensions
       const updatedImage = {
         ...selectedImage,
         width: actualVideoDimensions.width,
         height: actualVideoDimensions.height
       };
-      
-      const dimensions = calculateOptimalDimensions(updatedImage, window.innerWidth, window.innerHeight);
-      return dimensions;
+
+      return calculateOptimalDimensions(updatedImage, windowSize.width, windowSize.height);
     }
-    
-    const dimensions = calculateOptimalDimensions(selectedImage, window.innerWidth, window.innerHeight);
-    return dimensions;
-  }, [selectedImage, window.innerWidth, window.innerHeight, actualVideoDimensions]);
+
+    return calculateOptimalDimensions(selectedImage, windowSize.width, windowSize.height);
+  }, [selectedImage, windowSize.width, windowSize.height, actualVideoDimensions]);
 
   // Calculate fallback dimensions when needed
   useEffect(() => {
     if (selectedImage && initialPosition && !optimalDimensions) {
       const fallback = {
-        width: Math.min(800, window.innerWidth * 0.8),
-        height: Math.min(600, window.innerHeight * 0.8),
-        top: window.innerHeight / 2 - Math.min(600, window.innerHeight * 0.8) / 2,
-        left: window.innerWidth / 2 - Math.min(800, window.innerWidth * 0.8) / 2
+        width: Math.min(800, windowSize.width * 0.8),
+        height: Math.min(600, windowSize.height * 0.8),
+        top: windowSize.height / 2 - Math.min(600, windowSize.height * 0.8) / 2,
+        left: windowSize.width / 2 - Math.min(800, windowSize.width * 0.8) / 2
       };
       setFallbackDimensions(fallback);
     } else {
       setFallbackDimensions(null);
     }
-  }, [selectedImage, initialPosition, optimalDimensions]);
+  }, [selectedImage, initialPosition, optimalDimensions, windowSize]);
 
   // Get initial position from thumbnail
   useEffect(() => {
@@ -249,34 +260,39 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
   // Get video dimensions
   useEffect(() => {
-    const getVideoElement = () => {
+    if (!isOpen || selectedImage?.type !== 'video') return;
+
+    let listenerCleanup: (() => void) | undefined;
+
+    const setupVideoElement = () => {
       const videoElement = document.querySelector('video');
       if (videoElement && selectedImage?.type === 'video') {
         videoRef.current = videoElement;
-        
+
         const updateDimensions = () => {
           const width = videoElement.videoWidth;
           const height = videoElement.videoHeight;
-          
           if (width && height) {
             setActualVideoDimensions({ width, height });
           }
         };
-        
+
         if (videoElement.readyState >= 1) {
           updateDimensions();
         } else {
           videoElement.addEventListener('loadedmetadata', updateDimensions);
-          return () => videoElement.removeEventListener('loadedmetadata', updateDimensions);
+          listenerCleanup = () => videoElement.removeEventListener('loadedmetadata', updateDimensions);
         }
       }
     };
-    
-    if (isOpen && selectedImage?.type === 'video') {
-      getVideoElement();
-      const timeoutId = setTimeout(getVideoElement, 500);
-      return () => clearTimeout(timeoutId);
-    }
+
+    setupVideoElement();
+    const timeoutId = setTimeout(setupVideoElement, 500);
+
+    return () => {
+      clearTimeout(timeoutId);
+      listenerCleanup?.();
+    };
   }, [isOpen, selectedImage]);
 
   // Get video current time from thumbnail when modal opens
@@ -301,20 +317,20 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
 
     // Calculate the center position for our scrollable flex container
-    const containerCenter = window.innerWidth / 2;
-    
+    const containerCenter = windowSize.width / 2;
+
     // Calculate how to position the element so it appears at the same spot as the thumbnail
     const initialX = initialPosition.left - containerCenter + (initialPosition.width / 2);
-    
+
     // For Y position, we need to adjust for the scrollable container
     const initialY = initialPosition.top;
-    
+
     // Determine if this is a tall image
     const isTallImage = selectedImage && selectedImage.height > selectedImage.width * 2;
-    
+
     // For tall images, keep top alignment with 40px padding
     // For regular images, add moderate top padding (20px)
-    const finalY = isTallImage ? 40 : Math.max(20, (window.innerHeight - finalDimensions.height) / 2);
+    const finalY = isTallImage ? 40 : Math.max(20, (windowSize.height - finalDimensions.height) / 2);
     
     // For the position-absolute scrollable layout, we only need width and height
     // The position is handled by the scrollable container
@@ -366,10 +382,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     };
 
     return variants;
-  }, [initialPosition, optimalDimensions, fallbackDimensions, zoomState]);
-
-  // Log animation variants
-  useEffect(() => {}, [modalVariants]);
+  }, [initialPosition, optimalDimensions, fallbackDimensions, zoomState, windowSize, selectedImage]);
 
   // Check render conditions
   if (!selectedImage || !initialPosition || !modalVariants) {

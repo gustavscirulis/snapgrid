@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ImageItem } from "@/hooks/useImageStore";
-import { X, AlertCircle, Loader2, Key, Upload, AlertTriangle } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AnimatedImageModal from "./AnimatedImageModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageRenderer } from "@/components/ImageRenderer";
 import Masonry from 'react-masonry-css';
-import './masonry-grid.css'; // We'll create this CSS file
-import './text-shine.css'; // Import the text shine animation CSS
-import { hasApiKey } from "@/services/aiAnalysisService";
+import './masonry-grid.css';
+import './text-shine.css';
 import { useDragContext } from "./UploadZone";
 import { useImagePreloader } from "@/hooks/useImagePreloader";
+import { useApiKeyWatcher } from "@/hooks/useApiKeyWatcher";
+import PatternTags from "./PatternTags";
+import EmptyStateCard from "./EmptyStateCard";
+import EmptyStatePlaceholders from "./EmptyStatePlaceholders";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -31,83 +34,23 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [clickedImageId, setClickedImageId] = useState<string | null>(null);
   const [exitAnimationComplete, setExitAnimationComplete] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [hasOpenAIKey, setHasOpenAIKey] = useState<boolean | null>(null);
-  const [previousKeyStatus, setPreviousKeyStatus] = useState<boolean | null>(null);
-  
+
   // Image refs for animations
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
-  
-  // Initialize image preloader - preloads everything so settings are less critical
+
+  // Initialize image preloader
   const preloader = useImagePreloader(images, {
-    rootMargin: '1000px', 
+    rootMargin: '1000px',
     threshold: 0.1,
-    preloadDistance: 5 // Reduced since everything gets preloaded anyway
+    preloadDistance: 5
   });
-  
-  // Get drag context with fallback for when context is not available
-  const dragContext = { isDragging: false };
-  try {
-    const context = useDragContext();
-    if (context) {
-      Object.assign(dragContext, context);
-    }
-  } catch (error) {
-    // Context not available, use default (not dragging)
-    console.log("Drag context not available, using default");
-  }
-  
-  // Check if the OpenAI API key is set
-  useEffect(() => {
-    const checkApiKey = async () => {
-      const exists = await hasApiKey();
-      setHasOpenAIKey(exists);
-    };
-    
-    checkApiKey();
-  }, []);
-  
-  // Recheck API key when settings panel closes
-  useEffect(() => {
-    if (settingsOpen === false) {
-      // When settings panel closes, check if API key status has changed
-      const checkApiKey = async () => {
-        const exists = await hasApiKey();
-        setHasOpenAIKey(exists);
-      };
-      
-      checkApiKey();
-    }
-  }, [settingsOpen]);
-  
-  // Analyze all unanalyzed images when API key is newly set
-  useEffect(() => {
-    // Check if key status changed from false/null to true
-    if (previousKeyStatus !== true && hasOpenAIKey === true && retryAnalysis) {
-      // Find all images that don't have patterns and aren't analyzing
-      const imagesToAnalyze = images.filter(img => 
-        (!img.patterns || img.patterns.length === 0) && 
-        !img.isAnalyzing && 
-        !img.error
-      );
-      
-      if (imagesToAnalyze.length > 0) {
-        // Create a queue of images to analyze
-        const analyzeQueue = async () => {
-          for (const image of imagesToAnalyze) {
-            await retryAnalysis(image.id);
-            // Small delay to avoid overwhelming the API
-            await new Promise(resolve => setTimeout(resolve, 300));
-          }
-        };
-        
-        analyzeQueue();
-      }
-    }
-    
-    // Update previous key status for next comparison
-    setPreviousKeyStatus(hasOpenAIKey);
-  }, [hasOpenAIKey, images, retryAnalysis, previousKeyStatus]);
-  
+
+  // Get drag context (useContext never throws — returns default value if no Provider)
+  const dragContext = useDragContext();
+
+  // API key watching and batch analysis
+  const { hasOpenAIKey } = useApiKeyWatcher({ settingsOpen, images, retryAnalysis });
+
   // Prevent scrolling when in empty state
   useEffect(() => {
     // Only add the no-scroll style when we're in empty state and not searching
@@ -246,224 +189,23 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     onImageDelete?.(id);
   };
 
-  const renderPatternTags = (item: ImageItem) => {
-    if (!item.patterns || item.patterns.length === 0) {
-      if (item.isAnalyzing) {
-        return (
-          <div className="inline-flex items-center gap-1 text-xs text-primary-background bg-secondary px-2 py-1 rounded-md">
-            <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-            <span className="text-shine">Analyzing...</span>
-          </div>
-        );
-      }
-      if (item.error) {
-        return (
-          <div 
-            className="inline-flex items-center gap-1 text-xs text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-md hover:bg-destructive transition-all duration-200 hover:shadow-sm active:bg-destructive/90"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (retryAnalysis) {
-                retryAnalysis(item.id);
-              }
-            }}
-            title="Click to retry analysis"
-          >
-            <AlertTriangle className="w-3 h-3" />
-            <span>Analysis failed</span>
-          </div>
-        );
-      }
-      return null;
-    }
-
-    // Check if pill click analysis is enabled
-    const isPillClickAnalysisEnabled = localStorage.getItem('dev_enable_pill_click_analysis') === 'true';
-
-    // If analyzing, show loading state for all pills
-    if (item.isAnalyzing) {
-      return (
-        <div className="flex flex-wrap gap-1">
-          <div className="inline-flex items-center gap-1 text-xs text-primary-background bg-secondary px-2 py-1 rounded-md">
-            <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-            <span className="text-shine">Analyzing...</span>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex flex-wrap gap-1">
-        {/* Show image summary as the first pill */}
-        {item.patterns[0]?.imageSummary && (
-          <span 
-            className={`text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md cursor-default ${
-              isPillClickAnalysisEnabled ? 'hover:bg-secondary/90 transition-colors' : ''
-            }`}
-            title={item.patterns[0]?.imageContext || "Type of interface"}
-            onClick={(e) => {
-              if (isPillClickAnalysisEnabled) {
-                e.stopPropagation();
-                if (retryAnalysis) {
-                  retryAnalysis(item.id);
-                }
-              }
-            }}
-          >
-            {item.patterns[0]?.imageSummary}
-          </span>
-        )}
-        {/* Show top 3 patterns after the summary */}
-        {item.patterns
-          .slice(0, 4) // Only display top 4 patterns
-          .map((pattern, index) => (
-          <span 
-            key={index} 
-            className={`text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md cursor-default ${
-              isPillClickAnalysisEnabled ? 'hover:bg-secondary/90 transition-colors' : ''
-            }`}
-            title={`Confidence: ${Math.round(pattern.confidence * 100)}%`}
-            onClick={(e) => {
-              if (isPillClickAnalysisEnabled) {
-                e.stopPropagation();
-                if (retryAnalysis) {
-                  retryAnalysis(item.id);
-                }
-              }
-            }}
-          >
-            {pattern.name}
-          </span>
-        ))}
-      </div>
-    );
-  };
-
   // Memoize placeholder heights to prevent constant re-rendering
   const placeholderHeights = React.useMemo(() => {
-    // Define possible height ranges
     const heightRanges = [
-      { min: 150, max: 250 },  // Short
-      { min: 250, max: 350 },  // Medium
-      { min: 350, max: 450 }   // Tall
+      { min: 150, max: 250 },
+      { min: 250, max: 350 },
+      { min: 350, max: 450 }
     ];
-    
-    // Generate fixed heights for placeholders
+
     return Array.from({ length: 12 }).map((_, index) => {
       const heightIndex = index % 3;
       const range = heightRanges[heightIndex];
       return range.min + Math.floor(Math.random() * (range.max - range.min));
     });
-  }, []); // Empty dependency array ensures this only runs once
-
-  // Empty state placeholder masonry
-  const renderEmptyStatePlaceholders = () => {
-    const { isDragging } = dragContext;
-    
-    return (
-      <Masonry
-        breakpointCols={breakpointColumnsObj}
-        className={`my-masonry-grid ${isDragging ? 'opacity-30 blur-[1px]' : 'opacity-50'} transition-all duration-300`}
-        columnClassName="my-masonry-grid_column"
-      >
-        {placeholderHeights.map((height, index) => (
-          <div key={index} className="masonry-item">
-            <motion.div 
-              className="rounded-lg overflow-hidden bg-gray-300 dark:bg-zinc-800 w-full transition-all duration-300"
-              style={{ height: `${height}px` }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: isDragging ? 0.2 : 0.5 }}
-              transition={{ 
-                opacity: { duration: 0.5, delay: index * 0.05 }
-              }}
-            />
-          </div>
-        ))}
-      </Masonry>
-    );
-  };
-
-  // Empty state card for API key setup or drag-drop instruction
-  const renderEmptyStateCard = () => {
-    // Get the drag state from context
-    const { isDragging } = dragContext;
-    
-    return (
-      <motion.div 
-        className={`bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm shadow-2xl rounded-xl w-full overflow-hidden pointer-events-auto border border-gray-200 dark:border-zinc-800 transition-all duration-300 ${
-          isDragging ? 'opacity-80 blur-[1px]' : 'opacity-100'
-        }`}
-      >
-        {hasOpenAIKey === null ? (
-          // Loading state
-          <div className="p-6">
-            <div className="animate-pulse flex space-x-4">
-              <div className="flex-1 space-y-4 py-1">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-                <div className="space-y-2">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : hasOpenAIKey ? (
-          // API key is set - show drag and drop instructions
-          <>
-            <div className="p-8 select-none">
-              <div className="rounded-full bg-gray-100 dark:bg-zinc-800 w-14 h-14 flex items-center justify-center mb-5">
-                <Upload className="h-7 w-7 text-gray-600 dark:text-gray-400" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                Drag and drop images or videos here
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                They will be automatically analysed for UI patterns and organised.
-              </p>
-            </div>
-            <div className="bg-gray-50 dark:bg-zinc-800/50 px-6 py-4 border-t border-gray-200 dark:border-zinc-800 select-none">
-              <p className="text-xs text-gray-700 dark:text-gray-300">
-                You can also paste images from clipboard (⌘+V)
-              </p>
-            </div>
-          </>
-        ) : (
-          // No API key - show add API key card
-          <>
-            <div className="p-8 select-none">
-              <div className="rounded-full bg-gray-100 dark:bg-zinc-800 w-14 h-14 flex items-center justify-center mb-5">
-                <Key className="h-7 w-7 text-gray-600 dark:text-gray-400" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                Add an OpenAI API key
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                Unlock automatic pattern detection in screenshots by adding your OpenAI API key.
-              </p>
-              <Button 
-                onClick={() => {
-                  onOpenSettings?.();
-                }}
-                className="w-full bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white py-5 text-base font-medium"
-              >
-                Add API Key
-              </Button>
-            </div>
-            <div className="bg-gray-50 dark:bg-zinc-800/50 px-6 py-4 border-t border-gray-200 dark:border-zinc-800 select-none">
-              <p className="text-xs text-gray-700 dark:text-gray-300">
-                You can still upload and organize screenshots without an API key.
-              </p>
-            </div>
-          </>
-        )}
-      </motion.div>
-    );
-  };
+  }, []);
 
   return (
     <div className={`w-full px-4 pb-4 flex-1 flex flex-col bg-gray-100 dark:bg-zinc-900 ${images.length === 0 && !searchQuery ? 'overflow-hidden' : ''}`}>
-      {/* Debug info - remove in production */}
-      <div className="hidden">{`Images: ${images.length}, HasKey: ${hasOpenAIKey}, IsSearching: ${searchQuery !== ""}`}</div>
-      
       {images.length === 0 ? (
         <div className="flex-1 flex items-stretch">
           {searchQuery ? (
@@ -476,14 +218,18 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
             <>
               {/* Background masonry grid */}
               <div className="absolute inset-0 pt-20 pb-4 px-4 overflow-hidden bg-gray-100 dark:bg-zinc-900">
-                {renderEmptyStatePlaceholders()}
+                <EmptyStatePlaceholders
+                  breakpointColumnsObj={breakpointColumnsObj}
+                  isDragging={dragContext.isDragging}
+                  placeholderHeights={placeholderHeights}
+                />
               </div>
-              
+
               {/* Fixed centered card */}
               <div className="fixed top-0 left-0 right-0 bottom-0 flex items-center justify-center pointer-events-none z-[100]" style={{ paddingTop: "20px" }}>
                 <AnimatePresence>
                   {!settingsOpen && (
-                    <motion.div 
+                    <motion.div
                       className="max-w-lg w-full mx-4 pointer-events-auto"
                       style={{ marginTop: "-50px" }}
                       initial={{ opacity: 0, y: 20 }}
@@ -491,7 +237,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                       exit={{ opacity: 0, y: 20 }}
                       transition={{ duration: 0.3 }}
                     >
-                      {renderEmptyStateCard()}
+                      <EmptyStateCard
+                        hasOpenAIKey={hasOpenAIKey}
+                        isDragging={dragContext.isDragging}
+                        onOpenSettings={onOpenSettings}
+                      />
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -501,7 +251,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         </div>
       ) : (
         <>
-          <motion.div 
+          <motion.div
             animate={modalOpen ? { opacity: 0.3 } : { opacity: 1 }}
             transition={{ duration: 0.3 }}
             className="w-full"
@@ -518,12 +268,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                   ref = React.createRef<HTMLDivElement>();
                   imageRefs.current.set(image.id, ref);
                 }
-                
+
                 const isSelected = clickedImageId === image.id;
-                
+
                 return (
                   <div key={image.id} className="masonry-item">
-                    <div 
+                    <div
                       ref={ref}
                       className="rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800 shadow-sm hover:shadow-md relative group w-full"
                       onClick={() => handleImageClick(image, ref)}
@@ -536,7 +286,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                       }}
                     >
                       <div className="relative">
-                        <ImageRenderer 
+                        <ImageRenderer
                           image={image}
                           alt="UI Screenshot"
                           className="w-full h-auto object-cover rounded-t-lg"
@@ -544,22 +294,22 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                           autoPlay={false}
                           preloader={preloader}
                         />
-                        
+
                         <AnimatePresence>
                           {hoveredImageId === image.id && (
-                            <motion.div 
+                            <motion.div
                               id={`pattern-tags-${image.id}`}
                               className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent"
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: 10 }}
-                              style={{ 
+                              style={{
                                 bottom: '-2px',
                                 pointerEvents: 'none'
                               }}
                             >
                               <div className="pointer-events-auto">
-                                {renderPatternTags(image)}
+                                <PatternTags item={image} retryAnalysis={retryAnalysis} />
                               </div>
                             </motion.div>
                           )}

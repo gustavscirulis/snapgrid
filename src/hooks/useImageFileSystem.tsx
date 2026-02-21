@@ -122,7 +122,8 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
           ...media,
           actualFilePath: savedFilePath,
           url: `local-file://${savedFilePath}`,
-          useDirectPath: true
+          useDirectPath: true,
+          isAnalyzing: true // Set analyzing state here to combine with URL update (one render instead of two)
         };
         onAddToCollection(media);
 
@@ -221,14 +222,14 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
         });
         
         if (result.success && result.path) {
-          console.log("Media saved successfully at:", result.path);
           media = {
             ...media,
             actualFilePath: result.path,
             url: `local-file://${result.path}`,
-            useDirectPath: true
+            useDirectPath: true,
+            isAnalyzing: true // Set analyzing state here to combine with URL update (one render instead of two)
           };
-          
+
           // Add to image list
           onAddToCollection(media);
 

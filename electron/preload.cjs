@@ -47,6 +47,9 @@ contextBridge.exposeInMainWorld(
     getApiKey: (service) => ipcRenderer.invoke('get-api-key', { service }),
     hasApiKey: (service) => ipcRenderer.invoke('has-api-key', { service }),
     deleteApiKey: (service) => ipcRenderer.invoke('delete-api-key', { service }),
+
+    // OpenAI API proxy (avoids CORS by routing through main process)
+    callOpenAI: (payload) => ipcRenderer.invoke('call-openai', payload),
     
     // Analytics settings
     getAnalyticsConsent: () => ipcRenderer.invoke('get-analytics-consent'),

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { ImageItem } from '@/hooks/useImageStore';
 import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { useDragContext } from './UploadZone';
@@ -46,35 +46,33 @@ export const ImageRenderer = React.memo(function ImageRenderer({
   }, [currentTime]);
 
   // Determine if we're running in Electron
-  const isElectron = window && 
-    typeof window.electron !== 'undefined' && 
+  const isElectron = window &&
+    typeof window.electron !== 'undefined' &&
     window.electron !== null;
 
-  // Process the media URL
-  let mediaUrl = image.url;
-  const isLocalFileProtocol = mediaUrl?.startsWith('local-file://');
-  
-  // Check for invalid URLs
-  if (!mediaUrl) {
-    console.error('Missing URL for media:', image.id);
-    setLoadError(true);
-    mediaUrl = ''; // Set to empty string to avoid undefined errors
-  }
+  // Derive the effective media URL without side effects
+  const isLocalFileProtocol = image.url?.startsWith('local-file://');
 
-  // In browser development mode, we can't use local-file:// protocol for security reasons
-  // IMPORTANT: Always use local-file:// protocol for local files. file:// protocol does not work locally.
-  if (isLocalFileProtocol && !isElectron) {
-    // For videos, use the poster image instead of trying to load the video
-    if (image.type === 'video') {
-      // If we have a poster URL, we'll use that in the UI
-      if (!image.posterUrl) {
-        setLoadError(true); // Mark as error if no poster available
-      }
-    } else {
-      // For images in browser, use a placeholder
-      mediaUrl = '/placeholder.svg';
+  const mediaUrl = useMemo(() => {
+    if (!image.url) return '';
+    if (isLocalFileProtocol && !isElectron && image.type !== 'video') {
+      return '/placeholder.svg';
     }
-  }
+    return image.url;
+  }, [image.url, isLocalFileProtocol, isElectron, image.type]);
+
+  // Set error state via effect, not during render
+  useEffect(() => {
+    if (!image.url) {
+      setLoadError(true);
+      return;
+    }
+    if (isLocalFileProtocol && !isElectron && image.type === 'video' && !image.posterUrl) {
+      setLoadError(true);
+      return;
+    }
+    setLoadError(false);
+  }, [image.url, isLocalFileProtocol, isElectron, image.type, image.posterUrl]);
 
   // For videos in thumbnail view, always use the poster if available
   const shouldUsePoster = image.type === 'video' && !controls && image.posterUrl;
