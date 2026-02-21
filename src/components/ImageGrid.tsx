@@ -534,7 +534,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                       opacity: isSelected ? 0 : (isDragged ? 0.4 : 1),
                       visibility: isSelected ? 'hidden' : 'visible',
                       pointerEvents: isAnimating ? 'none' : 'auto',
-                      cursor: 'grab',
+                      cursor: 'default',
                     }}
                   >
                     <div className="relative">
