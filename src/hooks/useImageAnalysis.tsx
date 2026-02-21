@@ -5,15 +5,16 @@ import { captureVideoFrames } from '../lib/videoUtils';
 import { ImageItem, PatternTag } from "./useImageStore";
 
 export interface UseImageAnalysisReturn {
-  analyzeAndUpdateImage: (media: ImageItem, dataUrl: string, savedFilePath?: string) => Promise<ImageItem>;
-  retryAnalysis: (imageId: string, images: ImageItem[], updateImageFn: (id: string, updater: (img: ImageItem) => ImageItem) => void) => Promise<void>;
+  analyzeAndUpdateImage: (media: ImageItem, dataUrl: string, savedFilePath?: string, systemPrompt?: string) => Promise<ImageItem>;
+  retryAnalysis: (imageId: string, images: ImageItem[], updateImageFn: (id: string, updater: (img: ImageItem) => ImageItem) => void, systemPrompt?: string) => Promise<void>;
 }
 
 export function useImageAnalysis(): UseImageAnalysisReturn {
   const analyzeAndUpdateImage = useCallback(async (
-    media: ImageItem, 
-    dataUrl: string, 
-    savedFilePath?: string
+    media: ImageItem,
+    dataUrl: string,
+    savedFilePath?: string,
+    systemPrompt?: string
   ): Promise<ImageItem> => {
     // Early return if no API key available
     const hasKey = await hasApiKey();
@@ -26,7 +27,7 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
       // Handle different media types
       if (media.type === "image") {
         // For images, use the standard analysis
-        analysis = await analyzeImage(dataUrl);
+        analysis = await analyzeImage(dataUrl, systemPrompt);
       } else if (media.type === "video") {
         // For videos, capture frames and analyze them
         isAnalyzingVideo = true;
@@ -34,7 +35,7 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
           // Capture frames at 33% and 66% of the video duration
           const frames = await captureVideoFrames(dataUrl);
           // Analyze the captured frames
-          analysis = await analyzeVideoFrames(frames);
+          analysis = await analyzeVideoFrames(frames, systemPrompt);
         } catch (frameError) {
           console.error("Failed to capture or analyze video frames:", frameError);
           throw new Error("Failed to analyze video: " + (frameError instanceof Error ? frameError.message : 'Unknown error'));
@@ -112,7 +113,8 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
   const retryAnalysis = useCallback(async (
     imageId: string,
     images: ImageItem[],
-    updateImageFn: (id: string, updater: (img: ImageItem) => ImageItem) => void
+    updateImageFn: (id: string, updater: (img: ImageItem) => ImageItem) => void,
+    systemPrompt?: string
   ) => {
     // Find the media
     const mediaToAnalyze = images.find(img => img.id === imageId);
@@ -151,26 +153,31 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
       }
       
       // Perform analysis
-      const analyzedMedia = await analyzeAndUpdateImage(mediaToAnalyze, dataUrl, mediaToAnalyze.actualFilePath);
-      
-      // Update image in the state
-      updateImageFn(imageId, () => analyzedMedia);
+      const analyzedMedia = await analyzeAndUpdateImage(mediaToAnalyze, dataUrl, mediaToAnalyze.actualFilePath, systemPrompt);
+
+      // Merge analysis results into the current image state (preserves concurrent updates like spaceId)
+      updateImageFn(imageId, (img) => ({
+        ...img,
+        patterns: analyzedMedia.patterns,
+        imageContext: analyzedMedia.imageContext,
+        isAnalyzing: false,
+        error: undefined,
+      }));
     } catch (error) {
       console.error("Retry analysis failed:", error);
-      
-      // Create the updated media with error
-      const errorMedia = { ...mediaToAnalyze, isAnalyzing: false, error: 'Analysis failed' };
-      
-      // Update error state in UI
-      updateImageFn(imageId, () => errorMedia);
+
+      // Update error state in UI (merge into current state to preserve concurrent updates)
+      updateImageFn(imageId, (img) => ({ ...img, isAnalyzing: false, error: 'Analysis failed' }));
       
       // Persist error state to disk
       if (window.electron && mediaToAnalyze.actualFilePath) {
         try {
           await window.electron.updateMetadata({
-            id: errorMedia.id,
+            id: mediaToAnalyze.id,
             metadata: {
-              ...errorMedia,
+              ...mediaToAnalyze,
+              isAnalyzing: false,
+              error: 'Analysis failed',
               filePath: mediaToAnalyze.actualFilePath
             }
           });

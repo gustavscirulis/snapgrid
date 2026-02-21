@@ -113,7 +113,7 @@ export async function deleteApiKey(provider?: AIProvider): Promise<boolean> {
 
 // ── Shared prompt ──────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are an expert AI in analyzing images. Your task is to analyze the content of images and provide appropriate descriptions based on whether they contain UI interfaces or general scenes.
+export const DEFAULT_SYSTEM_PROMPT = `You are an expert AI in analyzing images. Your task is to analyze the content of images and provide appropriate descriptions.
 
     Provide your response in the following JSON format:
     {
@@ -121,7 +121,7 @@ const SYSTEM_PROMPT = `You are an expert AI in analyzing images. Your task is to
       "imageSummary": "Very brief summary (1-2 words) of the main content or purpose",
       "patterns": [
         {
-          "name": "Specific UI component/pattern name OR main object/subject",
+          "name": "Main object, subject, or element",
           "confidence": 0.95
         }
       ]
@@ -130,18 +130,13 @@ const SYSTEM_PROMPT = `You are an expert AI in analyzing images. Your task is to
     Guidelines:
       1. The "imageSummary" should be a very brief (1-2 words) description of what the image shows
       2. The "imageContext" should provide detailed information about the entire image
-      3. For UI images:
-         - List specific UI design components and UX patterns
-         - Use technical UI/UX terminology
-         - Each pattern should be 1-2 words maximum, not duplicative of imageSummary
-      4. For non-UI images:
-         - List main objects, subjects, or elements
-         - Focus on what is visually prominent
-         - Use descriptive, non-technical language
-      5. Include confidence scores between 0.8 and 1.0
-      6. List patterns in order of confidence/importance
-      7. Ensure that the patterns are unique and not duplicates of each other and imageSummary
-      7. Provide exactly 6 patterns, ordered by confidence`;
+      3. List the most prominent objects, subjects, or elements visible in the image
+      4. Use specific, descriptive language appropriate to the content (e.g. technical terms for UI screenshots, descriptive language for photos)
+      5. Each pattern should be 1-2 words maximum, not duplicative of imageSummary
+      6. Include confidence scores between 0.8 and 1.0
+      7. List patterns in order of confidence/importance
+      8. Ensure that the patterns are unique and not duplicates of each other and imageSummary
+      9. Provide exactly 6 patterns, ordered by confidence`;
 
 const USER_TEXT = "Analyze this image and provide a detailed breakdown of its content. If it's a UI screenshot, focus on UI patterns and components. If it's a general scene, focus on objects and subjects. Respond with a strict, valid JSON object in the format specified in the system prompt. Do not include markdown formatting, explanations, or code block symbols. Use title case for pattern/object names. Provide up to 6 patterns/objects, ordered by confidence.";
 
@@ -210,13 +205,13 @@ function extractBase64(dataUrl: string): { data: string; mediaType: string } {
 
 // ── OpenAI analysis ────────────────────────────────────────────────
 
-async function analyzeImageWithOpenAI(imageUrl: string, modelId: string): Promise<PatternMatch[]> {
+async function analyzeImageWithOpenAI(imageUrl: string, modelId: string, systemPrompt: string): Promise<PatternMatch[]> {
   const payload = {
     model: modelId,
     messages: [
       {
         role: "system",
-        content: SYSTEM_PROMPT
+        content: systemPrompt
       },
       {
         role: "user",
@@ -260,13 +255,13 @@ async function analyzeImageWithOpenAI(imageUrl: string, modelId: string): Promis
 
 // ── Claude analysis ────────────────────────────────────────────────
 
-async function analyzeImageWithClaude(imageUrl: string, modelId: string): Promise<PatternMatch[]> {
+async function analyzeImageWithClaude(imageUrl: string, modelId: string, systemPrompt: string): Promise<PatternMatch[]> {
   const { data: base64Data, mediaType } = extractBase64(imageUrl);
 
   const payload = {
     model: modelId,
     max_tokens: 800,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [
       {
         role: "user",
@@ -317,20 +312,22 @@ async function analyzeImageWithClaude(imageUrl: string, modelId: string): Promis
 
 // ── Public API ─────────────────────────────────────────────────────
 
-export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
+export async function analyzeImage(imageUrl: string, systemPrompt?: string): Promise<PatternMatch[]> {
   const provider = await getActiveProvider();
   const hasKey = await hasApiKey(provider);
   if (!hasKey) {
     throw new Error(`${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key not set. Please set an API key to use image analysis.`);
   }
 
+  const prompt = systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+
   try {
     const modelId = await resolveModel();
 
     if (provider === 'anthropic') {
-      return await analyzeImageWithClaude(imageUrl, modelId);
+      return await analyzeImageWithClaude(imageUrl, modelId, prompt);
     }
-    return await analyzeImageWithOpenAI(imageUrl, modelId);
+    return await analyzeImageWithOpenAI(imageUrl, modelId, prompt);
   } catch (error) {
     console.error(`Error analyzing image with ${provider}:`, error);
     throw error;
@@ -340,7 +337,7 @@ export async function analyzeImage(imageUrl: string): Promise<PatternMatch[]> {
 /**
  * Analyzes multiple frames from a video and combines the results
  */
-export async function analyzeVideoFrames(frameUrls: string[]): Promise<PatternMatch[]> {
+export async function analyzeVideoFrames(frameUrls: string[], systemPrompt?: string): Promise<PatternMatch[]> {
   if (!frameUrls || frameUrls.length === 0) {
     throw new Error("No frames provided for analysis");
   }
@@ -351,7 +348,7 @@ export async function analyzeVideoFrames(frameUrls: string[]): Promise<PatternMa
   }
 
   try {
-    const frameAnalysisPromises = frameUrls.map(frameUrl => analyzeImage(frameUrl));
+    const frameAnalysisPromises = frameUrls.map(frameUrl => analyzeImage(frameUrl, systemPrompt));
     const frameResults = await Promise.all(frameAnalysisPromises);
 
     const allPatterns: PatternMatch[] = [];

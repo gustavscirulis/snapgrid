@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
-import { useSpaces } from "@/hooks/useSpaces";
+import { useSpaces, resolvePromptForSpace } from "@/hooks/useSpaces";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
@@ -35,6 +35,9 @@ const Index = () => {
     createSpace,
     renameSpace,
     deleteSpace,
+    updateSpacePrompt,
+    allSpacePromptConfig,
+    updateAllSpacePrompt,
   } = useSpaces();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,17 +46,25 @@ const Index = () => {
   const [thumbnailSize, setThumbnailSize] = useState<'small' | 'medium' | 'large' | 'xl'>('medium');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Ref to track activeSpaceId for callbacks that shouldn't re-register on space change
+  // Refs to track values for callbacks that shouldn't re-register on space/prompt change
   const activeSpaceIdRef = useRef(activeSpaceId);
   activeSpaceIdRef.current = activeSpaceId;
+  const spacesRef = useRef(spaces);
+  spacesRef.current = spaces;
+  const allSpacePromptConfigRef = useRef(allSpacePromptConfig);
+  allSpacePromptConfigRef.current = allSpacePromptConfig;
 
-  // Wrap addImage to auto-assign to active space
+  // Wrap addImage to auto-assign to active space with prompt resolution
   const addImageToActiveSpace = useCallback(async (file: File) => {
-    await addImage(file, activeSpaceIdRef.current ?? undefined);
+    const spaceId = activeSpaceIdRef.current ?? undefined;
+    const prompt = resolvePromptForSpace(activeSpaceIdRef.current, spacesRef.current, allSpacePromptConfigRef.current);
+    await addImage(file, spaceId, prompt);
   }, [addImage]);
 
   const importToActiveSpace = useCallback(async (filePath: string) => {
-    await importFromFilePath(filePath, activeSpaceIdRef.current ?? undefined);
+    const spaceId = activeSpaceIdRef.current ?? undefined;
+    const prompt = resolvePromptForSpace(activeSpaceIdRef.current, spacesRef.current, allSpacePromptConfigRef.current);
+    await importFromFilePath(filePath, spaceId, prompt);
   }, [importFromFilePath]);
 
   // Load saved preferences on mount
@@ -236,9 +247,21 @@ const Index = () => {
     removeImage(id);
   };
 
-  const handleRemoveFromSpace = (id: string) => {
-    assignImageToSpace(id, null);
-  };
+  const handleAssignImageToSpace = useCallback(async (imageId: string, spaceId: string | null) => {
+    const prompt = resolvePromptForSpace(spaceId, spaces, allSpacePromptConfig);
+    await assignImageToSpace(imageId, spaceId, prompt);
+  }, [assignImageToSpace, spaces, allSpacePromptConfig]);
+
+  const handleRemoveFromSpace = useCallback(async (id: string) => {
+    const prompt = resolvePromptForSpace(null, spaces, allSpacePromptConfig);
+    await assignImageToSpace(id, null, prompt);
+  }, [assignImageToSpace, spaces, allSpacePromptConfig]);
+
+  const handleRetryAnalysis = useCallback(async (imageId: string) => {
+    const image = images.find(img => img.id === imageId);
+    const prompt = resolvePromptForSpace(image?.spaceId ?? null, spaces, allSpacePromptConfig);
+    await retryAnalysis(imageId, prompt);
+  }, [images, spaces, allSpacePromptConfig, retryAnalysis]);
 
   // Determine if we're in empty state - consider both actual emptiness and simulated empty state
   const isEmpty = images.length === 0 || simulateEmptyState;
@@ -321,11 +344,11 @@ const Index = () => {
                   searchQuery={searchQuery}
                   onOpenSettings={() => setSettingsOpen(true)}
                   settingsOpen={settingsOpen}
-                  retryAnalysis={retryAnalysis}
+                  retryAnalysis={handleRetryAnalysis}
                   thumbnailSize={thumbnailSize}
                   spaces={spaces}
                   activeSpaceId={null}
-                  onAssignToSpace={assignImageToSpace}
+                  onAssignToSpace={handleAssignImageToSpace}
                 />
               </div>
               {/* Space pages */}
@@ -338,11 +361,11 @@ const Index = () => {
                     searchQuery={searchQuery}
                     onOpenSettings={() => setSettingsOpen(true)}
                     settingsOpen={settingsOpen}
-                    retryAnalysis={retryAnalysis}
+                    retryAnalysis={handleRetryAnalysis}
                     thumbnailSize={thumbnailSize}
                     spaces={spaces}
                     activeSpaceId={space.id}
-                    onAssignToSpace={assignImageToSpace}
+                    onAssignToSpace={handleAssignImageToSpace}
                     onRemoveFromSpace={handleRemoveFromSpace}
                   />
                 </div>
@@ -354,6 +377,14 @@ const Index = () => {
         <SettingsPanel
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
+          spaces={spaces}
+          activeSpaceId={activeSpaceId}
+          allSpacePromptConfig={allSpacePromptConfig}
+          onCreateSpace={createSpace}
+          onRenameSpace={renameSpace}
+          onDeleteSpace={deleteSpace}
+          onUpdateSpacePrompt={updateSpacePrompt}
+          onUpdateAllSpacePrompt={updateAllSpacePrompt}
         />
       </div>
     </UploadZone>
