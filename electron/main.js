@@ -471,7 +471,7 @@ async function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://*.telemetrydeck.com https://nom.telemetrydeck.com https://telemetrydeck.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
+          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://openrouter.ai https://*.telemetrydeck.com https://nom.telemetrydeck.com https://telemetrydeck.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
         ]
       }
     });
@@ -975,6 +975,76 @@ ipcMain.handle('list-gemini-models', async () => {
     return { success: true, models };
   } catch (error) {
     console.error('Error listing Gemini models:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Proxy OpenRouter API calls through the main process to avoid CORS
+ipcMain.handle('call-openrouter', async (event, payload) => {
+  try {
+    const apiKey = apiKeyStorage.getApiKey('openrouter');
+    if (!apiKey) {
+      throw new Error('OpenRouter API key not found');
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://snapgrid.app',
+        'X-Title': 'SnapGrid'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`OpenRouter API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error calling OpenRouter:', error);
+    throw error;
+  }
+});
+
+// List available OpenRouter models filtered to vision-capable ones
+ipcMain.handle('list-openrouter-models', async () => {
+  try {
+    const apiKey = apiKeyStorage.getApiKey('openrouter');
+    if (!apiKey) {
+      throw new Error('OpenRouter API key not found');
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/models', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://snapgrid.app',
+        'X-Title': 'SnapGrid'
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`OpenRouter API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    const models = (data.data || [])
+      .filter((m) => {
+        const modalities = m.architecture?.input_modalities;
+        return Array.isArray(modalities) && modalities.includes('image');
+      })
+      .map((m) => ({
+        id: m.id,
+        display_name: m.name || m.id,
+      }));
+    return { success: true, models };
+  } catch (error) {
+    console.error('Error listing OpenRouter models:', error);
     return { success: false, error: error.message };
   }
 });
