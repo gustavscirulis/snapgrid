@@ -93,9 +93,15 @@ export async function setAnthropicApiKey(key: string): Promise<boolean> {
   return setApiKeyForService('anthropic', key);
 }
 
+export async function setGeminiApiKey(key: string): Promise<boolean> {
+  return setApiKeyForService('gemini', key);
+}
+
 export async function hasApiKey(provider?: AIProvider): Promise<boolean> {
   const p = provider ?? await getActiveProvider();
-  return hasApiKeyForService(p === 'anthropic' ? 'anthropic' : 'openai');
+  if (p === 'anthropic') return hasApiKeyForService('anthropic');
+  if (p === 'gemini') return hasApiKeyForService('gemini');
+  return hasApiKeyForService('openai');
 }
 
 export async function getApiKey(): Promise<string | null> {
@@ -106,9 +112,15 @@ export async function getAnthropicApiKey(): Promise<string | null> {
   return getApiKeyForService('anthropic');
 }
 
+export async function getGeminiApiKey(): Promise<string | null> {
+  return getApiKeyForService('gemini');
+}
+
 export async function deleteApiKey(provider?: AIProvider): Promise<boolean> {
   const p = provider ?? await getActiveProvider();
-  return deleteApiKeyForService(p === 'anthropic' ? 'anthropic' : 'openai');
+  if (p === 'anthropic') return deleteApiKeyForService('anthropic');
+  if (p === 'gemini') return deleteApiKeyForService('gemini');
+  return deleteApiKeyForService('openai');
 }
 
 // ── Shared prompt ──────────────────────────────────────────────────
@@ -310,13 +322,76 @@ async function analyzeImageWithClaude(imageUrl: string, modelId: string, systemP
   return parseAnalysisResponse(content);
 }
 
+// ── Gemini analysis ───────────────────────────────────────────────
+
+async function analyzeImageWithGemini(imageUrl: string, modelId: string, systemPrompt: string): Promise<PatternMatch[]> {
+  const { data: base64Data, mediaType } = extractBase64(imageUrl);
+
+  const payload = {
+    model: modelId,
+    contents: [
+      {
+        parts: [
+          { text: USER_TEXT },
+          {
+            inlineData: {
+              mimeType: mediaType,
+              data: base64Data,
+            },
+          },
+        ],
+      },
+    ],
+    systemInstruction: {
+      parts: [{ text: systemPrompt }],
+    },
+    generationConfig: {
+      maxOutputTokens: 800,
+    },
+  };
+
+  let data;
+
+  if (window.electron && window.electron.callGemini) {
+    data = await window.electron.callGemini(payload);
+  } else {
+    const apiKey = await getGeminiApiKey();
+    if (!apiKey) throw new Error("Gemini API key not found");
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Gemini API error: ${error.error?.message || "Unknown error"}`);
+    }
+
+    data = await response.json();
+  }
+
+  const content = data.candidates[0]?.content?.parts?.[0]?.text;
+  return parseAnalysisResponse(content);
+}
+
 // ── Public API ─────────────────────────────────────────────────────
+
+const PROVIDER_NAMES: Record<string, string> = {
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+  gemini: "Google Gemini",
+};
 
 export async function analyzeImage(imageUrl: string, systemPrompt?: string): Promise<PatternMatch[]> {
   const provider = await getActiveProvider();
   const hasKey = await hasApiKey(provider);
   if (!hasKey) {
-    throw new Error(`${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key not set. Please set an API key to use image analysis.`);
+    throw new Error(`${PROVIDER_NAMES[provider] || provider} API key not set. Please set an API key to use image analysis.`);
   }
 
   const prompt = systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
@@ -326,6 +401,9 @@ export async function analyzeImage(imageUrl: string, systemPrompt?: string): Pro
 
     if (provider === 'anthropic') {
       return await analyzeImageWithClaude(imageUrl, modelId, prompt);
+    }
+    if (provider === 'gemini') {
+      return await analyzeImageWithGemini(imageUrl, modelId, prompt);
     }
     return await analyzeImageWithOpenAI(imageUrl, modelId, prompt);
   } catch (error) {

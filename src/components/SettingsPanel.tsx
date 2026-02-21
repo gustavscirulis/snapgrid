@@ -3,15 +3,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
 import { Moon, Sun, SunMoon, Code, X, Check, Plus, Trash2 } from "lucide-react";
-import { setOpenAIApiKey, setAnthropicApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
+import { setOpenAIApiKey, setAnthropicApiKey, setGeminiApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAnalyticsConsent, setAnalyticsConsent } from "@/services/analyticsService";
 import {
-  fetchVisionModels, fetchClaudeModels,
+  fetchVisionModels, fetchClaudeModels, fetchGeminiModels,
   getSelectedModel, setSelectedModel,
   getSelectedClaudeModel, setSelectedClaudeModel,
+  getSelectedGeminiModel, setSelectedGeminiModel,
   getActiveProvider, setActiveProvider,
   clearModelCache, AUTO_MODEL_VALUE,
   type AIProvider,
@@ -201,12 +202,15 @@ const ProviderSelector = ({ provider, onProviderChange }: { provider: AIProvider
     <div className="flex items-center justify-between">
       <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Provider</span>
       <Tabs value={provider} onValueChange={(v) => onProviderChange(v as AIProvider)}>
-        <TabsList className="grid grid-cols-2 h-8 bg-gray-100/80 dark:bg-zinc-800/80 p-0.5 rounded-md">
+        <TabsList className="grid grid-cols-3 h-8 bg-gray-100/80 dark:bg-zinc-800/80 p-0.5 rounded-md">
           <TabsTrigger value="openai" className={tabTriggerClass + " px-3"}>
             OpenAI
           </TabsTrigger>
           <TabsTrigger value="anthropic" className={tabTriggerClass + " px-3"}>
             Claude
+          </TabsTrigger>
+          <TabsTrigger value="gemini" className={tabTriggerClass + " px-3"}>
+            Gemini
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -302,6 +306,13 @@ const PROVIDER_CONFIG = {
     placeholder: "sk-ant-...",
     setKey: setAnthropicApiKey,
   },
+  gemini: {
+    linkText: "Get an API key",
+    url: "https://aistudio.google.com/apikey",
+    prefix: "AIza",
+    placeholder: "AIza...",
+    setKey: setGeminiApiKey,
+  },
 } as const;
 
 const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) => {
@@ -344,7 +355,8 @@ const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) =>
     }
 
     if (!apiKey.trim().startsWith(config.prefix)) {
-      toast.error(`Invalid API key format. ${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API keys start with '${config.prefix}'`);
+      const providerNames: Record<AIProvider, string> = { openai: "OpenAI", anthropic: "Anthropic", gemini: "Google AI Studio" };
+      toast.error(`Invalid API key format. ${providerNames[provider]} API keys start with '${config.prefix}'`);
       return;
     }
 
@@ -463,7 +475,14 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
       setIsLoading(true);
       setError(null);
       try {
-        if (provider === 'anthropic') {
+        if (provider === 'gemini') {
+          const [pref, modelList] = await Promise.all([
+            getSelectedGeminiModel(),
+            fetchGeminiModels(),
+          ]);
+          setSelectedModelValue(pref);
+          setModels(modelList);
+        } else if (provider === 'anthropic') {
           const [pref, modelList] = await Promise.all([
             getSelectedClaudeModel(),
             fetchClaudeModels(),
@@ -492,7 +511,9 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
 
   const handleModelChange = async (value: string) => {
     setSelectedModelValue(value);
-    if (provider === 'anthropic') {
+    if (provider === 'gemini') {
+      await setSelectedGeminiModel(value);
+    } else if (provider === 'anthropic') {
       await setSelectedClaudeModel(value);
     } else {
       await setSelectedModel(value);

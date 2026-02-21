@@ -5,7 +5,7 @@ import { getApiKey } from "@/services/aiAnalysisService";
 
 // ── Provider type ──────────────────────────────────────────────────
 
-export type AIProvider = "openai" | "anthropic";
+export type AIProvider = "openai" | "anthropic" | "gemini";
 
 const PROVIDER_PREFERENCE_KEY = "ai-provider";
 
@@ -77,6 +77,7 @@ let cachedOpenAIModels: OpenAIModel[] | null = null;
 export function clearModelCache(): void {
   cachedOpenAIModels = null;
   cachedClaudeModels = null;
+  cachedGeminiModels = null;
 }
 
 export function isVisionCapable(modelId: string): boolean {
@@ -261,6 +262,96 @@ export async function setSelectedClaudeModel(modelId: string): Promise<void> {
   }
 }
 
+// ── Google Gemini ─────────────────────────────────────────────────
+
+export interface GeminiModel {
+  id: string;
+  display_name: string;
+}
+
+const GEMINI_PREFERENCE_KEY = "gemini-model";
+const GEMINI_FALLBACK_MODEL = "gemini-2.0-flash";
+
+let cachedGeminiModels: GeminiModel[] | null = null;
+
+export function isGeminiVisionCapable(modelId: string): boolean {
+  const lower = modelId.toLowerCase();
+  if (!lower.includes("gemini")) return false;
+  if (DATE_SNAPSHOT_REGEX.test(lower)) return false;
+  const excluded = ["embedding", "aqa", "text", "tuning"];
+  if (excluded.some((pat) => lower.includes(pat))) return false;
+  return true;
+}
+
+function getGeminiModelScore(modelId: string): number {
+  const lower = modelId.toLowerCase();
+  let score = 0;
+
+  const versionMatch = lower.match(/gemini-(\d+)\.(\d+)/);
+  if (versionMatch) {
+    score += (parseInt(versionMatch[1]) * 10 + parseInt(versionMatch[2])) * 100;
+  }
+
+  if (lower.includes("pro")) score += 50;
+  else if (lower.includes("flash")) score += 30;
+
+  return score;
+}
+
+export async function fetchGeminiModels(): Promise<GeminiModel[]> {
+  if (cachedGeminiModels) return cachedGeminiModels;
+
+  let allModels: GeminiModel[];
+
+  if (window.electron?.listGeminiModels) {
+    const result = await window.electron.listGeminiModels();
+    if (!result.success || !result.models) {
+      throw new Error(result.error || "Failed to fetch Gemini models");
+    }
+    allModels = result.models;
+  } else {
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models?key="
+    );
+    if (!response.ok) throw new Error("Failed to fetch Gemini models");
+    const data = await response.json();
+    allModels = data.models.map((m: { name: string; displayName: string }) => ({
+      id: m.name.replace("models/", ""),
+      display_name: m.displayName,
+    }));
+  }
+
+  cachedGeminiModels = allModels
+    .filter((m) => isGeminiVisionCapable(m.id))
+    .sort((a, b) => getGeminiModelScore(b.id) - getGeminiModelScore(a.id));
+
+  return cachedGeminiModels;
+}
+
+export function getLatestGeminiModel(models: GeminiModel[]): string {
+  if (models.length === 0) return GEMINI_FALLBACK_MODEL;
+  return models[0].id;
+}
+
+export async function getSelectedGeminiModel(): Promise<string> {
+  if (window.electron?.getUserPreference) {
+    const result = await window.electron.getUserPreference(
+      GEMINI_PREFERENCE_KEY,
+      AUTO_MODEL_VALUE
+    );
+    return result.success ? result.value || AUTO_MODEL_VALUE : AUTO_MODEL_VALUE;
+  }
+  return localStorage.getItem(GEMINI_PREFERENCE_KEY) || AUTO_MODEL_VALUE;
+}
+
+export async function setSelectedGeminiModel(modelId: string): Promise<void> {
+  if (window.electron?.setUserPreference) {
+    await window.electron.setUserPreference(GEMINI_PREFERENCE_KEY, modelId);
+  } else {
+    localStorage.setItem(GEMINI_PREFERENCE_KEY, modelId);
+  }
+}
+
 // ── Unified resolution ─────────────────────────────────────────────
 
 // Resolve which model ID to actually use for analysis, based on active provider
@@ -275,6 +366,19 @@ export async function resolveModel(): Promise<string> {
         return getLatestClaudeModel(models);
       } catch {
         return CLAUDE_FALLBACK_MODEL;
+      }
+    }
+    return preference;
+  }
+
+  if (provider === "gemini") {
+    const preference = await getSelectedGeminiModel();
+    if (preference === AUTO_MODEL_VALUE) {
+      try {
+        const models = await fetchGeminiModels();
+        return getLatestGeminiModel(models);
+      } catch {
+        return GEMINI_FALLBACK_MODEL;
       }
     }
     return preference;
