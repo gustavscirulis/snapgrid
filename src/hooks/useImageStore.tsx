@@ -74,9 +74,9 @@ export function useImageStore() {
     const updatedImage = { ...image, spaceId: spaceId ?? undefined };
     updateImage(imageId, () => updatedImage);
 
-    // Persist to metadata on disk
+    // Persist to metadata on disk (use null, not undefined, so it survives IPC and signals deletion in the merge handler)
     const { url, isAnalyzing, error, ...metadataToSave } = updatedImage;
-    await window.electron.updateMetadata({ id: imageId, metadata: { ...metadataToSave, spaceId: spaceId ?? undefined } });
+    await window.electron.updateMetadata({ id: imageId, metadata: { ...metadataToSave, spaceId: spaceId } });
 
     // Re-analyze with the target space's prompt
     updateImage(imageId, (img) => ({ ...img, isAnalyzing: true, error: undefined }));
