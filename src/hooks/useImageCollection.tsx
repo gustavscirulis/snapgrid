@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { ImageItem } from "./useImageStore";
 
@@ -21,6 +21,10 @@ export function useImageCollection(): UseImageCollectionReturn {
   const [trashItems, setTrashItems] = useState<ImageItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletedItemsHistory, setDeletedItemsHistory] = useState<ImageItem[]>([]);
+
+  // Ref to avoid stale closures in callbacks that need current images
+  const imagesRef = useRef(images);
+  imagesRef.current = images;
 
   // Load images on mount
   useEffect(() => {
@@ -50,23 +54,23 @@ export function useImageCollection(): UseImageCollectionReturn {
 
   const removeImage = useCallback(async (id: string) => {
     try {
-      const itemToDelete = images.find(img => img.id === id);
+      const itemToDelete = imagesRef.current.find(img => img.id === id);
       if (!itemToDelete) return;
 
       await window.electron.deleteImage(id);
-      
+
       // Update trash items list
       const updatedTrashItems = await window.electron.listTrash();
       setTrashItems(updatedTrashItems);
       setImages(prevImages => prevImages.filter(img => img.id !== id));
-      
+
       // Add to history
       setDeletedItemsHistory(prev => [...prev, itemToDelete]);
     } catch (error) {
       console.error("Failed to delete image:", error);
       toast.error("Failed to delete image");
     }
-  }, [images]);
+  }, []);
 
   const undoDelete = useCallback(async () => {
     if (deletedItemsHistory.length === 0) return;

@@ -671,6 +671,35 @@ ipcMain.handle('delete-api-key', async (event, { service }) => {
   }
 });
 
+// Proxy OpenAI API calls through the main process to avoid CORS
+ipcMain.handle('call-openai', async (event, payload) => {
+  try {
+    const apiKey = apiKeyStorage.getApiKey('openai');
+    if (!apiKey) {
+      throw new Error('OpenAI API key not found');
+    }
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error calling OpenAI:', error);
+    throw error;
+  }
+});
+
 // IPC handlers for file system operations
 ipcMain.handle('get-app-storage-dir', () => {
   return appStorageDir;

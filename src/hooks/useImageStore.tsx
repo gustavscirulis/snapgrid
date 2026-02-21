@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { hasApiKey } from "@/services/aiAnalysisService";
 import { useImageCollection } from "./useImageCollection";
 import { useImageAnalysis } from "./useImageAnalysis";
 import { useImageFileSystem } from "./useImageFileSystem";
@@ -69,15 +68,9 @@ export function useImageStore() {
       file,
       addToCollection,
       async (media, dataUrl, savedFilePath) => {
-        // Check if API key exists before attempting analysis
-        const hasKey = await hasApiKey();
-        if (!hasKey) return media;
-
-        // Set analyzing state
+        // Set analyzing state — analyzeAndUpdateImage will check for API key
+        // and return media unchanged if no key is available
         const analyzingMedia = { ...media, isAnalyzing: true };
-        addToCollection(analyzingMedia);
-        
-        // Perform analysis
         const analyzedMedia = await analysis.analyzeAndUpdateImage(analyzingMedia, dataUrl, savedFilePath);
         return analyzedMedia;
       }
@@ -90,15 +83,7 @@ export function useImageStore() {
       filePath,
       addToCollection,
       async (media, dataUrl, savedFilePath) => {
-        // Check if API key exists before attempting analysis
-        const hasKey = await hasApiKey();
-        if (!hasKey) return media;
-
-        // Set analyzing state
         const analyzingMedia = { ...media, isAnalyzing: true };
-        addToCollection(analyzingMedia);
-        
-        // Perform analysis
         const analyzedMedia = await analysis.analyzeAndUpdateImage(analyzingMedia, dataUrl, savedFilePath);
         return analyzedMedia;
       }
