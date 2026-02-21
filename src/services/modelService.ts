@@ -1,6 +1,39 @@
-// Service for fetching, filtering, and selecting OpenAI vision-capable models
+// Service for fetching, filtering, and selecting vision-capable models
+// Supports both OpenAI and Anthropic Claude providers
 
 import { getApiKey } from "@/services/aiAnalysisService";
+
+// ── Provider type ──────────────────────────────────────────────────
+
+export type AIProvider = "openai" | "anthropic";
+
+const PROVIDER_PREFERENCE_KEY = "ai-provider";
+
+export async function getActiveProvider(): Promise<AIProvider> {
+  if (window.electron?.getUserPreference) {
+    const result = await window.electron.getUserPreference(PROVIDER_PREFERENCE_KEY, "openai");
+    return (result.success ? result.value : "openai") as AIProvider;
+  }
+  return (localStorage.getItem(PROVIDER_PREFERENCE_KEY) as AIProvider) || "openai";
+}
+
+export async function setActiveProvider(provider: AIProvider): Promise<void> {
+  if (window.electron?.setUserPreference) {
+    await window.electron.setUserPreference(PROVIDER_PREFERENCE_KEY, provider);
+  } else {
+    localStorage.setItem(PROVIDER_PREFERENCE_KEY, provider);
+  }
+}
+
+// ── Shared constants ───────────────────────────────────────────────
+
+export const AUTO_MODEL_VALUE = "auto";
+
+// Date-stamped snapshots like gpt-4o-2024-08-06 or claude-sonnet-4-5-20250514
+// clutter the list — we only want the "latest" alias for each model family.
+const DATE_SNAPSHOT_REGEX = /\d{4}-?\d{2}-?\d{2}/;
+
+// ── OpenAI ─────────────────────────────────────────────────────────
 
 export interface OpenAIModel {
   id: string;
@@ -36,19 +69,14 @@ const EXCLUDED_PATTERNS = [
   "preview",  // preview models are unstable
 ];
 
-// Date-stamped snapshots like gpt-4o-2024-08-06 clutter the list —
-// we only want the "latest" alias for each model family.
-const DATE_SNAPSHOT_REGEX = /\d{4}-\d{2}-\d{2}/;
+const OPENAI_PREFERENCE_KEY = "openai-model";
+const OPENAI_FALLBACK_MODEL = "gpt-4o";
 
-export const AUTO_MODEL_VALUE = "auto";
-const PREFERENCE_KEY = "openai-model";
-const FALLBACK_MODEL = "gpt-4o";
-
-// In-memory cache (lasts for the session)
-let cachedModels: OpenAIModel[] | null = null;
+let cachedOpenAIModels: OpenAIModel[] | null = null;
 
 export function clearModelCache(): void {
-  cachedModels = null;
+  cachedOpenAIModels = null;
+  cachedClaudeModels = null;
 }
 
 export function isVisionCapable(modelId: string): boolean {
@@ -60,11 +88,6 @@ export function isVisionCapable(modelId: string): boolean {
 
 // Score models by generation and variant so "Use latest" picks the best
 // general-purpose vision model, not just the newest API entry.
-//
-// Scoring: base score from model family + sub-version bonus - variant penalty
-//   gpt-5.2      → 5200    gpt-5-mini  → 4990
-//   gpt-5.1      → 5100    gpt-4.1     → 4100
-//   gpt-5        → 5000    gpt-4o      → 4050
 function getModelScore(modelId: string): number {
   const lower = modelId.toLowerCase();
   let score = 0;
@@ -79,7 +102,6 @@ function getModelScore(modelId: string): number {
     score = 4050;
   }
 
-  // Penalize smaller variants
   if (lower.includes("-nano")) score -= 20;
   else if (lower.includes("-mini")) score -= 10;
 
@@ -87,7 +109,7 @@ function getModelScore(modelId: string): number {
 }
 
 export async function fetchVisionModels(): Promise<OpenAIModel[]> {
-  if (cachedModels) return cachedModels;
+  if (cachedOpenAIModels) return cachedOpenAIModels;
 
   let allModels: OpenAIModel[];
 
@@ -98,7 +120,6 @@ export async function fetchVisionModels(): Promise<OpenAIModel[]> {
     }
     allModels = result.models;
   } else {
-    // Web fallback: direct fetch
     const apiKey = await getApiKey();
     if (!apiKey) throw new Error("API key not found");
     const response = await fetch("https://api.openai.com/v1/models", {
@@ -109,50 +130,165 @@ export async function fetchVisionModels(): Promise<OpenAIModel[]> {
     allModels = data.data;
   }
 
-  cachedModels = allModels
+  cachedOpenAIModels = allModels
     .filter((m) => isVisionCapable(m.id))
     .sort((a, b) => getModelScore(b.id) - getModelScore(a.id));
 
-  return cachedModels;
+  return cachedOpenAIModels;
 }
 
-export function getLatestModel(models: OpenAIModel[]): string {
-  if (models.length === 0) return FALLBACK_MODEL;
+export function getLatestModel(models: Array<{ id: string }>): string {
+  if (models.length === 0) return OPENAI_FALLBACK_MODEL;
   return models[0].id;
 }
 
-// Preference persistence via existing user preferences IPC
 export async function getSelectedModel(): Promise<string> {
   if (window.electron?.getUserPreference) {
     const result = await window.electron.getUserPreference(
-      PREFERENCE_KEY,
+      OPENAI_PREFERENCE_KEY,
       AUTO_MODEL_VALUE
     );
     return result.success ? result.value || AUTO_MODEL_VALUE : AUTO_MODEL_VALUE;
   }
-  return localStorage.getItem(PREFERENCE_KEY) || AUTO_MODEL_VALUE;
+  return localStorage.getItem(OPENAI_PREFERENCE_KEY) || AUTO_MODEL_VALUE;
 }
 
 export async function setSelectedModel(modelId: string): Promise<void> {
   if (window.electron?.setUserPreference) {
-    await window.electron.setUserPreference(PREFERENCE_KEY, modelId);
+    await window.electron.setUserPreference(OPENAI_PREFERENCE_KEY, modelId);
   } else {
-    localStorage.setItem(PREFERENCE_KEY, modelId);
+    localStorage.setItem(OPENAI_PREFERENCE_KEY, modelId);
   }
 }
 
-// Resolve which model ID to actually use for analysis
-export async function resolveModel(): Promise<string> {
-  const preference = await getSelectedModel();
+// ── Anthropic Claude ───────────────────────────────────────────────
 
+export interface ClaudeModel {
+  id: string;
+  display_name: string;
+  created_at: string;
+}
+
+const CLAUDE_PREFERENCE_KEY = "anthropic-model";
+const CLAUDE_FALLBACK_MODEL = "claude-sonnet-4-5";
+
+let cachedClaudeModels: ClaudeModel[] | null = null;
+
+// Only include Claude model families that support vision (image input).
+// Exclude date-stamped snapshots to keep the list clean.
+export function isClaudeVisionCapable(modelId: string): boolean {
+  const lower = modelId.toLowerCase();
+  if (!lower.startsWith("claude-")) return false;
+  if (DATE_SNAPSHOT_REGEX.test(lower)) return false;
+  return true;
+}
+
+// Score Claude models so "Use latest" picks the best value for image analysis.
+// Sonnet is the sweet spot (fast, capable, affordable). Opus is overkill for
+// classification tasks. Haiku is cheapest but less capable.
+//   sonnet > opus > haiku
+//   higher version numbers score higher (4.5 > 4.0 > 3.5)
+function getClaudeModelScore(modelId: string): number {
+  const lower = modelId.toLowerCase();
+  let score = 0;
+
+  // Version score: extract the version number (e.g. "4-5" → 4.5)
+  const versionMatch = lower.match(/claude-\w+-(\d+)-(\d+)/);
+  if (versionMatch) {
+    score += parseFloat(`${versionMatch[1]}.${versionMatch[2]}`) * 1000;
+  }
+
+  // Tier score: sonnet preferred for best cost/quality tradeoff
+  if (lower.includes("sonnet")) score += 300;
+  else if (lower.includes("opus")) score += 200;
+  else if (lower.includes("haiku")) score += 100;
+
+  return score;
+}
+
+export async function fetchClaudeModels(): Promise<ClaudeModel[]> {
+  if (cachedClaudeModels) return cachedClaudeModels;
+
+  let allModels: ClaudeModel[];
+
+  if (window.electron?.listClaudeModels) {
+    const result = await window.electron.listClaudeModels();
+    if (!result.success || !result.models) {
+      throw new Error(result.error || "Failed to fetch Claude models");
+    }
+    allModels = result.models;
+  } else {
+    // Web fallback: direct fetch (will likely hit CORS, but matches OpenAI pattern)
+    const response = await fetch("https://api.anthropic.com/v1/models?limit=1000", {
+      headers: {
+        "x-api-key": "", // Would need key from localStorage — unlikely path
+        "anthropic-version": "2023-06-01",
+      },
+    });
+    if (!response.ok) throw new Error("Failed to fetch Claude models");
+    const data = await response.json();
+    allModels = data.data;
+  }
+
+  cachedClaudeModels = allModels
+    .filter((m) => isClaudeVisionCapable(m.id))
+    .sort((a, b) => getClaudeModelScore(b.id) - getClaudeModelScore(a.id));
+
+  return cachedClaudeModels;
+}
+
+export function getLatestClaudeModel(models: ClaudeModel[]): string {
+  if (models.length === 0) return CLAUDE_FALLBACK_MODEL;
+  return models[0].id;
+}
+
+export async function getSelectedClaudeModel(): Promise<string> {
+  if (window.electron?.getUserPreference) {
+    const result = await window.electron.getUserPreference(
+      CLAUDE_PREFERENCE_KEY,
+      AUTO_MODEL_VALUE
+    );
+    return result.success ? result.value || AUTO_MODEL_VALUE : AUTO_MODEL_VALUE;
+  }
+  return localStorage.getItem(CLAUDE_PREFERENCE_KEY) || AUTO_MODEL_VALUE;
+}
+
+export async function setSelectedClaudeModel(modelId: string): Promise<void> {
+  if (window.electron?.setUserPreference) {
+    await window.electron.setUserPreference(CLAUDE_PREFERENCE_KEY, modelId);
+  } else {
+    localStorage.setItem(CLAUDE_PREFERENCE_KEY, modelId);
+  }
+}
+
+// ── Unified resolution ─────────────────────────────────────────────
+
+// Resolve which model ID to actually use for analysis, based on active provider
+export async function resolveModel(): Promise<string> {
+  const provider = await getActiveProvider();
+
+  if (provider === "anthropic") {
+    const preference = await getSelectedClaudeModel();
+    if (preference === AUTO_MODEL_VALUE) {
+      try {
+        const models = await fetchClaudeModels();
+        return getLatestClaudeModel(models);
+      } catch {
+        return CLAUDE_FALLBACK_MODEL;
+      }
+    }
+    return preference;
+  }
+
+  // OpenAI path (default)
+  const preference = await getSelectedModel();
   if (preference === AUTO_MODEL_VALUE) {
     try {
       const models = await fetchVisionModels();
       return getLatestModel(models);
     } catch {
-      return FALLBACK_MODEL;
+      return OPENAI_FALLBACK_MODEL;
     }
   }
-
   return preference;
 }
