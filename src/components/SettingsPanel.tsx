@@ -6,7 +6,9 @@ import { Moon, Sun, SunMoon, Code, X, Smartphone } from "lucide-react";
 import { setOpenAIApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAnalyticsConsent, setAnalyticsConsent } from "@/services/analyticsService";
+import { fetchVisionModels, getSelectedModel, setSelectedModel, clearModelCache, AUTO_MODEL_VALUE, type OpenAIModel } from "@/services/modelService";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -57,6 +59,7 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
         <div className="py-1 space-y-8 max-h-[calc(100vh-200px)] overflow-y-auto pr-1 mac-scrollbar">
           <ThemeSelector />
           <ApiKeySection isOpen={open} />
+          <ModelSelector isOpen={open} />
           <QueueSection />
           <AnalyticsSection />
           {isDevMode && <DeveloperSection />}
@@ -326,6 +329,90 @@ const ApiKeySection = ({ isOpen }: ApiKeySectionProps) => {
           </div>
         )}
       </div>
+    </section>
+  );
+};
+
+const ModelSelector = ({ isOpen }: { isOpen: boolean }) => {
+  const [models, setModels] = useState<OpenAIModel[]>([]);
+  const [selectedModelValue, setSelectedModelValue] = useState<string>(AUTO_MODEL_VALUE);
+  const [isLoading, setIsLoading] = useState(false);
+  const [keyExists, setKeyExists] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const load = async () => {
+      const exists = await hasApiKey();
+      setKeyExists(exists);
+      if (!exists) return;
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [pref, modelList] = await Promise.all([
+          getSelectedModel(),
+          fetchVisionModels(),
+        ]);
+        setSelectedModelValue(pref);
+        setModels(modelList);
+      } catch {
+        setError("Could not load models");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    load();
+  }, [isOpen]);
+
+  if (!keyExists) return null;
+
+  const handleModelChange = async (value: string) => {
+    setSelectedModelValue(value);
+    await setSelectedModel(value);
+    clearModelCache();
+    toast.success(
+      value === AUTO_MODEL_VALUE
+        ? "Using latest model automatically"
+        : `Model set to ${value}`
+    );
+  };
+
+  const latestModelName = models.length > 0 ? models[0].id : "...";
+
+  return (
+    <section className="space-y-3">
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">
+          AI Model
+        </h3>
+        <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
+          Model used for image analysis.
+        </p>
+      </div>
+      <div className="p-0.5">
+        <Select value={selectedModelValue} onValueChange={handleModelChange} disabled={isLoading}>
+          <SelectTrigger className="h-9 rounded-md text-sm border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-700">
+            <SelectValue placeholder={isLoading ? "Loading models..." : "Select model..."} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={AUTO_MODEL_VALUE}>
+              Use latest ({latestModelName})
+            </SelectItem>
+            {models.length > 0 && <SelectSeparator />}
+            {models.map((m) => (
+              <SelectItem key={m.id} value={m.id}>
+                {m.id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {error && (
+        <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
+      )}
     </section>
   );
 };

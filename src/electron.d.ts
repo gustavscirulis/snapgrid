@@ -47,6 +47,11 @@ interface IElectronAPI {
   // Added methods
   convertImageToBase64?: (filePath: string) => Promise<string>;
   callOpenAI?: (payload: any) => Promise<any>;
+  listOpenAIModels?: () => Promise<{
+    success: boolean;
+    models?: Array<{ id: string; created: number; owned_by: string }>;
+    error?: string;
+  }>;
   saveMediaData?: (data: any) => Promise<any>;
   
   // Menu event handlers
