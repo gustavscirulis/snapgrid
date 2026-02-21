@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
-import { Moon, Sun, SunMoon, Code, X, Check } from "lucide-react";
+import { Moon, Sun, SunMoon, Code, X, Check, Plus, Trash2 } from "lucide-react";
 import { setOpenAIApiKey, setAnthropicApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -14,49 +14,62 @@ import {
   getSelectedClaudeModel, setSelectedClaudeModel,
   getActiveProvider, setActiveProvider,
   clearModelCache, AUTO_MODEL_VALUE,
-  type OpenAIModel, type ClaudeModel, type AIProvider,
+  type AIProvider,
 } from "@/services/modelService";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Space, AllSpacePromptConfig } from "@/hooks/useSpaces";
 
 // Helper to detect development mode
 const isDevelopmentMode = () => {
-  // Check for common development indicators
   if (window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1' ||
       window.location.port === '8080' ||
       window.location.port === '3000') {
     return true;
   }
-
-  // In Electron, check if we have dev tools available
   if (window && typeof window.electron !== 'undefined' &&
       window.electron !== null &&
       (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__) {
     return true;
   }
-
-  // Default to production mode
   return false;
 };
 
 interface SettingsPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  spaces: Space[];
+  activeSpaceId: string | null;
+  allSpacePromptConfig: AllSpacePromptConfig;
+  onCreateSpace: (name: string) => Promise<Space>;
+  onRenameSpace: (id: string, name: string) => Promise<void>;
+  onDeleteSpace: (id: string) => Promise<void>;
+  onUpdateSpacePrompt: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  onUpdateAllSpacePrompt: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
 }
 
-export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
+export function SettingsPanel({
+  open,
+  onOpenChange,
+  spaces,
+  activeSpaceId,
+  allSpacePromptConfig,
+  onCreateSpace,
+  onRenameSpace,
+  onDeleteSpace,
+  onUpdateSpacePrompt,
+  onUpdateAllSpacePrompt,
+}: SettingsPanelProps) {
   const [isDevMode, setIsDevMode] = useState(false);
   const [activeProvider, setActiveProviderState] = useState<AIProvider>("openai");
-  // Bumped when the API key is added or removed, so ModelSelector can react
   const [keyVersion, setKeyVersion] = useState(0);
+  const [activeTab, setActiveTab] = useState<"general" | "spaces" | "developer">("general");
 
-  // Check for development mode on mount
   useEffect(() => {
     setIsDevMode(isDevelopmentMode());
   }, []);
 
-  // Load provider preference when dialog opens
   useEffect(() => {
     if (open) {
       getActiveProvider().then(setActiveProviderState);
@@ -70,49 +83,92 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
 
   const handleKeyChange = () => setKeyVersion((v) => v + 1);
 
+  const navItems: { id: "general" | "spaces" | "developer"; label: string }[] = [
+    { id: "general", label: "General" },
+    { id: "spaces", label: "Spaces" },
+    ...(isDevMode ? [{ id: "developer" as const, label: "Developer" }] : []),
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-black backdrop-blur-none shadow-2xl z-[200] focus:outline-none focus:ring-0 pt-4">
-        <DialogHeader className="border-b border-gray-200 dark:border-zinc-800 pb-4 mb-4 -mx-6 px-6">
+      <DialogContent className="sm:max-w-[600px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-black backdrop-blur-none shadow-2xl z-[200] focus:outline-none focus:ring-0 p-0 overflow-hidden">
+        {/* Header */}
+        <DialogHeader className="border-b border-gray-200 dark:border-zinc-800 pb-4 pt-4 px-6">
           <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center h-8 select-none">Settings</DialogTitle>
           <DialogClose className="h-8 w-8 rounded-md text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-zinc-800 inline-flex items-center justify-center non-draggable transition-colors focus:outline-none focus:ring-0">
             <X className="h-5 w-5" />
             <span className="sr-only">Close</span>
           </DialogClose>
         </DialogHeader>
-        <div className="max-h-[calc(100vh-200px)] overflow-y-auto pr-1 mac-scrollbar">
-          {/* Appearance — standalone */}
-          <ThemeSelector />
 
-          {/* AI settings — tightly grouped */}
-          <div className="mt-6 space-y-4">
-            <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 select-none">AI Analysis</h3>
-            <ProviderSelector provider={activeProvider} onProviderChange={handleProviderChange} />
-            <ApiKeySection isOpen={open} provider={activeProvider} onKeyChange={handleKeyChange} />
-            <ModelSelector isOpen={open} provider={activeProvider} keyVersion={keyVersion} />
+        {/* Sidebar + Content */}
+        <div className="flex h-[500px]">
+          {/* Left nav */}
+          <nav className="w-[140px] flex-shrink-0 border-r border-gray-200 dark:border-zinc-800 p-2 space-y-0.5">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors select-none ${
+                  activeTab === item.id
+                    ? "bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-gray-100 font-medium"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Right content */}
+          <div className="flex-1 overflow-y-auto p-6 mac-scrollbar">
+            {activeTab === "general" && (
+              <>
+                <ThemeSelector />
+
+                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/80 space-y-4">
+                  <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 select-none">AI Analysis</h3>
+                  <ProviderSelector provider={activeProvider} onProviderChange={handleProviderChange} />
+                  <ApiKeySection isOpen={open} provider={activeProvider} onKeyChange={handleKeyChange} />
+                  <ModelSelector isOpen={open} provider={activeProvider} keyVersion={keyVersion} />
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/80">
+                  <QueueSection />
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/80">
+                  <AnalyticsSection />
+                </div>
+              </>
+            )}
+
+            {activeTab === "spaces" && (
+              <SpacesTab
+                spaces={spaces}
+                activeSpaceId={activeSpaceId}
+                allSpacePromptConfig={allSpacePromptConfig}
+                onCreateSpace={onCreateSpace}
+                onRenameSpace={onRenameSpace}
+                onDeleteSpace={onDeleteSpace}
+                onUpdateSpacePrompt={onUpdateSpacePrompt}
+                onUpdateAllSpacePrompt={onUpdateAllSpacePrompt}
+              />
+            )}
+
+            {activeTab === "developer" && <DeveloperSection />}
           </div>
-
-          {/* General — less frequently changed */}
-          <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/80 space-y-4">
-            <QueueSection />
-            <AnalyticsSection />
-          </div>
-
-          {isDevMode && (
-            <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/80">
-              <DeveloperSection />
-            </div>
-          )}
-
-          <div className="h-1" />
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-// Shared tab trigger styles
+// ── Shared styles ──────────────────────────────────────────────────
+
 const tabTriggerClass = "flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs";
+
+// ── General tab components ────────────────────────────────────────
 
 const ThemeSelector = () => {
   const { theme, setTheme } = useTheme();
@@ -162,7 +218,6 @@ const AnalyticsSection = () => {
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load the current analytics consent status
   useEffect(() => {
     const checkAnalyticsConsent = async () => {
       try {
@@ -178,25 +233,20 @@ const AnalyticsSection = () => {
 
     checkAnalyticsConsent();
 
-    // Set up a listener for consent changes from the main process
     if (window.electron.onAnalyticsConsentChanged) {
       const removeListener = window.electron.onAnalyticsConsentChanged((consent: boolean) => {
-        console.log('Received analytics consent change event:', consent);
         setAnalyticsEnabled(consent);
-        // Only show toast if we're not actively toggling (already handled in handleToggleChange)
         if (!isLoading) {
           toast.success(consent ? "Analytics enabled" : "Analytics disabled");
         }
       });
 
       return () => {
-        // Clean up the listener when component unmounts
         if (removeListener) removeListener();
       };
     }
   }, []);
 
-  // Handle toggle changes
   const handleToggleChange = async (checked: boolean) => {
     try {
       setIsLoading(true);
@@ -261,7 +311,6 @@ const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) =>
   const inputRef = useRef<HTMLInputElement>(null);
   const config = PROVIDER_CONFIG[provider];
 
-  // Check if key exists whenever provider or dialog state changes
   useEffect(() => {
     const checkKey = async () => {
       const exists = await hasApiKey(provider);
@@ -270,7 +319,6 @@ const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) =>
     checkKey();
   }, [provider, isOpen]);
 
-  // Auto-focus the input field when settings opens and no key exists
   useEffect(() => {
     if (isOpen && !keyExists) {
       const timer = setTimeout(() => {
@@ -280,7 +328,6 @@ const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) =>
     }
   }, [isOpen, keyExists]);
 
-  // Handle opening the API key URL in default browser
   const handleOpenApiKeyUrl = (e: React.MouseEvent) => {
     e.preventDefault();
     if (window.electron?.openUrl) {
@@ -500,28 +547,21 @@ const QueueSection = () => {
   );
 };
 
-// Developer section component only shown in dev mode
 const DeveloperSection = () => {
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
   const [enablePillClickAnalysis, setEnablePillClickAnalysis] = useState(false);
 
-  // Function to update the app's global state to simulate empty state
   const handleToggleEmptyState = (checked: boolean) => {
     setSimulateEmptyState(checked);
-    // Store the setting in localStorage so it persists across reloads
     localStorage.setItem('dev_simulate_empty_state', checked ? 'true' : 'false');
-
-    // Force a refresh to apply the change
     window.location.reload();
   };
 
-  // Function to handle pill click analysis toggle
   const handleTogglePillClickAnalysis = (checked: boolean) => {
     setEnablePillClickAnalysis(checked);
     localStorage.setItem('dev_enable_pill_click_analysis', checked ? 'true' : 'false');
   };
 
-  // Load the simulation setting on mount
   useEffect(() => {
     const savedEmptyState = localStorage.getItem('dev_simulate_empty_state');
     const savedPillClickAnalysis = localStorage.getItem('dev_enable_pill_click_analysis');
@@ -577,6 +617,267 @@ const DeveloperSection = () => {
           Delete
         </Button>
       </div>
+
+      <div className="flex justify-between items-center gap-4">
+        <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Reset all custom instructions</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async () => {
+            if (window.electron?.setUserPreference) {
+              const spacesResult = await window.electron.getUserPreference('spaces', []);
+              if (spacesResult.success && Array.isArray(spacesResult.value)) {
+                const cleared = spacesResult.value.map((s: Space) => ({
+                  ...s,
+                  customPrompt: undefined,
+                  useCustomPrompt: false,
+                }));
+                await window.electron.setUserPreference('spaces', cleared);
+              }
+              await window.electron.setUserPreference('allSpacePrompt', {});
+              toast.success("All custom instructions reset. Reload to apply.");
+              window.location.reload();
+            }
+          }}
+          className="h-7 text-xs border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+        >
+          Reset
+        </Button>
+      </div>
     </section>
+  );
+};
+
+// ── Spaces tab ────────────────────────────────────────────────────
+
+interface SpacesTabProps {
+  spaces: Space[];
+  activeSpaceId: string | null;
+  allSpacePromptConfig: AllSpacePromptConfig;
+  onCreateSpace: (name: string) => Promise<Space>;
+  onRenameSpace: (id: string, name: string) => Promise<void>;
+  onDeleteSpace: (id: string) => Promise<void>;
+  onUpdateSpacePrompt: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  onUpdateAllSpacePrompt: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+}
+
+const SpacesTab = ({
+  spaces,
+  activeSpaceId,
+  allSpacePromptConfig,
+  onCreateSpace,
+  onRenameSpace,
+  onDeleteSpace,
+  onUpdateSpacePrompt,
+  onUpdateAllSpacePrompt,
+}: SpacesTabProps) => {
+  // Which space is selected for editing (null = "All")
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(activeSpaceId);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editNameValue, setEditNameValue] = useState("");
+  const editNameRef = useRef<HTMLInputElement>(null);
+
+  // Prompt editing state
+  const selectedSpace = selectedSpaceId !== null ? spaces.find(s => s.id === selectedSpaceId) : null;
+  const isCustom = selectedSpaceId === null
+    ? allSpacePromptConfig.useCustomPrompt ?? false
+    : selectedSpace?.useCustomPrompt ?? false;
+  const currentPromptText = selectedSpaceId === null
+    ? allSpacePromptConfig.customPrompt ?? ""
+    : selectedSpace?.customPrompt ?? "";
+
+  // Local prompt text for responsive editing
+  const [localPromptText, setLocalPromptText] = useState(currentPromptText);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Sync local text when selection changes
+  useEffect(() => {
+    setLocalPromptText(currentPromptText);
+  }, [selectedSpaceId, currentPromptText]);
+
+  // Focus name input when editing
+  useEffect(() => {
+    if (editingNameId) {
+      requestAnimationFrame(() => {
+        editNameRef.current?.focus();
+        editNameRef.current?.select();
+      });
+    }
+  }, [editingNameId]);
+
+  const handleToggleCustomPrompt = (checked: boolean) => {
+    if (selectedSpaceId === null) {
+      onUpdateAllSpacePrompt(currentPromptText || undefined, checked);
+    } else {
+      onUpdateSpacePrompt(selectedSpaceId, currentPromptText || undefined, checked);
+    }
+  };
+
+  const handlePromptChange = useCallback((text: string) => {
+    setLocalPromptText(text);
+    // Debounce persistence
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      if (selectedSpaceId === null) {
+        onUpdateAllSpacePrompt(text, true);
+      } else {
+        onUpdateSpacePrompt(selectedSpaceId, text, true);
+      }
+    }, 500);
+  }, [selectedSpaceId, onUpdateAllSpacePrompt, onUpdateSpacePrompt]);
+
+  // Clean up debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const handleCreateSpace = async () => {
+    const space = await onCreateSpace("New Space");
+    setSelectedSpaceId(space.id);
+    setEditingNameId(space.id);
+    setEditNameValue(space.name);
+  };
+
+  const commitRename = () => {
+    if (editingNameId && editNameValue.trim()) {
+      onRenameSpace(editingNameId, editNameValue.trim());
+    }
+    setEditingNameId(null);
+  };
+
+  const handleDeleteSpace = (id: string) => {
+    onDeleteSpace(id);
+    if (selectedSpaceId === id) {
+      setSelectedSpaceId(null);
+    }
+  };
+
+  // Build the list: "All" + named spaces
+  const spaceItems: { id: string | null; name: string; hasCustomPrompt: boolean }[] = [
+    { id: null, name: "All", hasCustomPrompt: allSpacePromptConfig.useCustomPrompt ?? false },
+    ...spaces.map(s => ({
+      id: s.id,
+      name: s.name,
+      hasCustomPrompt: s.useCustomPrompt ?? false,
+    })),
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Space list */}
+      <div className="space-y-1">
+        {spaceItems.map((item) => {
+          const isSelected = selectedSpaceId === item.id;
+          const isEditing = item.id !== null && editingNameId === item.id;
+
+          return (
+            <div
+              key={item.id ?? "__all__"}
+              onClick={() => {
+                if (!isEditing) setSelectedSpaceId(item.id);
+              }}
+              className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                isSelected
+                  ? "bg-gray-100 dark:bg-zinc-800"
+                  : "hover:bg-gray-50 dark:hover:bg-zinc-800/50"
+              }`}
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {isEditing ? (
+                  <input
+                    ref={editNameRef}
+                    value={editNameValue}
+                    onChange={(e) => setEditNameValue(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitRename();
+                      if (e.key === "Escape") setEditingNameId(null);
+                    }}
+                    className="bg-transparent border-none outline-none text-sm font-medium text-gray-900 dark:text-gray-100 w-full min-w-0"
+                  />
+                ) : (
+                  <span className="text-sm text-gray-900 dark:text-gray-100 truncate select-none">
+                    {item.name}
+                  </span>
+                )}
+                {item.hasCustomPrompt && (
+                  <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-zinc-700 text-gray-500 dark:text-gray-400 select-none">
+                    custom instructions
+                  </span>
+                )}
+              </div>
+
+              {/* Actions for named spaces (not "All") */}
+              {item.id !== null && isSelected && !isEditing && (
+                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingNameId(item.id);
+                      setEditNameValue(item.name);
+                    }}
+                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-1.5 py-0.5 rounded transition-colors"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteSpace(item.id!);
+                    }}
+                    className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 p-0.5 rounded transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Add space button */}
+        <button
+          onClick={handleCreateSpace}
+          className="flex items-center gap-2 px-3 py-2 w-full rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-zinc-800/50 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span className="text-sm select-none">Add space</span>
+        </button>
+      </div>
+
+      {/* Prompt section */}
+      <div className="pt-4 border-t border-gray-100 dark:border-zinc-800/80 space-y-3">
+        <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 select-none">
+          Analysis Instructions
+          {selectedSpaceId === null ? " — All" : ` — ${selectedSpace?.name ?? ""}`}
+        </h3>
+
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Custom instructions</span>
+          <Switch
+            checked={isCustom}
+            onCheckedChange={handleToggleCustomPrompt}
+            className="data-[state=checked]:bg-gray-800 dark:data-[state=checked]:bg-zinc-700 data-[state=checked]:text-gray-100"
+          />
+        </div>
+
+        {isCustom ? (
+          <div className="space-y-2">
+            <textarea
+              value={localPromptText}
+              onChange={(e) => handlePromptChange(e.target.value)}
+              className="w-full h-32 text-xs rounded-md border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 resize-y focus:outline-none focus:border-gray-400 dark:focus:border-zinc-700 transition-colors text-gray-800 dark:text-gray-200 placeholder:text-gray-400"
+              placeholder="e.g., Focus on architectural details and building materials"
+            />
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500 dark:text-gray-500 select-none">
+            Using the built-in prompt. App updates will automatically improve analysis.
+          </p>
+        )}
+      </div>
+    </div>
   );
 };

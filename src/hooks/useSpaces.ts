@@ -1,10 +1,18 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { DEFAULT_SYSTEM_PROMPT } from "@/services/aiAnalysisService";
 
 export interface Space {
   id: string;
   name: string;
   order: number;
   createdAt: string;
+  customPrompt?: string;
+  useCustomPrompt?: boolean;
+}
+
+export interface AllSpacePromptConfig {
+  customPrompt?: string;
+  useCustomPrompt?: boolean;
 }
 
 export interface UseSpacesReturn {
@@ -15,7 +23,46 @@ export interface UseSpacesReturn {
   createSpace: (name: string) => Promise<Space>;
   renameSpace: (id: string, name: string) => Promise<void>;
   deleteSpace: (id: string) => Promise<void>;
+  updateSpacePrompt: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  allSpacePromptConfig: AllSpacePromptConfig;
+  updateAllSpacePrompt: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
   isLoading: boolean;
+}
+
+export function resolvePromptForSpace(
+  spaceId: string | null | undefined,
+  spaces: Space[],
+  allSpacePromptConfig: AllSpacePromptConfig
+): string | undefined {
+  let spaceName: string | undefined;
+  let customInstructions: string | undefined;
+
+  if (spaceId === null || spaceId === undefined) {
+    if (allSpacePromptConfig.useCustomPrompt && allSpacePromptConfig.customPrompt) {
+      customInstructions = allSpacePromptConfig.customPrompt;
+    }
+  } else {
+    const space = spaces.find(s => s.id === spaceId);
+    if (space) {
+      spaceName = space.name;
+      if (space.useCustomPrompt && space.customPrompt) {
+        customInstructions = space.customPrompt;
+      }
+    }
+  }
+
+  const additions: string[] = [];
+  if (spaceName) {
+    additions.push(`This image belongs to a collection called "${spaceName}". Use this as context to inform your analysis — pay attention to aspects relevant to this theme.`);
+  }
+  if (customInstructions) {
+    additions.push(customInstructions);
+  }
+
+  if (additions.length > 0) {
+    return `${DEFAULT_SYSTEM_PROMPT}\n\nAdditional instructions:\n${additions.join('\n')}`;
+  }
+  return undefined;
 }
 
 function generateId(): string {
@@ -27,6 +74,7 @@ export function useSpaces(): UseSpacesReturn {
   const [activeSpaceId, setActiveSpaceIdRaw] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [slideDirection, setSlideDirection] = useState(0);
+  const [allSpacePromptConfig, setAllSpacePromptConfig] = useState<AllSpacePromptConfig>({});
 
   const currentIndexRef = useRef(0);
 
@@ -40,15 +88,21 @@ export function useSpaces(): UseSpacesReturn {
     setActiveSpaceIdRaw(id);
   }, [spaces]);
 
-  // Load spaces from preferences on mount
+  // Load spaces and allSpacePromptConfig from preferences on mount
   useEffect(() => {
     const load = async () => {
       try {
         if (window.electron?.getUserPreference) {
-          const result = await window.electron.getUserPreference('spaces', []);
-          if (result.success && result.value) {
-            const loaded = Array.isArray(result.value) ? result.value : [];
+          const [spacesResult, allPromptResult] = await Promise.all([
+            window.electron.getUserPreference('spaces', []),
+            window.electron.getUserPreference('allSpacePrompt', {}),
+          ]);
+          if (spacesResult.success && spacesResult.value) {
+            const loaded = Array.isArray(spacesResult.value) ? spacesResult.value : [];
             setSpaces(loaded.sort((a: Space, b: Space) => a.order - b.order));
+          }
+          if (allPromptResult.success && allPromptResult.value) {
+            setAllSpacePromptConfig(allPromptResult.value);
           }
         }
       } catch (error) {
@@ -97,6 +151,29 @@ export function useSpaces(): UseSpacesReturn {
     }
   }, [spaces, activeSpaceId, persistSpaces]);
 
+  const updateSpacePrompt = useCallback(async (
+    id: string,
+    customPrompt: string | undefined,
+    useCustomPrompt: boolean
+  ) => {
+    const updated = spaces.map(s =>
+      s.id === id ? { ...s, customPrompt, useCustomPrompt } : s
+    );
+    setSpaces(updated);
+    await persistSpaces(updated);
+  }, [spaces, persistSpaces]);
+
+  const updateAllSpacePrompt = useCallback(async (
+    customPrompt: string | undefined,
+    useCustomPrompt: boolean
+  ) => {
+    const config = { customPrompt, useCustomPrompt };
+    setAllSpacePromptConfig(config);
+    if (window.electron?.setUserPreference) {
+      await window.electron.setUserPreference('allSpacePrompt', config);
+    }
+  }, []);
+
   return {
     spaces,
     activeSpaceId,
@@ -105,6 +182,9 @@ export function useSpaces(): UseSpacesReturn {
     createSpace,
     renameSpace,
     deleteSpace,
+    updateSpacePrompt,
+    allSpacePromptConfig,
+    updateAllSpacePrompt,
     isLoading,
   };
 }
