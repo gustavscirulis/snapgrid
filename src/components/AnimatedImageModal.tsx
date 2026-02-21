@@ -156,11 +156,13 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     previewEl: HTMLDivElement | null;
     cleanupTimer: ReturnType<typeof setTimeout> | null;
   } | null>(null);
-  // Stable ref so document-level listeners always see the latest image
+  // Stable refs so document-level listeners always see the latest values
   const selectedImageRef2 = useRef(selectedImage);
   selectedImageRef2.current = selectedImage;
   const zoomStateRef = useRef(zoomState);
   zoomStateRef.current = zoomState;
+  const setInternalDragActiveRef = useRef(dragContext.setInternalDragActive);
+  setInternalDragActiveRef.current = dragContext.setInternalDragActive;
 
   // Track window size reactively so layout recalculates on resize
   const [windowSize, setWindowSize] = useState({
@@ -277,7 +279,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
       if (state.previewEl) state.previewEl.remove();
       if (state.cleanupTimer) clearTimeout(state.cleanupTimer);
       if (state.isDragging) {
-        dragContext.setInternalDragActive(false);
+        setInternalDragActiveRef.current(false);
       }
       document.body.style.cursor = '';
       customDragRef.current = null;
@@ -303,7 +305,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
         state.isDragging = true;
         justExportDraggedRef.current = true;
-        dragContext.setInternalDragActive(true);
+        setInternalDragActiveRef.current(true);
         document.body.style.cursor = 'grabbing';
 
         // Create floating thumbnail preview
@@ -394,7 +396,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
       }
       customDragRef.current = null;
     };
-  }, [isOpen, dragContext]);
+  }, [isOpen]);
 
   // Handle body overflow and keyboard events
   useEffect(() => {
