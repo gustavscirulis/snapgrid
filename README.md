@@ -9,9 +9,12 @@ It's built by [@gustavscirulis](https://github.com/gustavscirulis), and all of t
 ## Features
 
 - **Screenshot Management** – Collect and organize your UI screenshots in a visual grid layout
-- **AI-Powered Pattern Detection** – Identify UI components and patterns using OpenAI's Vision API  
-- **Smart Organization** – Search and filter your screenshots based on detected UI elements  
-- **Fast Local Storage** – All screenshots and metadata are stored locally and can be synced with iCloud  
+- **Spaces** – Organize images into collections with drag-and-drop support and per-space export
+- **Multi-Provider AI Analysis** – Detect UI components and patterns using OpenAI, Claude (Anthropic), Google Gemini, or OpenRouter
+- **Custom AI Instructions** – Configure custom analysis prompts per space for tailored insights
+- **Smart Organization** – Search and filter your screenshots based on detected UI elements
+- **iOS Shortcut Import** – Export an iOS Shortcut from settings to import screenshots from your phone
+- **Fast Local Storage** – All screenshots and metadata are stored locally and can be synced with iCloud
 
 ## Installation
 
@@ -24,14 +27,14 @@ Download the latest release for your platform from the [releases](https://github
 
 ## Requirements
 
-To use the AI pattern detection feature, you'll need to add your OpenAI API key in the settings. The app uses GPT-4.1-mini for vision analysis. You can still use the app without this feature — it just won't detect patterns.
+To use the AI analysis feature, you'll need to add an API key for at least one supported provider in the settings: OpenAI, Anthropic (Claude), Google Gemini, or OpenRouter. You can choose your preferred provider and model from the settings panel. You can still use the app without this feature — it just won't detect patterns.
 
 ## Privacy
 
 SnapGrid is built with privacy in mind:
 
 - **Local-first by design**: All screenshots, metadata, and app data are stored locally on your device. Nothing is uploaded or stored remotely.
-- **Optional AI analysis**: If enabled, screenshots are temporarily sent to OpenAI’s Vision API for pattern detection. This feature is optional and can be turned off at any time in the settings.
+- **Optional AI analysis**: If enabled, screenshots are temporarily sent to your chosen AI provider (OpenAI, Anthropic, Google Gemini, or OpenRouter) for pattern detection. This feature is optional and can be turned off at any time in the settings.
 - **Anonymous usage analytics**: SnapGrid collects basic, anonymous usage stats and crash reports to help improve the app. No personal data or screenshots are ever collected. You can opt out of tracking in the settings.
 
 ## File storage
@@ -93,6 +96,6 @@ This project is licensed under the GNU General Public License v3.0 (GPL-3.0) - s
 
 - Thanks to [Cursor](https://cursor.com) and [Loveable](https://loveable.dev) teams for building the AI code generation tools that made this project possible
 - Thanks to [Midjourney](https://www.midjourney.com/) for the app icon
-- Thanks to OpenAI for their Vision API that powers the pattern detection
+- Thanks to [OpenAI](https://openai.com/), [Anthropic](https://anthropic.com/), [Google Gemini](https://deepmind.google/technologies/gemini/), and [OpenRouter](https://openrouter.ai/) for their AI APIs that power the pattern detection
 - Built with [Electron](https://www.electronjs.org/) and [React](https://reactjs.org/)
 - UI components from [shadcn/ui](https://ui.shadcn.com/)

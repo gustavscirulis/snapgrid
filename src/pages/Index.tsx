@@ -25,7 +25,8 @@ const Index = () => {
     canUndo,
     importFromFilePath,
     retryAnalysis,
-    assignImageToSpace
+    assignImageToSpace,
+    shuffleImages
   } = useImageStore();
 
   const {
@@ -124,6 +125,14 @@ const Index = () => {
         if (current === 'medium') return 'small';
         return 'small'; // Already at smallest
       });
+    },
+    onSwitchSpace: (index: number) => {
+      if (index === 1) {
+        setActiveSpaceId(null); // "All"
+      } else {
+        const space = spaces[index - 2];
+        if (space) setActiveSpaceId(space.id);
+      }
     }
   });
 
@@ -412,6 +421,7 @@ const Index = () => {
           onDeleteSpace={deleteSpace}
           onUpdateSpacePrompt={updateSpacePrompt}
           onUpdateAllSpacePrompt={updateAllSpacePrompt}
+          onShuffleImages={shuffleImages}
         />
       </div>
     </UploadZone>

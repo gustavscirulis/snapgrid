@@ -13,6 +13,7 @@ export interface UseImageCollectionReturn {
   removeImage: (id: string) => Promise<void>;
   undoDelete: () => Promise<void>;
   emptyTrash: () => Promise<void>;
+  shuffleImages: () => void;
   canUndo: boolean;
 }
 
@@ -112,6 +113,17 @@ export function useImageCollection(): UseImageCollectionReturn {
     }
   }, [deletedItemsHistory]);
 
+  const shuffleImages = useCallback(() => {
+    setImages(prev => {
+      const shuffled = [...prev];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    });
+  }, []);
+
   const emptyTrash = useCallback(async () => {
     try {
       await window.electron.emptyTrash();
@@ -135,6 +147,7 @@ export function useImageCollection(): UseImageCollectionReturn {
     removeImage,
     undoDelete,
     emptyTrash,
+    shuffleImages,
     canUndo: deletedItemsHistory.length > 0,
   };
 }

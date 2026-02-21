@@ -140,6 +140,9 @@ export function useImageStore() {
     // Space operations
     assignImageToSpace,
 
+    // Developer tools
+    shuffleImages: collection.shuffleImages,
+
     // Queue management
     queueService: queue.queueService,
   };

@@ -7,6 +7,7 @@ interface KeyboardShortcutsProps {
   onOpenSettings?: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
+  onSwitchSpace?: (index: number) => void;
 }
 
 export function useKeyboardShortcuts({ 
@@ -15,7 +16,8 @@ export function useKeyboardShortcuts({
   onUnfocusSearch,
   onOpenSettings,
   onZoomIn,
-  onZoomOut
+  onZoomOut,
+  onSwitchSpace
 }: KeyboardShortcutsProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -55,9 +57,15 @@ export function useKeyboardShortcuts({
         event.preventDefault(); // Prevent default browser zoom behavior
         onZoomOut?.();
       }
+
+      // Cmd+1-9 to switch spaces (1 = All, 2 = first space, etc.)
+      if ((event.metaKey || event.ctrlKey) && event.key >= '1' && event.key <= '9') {
+        event.preventDefault();
+        onSwitchSpace?.(parseInt(event.key, 10));
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onUndo, onFocusSearch, onUnfocusSearch, onOpenSettings, onZoomIn, onZoomOut]);
+  }, [onUndo, onFocusSearch, onUnfocusSearch, onOpenSettings, onZoomIn, onZoomOut, onSwitchSpace]);
 } 
