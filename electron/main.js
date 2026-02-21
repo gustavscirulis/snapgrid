@@ -1231,12 +1231,30 @@ ipcMain.handle('open-url', async (event, url) => {
   }
 });
 
-// Add update-metadata handler
+// Add update-metadata handler (merges with existing metadata to prevent stale overwrites)
 ipcMain.handle('update-metadata', async (event, { id, metadata }) => {
   try {
     const metadataDir = path.join(appStorageDir, 'metadata');
     const metadataPath = path.join(metadataDir, `${id}.json`);
-    await fs.writeJson(metadataPath, metadata);
+
+    // Read existing metadata so concurrent writes don't clobber each other's fields
+    let existing = {};
+    try {
+      existing = await fs.readJson(metadataPath);
+    } catch (e) {
+      // File doesn't exist yet — start fresh
+    }
+
+    const merged = { ...existing, ...metadata };
+
+    // Treat explicit null values as field deletions
+    for (const key of Object.keys(merged)) {
+      if (merged[key] === null) {
+        delete merged[key];
+      }
+    }
+
+    await fs.writeJson(metadataPath, merged);
     console.log(`Updated metadata at: ${metadataPath}`);
     return { success: true };
   } catch (error) {
