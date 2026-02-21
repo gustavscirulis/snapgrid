@@ -52,6 +52,12 @@ interface IElectronAPI {
     models?: Array<{ id: string; created: number; owned_by: string }>;
     error?: string;
   }>;
+  callClaude?: (payload: any) => Promise<any>;
+  listClaudeModels?: () => Promise<{
+    success: boolean;
+    models?: Array<{ id: string; display_name: string; created_at: string }>;
+    error?: string;
+  }>;
   saveMediaData?: (data: any) => Promise<any>;
   
   // Menu event handlers
