@@ -37,11 +37,23 @@
       },
     ],
     "icon": "assets/icons/icon.icns",
+    "extraFiles": [
+      {
+        "from": "assets/icons/Assets.car",
+        "to": "Resources/Assets.car"
+      }
+    ],
+    "extendInfo": {
+      "CFBundleIconName": "icon"
+    },
     "hardenedRuntime": true,
     "gatekeeperAssess": false,
     "entitlements": "build/entitlements.mac.plist",
     "entitlementsInherit": "build/entitlements.mac.plist",
     "notarize": true
+  },
+  "dmg": {
+    "icon": "assets/icons/icon.icns"
   },
   "win": {
     "target": [
