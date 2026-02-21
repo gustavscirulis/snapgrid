@@ -33,9 +33,13 @@ export function SpaceTabBar({
 
   // Focus the input when entering edit mode
   useEffect(() => {
-    if (editingId && editInputRef.current) {
-      editInputRef.current.focus();
-      editInputRef.current.select();
+    if (editingId) {
+      // Use rAF so the input is in the DOM before we focus
+      const rafId = requestAnimationFrame(() => {
+        editInputRef.current?.focus();
+        editInputRef.current?.select();
+      });
+      return () => cancelAnimationFrame(rafId);
     }
   }, [editingId]);
 
@@ -71,6 +75,32 @@ export function SpaceTabBar({
         const isSpace = tab.id !== null;
         const isEditing = isSpace && editingId === tab.id;
 
+        // When editing, render a standalone input instead of the button
+        if (isEditing) {
+          return (
+            <div key={tab.id} className="relative px-3 py-3 text-sm whitespace-nowrap non-draggable">
+              <input
+                ref={editInputRef}
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitRename();
+                  if (e.key === "Escape") setEditingId(null);
+                }}
+                className="bg-transparent border-none outline-none text-sm font-medium text-gray-900 dark:text-gray-100 w-24 min-w-0"
+              />
+              {isActive && (
+                <motion.div
+                  layoutId="activeSpaceIndicator"
+                  className="absolute bottom-0 left-3 right-3 h-0.5 bg-gray-900 dark:bg-gray-100 rounded-full"
+                  transition={{ type: "spring", damping: 30, stiffness: 400 }}
+                />
+              )}
+            </div>
+          );
+        }
+
         const tabButton = (
           <button
             key={tab.id ?? "all"}
@@ -83,30 +113,15 @@ export function SpaceTabBar({
             }}
             className="relative px-3 py-3 text-sm whitespace-nowrap transition-colors non-draggable focus:outline-none"
           >
-            {isEditing ? (
-              <input
-                ref={editInputRef}
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onBlur={commitRename}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitRename();
-                  if (e.key === "Escape") setEditingId(null);
-                }}
-                className="bg-transparent border-none outline-none text-sm font-medium text-gray-900 dark:text-gray-100 w-24 min-w-0"
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <span
-                className={
-                  isActive
-                    ? "font-medium text-gray-900 dark:text-gray-100"
-                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                }
-              >
-                {tab.name}
-              </span>
-            )}
+            <span
+              className={
+                isActive
+                  ? "font-medium text-gray-900 dark:text-gray-100"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              }
+            >
+              {tab.name}
+            </span>
             {isActive && (
               <motion.div
                 layoutId="activeSpaceIndicator"
