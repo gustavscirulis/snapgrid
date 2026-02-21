@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
-import { Moon, Sun, SunMoon, Code, X, Smartphone } from "lucide-react";
+import { Moon, Sun, SunMoon, Code, X, Check } from "lucide-react";
 import { setOpenAIApiKey, setAnthropicApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -80,83 +80,81 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
             <span className="sr-only">Close</span>
           </DialogClose>
         </DialogHeader>
-        <div className="py-1 space-y-8 max-h-[calc(100vh-200px)] overflow-y-auto pr-1 mac-scrollbar">
+        <div className="max-h-[calc(100vh-200px)] overflow-y-auto pr-1 mac-scrollbar">
+          {/* Appearance — standalone */}
           <ThemeSelector />
-          <ProviderSelector provider={activeProvider} onProviderChange={handleProviderChange} />
-          <ApiKeySection isOpen={open} provider={activeProvider} onKeyChange={handleKeyChange} />
-          <ModelSelector isOpen={open} provider={activeProvider} keyVersion={keyVersion} />
-          <QueueSection />
-          <AnalyticsSection />
-          {isDevMode && <DeveloperSection />}
+
+          {/* AI settings — tightly grouped */}
+          <div className="mt-6 space-y-4">
+            <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 select-none">AI Analysis</h3>
+            <ProviderSelector provider={activeProvider} onProviderChange={handleProviderChange} />
+            <ApiKeySection isOpen={open} provider={activeProvider} onKeyChange={handleKeyChange} />
+            <ModelSelector isOpen={open} provider={activeProvider} keyVersion={keyVersion} />
+          </div>
+
+          {/* General — less frequently changed */}
+          <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/80 space-y-4">
+            <QueueSection />
+            <AnalyticsSection />
+          </div>
+
+          {isDevMode && (
+            <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/80">
+              <DeveloperSection />
+            </div>
+          )}
+
+          <div className="h-1" />
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
+// Shared tab trigger styles
+const tabTriggerClass = "flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs";
+
 const ThemeSelector = () => {
   const { theme, setTheme } = useTheme();
 
   return (
-    <section className="space-y-3">
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">Appearance</h3>
-      </div>
-      <Tabs defaultValue={theme} onValueChange={setTheme} className="w-full">
-        <TabsList className="w-full grid grid-cols-3 h-9 bg-gray-100/80 dark:bg-zinc-800/80 p-1 rounded-md">
-          <TabsTrigger
-            value="light"
-            className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
-          >
+    <div className="flex items-center justify-between">
+      <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 select-none">Appearance</h3>
+      <Tabs defaultValue={theme} onValueChange={setTheme}>
+        <TabsList className="grid grid-cols-3 h-8 bg-gray-100/80 dark:bg-zinc-800/80 p-0.5 rounded-md">
+          <TabsTrigger value="light" className={tabTriggerClass}>
             <Sun className="h-3.5 w-3.5" />
             <span>Light</span>
           </TabsTrigger>
-          <TabsTrigger
-            value="dark"
-            className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
-          >
+          <TabsTrigger value="dark" className={tabTriggerClass}>
             <Moon className="h-3.5 w-3.5" />
             <span>Dark</span>
           </TabsTrigger>
-          <TabsTrigger
-            value="system"
-            className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
-          >
+          <TabsTrigger value="system" className={tabTriggerClass}>
             <SunMoon className="h-3.5 w-3.5" />
             <span>Auto</span>
           </TabsTrigger>
         </TabsList>
       </Tabs>
-    </section>
+    </div>
   );
 };
 
 const ProviderSelector = ({ provider, onProviderChange }: { provider: AIProvider; onProviderChange: (p: AIProvider) => void }) => {
   return (
-    <section className="space-y-3">
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">AI Provider</h3>
-        <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
-          Choose which AI service to use for image analysis.
-        </p>
-      </div>
-      <Tabs value={provider} onValueChange={(v) => onProviderChange(v as AIProvider)} className="w-full">
-        <TabsList className="w-full grid grid-cols-2 h-9 bg-gray-100/80 dark:bg-zinc-800/80 p-1 rounded-md">
-          <TabsTrigger
-            value="openai"
-            className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
-          >
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Provider</span>
+      <Tabs value={provider} onValueChange={(v) => onProviderChange(v as AIProvider)}>
+        <TabsList className="grid grid-cols-2 h-8 bg-gray-100/80 dark:bg-zinc-800/80 p-0.5 rounded-md">
+          <TabsTrigger value="openai" className={tabTriggerClass + " px-3"}>
             OpenAI
           </TabsTrigger>
-          <TabsTrigger
-            value="anthropic"
-            className="flex items-center justify-center gap-1.5 data-[state=active]:bg-white data-[state=active]:dark:bg-zinc-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm rounded-sm text-xs"
-          >
+          <TabsTrigger value="anthropic" className={tabTriggerClass + " px-3"}>
             Claude
           </TabsTrigger>
         </TabsList>
       </Tabs>
-    </section>
+    </div>
   );
 };
 
@@ -215,23 +213,21 @@ const AnalyticsSection = () => {
   };
 
   return (
-    <section className="space-y-3">
-      <div className="flex justify-between items-center gap-4">
-        <div className="space-y-1 flex-1">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">Send anonymous usage data</h3>
-          <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
-            Helps us understand usage. No personal data is collected.
-          </p>
-        </div>
-        <Switch
-          id="analytics-toggle"
-          checked={analyticsEnabled}
-          onCheckedChange={handleToggleChange}
-          disabled={isLoading}
-          className="data-[state=checked]:bg-gray-800 dark:data-[state=checked]:bg-zinc-700 data-[state=checked]:text-gray-100"
-        />
+    <div className="flex justify-between items-center gap-4">
+      <div className="flex-1">
+        <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Anonymous analytics</span>
+        <p className="text-xs text-gray-500 dark:text-gray-500 select-none mt-0.5">
+          No personal data is collected.
+        </p>
       </div>
-    </section>
+      <Switch
+        id="analytics-toggle"
+        checked={analyticsEnabled}
+        onCheckedChange={handleToggleChange}
+        disabled={isLoading}
+        className="data-[state=checked]:bg-gray-800 dark:data-[state=checked]:bg-zinc-700 data-[state=checked]:text-gray-100"
+      />
+    </div>
   );
 };
 
@@ -243,18 +239,14 @@ interface ApiKeySectionProps {
 
 const PROVIDER_CONFIG = {
   openai: {
-    title: "OpenAI API Key",
-    description: "Required for image analysis with OpenAI models.",
-    linkText: "Get an OpenAI API key",
+    linkText: "Get an API key",
     url: "https://platform.openai.com/api-keys",
     prefix: "sk-",
     placeholder: "sk-...",
     setKey: setOpenAIApiKey,
   },
   anthropic: {
-    title: "Anthropic API Key",
-    description: "Required for image analysis with Claude models.",
-    linkText: "Get an Anthropic API key",
+    linkText: "Get an API key",
     url: "https://console.anthropic.com/settings/keys",
     prefix: "sk-ant-",
     placeholder: "sk-ant-...",
@@ -314,16 +306,16 @@ const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) =>
       const success = await config.setKey(apiKey.trim());
 
       if (success) {
-        toast.success("API key updated successfully");
+        toast.success("API key saved");
         setApiKeyValue("");
         setKeyExists(true);
         onKeyChange();
       } else {
-        throw new Error("Failed to update API key");
+        throw new Error("Failed to save API key");
       }
     } catch (err) {
       console.error("Error saving API key:", err);
-      toast.error("Failed to update API key");
+      toast.error("Failed to save API key");
     } finally {
       setIsSubmitting(false);
     }
@@ -348,61 +340,58 @@ const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) =>
   };
 
   return (
-    <section className="space-y-3">
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">{config.title}</h3>
-        <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
-          {config.description} <a
-          href={config.url}
-          onClick={handleOpenApiKeyUrl}
-          className="text-gray-800 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 underline font-medium select-none"
-        >
-          {config.linkText}
-        </a>.
-        </p>
-      </div>
-      <div className="space-y-4">
-        {!keyExists ? (
-          <div className="flex gap-2 p-0.5">
-            <Input
-              ref={inputRef}
-              type="password"
-              placeholder={config.placeholder}
-              value={apiKey}
-              onChange={(e) => setApiKeyValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleUpdateApiKey();
-                }
-              }}
-              className="h-9 rounded-md text-sm border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-700"
-            />
-            <Button
-              size="default"
-              onClick={handleUpdateApiKey}
-              disabled={isSubmitting || !apiKey.trim()}
-              className="h-9 rounded-md bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white border-0 text-xs font-medium select-none"
-            >
-              {isSubmitting ? "Updating..." : "Update"}
-            </Button>
-          </div>
-        ) : (
-          <div className="flex gap-2 p-0.5">
-            <div className="flex-1 rounded-md border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50 flex items-center h-9 px-3 text-xs text-gray-600 dark:text-gray-400 select-none">
-              API key is currently set
-            </div>
-            <Button
-              variant="outline"
-              size="default"
-              onClick={handleDeleteApiKey}
-              className="h-9 rounded-md text-xs border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 font-medium select-none"
-            >
-              Remove
-            </Button>
-          </div>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-gray-700 dark:text-gray-300 select-none">API Key</span>
+        {!keyExists && (
+          <a
+            href={config.url}
+            onClick={handleOpenApiKeyUrl}
+            className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300 underline select-none transition-colors"
+          >
+            {config.linkText}
+          </a>
         )}
       </div>
-    </section>
+      {!keyExists ? (
+        <div className="flex gap-2">
+          <Input
+            ref={inputRef}
+            type="password"
+            placeholder={config.placeholder}
+            value={apiKey}
+            onChange={(e) => setApiKeyValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleUpdateApiKey();
+              }
+            }}
+            className="h-9 rounded-md text-sm border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-700 transition-colors"
+          />
+          <Button
+            size="default"
+            onClick={handleUpdateApiKey}
+            disabled={isSubmitting || !apiKey.trim()}
+            className="h-9 rounded-md bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white border-0 text-xs font-medium select-none transition-colors"
+          >
+            {isSubmitting ? "Saving..." : "Save"}
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between h-9 rounded-md border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50 px-3">
+          <span className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 select-none">
+            <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-500" />
+            Key saved
+          </span>
+          <button
+            onClick={handleDeleteApiKey}
+            className="text-xs text-gray-500 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 select-none transition-colors"
+          >
+            Remove
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -472,64 +461,42 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
   const latestModelName = models.length > 0 ? models[0].id : "...";
 
   return (
-    <section className="space-y-3">
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">
-          AI Model
-        </h3>
-        <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
-          Model used for image analysis.
-        </p>
-      </div>
-      <div className="p-0.5">
-        <Select value={selectedModelValue} onValueChange={handleModelChange} disabled={isLoading}>
-          <SelectTrigger className="h-9 rounded-md text-sm border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-700">
-            <SelectValue placeholder={isLoading ? "Loading models..." : "Select model..."} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={AUTO_MODEL_VALUE}>
-              Use latest ({latestModelName})
+    <div className="space-y-2">
+      <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Model</span>
+      <Select value={selectedModelValue} onValueChange={handleModelChange} disabled={isLoading}>
+        <SelectTrigger className="h-9 rounded-md text-sm border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-700">
+          <SelectValue placeholder={isLoading ? "Loading models..." : "Select model..."} />
+        </SelectTrigger>
+        <SelectContent side="bottom" sideOffset={4} avoidCollisions={false} className="max-h-52">
+          <SelectItem value={AUTO_MODEL_VALUE}>
+            Use latest ({latestModelName})
+          </SelectItem>
+          {models.length > 0 && <SelectSeparator />}
+          {models.map((m) => (
+            <SelectItem key={m.id} value={m.id}>
+              {m.id}
             </SelectItem>
-            {models.length > 0 && <SelectSeparator />}
-            {models.map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.id}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+          ))}
+        </SelectContent>
+      </Select>
       {error && (
         <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
       )}
-    </section>
+    </div>
   );
 };
 
 const QueueSection = () => {
-
   return (
-    <section className="space-y-3">
-      <div className="space-y-3">
-        <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none">
-            Mobile Import
-          </h3>
-          <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
-            Save images from your phone to the queue folder and they'll automatically import when you open SnapGrid.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <div className="text-xs text-gray-600 dark:text-gray-400 select-none">
-            <p>Queue folder location:</p>
-            <code className="block text-[11px] bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded text-gray-800 dark:text-gray-200 font-mono mt-1">
-              iCloud Drive/Documents/SnapGrid/queue/
-            </code>
-          </div>
-        </div>
-      </div>
-    </section>
+    <div className="space-y-2">
+      <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Mobile Import</span>
+      <p className="text-xs text-gray-500 dark:text-gray-500 select-none">
+        Save images from your phone to the queue folder and they'll automatically import.
+      </p>
+      <code className="block text-[11px] bg-gray-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-md text-gray-600 dark:text-gray-300 font-mono select-all">
+        iCloud Drive/Documents/SnapGrid/queue/
+      </code>
+    </div>
   );
 };
 
@@ -567,24 +534,14 @@ const DeveloperSection = () => {
   }, []);
 
   return (
-    <section className="space-y-4 p-3 rounded-md bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-900">
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-none flex items-center gap-1.5">
-          <Code className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-          Developer Options
-        </h3>
-        <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
-          These options are only available in development mode.
-        </p>
+    <section className="space-y-3 p-3 -mx-1 rounded-lg bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-900/50">
+      <div className="flex items-center gap-1.5">
+        <Code className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
+        <span className="text-[11px] font-medium uppercase tracking-wide text-rose-500 dark:text-rose-400 select-none">Developer</span>
       </div>
 
       <div className="flex justify-between items-center gap-4">
-        <div className="space-y-1 flex-1">
-          <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100 select-none">Simulate Empty State</h4>
-          <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
-            Shows the empty state UI even when images are present
-          </p>
-        </div>
+        <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Simulate empty state</span>
         <Switch
           id="empty-state-toggle"
           checked={simulateEmptyState}
@@ -594,12 +551,7 @@ const DeveloperSection = () => {
       </div>
 
       <div className="flex justify-between items-center gap-4">
-        <div className="space-y-1 flex-1">
-          <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100 select-none">Enable Pill Click Analysis</h4>
-          <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
-            Click on pattern pills to refresh AI analysis
-          </p>
-        </div>
+        <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Pill click analysis</span>
         <Switch
           id="pill-click-analysis-toggle"
           checked={enablePillClickAnalysis}
@@ -609,12 +561,7 @@ const DeveloperSection = () => {
       </div>
 
       <div className="flex justify-between items-center gap-4">
-        <div className="space-y-1 flex-1">
-          <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100 select-none">Delete All Spaces</h4>
-          <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
-            Removes all spaces and unassigns all images
-          </p>
-        </div>
+        <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Delete all spaces</span>
         <Button
           variant="outline"
           size="sm"

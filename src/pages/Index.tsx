@@ -236,6 +236,10 @@ const Index = () => {
     removeImage(id);
   };
 
+  const handleRemoveFromSpace = (id: string) => {
+    assignImageToSpace(id, null);
+  };
+
   // Determine if we're in empty state - consider both actual emptiness and simulated empty state
   const isEmpty = images.length === 0 || simulateEmptyState;
 
@@ -339,6 +343,7 @@ const Index = () => {
                     spaces={spaces}
                     activeSpaceId={space.id}
                     onAssignToSpace={assignImageToSpace}
+                    onRemoveFromSpace={handleRemoveFromSpace}
                   />
                 </div>
               ))}
