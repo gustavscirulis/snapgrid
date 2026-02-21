@@ -284,11 +284,11 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
   const transform = `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`;
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="w-full h-full flex items-center justify-center"
+      className={`w-full ${disableZoom ? '' : 'h-full'} flex ${disableZoom ? 'items-start' : 'items-center'} justify-center`}
       style={{
-        overflow: 'visible', // Allow image to grow beyond container
+        overflow: 'visible',
         position: 'relative'
       }}
       onClick={handleClick}
@@ -305,7 +305,8 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
           transition: (isDragging || isAnimating) ? 'none' : 'transform 0.2s ease-out',
           transformOrigin: 'center center',
           cursor: disableZoom ? 'default' : (scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'),
-          userSelect: 'none'
+          userSelect: 'none',
+          width: disableZoom ? '100%' : undefined,
         }}
       >
         <ImageRenderer
