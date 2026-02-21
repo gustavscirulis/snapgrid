@@ -1,20 +1,28 @@
 ## Project info
 
-SnapGrid is an open-source desktop app for collecting, organizing, and analyzing UI screenshots. It uses AI to automatically detect UI components and patterns, making it a powerful tool for designers and developers.
+SnapGrid is an open-source desktop app for collecting, organizing, and analyzing images and videos. It uses AI to automatically categorize your visual content, making it easy to search and manage large collections.
 
 ![SnapGrid Preview](assets/preview.png)
 
 It's built by [@gustavscirulis](https://github.com/gustavscirulis), and all of the code is entirely AI-generated.
 
+### Use cases
+
+- **UI/UX Design** – Collect reference screenshots, organize design inspiration, and track UI patterns across apps
+- **Mood Boarding** – Gather visual references for creative projects and organize them into themed spaces
+- **Development** – Save and categorize UI states, bugs, and visual regression captures
+- **Content Creation** – Manage image and video assets with AI-powered tagging and search
+- **Research** – Organize visual research material and let AI surface patterns across collections
+
 ## Features
 
-- **Screenshot Management** – Collect and organize your UI screenshots in a visual grid layout
-- **Spaces** – Organize images into collections with drag-and-drop support and per-space export
-- **Multi-Provider AI Analysis** – Detect UI components and patterns using OpenAI, Claude (Anthropic), Google Gemini, or OpenRouter
+- **Image & Video Management** – Collect and organize images and videos in a visual grid layout
+- **Spaces** – Organize media into collections with drag-and-drop support and per-space export
+- **Multi-Provider AI Analysis** – Automatically categorize content using OpenAI, Claude (Anthropic), Google Gemini, or OpenRouter
 - **Custom AI Instructions** – Configure custom analysis prompts per space for tailored insights
-- **Smart Organization** – Search and filter your screenshots based on detected UI elements
-- **iOS Shortcut Import** – Export an iOS Shortcut from settings to import screenshots from your phone
-- **Fast Local Storage** – All screenshots and metadata are stored locally and can be synced with iCloud
+- **Smart Organization** – Search and filter your library based on AI-detected categories and patterns
+- **iOS Shortcut Import** – Export an iOS Shortcut from settings to import media from your phone
+- **Fast Local Storage** – All media and metadata are stored locally and can be synced with iCloud
 
 ## Installation
 
@@ -27,15 +35,15 @@ Download the latest release for your platform from the [releases](https://github
 
 ## Requirements
 
-To use the AI analysis feature, you'll need to add an API key for at least one supported provider in the settings: OpenAI, Anthropic (Claude), Google Gemini, or OpenRouter. You can choose your preferred provider and model from the settings panel. You can still use the app without this feature — it just won't detect patterns.
+To use the AI analysis feature, you'll need to add an API key for at least one supported provider in the settings: OpenAI, Anthropic (Claude), Google Gemini, or OpenRouter. You can choose your preferred provider and model from the settings panel. You can still use the app without AI — it works great as a media organizer on its own.
 
 ## Privacy
 
 SnapGrid is built with privacy in mind:
 
-- **Local-first by design**: All screenshots, metadata, and app data are stored locally on your device. Nothing is uploaded or stored remotely.
-- **Optional AI analysis**: If enabled, screenshots are temporarily sent to your chosen AI provider (OpenAI, Anthropic, Google Gemini, or OpenRouter) for pattern detection. This feature is optional and can be turned off at any time in the settings.
-- **Anonymous usage analytics**: SnapGrid collects basic, anonymous usage stats and crash reports to help improve the app. No personal data or screenshots are ever collected. You can opt out of tracking in the settings.
+- **Local-first by design**: All media, metadata, and app data are stored locally on your device. Nothing is uploaded or stored remotely.
+- **Optional AI analysis**: If enabled, images are temporarily sent to your chosen AI provider (OpenAI, Anthropic, Google Gemini, or OpenRouter) for categorization. This feature is optional and can be turned off at any time in the settings.
+- **Anonymous usage analytics**: SnapGrid collects basic, anonymous usage stats and crash reports to help improve the app. No personal data or media are ever collected. You can opt out of tracking in the settings.
 
 ## File storage
 
@@ -46,7 +54,7 @@ SnapGrid stores files in the following locations:
 
 Inside that folder:
 
-- `images/` – All media files (PNG screenshots and MP4 videos)  
+- `images/` – All media files (PNG images and MP4 videos)
 - `metadata/` – JSON metadata for each media item  
 - `.trash/` – Deleted items are moved here (same structure as above)
 
@@ -96,6 +104,6 @@ This project is licensed under the GNU General Public License v3.0 (GPL-3.0) - s
 
 - Thanks to [Cursor](https://cursor.com) and [Loveable](https://loveable.dev) teams for building the AI code generation tools that made this project possible
 - Thanks to [Midjourney](https://www.midjourney.com/) for the app icon
-- Thanks to [OpenAI](https://openai.com/), [Anthropic](https://anthropic.com/), [Google Gemini](https://deepmind.google/technologies/gemini/), and [OpenRouter](https://openrouter.ai/) for their AI APIs that power the pattern detection
+- Thanks to [OpenAI](https://openai.com/), [Anthropic](https://anthropic.com/), [Google Gemini](https://deepmind.google/technologies/gemini/), and [OpenRouter](https://openrouter.ai/) for their AI APIs that power image categorization
 - Built with [Electron](https://www.electronjs.org/) and [React](https://reactjs.org/)
 - UI components from [shadcn/ui](https://ui.shadcn.com/)
