@@ -55,6 +55,10 @@ contextBridge.exposeInMainWorld(
     // Anthropic Claude API proxy
     callClaude: (payload) => ipcRenderer.invoke('call-claude', payload),
     listClaudeModels: () => ipcRenderer.invoke('list-claude-models'),
+
+    // Google Gemini API proxy
+    callGemini: (payload) => ipcRenderer.invoke('call-gemini', payload),
+    listGeminiModels: () => ipcRenderer.invoke('list-gemini-models'),
     
     // Analytics settings
     getAnalyticsConsent: () => ipcRenderer.invoke('get-analytics-consent'),

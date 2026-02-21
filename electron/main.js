@@ -471,7 +471,7 @@ async function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com https://api.anthropic.com https://*.telemetrydeck.com https://nom.telemetrydeck.com https://telemetrydeck.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
+          "default-src 'self' 'unsafe-inline' local-file: file: data:; connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://*.telemetrydeck.com https://nom.telemetrydeck.com https://telemetrydeck.com local-file: file: data:; script-src 'self' 'unsafe-inline' blob:; media-src 'self' local-file: file: blob: data:; img-src 'self' local-file: file: blob: data:;"
         ]
       }
     });
@@ -914,6 +914,67 @@ ipcMain.handle('list-claude-models', async () => {
     return { success: true, models: data.data };
   } catch (error) {
     console.error('Error listing Claude models:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Proxy Google Gemini API calls through the main process to avoid CORS
+ipcMain.handle('call-gemini', async (event, payload) => {
+  try {
+    const apiKey = apiKeyStorage.getApiKey('gemini');
+    if (!apiKey) {
+      throw new Error('Gemini API key not found');
+    }
+
+    const { model, ...body } = payload;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Gemini API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error calling Gemini:', error);
+    throw error;
+  }
+});
+
+// List available Google Gemini models (for model selection in settings)
+ipcMain.handle('list-gemini-models', async () => {
+  try {
+    const apiKey = apiKeyStorage.getApiKey('gemini');
+    if (!apiKey) {
+      throw new Error('Gemini API key not found');
+    }
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+      { method: 'GET' }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Gemini API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    const models = (data.models || []).map((m) => ({
+      id: m.name.replace('models/', ''),
+      display_name: m.displayName,
+    }));
+    return { success: true, models };
+  } catch (error) {
+    console.error('Error listing Gemini models:', error);
     return { success: false, error: error.message };
   }
 });
