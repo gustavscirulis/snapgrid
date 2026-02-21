@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useState, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ZoomableImageWrapper } from "@/components/ZoomableImageWrapper";
@@ -197,8 +198,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     }
   }, [selectedImage, initialPosition, optimalDimensions, windowSize]);
 
-  // Get initial position from thumbnail
-  useEffect(() => {
+  // Get initial position from thumbnail — useLayoutEffect so the measurement
+  // and subsequent re-render happen before the browser paints, preventing
+  // a visible flash where the thumbnail is hidden but the modal hasn't appeared.
+  useLayoutEffect(() => {
     if (isOpen && selectedImageRef?.current) {
       try {
         const rect = selectedImageRef.current.getBoundingClientRect();
@@ -213,11 +216,15 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         console.error('Error getting initial position:', error);
       }
     } else if (!isOpen) {
-      // Ensure we clean up after the exit animation
-      setTimeout(() => {
+      // Cleanup is handled by onExitComplete; this is a safety fallback
+      // in case the exit animation never completes (e.g. if the component
+      // was never visible). Use a generous timeout so it never races
+      // against the spring animation.
+      const id = setTimeout(() => {
         setInitialPosition(null);
         isAnimatingRef.current = false;
-      }, 300);
+      }, 2000);
+      return () => clearTimeout(id);
     }
   }, [isOpen, selectedImageRef]);
 
@@ -389,9 +396,12 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     return null;
   }
 
-  return (
+  // Portal to document.body so the modal escapes any parent CSS transforms
+  // (e.g. the carousel's translateX) that would break position:fixed
+  return createPortal(
     <AnimatePresence onExitComplete={() => {
       onAnimationComplete && onAnimationComplete("exit");
+      setInitialPosition(null);
       isAnimatingRef.current = false;
       isClosingRef.current = false;
     }}>
@@ -407,9 +417,9 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           />
 
           {/* Scrollable wrapper - fixed position but allows scrolling */}
-          <div 
-            className="fixed inset-0 z-50 flex justify-center" 
-            style={{ 
+          <div
+            className="fixed inset-0 z-50 flex justify-center"
+            style={{
               overflow: selectedImage.height > selectedImage.width * 2 ? 'auto' : 'visible', // Enable scrolling for tall images
               paddingTop: 0,
               paddingBottom: selectedImage.height > selectedImage.width * 2 ? '40px' : '20px'
@@ -419,7 +429,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             {/* Image container with animation */}
             <motion.div
               className="rounded-lg flex justify-center"
-              style={{ 
+              style={{
                 position: 'relative',
                 alignSelf: 'flex-start',
                 marginTop: 0,
@@ -464,7 +474,8 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           </div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 

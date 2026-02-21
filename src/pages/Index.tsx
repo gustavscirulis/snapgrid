@@ -1,33 +1,60 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
+import { useSpaces } from "@/hooks/useSpaces";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid from "@/components/ImageGrid";
+import { SpaceTabBar } from "@/components/SpaceTabBar";
 import { Search, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Toaster, toast } from "sonner";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import WindowControls from "@/components/WindowControls";
+import { motion } from "framer-motion";
 
 
 const Index = () => {
-  const { 
-    images, 
-    isUploading, 
-    isLoading, 
-    addImage, 
-    removeImage, 
-    undoDelete, 
+  const {
+    images,
+    isUploading,
+    isLoading,
+    addImage,
+    removeImage,
+    undoDelete,
     canUndo,
     importFromFilePath,
-    retryAnalysis
+    retryAnalysis,
+    assignImageToSpace
   } = useImageStore();
+
+  const {
+    spaces,
+    activeSpaceId,
+    setActiveSpaceId,
+    createSpace,
+    renameSpace,
+    deleteSpace,
+  } = useSpaces();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
   const [thumbnailSize, setThumbnailSize] = useState<'small' | 'medium' | 'large' | 'xl'>('medium');
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Ref to track activeSpaceId for callbacks that shouldn't re-register on space change
+  const activeSpaceIdRef = useRef(activeSpaceId);
+  activeSpaceIdRef.current = activeSpaceId;
+
+  // Wrap addImage to auto-assign to active space
+  const addImageToActiveSpace = useCallback(async (file: File) => {
+    await addImage(file, activeSpaceIdRef.current ?? undefined);
+  }, [addImage]);
+
+  const importToActiveSpace = useCallback(async (filePath: string) => {
+    await importFromFilePath(filePath, activeSpaceIdRef.current ?? undefined);
+  }, [importFromFilePath]);
 
   // Load saved preferences on mount
   useEffect(() => {
@@ -94,7 +121,7 @@ const Index = () => {
     // Consider empty if there are no images OR we're simulating empty state
     const hasImages = images.length > 0 && !simulateEmptyState;
     document.body.style.overflow = hasImages ? 'auto' : 'hidden';
-    
+
     return () => {
       // Reset overflow when component unmounts
       document.body.style.overflow = 'auto';
@@ -113,7 +140,7 @@ const Index = () => {
           const file = item.getAsFile();
           if (file) {
             try {
-              await addImage(file);
+              await addImageToActiveSpace(file);
             } catch (error) {
               console.error("Error pasting image:", error);
               toast.error("Failed to paste image");
@@ -126,18 +153,15 @@ const Index = () => {
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [addImage]);
+  }, [addImageToActiveSpace]);
 
   useEffect(() => {
     // Set up listeners for menu-triggered events
     const cleanupImportFiles = window.electron.onImportFiles(async (filePaths) => {
       try {
-        // Remove the toast that shows importing status
-        
         for (const filePath of filePaths) {
           try {
-            // Use direct file import method
-            await importFromFilePath(filePath);
+            await importToActiveSpace(filePath);
           } catch (error) {
             console.error(`Error importing file ${filePath}:`, error);
             toast.error(`Failed to import file: ${filePath.split(/[\\/]/).pop()}`);
@@ -148,94 +172,62 @@ const Index = () => {
         toast.error('Failed to import files');
       }
     });
-    
+
     const cleanupOpenStorageLocation = window.electron.onOpenStorageLocation(() => {
       // Storage location is opened by the main process
     });
-    
+
     const cleanupOpenSettings = window.electron.onOpenSettings(() => {
       setSettingsOpen(true);
     });
-    
+
     // Clean up listeners on component unmount
     return () => {
       cleanupImportFiles();
       cleanupOpenStorageLocation();
       cleanupOpenSettings();
     };
-    
-    // Initial loading of API key happens in the aiAnalysisService
-    // No need to manually load from localStorage here as it's handled by the service
-  }, [addImage, importFromFilePath]);
+  }, [addImageToActiveSpace, importToActiveSpace]);
 
-  const filteredImages = images.filter(image => {
-    const query = searchQuery.toLowerCase();
-    if (query === "") return true;
-    
-    // If query starts with "vid", show all videos
-    if (query.startsWith("vid")) {
-      return image.type === "video";
-    }
-    
-    // If query starts with "img", show all images
-    if (query.startsWith("img")) {
-      return image.type === "image";
-    }
-    
-    // Otherwise, search in patterns and imageContext
-    if (image.patterns && image.patterns.length > 0) {
-      // Search in pattern names
-      const patternMatch = image.patterns.some(pattern => 
-        pattern.name.toLowerCase().includes(query)
-      );
-      
-      // Also search in imageContext if it exists at the image level
-      const contextMatch = image.imageContext ? 
-        image.imageContext.toLowerCase().includes(query) : false;
-      
-      return patternMatch || contextMatch;
-    }
-    
-    return false;
-  }).sort((a, b) => {
-    // Only sort by confidence when there's a search query and it's not a media type filter
-    const query = searchQuery.toLowerCase();
-    if (query === "" || query.startsWith("vid") || query.startsWith("img")) {
-      return 0; // Keep original order
-    }
-    
-    // Find the highest confidence score for matching patterns in each image
-    const aMaxConfidence = a.patterns?.reduce((max, pattern) => {
-      // Match in pattern name
-      const matchesPattern = pattern.name.toLowerCase().includes(query);
-      
-      if (matchesPattern) {
-        return Math.max(max, pattern.confidence);
+  // Search filter applicable to any set of images
+  const filterBySearch = (baseImages: ImageItem[]): ImageItem[] => {
+    if (simulateEmptyState) return [];
+    return baseImages.filter(image => {
+      const query = searchQuery.toLowerCase();
+      if (query === "") return true;
+
+      if (query.startsWith("vid")) return image.type === "video";
+      if (query.startsWith("img")) return image.type === "image";
+
+      if (image.patterns && image.patterns.length > 0) {
+        const patternMatch = image.patterns.some(pattern =>
+          pattern.name.toLowerCase().includes(query)
+        );
+        const contextMatch = image.imageContext ?
+          image.imageContext.toLowerCase().includes(query) : false;
+        return patternMatch || contextMatch;
       }
-      return max;
-    }, 0) || 0;
-    
-    const bMaxConfidence = b.patterns?.reduce((max, pattern) => {
-      // Match in pattern name
-      const matchesPattern = pattern.name.toLowerCase().includes(query);
-      
-      if (matchesPattern) {
-        return Math.max(max, pattern.confidence);
-      }
-      return max;
-    }, 0) || 0;
-    
-    // If searching for context that matches, prioritize those images
-    if (query && a.imageContext && a.imageContext.toLowerCase().includes(query)) {
-      return -1; // a comes first
-    }
-    if (query && b.imageContext && b.imageContext.toLowerCase().includes(query)) {
-      return 1; // b comes first
-    }
-    
-    // Sort by confidence score (highest first)
-    return bMaxConfidence - aMaxConfidence;
-  });
+      return false;
+    }).sort((a, b) => {
+      const query = searchQuery.toLowerCase();
+      if (query === "" || query.startsWith("vid") || query.startsWith("img")) return 0;
+
+      const aMaxConfidence = a.patterns?.reduce((max, pattern) => {
+        const matchesPattern = pattern.name.toLowerCase().includes(query);
+        return matchesPattern ? Math.max(max, pattern.confidence) : max;
+      }, 0) || 0;
+
+      const bMaxConfidence = b.patterns?.reduce((max, pattern) => {
+        const matchesPattern = pattern.name.toLowerCase().includes(query);
+        return matchesPattern ? Math.max(max, pattern.confidence) : max;
+      }, 0) || 0;
+
+      if (query && a.imageContext && a.imageContext.toLowerCase().includes(query)) return -1;
+      if (query && b.imageContext && b.imageContext.toLowerCase().includes(query)) return 1;
+
+      return bMaxConfidence - aMaxConfidence;
+    });
+  };
 
   const handleImageClick = (image: ImageItem) => {
   };
@@ -247,64 +239,109 @@ const Index = () => {
   // Determine if we're in empty state - consider both actual emptiness and simulated empty state
   const isEmpty = images.length === 0 || simulateEmptyState;
 
+  // Carousel: all spaces are side-by-side, animate x to the active page
+  const activeIndex = activeSpaceId === null
+    ? 0
+    : spaces.findIndex(s => s.id === activeSpaceId) + 1;
+
   return (
-    <UploadZone 
-      onImageUpload={addImage} 
+    <UploadZone
+      onImageUpload={addImageToActiveSpace}
       isUploading={isUploading}
     >
-      <div className={`min-h-screen flex flex-col ${isEmpty ? 'overflow-hidden' : ''}`}>
+      <div className={`h-screen relative ${isEmpty ? 'overflow-hidden' : ''}`}>
         <Toaster />
-        <header className="sticky top-0 z-10 bg-gray-100/90 dark:bg-zinc-900/90 backdrop-blur-lg py-4 px-6 relative">
-          <div className="absolute inset-0 draggable"></div>
-          <div className="relative mx-auto flex items-center">
-            <div className="w-8 draggable"></div> {/* Left draggable area */}
-            <div className="flex-1 flex justify-center">
-              <div className="relative w-96 non-draggable">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400 pointer-events-none z-10" />
-                <Input
-                  ref={searchInputRef}
-                  placeholder="Search..."
-                  type="search"
-                  className="pl-9 bg-gray-50 dark:bg-zinc-800 focus:bg-white dark:focus:bg-zinc-700 focus:ring-0 focus:border-gray-300 dark:focus:border-zinc-600"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+        {/* Header + Tab bar overlay — floats above carousel so content scrolls behind it */}
+        <div className="absolute top-0 left-0 right-0 z-10 bg-gray-100/90 dark:bg-zinc-900/90 backdrop-blur-lg">
+          <header className="py-4 px-6 relative">
+            <div className="absolute inset-0 draggable"></div>
+            <div className="relative mx-auto flex items-center">
+              <div className="w-8 draggable"></div> {/* Left draggable area */}
+              <div className="flex-1 flex justify-center">
+                <div className="relative w-96 non-draggable">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400 pointer-events-none z-10" />
+                  <Input
+                    ref={searchInputRef}
+                    placeholder="Search..."
+                    type="search"
+                    className="pl-9 bg-gray-50 dark:bg-zinc-800 focus:bg-white dark:focus:bg-zinc-700 focus:ring-0 focus:border-gray-300 dark:focus:border-zinc-600"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSettingsOpen(true)}
+                  className="h-8 w-8 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-zinc-800 non-draggable transition-colors"
+                  aria-label="Settings"
+                >
+                  <Settings className="h-5 w-5" />
+                  <span className="sr-only">Settings</span>
+                </Button>
               </div>
             </div>
-            <div className="flex items-center">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSettingsOpen(true)}
-                className="h-8 w-8 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-zinc-800 non-draggable transition-colors"
-                aria-label="Settings"
-              >
-                <Settings className="h-5 w-5" />
-                <span className="sr-only">Settings</span>
-              </Button>
-            </div>
-          </div>
-          <WindowControls />
-        </header>
+            <WindowControls />
+          </header>
 
-        <main className={`mx-auto flex-1 flex flex-col min-h-0 w-full ${isEmpty ? 'overflow-hidden' : ''}`}>
+          <SpaceTabBar
+            spaces={spaces}
+            activeSpaceId={activeSpaceId}
+            onSelectSpace={setActiveSpaceId}
+            onCreateSpace={createSpace}
+            onRenameSpace={renameSpace}
+            onDeleteSpace={deleteSpace}
+          />
+        </div>
+
+        <main className="h-full overflow-hidden w-full">
           {isLoading ? (
             <div className="flex justify-center items-center" style={{ height: 'calc(100vh - 4rem)' }}>
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           ) : (
-            <>
-              <ImageGrid 
-                images={simulateEmptyState ? [] : filteredImages} 
-                onImageClick={handleImageClick} 
-                onImageDelete={handleDeleteImage}
-                searchQuery={searchQuery}
-                onOpenSettings={() => setSettingsOpen(true)}
-                settingsOpen={settingsOpen}
-                retryAnalysis={retryAnalysis}
-                thumbnailSize={thumbnailSize}
-              />
-            </>
+            <motion.div
+              className="flex h-full"
+              animate={{ x: `${-activeIndex * 100}%` }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            >
+              {/* "All" page */}
+              <div className="w-full flex-shrink-0 overflow-y-auto h-full relative flex flex-col bg-gray-100 dark:bg-zinc-900 pt-[117px]">
+                <ImageGrid
+                  images={filterBySearch(images)}
+                  onImageClick={handleImageClick}
+                  onImageDelete={handleDeleteImage}
+                  searchQuery={searchQuery}
+                  onOpenSettings={() => setSettingsOpen(true)}
+                  settingsOpen={settingsOpen}
+                  retryAnalysis={retryAnalysis}
+                  thumbnailSize={thumbnailSize}
+                  spaces={spaces}
+                  activeSpaceId={null}
+                  onAssignToSpace={assignImageToSpace}
+                />
+              </div>
+              {/* Space pages */}
+              {spaces.map(space => (
+                <div key={space.id} className="w-full flex-shrink-0 overflow-y-auto h-full relative flex flex-col bg-gray-100 dark:bg-zinc-900 pt-[117px]">
+                  <ImageGrid
+                    images={filterBySearch(images.filter(img => img.spaceId === space.id))}
+                    onImageClick={handleImageClick}
+                    onImageDelete={handleDeleteImage}
+                    searchQuery={searchQuery}
+                    onOpenSettings={() => setSettingsOpen(true)}
+                    settingsOpen={settingsOpen}
+                    retryAnalysis={retryAnalysis}
+                    thumbnailSize={thumbnailSize}
+                    spaces={spaces}
+                    activeSpaceId={space.id}
+                    onAssignToSpace={assignImageToSpace}
+                  />
+                </div>
+              ))}
+            </motion.div>
           )}
         </main>
 
