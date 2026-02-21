@@ -66,6 +66,9 @@ interface IElectronAPI {
   }>;
   saveMediaData?: (data: any) => Promise<any>;
   
+  // Export iOS Shortcut
+  exportShortcut?: () => Promise<{ success: boolean; path?: string; error?: string }>;
+
   // Native drag support
   startDrag?: (filePath: string, iconPath: string, displayName?: string) => void;
 

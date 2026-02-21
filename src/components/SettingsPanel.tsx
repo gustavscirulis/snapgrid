@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
-import { Moon, Sun, SunMoon, Code, X, Check, Plus, Trash2 } from "lucide-react";
+import { Moon, Sun, SunMoon, Code, X, Check, Plus, Trash2, Download } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { setOpenAIApiKey, setAnthropicApiKey, setGeminiApiKey, hasApiKey, deleteApiKey } from "@/services/aiAnalysisService";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -92,9 +93,9 @@ export function SettingsPanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-black backdrop-blur-none shadow-2xl z-[200] focus:outline-none focus:ring-0 p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[600px] rounded-xl border border-gray-200 dark:border-zinc-800/50 bg-white dark:bg-zinc-900 backdrop-blur-none z-[200] focus:outline-none focus:ring-0 p-0 overflow-hidden" style={{ boxShadow: '0 25px 80px -12px rgba(0, 0, 0, 0.4), 0 12px 30px -8px rgba(0, 0, 0, 0.3)' }}>
         {/* Header */}
-        <DialogHeader className="border-b border-gray-200 dark:border-zinc-800 pb-4 pt-4 px-6">
+        <DialogHeader className="border-b border-gray-200 dark:border-zinc-800/50 pb-4 pt-4 px-6">
           <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center h-8 select-none">Settings</DialogTitle>
           <DialogClose className="h-8 w-8 rounded-md text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-zinc-800 inline-flex items-center justify-center non-draggable transition-colors focus:outline-none focus:ring-0">
             <X className="h-5 w-5" />
@@ -105,7 +106,7 @@ export function SettingsPanel({
         {/* Sidebar + Content */}
         <div className="flex h-[500px]">
           {/* Left nav */}
-          <nav className="w-[140px] flex-shrink-0 border-r border-gray-200 dark:border-zinc-800 p-2 space-y-0.5">
+          <nav className="w-[140px] flex-shrink-0 border-r border-gray-200 dark:border-zinc-800/50 p-2 space-y-0.5">
             {navItems.map((item) => (
               <button
                 key={item.id}
@@ -123,41 +124,67 @@ export function SettingsPanel({
 
           {/* Right content */}
           <div className="flex-1 overflow-y-auto p-6 mac-scrollbar">
-            {activeTab === "general" && (
-              <>
-                <ThemeSelector />
+            <AnimatePresence mode="wait" initial={false}>
+              {activeTab === "general" && (
+                <motion.div
+                  key="general"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <ThemeSelector />
 
-                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/80 space-y-4">
-                  <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 select-none">AI Analysis</h3>
-                  <ProviderSelector provider={activeProvider} onProviderChange={handleProviderChange} />
-                  <ApiKeySection isOpen={open} provider={activeProvider} onKeyChange={handleKeyChange} />
-                  <ModelSelector isOpen={open} provider={activeProvider} keyVersion={keyVersion} />
-                </div>
+                  <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/50 space-y-4">
+                    <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 select-none">AI Analysis</h3>
+                    <ProviderSelector provider={activeProvider} onProviderChange={handleProviderChange} />
+                    <ApiKeySection isOpen={open} provider={activeProvider} onKeyChange={handleKeyChange} />
+                    <ModelSelector isOpen={open} provider={activeProvider} keyVersion={keyVersion} />
+                  </div>
 
-                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/80">
-                  <QueueSection />
-                </div>
+                  <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/50">
+                    <QueueSection />
+                  </div>
 
-                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/80">
-                  <AnalyticsSection />
-                </div>
-              </>
-            )}
+                  <div className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800/50">
+                    <AnalyticsSection />
+                  </div>
+                </motion.div>
+              )}
 
-            {activeTab === "spaces" && (
-              <SpacesTab
-                spaces={spaces}
-                activeSpaceId={activeSpaceId}
-                allSpacePromptConfig={allSpacePromptConfig}
-                onCreateSpace={onCreateSpace}
-                onRenameSpace={onRenameSpace}
-                onDeleteSpace={onDeleteSpace}
-                onUpdateSpacePrompt={onUpdateSpacePrompt}
-                onUpdateAllSpacePrompt={onUpdateAllSpacePrompt}
-              />
-            )}
+              {activeTab === "spaces" && (
+                <motion.div
+                  key="spaces"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <SpacesTab
+                    spaces={spaces}
+                    activeSpaceId={activeSpaceId}
+                    allSpacePromptConfig={allSpacePromptConfig}
+                    onCreateSpace={onCreateSpace}
+                    onRenameSpace={onRenameSpace}
+                    onDeleteSpace={onDeleteSpace}
+                    onUpdateSpacePrompt={onUpdateSpacePrompt}
+                    onUpdateAllSpacePrompt={onUpdateAllSpacePrompt}
+                  />
+                </motion.div>
+              )}
 
-            {activeTab === "developer" && <DeveloperSection />}
+              {activeTab === "developer" && (
+                <motion.div
+                  key="developer"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <DeveloperSection />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </DialogContent>
@@ -425,7 +452,7 @@ const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) =>
                 handleUpdateApiKey();
               }
             }}
-            className="h-9 rounded-md text-sm border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-700 transition-colors"
+            className="h-9 rounded-md text-sm border-gray-200 dark:border-zinc-700/50 bg-gray-50 dark:bg-zinc-800 focus:outline-none focus:ring-0 focus:border-gray-300 dark:focus:border-zinc-600 transition-colors"
           />
           <Button
             size="default"
@@ -437,7 +464,7 @@ const ApiKeySection = ({ isOpen, provider, onKeyChange }: ApiKeySectionProps) =>
           </Button>
         </div>
       ) : (
-        <div className="flex items-center justify-between h-9 rounded-md border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50 px-3">
+        <div className="flex items-center justify-between h-9 rounded-md border border-gray-200 dark:border-zinc-700/50 bg-gray-50 dark:bg-zinc-800 px-3">
           <span className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 select-none">
             <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-500" />
             Key saved
@@ -532,7 +559,7 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
     <div className="space-y-2">
       <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Model</span>
       <Select value={selectedModelValue} onValueChange={handleModelChange} disabled={isLoading}>
-        <SelectTrigger className="h-9 rounded-md text-sm border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-zinc-700">
+        <SelectTrigger className="h-9 rounded-md text-sm border-gray-200 dark:border-zinc-700/50 bg-gray-50 dark:bg-zinc-800 focus:outline-none focus:ring-0 focus:border-gray-300 dark:focus:border-zinc-600">
           <SelectValue placeholder={isLoading ? "Loading models..." : "Select model..."} />
         </SelectTrigger>
         <SelectContent side="bottom" sideOffset={4} avoidCollisions={false} className="max-h-52">
@@ -555,12 +582,70 @@ const ModelSelector = ({ isOpen, provider, keyVersion }: { isOpen: boolean; prov
 };
 
 const QueueSection = () => {
+  const [exported, setExported] = useState(false);
+  const isElectron = window?.electron && typeof window.electron !== 'undefined';
+
+  const handleExportShortcut = async () => {
+    if (!window.electron?.exportShortcut) return;
+    const result = await window.electron.exportShortcut();
+    if (result.success) {
+      setExported(true);
+      toast.success('Shortcut saved to Downloads');
+      setTimeout(() => setExported(false), 2000);
+    } else {
+      toast.error('Failed to export shortcut');
+    }
+  };
+
   return (
     <div className="space-y-2">
       <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Mobile Import</span>
       <p className="text-xs text-gray-500 dark:text-gray-500 select-none">
-        Save images from your phone to the queue folder and they'll automatically import.
+        Images saved to the queue folder are automatically imported into SnapGrid. To send images from your iPhone, install the shortcut below, then share any image and select "Save to SnapGrid".
       </p>
+      {isElectron && (
+        <motion.div whileTap={{ scale: 0.98 }} transition={{ duration: 0.1 }}>
+          <Button
+            variant="outline"
+            size="sm"
+            className={`w-full text-xs h-8 transition-colors duration-200 ${
+              exported
+                ? "border-green-200 dark:border-green-900 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30"
+                : ""
+            }`}
+            onClick={handleExportShortcut}
+            disabled={exported}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              {exported ? (
+                <motion.span
+                  key="done"
+                  className="flex items-center"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Check className="h-3.5 w-3.5 mr-1.5" />
+                  Saved to Downloads
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="download"
+                  className="flex items-center"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                  Get iOS Shortcut
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </Button>
+        </motion.div>
+      )}
       <code className="block text-[11px] bg-gray-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-md text-gray-600 dark:text-gray-300 font-mono select-all">
         iCloud Drive/Documents/SnapGrid/queue/
       </code>
@@ -869,7 +954,7 @@ const SpacesTab = ({
       </div>
 
       {/* Prompt section */}
-      <div className="pt-4 border-t border-gray-100 dark:border-zinc-800/80 space-y-3">
+      <div className="pt-4 border-t border-gray-100 dark:border-zinc-800/50 space-y-3">
         <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 select-none">
           Analysis Instructions
           {selectedSpaceId === null ? " — All" : ` — ${selectedSpace?.name ?? ""}`}
@@ -889,7 +974,7 @@ const SpacesTab = ({
             <textarea
               value={localPromptText}
               onChange={(e) => handlePromptChange(e.target.value)}
-              className="w-full h-32 text-xs rounded-md border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 resize-y focus:outline-none focus:border-gray-400 dark:focus:border-zinc-700 transition-colors text-gray-800 dark:text-gray-200 placeholder:text-gray-400"
+              className="w-full h-32 text-xs rounded-md border border-gray-200 dark:border-zinc-700/50 bg-gray-50 dark:bg-zinc-800 p-3 resize-y focus:outline-none focus:border-gray-300 dark:focus:border-zinc-600 transition-colors text-gray-800 dark:text-gray-200 placeholder:text-gray-400"
               placeholder="e.g., Focus on architectural details and building materials"
             />
           </div>

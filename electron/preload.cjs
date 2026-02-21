@@ -145,6 +145,9 @@ contextBridge.exposeInMainWorld(
       return () => ipcRenderer.removeAllListeners('queue:new-file');
     },
 
+    // Export iOS Shortcut
+    exportShortcut: () => ipcRenderer.invoke('export-shortcut'),
+
     // Native drag support (drag files out of app)
     startDrag: (filePath, iconPath, displayName) => ipcRenderer.send('start-drag', { filePath, iconPath, displayName }),
   }

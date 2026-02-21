@@ -1564,7 +1564,7 @@ ipcMain.handle('queue:process-file', async (event, filePath) => {
 ipcMain.handle('queue:remove-file', async (event, filePath) => {
   try {
     const queueDir = path.join(appStorageDir, 'queue');
-    
+
     // Check if file is in queue directory
     if (!filePath.startsWith(queueDir)) {
       throw new Error('File is not in queue directory');
@@ -1572,10 +1572,32 @@ ipcMain.handle('queue:remove-file', async (event, filePath) => {
 
     await fs.remove(filePath);
     console.log('Removed processed file from queue:', path.basename(filePath));
-    
+
     return { success: true, message: 'File removed from queue' };
   } catch (error) {
     console.error('Error removing file from queue:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Export the iOS Shortcut file to Downloads
+ipcMain.handle('export-shortcut', async () => {
+  try {
+    const shortcutSource = path.join(__dirname, '..', 'assets', 'Save To Snapgrid.shortcut');
+
+    if (!await fs.pathExists(shortcutSource)) {
+      throw new Error('Shortcut file not found in app bundle');
+    }
+
+    const downloadsDir = app.getPath('downloads');
+    const destPath = path.join(downloadsDir, 'Save To Snapgrid.shortcut');
+
+    await fs.copy(shortcutSource, destPath, { overwrite: true });
+    shell.showItemInFolder(destPath);
+
+    return { success: true, path: destPath };
+  } catch (error) {
+    console.error('Error exporting shortcut:', error);
     return { success: false, error: error.message };
   }
 }); 
