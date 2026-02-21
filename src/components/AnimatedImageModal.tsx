@@ -63,14 +63,16 @@ const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, scree
   const isTallImage = originalHeight > originalWidth * 2;
   
   if (isTallImage) {
-    // For tall images, fit to width and top-align
+    // For tall images, fit to width and cap height to viewport.
+    // The full image is revealed via scrolling inside the motion div after animation.
     const width = Math.min(originalWidth, maxWidth);
-    const height = (width / originalWidth) * originalHeight;
-    
+    const naturalHeight = (width / originalWidth) * originalHeight;
+    const height = Math.min(naturalHeight, screenHeight - 80);
+
     return {
       width,
       height,
-      top: 40, // Fixed padding that's consistent with the design
+      top: 40,
       left: (screenWidth - width) / 2
     };
   }
@@ -106,6 +108,12 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   // AnimatePresence can play the shrink-back transition before unmounting.
   const initialPosition = initialRect;
   
+  // Track whether the opening animation has completed (enables scroll for tall images)
+  const [openAnimComplete, setOpenAnimComplete] = useState(false);
+
+  // Ref to the motion div so we can scroll-to-top before exit animation
+  const motionDivRef = useRef<HTMLDivElement>(null);
+
   // Add a ref to access the video element
   const videoRef = useRef<HTMLVideoElement | null>(null);
   
@@ -159,6 +167,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     if (!isOpen) {
       setMediaLoadError(false);
       setZoomState({ scale: 1, position: { x: 0, y: 0 } });
+      setOpenAnimComplete(false);
     }
   }, [isOpen, selectedImage]);
 
@@ -214,18 +223,19 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   const handleClose = useCallback(() => {
     if (isClosingRef.current) return;
     isClosingRef.current = true;
+    // Scroll to top and disable overflow before exit animation
+    if (motionDivRef.current) {
+      motionDivRef.current.scrollTop = 0;
+    }
+    setOpenAnimComplete(false);
     onClose();
   }, [onClose]);
 
   // Handle body overflow and keyboard events
   useEffect(() => {
     if (isOpen) {
-      // Allow scrolling for tall images
-      if (selectedImage?.height > (selectedImage?.width || 0) * 2) {
-        // Tall image - keep scrolling enabled
-      } else {
-        document.body.style.overflow = "hidden";
-      }
+      // Always hide body overflow — tall image scrolling is handled inside the motion div
+      document.body.style.overflow = "hidden";
       isAnimatingRef.current = true;
       isClosingRef.current = false;
     } else {
@@ -376,6 +386,8 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
     return null;
   }
 
+  const isTallImage = selectedImage.height > selectedImage.width * 2;
+
   return (
     <AnimatePresence onExitComplete={() => {
       onAnimationComplete && onAnimationComplete("exit");
@@ -393,30 +405,33 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
             onClick={handleClose}
           />
 
-          {/* Scrollable wrapper - fixed position but allows scrolling */}
-          <div 
-            className="fixed inset-0 z-50 flex justify-center" 
-            style={{ 
-              overflow: selectedImage.height > selectedImage.width * 2 ? 'auto' : 'visible', // Enable scrolling for tall images
+          {/* Fixed wrapper - scrolling for tall images is handled by the motion div */}
+          <div
+            className="fixed inset-0 z-50 flex justify-center"
+            style={{
+              overflow: 'hidden',
               paddingTop: 0,
-              paddingBottom: selectedImage.height > selectedImage.width * 2 ? '40px' : '20px'
+              paddingBottom: isTallImage ? '40px' : '20px'
             }}
             onClick={handleClose}
           >
             {/* Image container with animation */}
             <motion.div
+              ref={motionDivRef}
               className="rounded-lg flex justify-center"
               style={{
                 position: 'relative',
                 alignSelf: 'flex-start',
                 marginTop: 0,
                 marginBottom: 0,
-                paddingBottom: selectedImage.height > selectedImage.width * 2 ? '30px' : 0,
+                paddingBottom: isTallImage ? '30px' : 0,
                 height: 'fit-content',
                 width: 'fit-content',
                 minWidth: initialPosition.width,
                 minHeight: initialPosition.height,
-                transformOrigin: 'center center'
+                transformOrigin: 'center center',
+                overflowY: isTallImage && openAnimComplete ? 'auto' : 'hidden',
+                overflowX: 'hidden',
               }}
               variants={modalVariants}
               initial="initial"
@@ -429,6 +444,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               onAnimationComplete={(definition) => {
                 if (definition === "open") {
                   isAnimatingRef.current = false;
+                  setOpenAnimComplete(true);
                 } else if (definition === "exit") {
                   onAnimationComplete && onAnimationComplete("exit");
                   isAnimatingRef.current = false;
@@ -439,7 +455,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
               <ZoomableImageWrapper
                 image={selectedImage}
                 alt={selectedImage.title || "Selected media"}
-                className={`w-full h-full ${selectedImage.height > selectedImage.width * 2 ? 'object-cover object-top' : 'object-contain'} rounded-xl shadow-xl`}
+                className={`w-full ${isTallImage ? '' : 'h-full object-contain'} rounded-xl shadow-xl`}
                 controls={true}
                 autoPlay={selectedImage.type === "video"}
                 muted={false}
@@ -447,7 +463,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 onLoad={(e) => {}}
                 onClose={handleClose}
                 onZoomStateChange={(scale, position) => setZoomState({ scale, position })}
-                disableZoom={selectedImage.height > selectedImage.width * 2}
+                disableZoom={isTallImage}
               />
             </motion.div>
           </div>
