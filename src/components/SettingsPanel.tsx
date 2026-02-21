@@ -607,6 +607,29 @@ const DeveloperSection = () => {
           className="data-[state=checked]:bg-rose-600 dark:data-[state=checked]:bg-rose-700"
         />
       </div>
+
+      <div className="flex justify-between items-center gap-4">
+        <div className="space-y-1 flex-1">
+          <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100 select-none">Delete All Spaces</h4>
+          <p className="text-xs text-gray-600 dark:text-gray-400 select-none">
+            Removes all spaces and unassigns all images
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async () => {
+            if (window.electron?.setUserPreference) {
+              await window.electron.setUserPreference('spaces', []);
+              toast.success("All spaces deleted. Reload to apply.");
+              window.location.reload();
+            }
+          }}
+          className="h-7 text-xs border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+        >
+          Delete
+        </Button>
+      </div>
     </section>
   );
 };

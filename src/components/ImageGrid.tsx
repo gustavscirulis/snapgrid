@@ -14,6 +14,17 @@ import { useApiKeyWatcher } from "@/hooks/useApiKeyWatcher";
 import PatternTags from "./PatternTags";
 import EmptyStateCard from "./EmptyStateCard";
 import EmptyStatePlaceholders from "./EmptyStatePlaceholders";
+import { Space } from "@/hooks/useSpaces";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+} from "@/components/ui/context-menu";
 
 interface ImageGridProps {
   images: ImageItem[];
@@ -24,9 +35,12 @@ interface ImageGridProps {
   settingsOpen?: boolean;
   retryAnalysis?: (imageId: string) => Promise<void>;
   thumbnailSize?: 'small' | 'medium' | 'large' | 'xl';
+  spaces?: Space[];
+  activeSpaceId?: string | null;
+  onAssignToSpace?: (imageId: string, spaceId: string | null) => Promise<void>;
 }
 
-const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete, searchQuery = "", onOpenSettings, settingsOpen = false, retryAnalysis, thumbnailSize = 'medium' }) => {
+const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete, searchQuery = "", onOpenSettings, settingsOpen = false, retryAnalysis, thumbnailSize = 'medium', spaces = [], activeSpaceId, onAssignToSpace }) => {
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -52,10 +66,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   // API key watching and batch analysis
   const { hasOpenAIKey } = useApiKeyWatcher({ settingsOpen, images, retryAnalysis });
 
-  // Prevent scrolling when in empty state
+  // Only show the full onboarding empty state when there's no active space filter
+  const isSpaceFilteredEmpty = images.length === 0 && activeSpaceId != null;
+
+  // Prevent scrolling when in empty state (but not when a space is just empty)
   useEffect(() => {
-    // Only add the no-scroll style when we're in empty state and not searching
-    if (images.length === 0 && !searchQuery) {
+    if (images.length === 0 && !searchQuery && !activeSpaceId) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -222,13 +238,19 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   }, []);
 
   return (
-    <div className={`w-full px-4 pb-4 flex-1 flex flex-col bg-gray-100 dark:bg-zinc-900 ${images.length === 0 && !searchQuery ? 'overflow-hidden' : ''}`}>
+    <div className={`w-full px-4 pt-5 pb-4 flex-1 min-h-full flex flex-col bg-gray-100 dark:bg-zinc-900 ${images.length === 0 && !searchQuery && !activeSpaceId ? 'overflow-hidden' : ''}`}>
       {images.length === 0 ? (
         <div className="flex-1 flex items-stretch">
           {searchQuery ? (
-            <div className="flex justify-center items-center w-full min-h-[50vh]">
+            <div className="flex justify-center items-center w-full flex-1">
               <p className="text-sm text-muted-foreground select-none">
                 Nothing found
+              </p>
+            </div>
+          ) : isSpaceFilteredEmpty ? (
+            <div className="flex justify-center items-center w-full flex-1">
+              <p className="text-sm text-muted-foreground select-none">
+                Drop images here or move existing images to this space
               </p>
             </div>
           ) : (
@@ -242,8 +264,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                 />
               </div>
 
-              {/* Fixed centered card */}
-              <div className="fixed top-0 left-0 right-0 bottom-0 flex items-center justify-center pointer-events-none z-[100]" style={{ paddingTop: "20px" }}>
+              {/* Centered card */}
+              <div className="absolute top-0 left-0 right-0 bottom-0 flex items-center justify-center pointer-events-none z-[100]" style={{ paddingTop: "20px" }}>
                 <AnimatePresence>
                   {!settingsOpen && (
                     <motion.div
@@ -288,74 +310,113 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
 
                 const isSelected = clickedImageId === image.id;
 
-                return (
-                  <div key={image.id} className="masonry-item">
-                    <div
-                      ref={ref}
-                      className="rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800 shadow-sm hover:shadow-md relative group w-full"
-                      onClick={() => handleImageClick(image, ref)}
-                      onMouseEnter={() => setHoveredImageId(image.id)}
-                      onMouseLeave={() => setHoveredImageId(null)}
-                      style={{
-                        opacity: isSelected ? 0 : 1,
-                        visibility: isSelected ? 'hidden' : 'visible',
-                        pointerEvents: isAnimating ? 'none' : 'auto'
-                      }}
-                    >
-                      <div className="relative">
-                        <ImageRenderer
-                          image={image}
-                          alt="UI Screenshot"
-                          className="w-full h-auto object-cover rounded-t-lg"
-                          controls={false}
-                          autoPlay={false}
-                          preloader={preloader}
-                        />
+                const imageCard = (
+                  <div
+                    ref={ref}
+                    className="rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800 shadow-sm hover:shadow-md relative group w-full"
+                    onClick={() => handleImageClick(image, ref)}
+                    onMouseEnter={() => setHoveredImageId(image.id)}
+                    onMouseLeave={() => setHoveredImageId(null)}
+                    style={{
+                      opacity: isSelected ? 0 : 1,
+                      visibility: isSelected ? 'hidden' : 'visible',
+                      pointerEvents: isAnimating ? 'none' : 'auto'
+                    }}
+                  >
+                    <div className="relative">
+                      <ImageRenderer
+                        image={image}
+                        alt="UI Screenshot"
+                        className="w-full h-auto object-cover rounded-t-lg"
+                        controls={false}
+                        autoPlay={false}
+                        preloader={preloader}
+                      />
 
-                        <AnimatePresence>
-                          {hoveredImageId === image.id && (
-                            <motion.div
-                              id={`pattern-tags-${image.id}`}
-                              className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent"
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: 10 }}
-                              style={{
-                                bottom: '-2px',
-                                pointerEvents: 'none'
-                              }}
-                            >
-                              <div className="pointer-events-auto">
-                                <PatternTags item={image} retryAnalysis={retryAnalysis} />
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                        
-                        {/* Video indicator icon */}
-                        {image.type === 'video' && (
-                          <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs z-10">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
-                            </svg>
-                          </div>
-                        )}
-                        
-                        {onImageDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full h-6 w-6 bg-black/60 text-white hover:text-white hover:bg-black/80"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteImage(image.id);
+                      <AnimatePresence>
+                        {hoveredImageId === image.id && (
+                          <motion.div
+                            id={`pattern-tags-${image.id}`}
+                            className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            style={{
+                              bottom: '-2px',
+                              pointerEvents: 'none'
                             }}
                           >
-                            <X className="h-3 w-3" />
-                          </Button>
+                            <div className="pointer-events-auto">
+                              <PatternTags item={image} retryAnalysis={retryAnalysis} />
+                            </div>
+                          </motion.div>
                         )}
-                      </div>
+                      </AnimatePresence>
+
+                      {/* Video indicator icon */}
+                      {image.type === 'video' && (
+                        <div className="absolute bottom-2 right-2 bg-black/70 p-1 rounded text-white text-xs z-10">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
+                          </svg>
+                        </div>
+                      )}
+
+                      {onImageDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full h-6 w-6 bg-black/60 text-white hover:text-white hover:bg-black/80"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteImage(image.id);
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
+                  </div>
+                );
+
+                return (
+                  <div key={image.id} className="masonry-item">
+                    {onAssignToSpace && spaces.length > 0 ? (
+                      <ContextMenu>
+                        <ContextMenuTrigger asChild>
+                          {imageCard}
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuSub>
+                            <ContextMenuSubTrigger>Move to</ContextMenuSubTrigger>
+                            <ContextMenuSubContent>
+                              {spaces.map(space => (
+                                <ContextMenuItem
+                                  key={space.id}
+                                  onClick={() => onAssignToSpace(image.id, space.id)}
+                                  className={image.spaceId === space.id ? "font-medium" : ""}
+                                >
+                                  {space.name}
+                                  {image.spaceId === space.id && (
+                                    <span className="ml-auto text-xs text-gray-400">current</span>
+                                  )}
+                                </ContextMenuItem>
+                              ))}
+                            </ContextMenuSubContent>
+                          </ContextMenuSub>
+                          {image.spaceId && (
+                            <>
+                              <ContextMenuSeparator />
+                              <ContextMenuItem onClick={() => onAssignToSpace(image.id, null)}>
+                                Remove from Space
+                              </ContextMenuItem>
+                            </>
+                          )}
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    ) : (
+                      imageCard
+                    )}
                   </div>
                 );
               })}

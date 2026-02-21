@@ -13,12 +13,14 @@ export interface UseImageFileSystemReturn {
   addImageFromFile: (
     file: File,
     onAddToCollection: (media: ImageItem) => void,
-    onAnalyze: (media: ImageItem, dataUrl: string, savedFilePath?: string) => Promise<ImageItem>
+    onAnalyze: (media: ImageItem, dataUrl: string, savedFilePath?: string) => Promise<ImageItem>,
+    spaceId?: string
   ) => Promise<void>;
   importFromFilePath: (
     filePath: string,
     onAddToCollection: (media: ImageItem) => void,
-    onAnalyze: (media: ImageItem, dataUrl: string, savedFilePath?: string) => Promise<ImageItem>
+    onAnalyze: (media: ImageItem, dataUrl: string, savedFilePath?: string) => Promise<ImageItem>,
+    spaceId?: string
   ) => Promise<void>;
 }
 
@@ -64,6 +66,7 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
           type: media.type,
           duration: media.duration,
           posterUrl: media.posterUrl,
+          ...(media.spaceId ? { spaceId: media.spaceId } : {}),
         }
       });
 
@@ -82,7 +85,8 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
   const addImageFromFile = useCallback(async (
     file: File,
     onAddToCollection: (media: ImageItem) => void,
-    onAnalyze: (media: ImageItem, dataUrl: string, savedFilePath?: string) => Promise<ImageItem>
+    onAnalyze: (media: ImageItem, dataUrl: string, savedFilePath?: string) => Promise<ImageItem>,
+    spaceId?: string
   ) => {
     setIsUploading(true);
 
@@ -98,6 +102,7 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
         width: 0,
         height: 0,
         createdAt: new Date(),
+        ...(spaceId ? { spaceId } : {}),
       };
 
       // Get dimensions and additional data
@@ -156,7 +161,8 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
   const importFromFilePath = useCallback(async (
     filePath: string,
     onAddToCollection: (media: ImageItem) => void,
-    onAnalyze: (media: ImageItem, dataUrl: string, savedFilePath?: string) => Promise<ImageItem>
+    onAnalyze: (media: ImageItem, dataUrl: string, savedFilePath?: string) => Promise<ImageItem>,
+    spaceId?: string
   ) => {
     try {
       // Get the file extension
@@ -181,6 +187,7 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
           width: 0,
           height: 0,
           createdAt: new Date(),
+          ...(spaceId ? { spaceId } : {}),
         };
         
         // Try to get dimensions if possible
@@ -218,7 +225,8 @@ export function useImageFileSystem(): UseImageFileSystemReturn {
             type: media.type,
             duration: media.duration,
             posterUrl: media.posterUrl,
-            originalPath: filePath // Include the original path
+            originalPath: filePath, // Include the original path
+            ...(media.spaceId ? { spaceId: media.spaceId } : {}),
           }
         });
         

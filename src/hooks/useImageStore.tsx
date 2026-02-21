@@ -35,6 +35,8 @@ export interface ImageItem {
   thumbnailUrl?: string;
   // Context description for the entire image
   imageContext?: string;
+  // Space assignment
+  spaceId?: string;
 }
 
 export function useImageStore() {
@@ -64,23 +66,35 @@ export function useImageStore() {
     });
   }, [collection.setImages]);
 
+  // Assign an image to a space (or remove from space with null)
+  const assignImageToSpace = useCallback(async (imageId: string, spaceId: string | null) => {
+    const image = collection.images.find(img => img.id === imageId);
+    if (!image) return;
+
+    const updatedImage = { ...image, spaceId: spaceId ?? undefined };
+    updateImage(imageId, () => updatedImage);
+
+    // Persist to metadata on disk
+    const { url, isAnalyzing, error, ...metadataToSave } = updatedImage;
+    await window.electron.updateMetadata({ id: imageId, metadata: { ...metadataToSave, spaceId: spaceId ?? undefined } });
+  }, [collection.images, updateImage]);
+
   // Enhanced addImage that uses the new hooks
-  const addImage = useCallback(async (file: File) => {
+  const addImage = useCallback(async (file: File, spaceId?: string) => {
     await fileSystem.addImageFromFile(
       file,
       addToCollection,
       async (media, dataUrl, savedFilePath) => {
-        // Set analyzing state — analyzeAndUpdateImage will check for API key
-        // and return media unchanged if no key is available
         const analyzingMedia = { ...media, isAnalyzing: true };
         const analyzedMedia = await analysis.analyzeAndUpdateImage(analyzingMedia, dataUrl, savedFilePath);
         return analyzedMedia;
-      }
+      },
+      spaceId
     );
   }, [fileSystem, analysis, addToCollection]);
 
   // Enhanced importFromFilePath that uses the new hooks
-  const importFromFilePath = useCallback(async (filePath: string) => {
+  const importFromFilePath = useCallback(async (filePath: string, spaceId?: string) => {
     await fileSystem.importFromFilePath(
       filePath,
       addToCollection,
@@ -88,7 +102,8 @@ export function useImageStore() {
         const analyzingMedia = { ...media, isAnalyzing: true };
         const analyzedMedia = await analysis.analyzeAndUpdateImage(analyzingMedia, dataUrl, savedFilePath);
         return analyzedMedia;
-      }
+      },
+      spaceId
     );
   }, [fileSystem, analysis, addToCollection]);
 
@@ -117,7 +132,10 @@ export function useImageStore() {
     
     // Analysis operations
     retryAnalysis,
-    
+
+    // Space operations
+    assignImageToSpace,
+
     // Queue management
     queueService: queue.queueService,
   };

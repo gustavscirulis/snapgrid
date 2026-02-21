@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageItem } from "@/hooks/useImageStore";
 import { ZoomableImageWrapper } from "@/components/ZoomableImageWrapper";
@@ -19,30 +20,30 @@ const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, scree
   // Account for padding in available height
   const verticalPadding = 40; // 20px top + 20px bottom
   const availableHeight = screenHeight - verticalPadding;
-  
+
   // For videos, use maximum screen space while respecting original dimensions
   if (image.type === 'video') {
     // Calculate maximum available space (95% of screen)
     const maxWidth = screenWidth * 0.95;
     const maxHeight = availableHeight * 0.95;
-    
+
     // Get original dimensions, with fallbacks
     const originalWidth = image.width || 800;
     const originalHeight = image.height || 600;
-    
+
     // Calculate scaling factors to fit within screen
     const widthScale = maxWidth / originalWidth;
     const heightScale = maxHeight / originalHeight;
-    
+
     // Use the smaller scaling factor to ensure both dimensions fit
     // If scale > 1, it means we can fit the video at larger than original size,
     // but we'll cap at 1 to avoid quality loss
     const scale = Math.min(widthScale, heightScale);
-    
+
     // Calculate final dimensions - never exceed original dimensions
     const width = originalWidth * Math.min(scale, 1);
     const height = originalHeight * Math.min(scale, 1);
-    
+
     return {
       width,
       height,
@@ -50,18 +51,18 @@ const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, scree
       left: (screenWidth - width) / 2
     };
   }
-  
+
   // For images, ensure we never exceed original dimensions
   const originalWidth = image.width || 800;
   const originalHeight = image.height || 600;
-  
+
   // Calculate maximum available space (95% of screen)
   const maxWidth = screenWidth * 0.95;
   const maxHeight = availableHeight * 0.95;
-  
+
   // Check if image is tall (height > 2x width)
   const isTallImage = originalHeight > originalWidth * 2;
-  
+
   if (isTallImage) {
     // For tall images, fit to width and cap height to viewport.
     // The full image is revealed via scrolling inside the motion div after animation.
@@ -76,16 +77,16 @@ const calculateOptimalDimensions = (image: ImageItem, screenWidth: number, scree
       left: (screenWidth - width) / 2
     };
   }
-  
+
   // For regular images, use the smaller scaling factor to ensure both dimensions fit
   const widthScale = maxWidth / originalWidth;
   const heightScale = maxHeight / originalHeight;
   const scale = Math.min(widthScale, heightScale);
-  
+
   // Calculate final dimensions - never exceed original dimensions
   const width = originalWidth * Math.min(scale, 1);
   const height = originalHeight * Math.min(scale, 1);
-  
+
   return {
     width,
     height,
@@ -107,7 +108,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
   // NOT gated on isOpen: initialRect must persist during exit animation so
   // AnimatePresence can play the shrink-back transition before unmounting.
   const initialPosition = initialRect;
-  
+
   // Track whether the opening animation has completed (enables scroll for tall images)
   const [openAnimComplete, setOpenAnimComplete] = useState(false);
 
@@ -116,7 +117,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
   // Add a ref to access the video element
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  
+
   // Add state to store actual video dimensions
   const [actualVideoDimensions, setActualVideoDimensions] = useState<{width: number, height: number} | null>(null);
 
@@ -388,7 +389,9 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
 
   const isTallImage = selectedImage.height > selectedImage.width * 2;
 
-  return (
+  // Portal to document.body so the modal escapes any parent CSS transforms
+  // (e.g. the carousel's translateX) that would break position:fixed
+  return createPortal(
     <AnimatePresence onExitComplete={() => {
       onAnimationComplete && onAnimationComplete("exit");
       isAnimatingRef.current = false;
@@ -469,7 +472,8 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           </div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 
