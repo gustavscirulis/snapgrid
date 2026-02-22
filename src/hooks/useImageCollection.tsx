@@ -8,9 +8,10 @@ export interface UseImageCollectionReturn {
   isLoading: boolean;
   setImages: React.Dispatch<React.SetStateAction<ImageItem[]>>;
   setTrashItems: React.Dispatch<React.SetStateAction<ImageItem[]>>;
-  deletedItemsHistory: ImageItem[];
-  setDeletedItemsHistory: React.Dispatch<React.SetStateAction<ImageItem[]>>;
+  deletedItemsHistory: ImageItem[][];
+  setDeletedItemsHistory: React.Dispatch<React.SetStateAction<ImageItem[][]>>;
   removeImage: (id: string) => Promise<void>;
+  removeImages: (ids: string[]) => Promise<void>;
   undoDelete: () => Promise<void>;
   emptyTrash: () => Promise<void>;
   shuffleImages: () => void;
@@ -21,7 +22,7 @@ export function useImageCollection(): UseImageCollectionReturn {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [trashItems, setTrashItems] = useState<ImageItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [deletedItemsHistory, setDeletedItemsHistory] = useState<ImageItem[]>([]);
+  const [deletedItemsHistory, setDeletedItemsHistory] = useState<ImageItem[][]>([]);
 
   // Ref to avoid stale closures in callbacks that need current images
   const imagesRef = useRef(images);
@@ -65,11 +66,31 @@ export function useImageCollection(): UseImageCollectionReturn {
       setTrashItems(updatedTrashItems);
       setImages(prevImages => prevImages.filter(img => img.id !== id));
 
-      // Add to history
-      setDeletedItemsHistory(prev => [...prev, itemToDelete]);
+      // Add to history as a batch of one
+      setDeletedItemsHistory(prev => [...prev, [itemToDelete]]);
     } catch (error) {
       console.error("Failed to delete image:", error);
       toast.error("Failed to delete image");
+    }
+  }, []);
+
+  const removeImages = useCallback(async (ids: string[]) => {
+    try {
+      const idsSet = new Set(ids);
+      const itemsToDelete = imagesRef.current.filter(img => idsSet.has(img.id));
+      if (itemsToDelete.length === 0) return;
+
+      await Promise.all(ids.map(id => window.electron.deleteImage(id)));
+
+      const updatedTrashItems = await window.electron.listTrash();
+      setTrashItems(updatedTrashItems);
+      setImages(prevImages => prevImages.filter(img => !idsSet.has(img.id)));
+
+      // Add entire batch as one undo entry
+      setDeletedItemsHistory(prev => [...prev, itemsToDelete]);
+    } catch (error) {
+      console.error("Failed to delete images:", error);
+      toast.error("Failed to delete images");
     }
   }, []);
 
@@ -77,35 +98,31 @@ export function useImageCollection(): UseImageCollectionReturn {
     if (deletedItemsHistory.length === 0) return;
 
     try {
-      // Get the last deleted item
-      const lastDeletedItem = deletedItemsHistory[deletedItemsHistory.length - 1];
-      await window.electron.restoreFromTrash(lastDeletedItem.id);
-      
-      // Get the restored image
-      const [loadedImages] = await Promise.all([
-        window.electron.loadImages()
-      ]);
-      
-      // Find the restored image in the loaded images
-      const restoredImage = loadedImages.find(img => img.id === lastDeletedItem.id);
-      if (!restoredImage) {
-        throw new Error('Failed to find restored image');
-      }
+      // Get the last batch of deleted items
+      const lastBatch = deletedItemsHistory[deletedItemsHistory.length - 1];
 
-      // Insert the restored image back into its original position
+      // Restore all items in the batch
+      await Promise.all(lastBatch.map(item => window.electron.restoreFromTrash(item.id)));
+
+      const loadedImages = await window.electron.loadImages();
+
+      // Insert all restored images back into their correct positions
       setImages(prevImages => {
         const newImages = [...prevImages];
-        // Find the position where this image should be inserted
-        const insertIndex = prevImages.findIndex(img => 
-          new Date(img.createdAt).getTime() < new Date(restoredImage.createdAt).getTime()
-        );
-        // If no position found (should be at end), use length
-        const position = insertIndex === -1 ? prevImages.length : insertIndex;
-        newImages.splice(position, 0, restoredImage);
+        for (const item of lastBatch) {
+          const restoredImage = loadedImages.find(img => img.id === item.id);
+          if (restoredImage) {
+            const insertIndex = newImages.findIndex(img =>
+              new Date(img.createdAt).getTime() < new Date(restoredImage.createdAt).getTime()
+            );
+            const position = insertIndex === -1 ? newImages.length : insertIndex;
+            newImages.splice(position, 0, restoredImage);
+          }
+        }
         return newImages;
       });
 
-      // Remove the last item from history
+      // Remove the last batch from history
       setDeletedItemsHistory(prev => prev.slice(0, -1));
     } catch (error) {
       console.error("Failed to restore image:", error);
@@ -145,6 +162,7 @@ export function useImageCollection(): UseImageCollectionReturn {
     deletedItemsHistory,
     setDeletedItemsHistory,
     removeImage,
+    removeImages,
     undoDelete,
     emptyTrash,
     shuffleImages,

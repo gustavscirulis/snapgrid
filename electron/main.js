@@ -799,6 +799,43 @@ ipcMain.on('start-drag', (event, { filePath, iconPath, displayName }) => {
   }
 });
 
+// Handle multi-file drag-out-of-app
+ipcMain.on('start-drag-multiple', (event, { filePaths, iconPath }) => {
+  try {
+    let icon;
+    if (iconPath) {
+      icon = nativeImage.createFromPath(iconPath);
+      const size = icon.getSize();
+      if (size.width > 200) {
+        icon = icon.resize({ width: 200, height: Math.round((200 / size.width) * size.height) });
+      }
+    }
+
+    if (!icon || icon.isEmpty()) {
+      if (filePaths.length > 0) {
+        icon = nativeImage.createFromPath(filePaths[0]);
+        if (!icon.isEmpty()) {
+          const size = icon.getSize();
+          if (size.width > 200) {
+            icon = icon.resize({ width: 200, height: Math.round((200 / size.width) * size.height) });
+          }
+        }
+      }
+    }
+
+    if (!icon || icon.isEmpty()) {
+      icon = nativeImage.createEmpty();
+    }
+
+    event.sender.startDrag({
+      files: filePaths,
+      icon: icon,
+    });
+  } catch (error) {
+    console.error('Error starting multi drag:', error);
+  }
+});
+
 // Add API key management handlers
 ipcMain.handle('set-api-key', async (event, { service, key }) => {
   try {

@@ -170,5 +170,6 @@ contextBridge.exposeInMainWorld(
 
     // Native drag support (drag files out of app)
     startDrag: (filePath, iconPath, displayName) => ipcRenderer.send('start-drag', { filePath, iconPath, displayName }),
+    startDragMultiple: (filePaths, iconPath) => ipcRenderer.send('start-drag-multiple', { filePaths, iconPath }),
   }
 );

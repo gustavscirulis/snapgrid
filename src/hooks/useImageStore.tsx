@@ -66,6 +66,25 @@ export function useImageStore() {
     });
   }, [collection.setImages]);
 
+  // Assign multiple images to a space (bulk), then re-analyze each with the target space's prompt
+  const assignImagesToSpace = useCallback(async (imageIds: string[], spaceId: string | null, systemPrompt?: string) => {
+    // Update all in state immediately
+    for (const imageId of imageIds) {
+      updateImage(imageId, (img) => ({ ...img, spaceId: spaceId ?? undefined }));
+    }
+
+    // Persist metadata for all, then re-analyze in parallel
+    await Promise.all(imageIds.map(async (imageId) => {
+      const image = collection.images.find(img => img.id === imageId);
+      if (!image) return;
+      const updatedImage = { ...image, spaceId: spaceId ?? undefined };
+      const { url, isAnalyzing, error, ...metadataToSave } = updatedImage;
+      await window.electron.updateMetadata({ id: imageId, metadata: { ...metadataToSave, spaceId: spaceId } });
+      updateImage(imageId, (img) => ({ ...img, isAnalyzing: true, error: undefined }));
+      await analysis.retryAnalysis(imageId, collection.images, updateImage, systemPrompt);
+    }));
+  }, [collection.images, updateImage, analysis]);
+
   // Assign an image to a space (or remove from space with null), then re-analyze with the target space's prompt
   const assignImageToSpace = useCallback(async (imageId: string, spaceId: string | null, systemPrompt?: string) => {
     const image = collection.images.find(img => img.id === imageId);
@@ -125,6 +144,7 @@ export function useImageStore() {
     trashItems: collection.trashItems,
     isLoading: collection.isLoading,
     removeImage: collection.removeImage,
+    removeImages: collection.removeImages,
     undoDelete: collection.undoDelete,
     emptyTrash: collection.emptyTrash,
     canUndo: collection.canUndo,
@@ -139,6 +159,7 @@ export function useImageStore() {
 
     // Space operations
     assignImageToSpace,
+    assignImagesToSpace,
 
     // Developer tools
     shuffleImages: collection.shuffleImages,

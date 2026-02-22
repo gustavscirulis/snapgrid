@@ -81,6 +81,7 @@ interface IElectronAPI {
 
   // Native drag support
   startDrag?: (filePath: string, iconPath: string, displayName?: string) => void;
+  startDragMultiple?: (filePaths: string[], iconPath: string) => void;
 
   // Menu event handlers
   onImportFiles?: (callback: (filePaths: string[]) => void) => () => void;
