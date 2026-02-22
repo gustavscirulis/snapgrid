@@ -1,10 +1,15 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, protocol, Menu, nativeImage } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import fs from 'fs-extra';
 import os from 'os';
 import {promises as fsPromises} from 'fs'; // Import fsPromises
 import chokidar from 'chokidar';
+
+// electron-updater is CJS, so we use createRequire to import it in ESM context
+const _require = createRequire(import.meta.url);
+const { autoUpdater } = _require('electron-updater');
 // We'll use dynamic import for electron-window-state instead
 // import windowStateKeeper from 'electron-window-state';
 
@@ -294,46 +299,71 @@ const getAppStorageDir = async () => {
   return storageDir;
 };
 
-// Add this function before createWindow()
-async function checkForUpdates() {
-  try {
-    // Read package.json using fs instead of require
-    const packageJsonPath = path.join(path.dirname(__dirname), 'package.json');
-    const packageJsonContent = await fs.readFile(packageJsonPath, 'utf-8');
-    const packageJson = JSON.parse(packageJsonContent);
-    const currentVersion = packageJson.version;
-    
-    const repoOwner = 'gustavscirulis'; // Repository owner
-    const repoName = 'snapgrid'; // Repository name
-    
-    console.log('Checking for updates. Current version:', currentVersion);
-    
-    const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`);
-    
-    if (!response.ok) {
-      console.error('Error checking for updates:', response.status);
-      return;
-    }
-    
-    const latestRelease = await response.json();
-    const latestVersion = latestRelease.tag_name.replace(/^v/, '');
-    
-    console.log('Latest version available:', latestVersion);
-    
-    // Compare versions (simple string comparison works for semver)
-    if (latestVersion > currentVersion) {
-      console.log('Update available!', latestRelease.name);
-      
-      // Notify renderer process about the update
-      if (mainWindow) {
-        mainWindow.webContents.send('update-available', latestRelease);
-      }
-    } else {
-      console.log('No updates available');
-    }
-  } catch (error) {
-    console.error('Failed to check for updates:', error);
+// Track whether the current update check was triggered manually via menu
+let isManualUpdateCheck = false;
+
+// Initialize native auto-updater (electron-updater)
+function initAutoUpdater() {
+  if (isDev) {
+    console.log('Skipping auto-updater in development mode');
+    return;
   }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    console.log('Checking for update...');
+    mainWindow?.webContents.send('updater-checking');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('Update available:', info.version);
+    isManualUpdateCheck = false;
+    mainWindow?.webContents.send('updater-update-available', {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      releaseName: info.releaseName,
+    });
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('No update available. Current version is up to date.');
+    if (isManualUpdateCheck) {
+      mainWindow?.webContents.send('updater-not-available');
+      isManualUpdateCheck = false;
+    }
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    mainWindow?.webContents.send('updater-download-progress', {
+      percent: progress.percent,
+      bytesPerSecond: progress.bytesPerSecond,
+      transferred: progress.transferred,
+      total: progress.total,
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('Update downloaded:', info.version);
+    mainWindow?.webContents.send('updater-update-downloaded', {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      releaseName: info.releaseName,
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('Auto-updater error:', err);
+    mainWindow?.webContents.send('updater-error', err?.message || 'Unknown update error');
+  });
+
+  // Check for updates after a short delay to let the window fully load
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error('Initial update check failed:', err);
+    });
+  }, 3000);
 }
 
 async function createWindow() {
@@ -489,6 +519,9 @@ async function createWindow() {
   
   // Create the application menu
   createApplicationMenu();
+
+  // Initialize native auto-updater
+  initAutoUpdater();
 }
 
 // Create the application menu with File browsing options
@@ -501,13 +534,18 @@ function createApplicationMenu() {
       label: app.name,
       submenu: [
         { role: 'about' },
-        { 
+        {
           label: 'Check for Updates',
-          click: async () => {
-            await checkForUpdates();
-            // If no update was found, inform the user
-            if (mainWindow) {
-              mainWindow.webContents.send('manual-update-check-completed');
+          click: () => {
+            if (!isDev) {
+              isManualUpdateCheck = true;
+              autoUpdater.checkForUpdates().catch((err) => {
+                isManualUpdateCheck = false;
+                console.error('Manual update check failed:', err);
+                mainWindow?.webContents.send('updater-error', err?.message || 'Update check failed');
+              });
+            } else {
+              mainWindow?.webContents.send('updater-not-available');
             }
           }
         },
@@ -1422,10 +1460,9 @@ ipcMain.handle('set-analytics-consent', async (event, consent) => {
   }
 });
 
-// Add handler for manual update checks from renderer
-ipcMain.handle('check-for-updates', async () => {
-  await checkForUpdates();
-  return { success: true };
+// Install downloaded update and restart the app
+ipcMain.handle('install-update', () => {
+  autoUpdater.quitAndInstall();
 });
 
 // Add handlers for user preferences (thumbnail size, etc.)

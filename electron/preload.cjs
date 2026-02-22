@@ -31,15 +31,31 @@ contextBridge.exposeInMainWorld(
     // Browser functionality
     openUrl: (url) => ipcRenderer.invoke('open-url', url),
 
-    // Update functionality
-    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
-    onUpdateAvailable: (callback) => {
-      ipcRenderer.on('update-available', (_, releaseInfo) => callback(releaseInfo));
-      return () => ipcRenderer.removeAllListeners('update-available');
+    // Native auto-updater
+    installUpdate: () => ipcRenderer.invoke('install-update'),
+    onUpdaterChecking: (callback) => {
+      ipcRenderer.on('updater-checking', () => callback());
+      return () => ipcRenderer.removeAllListeners('updater-checking');
     },
-    onManualUpdateCheckCompleted: (callback) => {
-      ipcRenderer.on('manual-update-check-completed', () => callback());
-      return () => ipcRenderer.removeAllListeners('manual-update-check-completed');
+    onUpdaterUpdateAvailable: (callback) => {
+      ipcRenderer.on('updater-update-available', (_, info) => callback(info));
+      return () => ipcRenderer.removeAllListeners('updater-update-available');
+    },
+    onUpdaterNotAvailable: (callback) => {
+      ipcRenderer.on('updater-not-available', () => callback());
+      return () => ipcRenderer.removeAllListeners('updater-not-available');
+    },
+    onUpdaterDownloadProgress: (callback) => {
+      ipcRenderer.on('updater-download-progress', (_, progress) => callback(progress));
+      return () => ipcRenderer.removeAllListeners('updater-download-progress');
+    },
+    onUpdaterDownloaded: (callback) => {
+      ipcRenderer.on('updater-update-downloaded', (_, info) => callback(info));
+      return () => ipcRenderer.removeAllListeners('updater-update-downloaded');
+    },
+    onUpdaterError: (callback) => {
+      ipcRenderer.on('updater-error', (_, message) => callback(message));
+      return () => ipcRenderer.removeAllListeners('updater-error');
     },
 
     // Secure API key management

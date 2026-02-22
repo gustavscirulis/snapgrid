@@ -1,5 +1,11 @@
 {
   "appId": "com.snapgrid.app",
+  "publish": {
+    "provider": "github",
+    "owner": "gustavscirulis",
+    "repo": "snapgrid",
+    "releaseType": "draft"
+  },
   "productName": "SnapGrid",
   "directories": {
     "output": "release/"
@@ -27,14 +33,10 @@
   "mac": {
     "category": "public.app-category.developer-tools",
     "target": [
-      {
-        "target": "dmg",
-        "arch": "x64"
-      },
-      {
-        "target": "dmg",
-        "arch": "arm64"
-      },
+      { "target": "dmg", "arch": "x64" },
+      { "target": "dmg", "arch": "arm64" },
+      { "target": "zip", "arch": "x64" },
+      { "target": "zip", "arch": "arm64" }
     ],
     "icon": "assets/icons/icon.icns",
     "extraFiles": [
@@ -50,7 +52,7 @@
     "gatekeeperAssess": false,
     "entitlements": "build/entitlements.mac.plist",
     "entitlementsInherit": "build/entitlements.mac.plist",
-    "notarize": true
+    "notarize": false
   },
   "dmg": {
     "icon": "assets/icons/icon.icns"
