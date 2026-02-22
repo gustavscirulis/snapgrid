@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, useImperativeHandle, forwardRef } from "react";
+import { createPortal } from "react-dom";
 import { ImageItem } from "@/hooks/useImageStore";
 import AnimatedImageModal from "./AnimatedImageModal";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,11 +13,20 @@ import EmptyStateCard from "./EmptyStateCard";
 import EmptyStatePlaceholders from "./EmptyStatePlaceholders";
 import { Space } from "@/hooks/useSpaces";
 import ImageCard from "./ImageCard";
+import { useSelection } from "@/hooks/useSelection";
+import { useRubberBand } from "@/hooks/useRubberBand";
+
+export interface ImageGridHandle {
+  selectAll: () => void;
+  clearSelection: () => boolean;
+  deleteSelected: () => void;
+}
 
 interface ImageGridProps {
   images: ImageItem[];
   onImageClick: (image: ImageItem) => void;
   onImageDelete?: (id: string) => void;
+  onImagesDelete?: (ids: string[]) => void;
   searchQuery?: string;
   onOpenSettings?: () => void;
   settingsOpen?: boolean;
@@ -25,10 +35,15 @@ interface ImageGridProps {
   spaces?: Space[];
   activeSpaceId?: string | null;
   onAssignToSpace?: (imageId: string, spaceId: string | null) => Promise<void>;
+  onAssignImagesToSpace?: (imageIds: string[], spaceId: string | null) => Promise<void>;
   onRemoveFromSpace?: (imageId: string) => void;
+  scrollContainerRef?: React.RefObject<HTMLElement>;
 }
 
-const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDelete, searchQuery = "", onOpenSettings, settingsOpen = false, retryAnalysis, thumbnailSize = 'medium', spaces = [], activeSpaceId, onAssignToSpace, onRemoveFromSpace }) => {
+const ImageGrid = forwardRef<ImageGridHandle, ImageGridProps>(function ImageGrid(
+  { images, onImageClick, onImageDelete, onImagesDelete, searchQuery = "", onOpenSettings, settingsOpen = false, retryAnalysis, thumbnailSize = 'medium', spaces = [], activeSpaceId, onAssignToSpace, onAssignImagesToSpace, onRemoveFromSpace, scrollContainerRef },
+  ref
+) {
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedImageRef, setSelectedImageRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
@@ -36,9 +51,70 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   const [clickedImageId, setClickedImageId] = useState<string | null>(null);
   const [exitAnimationComplete, setExitAnimationComplete] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [activeDragIds, setActiveDragIds] = useState<Set<string>>(new Set());
 
   // Image refs for animations
   const imageRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
+
+  // Selection state
+  const selection = useSelection();
+
+  // Ordered image IDs for range select and rubber band
+  const orderedImageIds = useMemo(() => images.map(img => img.id), [images]);
+
+  // Prune selection when images list changes (e.g. from search filter)
+  useEffect(() => {
+    const visibleIds = new Set(orderedImageIds);
+    const currentSelection = selection.selectedIds;
+    if (currentSelection.size === 0) return;
+    let changed = false;
+    for (const id of currentSelection) {
+      if (!visibleIds.has(id)) {
+        changed = true;
+        break;
+      }
+    }
+    if (changed) {
+      const pruned = new Set<string>();
+      for (const id of currentSelection) {
+        if (visibleIds.has(id)) pruned.add(id);
+      }
+      selection.setSelection(pruned);
+    }
+  }, [orderedImageIds]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Default scroll container ref if none provided
+  const fallbackScrollRef = useRef<HTMLElement>(null);
+  const effectiveScrollRef = scrollContainerRef || fallbackScrollRef;
+
+  // Rubber band selection
+  const rubberBand = useRubberBand({
+    scrollContainerRef: effectiveScrollRef,
+    imageRefs,
+    imageIds: orderedImageIds,
+    onSelectionChange: selection.setSelection,
+    existingSelection: selection.selectedIds,
+  });
+
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    selectAll: () => {
+      selection.selectAll(orderedImageIds);
+    },
+    clearSelection: () => {
+      return selection.clear();
+    },
+    deleteSelected: () => {
+      if (selection.selectionCount === 0) return;
+      const ids = Array.from(selection.selectedIds);
+      if (onImagesDelete) {
+        onImagesDelete(ids);
+      } else if (onImageDelete) {
+        ids.forEach(id => onImageDelete(id));
+      }
+      selection.clear();
+    },
+  }), [selection, orderedImageIds, onImagesDelete, onImageDelete]);
 
   // Initialize image preloader
   const preloader = useImagePreloader(images, {
@@ -63,12 +139,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     } else {
       document.body.style.overflow = '';
     }
-    
+
     return () => {
       document.body.style.overflow = '';
     };
   }, [images.length, searchQuery]);
-  
+
 
   // Dynamic responsive breakpoints based on thumbnail size
   const breakpointColumnsObj = useMemo(() => {
@@ -85,7 +161,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         return { default: 4, 1536: 4, 1280: 3, 1024: 2, 640: 1, 480: 1 };
     }
   }, [thumbnailSize]);
-  
+
   // Initialize image refs and setup intersection observer
   useEffect(() => {
     images.forEach(image => {
@@ -116,7 +192,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       }
     };
   }, [images, preloader]);
-  
+
   // Reset exitAnimationComplete after a delay
   useEffect(() => {
     if (exitAnimationComplete) {
@@ -126,7 +202,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       return () => clearTimeout(timeoutId);
     }
   }, [exitAnimationComplete]);
-  
+
   // Use ref for isAnimating so handleImageClick doesn't need it as a dependency
   const isAnimatingRef = useRef(isAnimating);
   isAnimatingRef.current = isAnimating;
@@ -176,11 +252,56 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
     onImageDelete?.(id);
   }, [onImageDelete]);
 
+  // Selection click handlers
+  const handleCmdClick = useCallback((id: string) => {
+    selection.toggle(id);
+  }, [selection]);
+
+  const handleShiftClick = useCallback((id: string) => {
+    selection.rangeSelect(id, orderedImageIds);
+  }, [selection, orderedImageIds]);
+
+  // Bulk action handlers
+  const handleBulkAssignToSpace = useCallback(async (spaceId: string | null) => {
+    if (selection.selectionCount === 0) return;
+    const ids = Array.from(selection.selectedIds);
+    if (onAssignImagesToSpace) {
+      await onAssignImagesToSpace(ids, spaceId);
+    } else if (onAssignToSpace) {
+      await Promise.all(ids.map(id => onAssignToSpace(id, spaceId)));
+    }
+    selection.clear();
+  }, [selection, onAssignImagesToSpace, onAssignToSpace]);
+
+  const handleBulkDelete = useCallback(() => {
+    if (selection.selectionCount === 0) return;
+    const ids = Array.from(selection.selectedIds);
+    if (onImagesDelete) {
+      onImagesDelete(ids);
+    } else if (onImageDelete) {
+      ids.forEach(id => onImageDelete(id));
+    }
+    selection.clear();
+  }, [selection, onImagesDelete, onImageDelete]);
+
+  const handleBulkRemoveFromSpace = useCallback(async () => {
+    if (selection.selectionCount === 0) return;
+    const ids = Array.from(selection.selectedIds);
+    if (onAssignImagesToSpace) {
+      await onAssignImagesToSpace(ids, null);
+    } else if (onAssignToSpace) {
+      await Promise.all(ids.map(id => onAssignToSpace(id, null)));
+    }
+    selection.clear();
+  }, [selection, onAssignImagesToSpace, onAssignToSpace]);
+
   // Custom mouse-based drag system for drag-to-space and drag-out-of-app.
   // We avoid HTML5 drag because Electron's startDrag (needed for desktop export)
   // is incompatible with it — startDrag takes over and fires dragend immediately.
   const customDragRef = useRef<{
     image: ImageItem;
+    isMultiDrag: boolean;
+    draggedIds: string[];
     startX: number;
     startY: number;
     isDragging: boolean;
@@ -194,17 +315,32 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   // Stable refs for callbacks used in the global mouse event effect
   const onAssignToSpaceRef = useRef(onAssignToSpace);
   onAssignToSpaceRef.current = onAssignToSpace;
+  const onAssignImagesToSpaceRef = useRef(onAssignImagesToSpace);
+  onAssignImagesToSpaceRef.current = onAssignImagesToSpace;
   const setDraggedImageIdRef = useRef(dragContext.setDraggedImageId);
   setDraggedImageIdRef.current = dragContext.setDraggedImageId;
   const setInternalDragActiveRef = useRef(dragContext.setInternalDragActive);
   setInternalDragActiveRef.current = dragContext.setInternalDragActive;
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
+  const imagesRef = useRef(images);
+  imagesRef.current = images;
+  const setActiveDragIdsRef = useRef(setActiveDragIds);
+  setActiveDragIdsRef.current = setActiveDragIds;
 
   const handleImageMouseDown = useCallback((e: React.MouseEvent, image: ImageItem) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest('button, input, a, [role="menuitem"]')) return;
 
+    // Determine if this is a multi-drag
+    const sel = selectionRef.current;
+    const isMultiDrag = sel.selectedIds.has(image.id) && sel.selectionCount > 1;
+    const draggedIds = isMultiDrag ? Array.from(sel.selectedIds) : [image.id];
+
     customDragRef.current = {
       image,
+      isMultiDrag,
+      draggedIds,
       startX: e.clientX,
       startY: e.clientY,
       isDragging: false,
@@ -229,6 +365,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       if (state.isDragging) {
         setDraggedImageIdRef.current(null);
         setInternalDragActiveRef.current(false);
+        setActiveDragIdsRef.current(new Set());
       }
       document.body.style.cursor = '';
       customDragRef.current = null;
@@ -258,23 +395,50 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         justDraggedRef.current = true;
         setDraggedImageIdRef.current(state.image.id);
         setInternalDragActiveRef.current(true);
+        setActiveDragIdsRef.current(new Set(state.draggedIds));
         document.body.style.cursor = 'grabbing';
 
-        // Create floating preview — small and semi-transparent so drop targets stay visible
-        const preview = document.createElement('div');
-        preview.style.cssText =
-          'position:fixed;pointer-events:none;width:96px;border-radius:8px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.25);transform:rotate(2deg);z-index:99999;opacity:0.7;';
-        const img = document.createElement('img');
-        img.src =
-          state.image.thumbnailUrl ||
-          state.image.posterUrl ||
-          state.image.url ||
-          '';
-        img.style.cssText = 'width:100%;height:auto;display:block;';
-        img.draggable = false;
-        preview.appendChild(img);
-        document.body.appendChild(preview);
-        state.previewEl = preview;
+        if (state.isMultiDrag) {
+          // Create stacked preview for multi-drag
+          const preview = document.createElement('div');
+          preview.style.cssText =
+            'position:fixed;pointer-events:none;z-index:99999;width:96px;height:96px;';
+
+          const selectedImages = imagesRef.current.filter(img => state.draggedIds.includes(img.id));
+          const stackImages = selectedImages.slice(0, 3);
+          stackImages.forEach((img, i) => {
+            const el = document.createElement('img');
+            el.src = img.thumbnailUrl || img.posterUrl || img.url || '';
+            el.style.cssText = `width:80px;border-radius:6px;display:block;position:absolute;box-shadow:0 4px 12px rgba(0,0,0,0.2);transform:rotate(${(i - 1) * 3}deg) translateY(${i * -4}px);opacity:${1 - i * 0.15};`;
+            el.draggable = false;
+            preview.appendChild(el);
+          });
+
+          // Count badge
+          const badge = document.createElement('div');
+          badge.textContent = `${state.draggedIds.length}`;
+          badge.style.cssText = 'position:absolute;top:-8px;right:-8px;background:#3b82f6;color:white;border-radius:50%;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;padding:0 4px;';
+          preview.appendChild(badge);
+
+          document.body.appendChild(preview);
+          state.previewEl = preview;
+        } else {
+          // Single image preview (existing behavior)
+          const preview = document.createElement('div');
+          preview.style.cssText =
+            'position:fixed;pointer-events:none;width:96px;border-radius:8px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.25);transform:rotate(2deg);z-index:99999;opacity:0.7;';
+          const img = document.createElement('img');
+          img.src =
+            state.image.thumbnailUrl ||
+            state.image.posterUrl ||
+            state.image.url ||
+            '';
+          img.style.cssText = 'width:100%;height:auto;display:block;';
+          img.draggable = false;
+          preview.appendChild(img);
+          document.body.appendChild(preview);
+          state.previewEl = preview;
+        }
       }
 
       // Update preview position (offset so cursor is at top-left corner)
@@ -309,36 +473,58 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
       // Don't trigger on top edge — space tabs live there
 
       if (nearEdge && state.isDragging && window.electron?.startDrag) {
-        const image = state.image;
-        const filePath =
-          image.actualFilePath || image.url?.replace('local-file://', '');
-        if (filePath) {
-          state.nativeDragStarted = true;
+        if (state.isMultiDrag && window.electron?.startDragMultiple) {
+          // Multi-file native drag
+          const filePaths = state.draggedIds.map(id => {
+            const img = imagesRef.current.find(i => i.id === id);
+            return img?.actualFilePath || img?.url?.replace('local-file://', '') || '';
+          }).filter(Boolean);
 
-          // Remove custom preview — OS will show its own
-          if (state.previewEl) {
-            state.previewEl.remove();
-            state.previewEl = null;
+          if (filePaths.length > 0) {
+            state.nativeDragStarted = true;
+            if (state.previewEl) { state.previewEl.remove(); state.previewEl = null; }
+            if (state.lastHighlightedTab) { state.lastHighlightedTab.removeAttribute('data-drag-over'); state.lastHighlightedTab = null; }
+            document.body.style.cursor = '';
+
+            const iconUrl = state.image.thumbnailUrl || state.image.posterUrl || '';
+            const iconPath = iconUrl.replace('local-file://', '');
+            window.electron.startDragMultiple(filePaths, iconPath);
+
+            state.cleanupTimer = setTimeout(() => { cleanupDrag(); justDraggedRef.current = false; }, 10000);
           }
-          if (state.lastHighlightedTab) {
-            state.lastHighlightedTab.removeAttribute('data-drag-over');
-            state.lastHighlightedTab = null;
+        } else {
+          // Single file native drag (existing behavior)
+          const image = state.image;
+          const filePath =
+            image.actualFilePath || image.url?.replace('local-file://', '');
+          if (filePath) {
+            state.nativeDragStarted = true;
+
+            // Remove custom preview — OS will show its own
+            if (state.previewEl) {
+              state.previewEl.remove();
+              state.previewEl = null;
+            }
+            if (state.lastHighlightedTab) {
+              state.lastHighlightedTab.removeAttribute('data-drag-over');
+              state.lastHighlightedTab = null;
+            }
+            document.body.style.cursor = '';
+
+            const iconUrl = image.thumbnailUrl || image.posterUrl || '';
+            const iconPath = iconUrl.replace('local-file://', '');
+            const displayName =
+              image.title ||
+              image.imageContext?.substring(0, 60) ||
+              undefined;
+            window.electron.startDrag(filePath, iconPath, displayName);
+
+            // Cleanup timer — native drag will complete eventually
+            state.cleanupTimer = setTimeout(() => {
+              cleanupDrag();
+              justDraggedRef.current = false;
+            }, 10000);
           }
-          document.body.style.cursor = '';
-
-          const iconUrl = image.thumbnailUrl || image.posterUrl || '';
-          const iconPath = iconUrl.replace('local-file://', '');
-          const displayName =
-            image.title ||
-            image.imageContext?.substring(0, 60) ||
-            undefined;
-          window.electron.startDrag(filePath, iconPath, displayName);
-
-          // Cleanup timer — native drag will complete eventually
-          state.cleanupTimer = setTimeout(() => {
-            cleanupDrag();
-            justDraggedRef.current = false;
-          }, 10000);
         }
       }
 
@@ -360,7 +546,12 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
         while (target) {
           if (target.dataset.spaceTabId !== undefined) {
             if (target.dataset.spaceTabId !== '') {
-              onAssignToSpaceRef.current?.(state.image.id, target.dataset.spaceTabId);
+              const spaceId = target.dataset.spaceTabId;
+              if (state.isMultiDrag && onAssignImagesToSpaceRef.current) {
+                onAssignImagesToSpaceRef.current(state.draggedIds, spaceId);
+              } else {
+                onAssignToSpaceRef.current?.(state.image.id, spaceId);
+              }
             }
             break;
           }
@@ -401,7 +592,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
   }, []);
 
   return (
-    <div className={`w-full px-4 pt-5 pb-4 flex-1 min-h-full flex flex-col bg-gray-100 dark:bg-zinc-900 ${images.length === 0 && !searchQuery && !activeSpaceId ? 'overflow-hidden' : ''}`}>
+    <div
+      className={`w-full px-4 pt-5 pb-4 flex-1 min-h-full flex flex-col bg-gray-100 dark:bg-zinc-900 ${images.length === 0 && !searchQuery && !activeSpaceId ? 'overflow-hidden' : ''}`}
+      onMouseDown={rubberBand.handleMouseDown}
+    >
       {images.length === 0 ? (
         <div className="flex-1 flex items-stretch">
           {searchQuery ? (
@@ -476,9 +670,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                     key={image.id}
                     image={image}
                     imageRef={ref}
-                    isSelected={clickedImageId === image.id}
-                    isDragged={dragContext.draggedImageId === image.id}
+                    isModalTarget={clickedImageId === image.id}
+                    isDragged={activeDragIds.has(image.id) || dragContext.draggedImageId === image.id}
                     isAnimating={isAnimating}
+                    isMultiSelected={selection.selectedIds.has(image.id)}
+                    selectionCount={selection.selectionCount}
                     preloader={preloader}
                     retryAnalysis={retryAnalysis}
                     activeSpaceId={activeSpaceId}
@@ -486,8 +682,13 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
                     onImageClick={handleImageClick}
                     onImageDelete={handleDeleteImage}
                     onMouseDown={handleImageMouseDown}
+                    onCmdClick={handleCmdClick}
+                    onShiftClick={handleShiftClick}
                     onAssignToSpace={onAssignToSpace}
+                    onBulkAssignToSpace={handleBulkAssignToSpace}
+                    onBulkDelete={handleBulkDelete}
                     onRemoveFromSpace={onRemoveFromSpace}
+                    onBulkRemoveFromSpace={handleBulkRemoveFromSpace}
                   />
                 );
               })}
@@ -505,8 +706,30 @@ const ImageGrid: React.FC<ImageGridProps> = ({ images, onImageClick, onImageDele
           />
         </>
       )}
+
+      {/* Rubber band selection rectangle — portal to escape carousel transform */}
+      {rubberBand.isActive && rubberBand.rect && createPortal(
+        <div
+          className="fixed pointer-events-none border border-blue-400 bg-blue-400/10 z-50 rounded-sm"
+          style={{
+            left: rubberBand.rect.x,
+            top: rubberBand.rect.y,
+            width: rubberBand.rect.width,
+            height: rubberBand.rect.height,
+          }}
+        />,
+        document.body
+      )}
+
+      {/* Selection count indicator — portal to escape carousel transform */}
+      {selection.selectionCount > 0 && createPortal(
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg select-none">
+          {selection.selectionCount} selected
+        </div>,
+        document.body
+      )}
     </div>
   );
-};
+});
 
 export default ImageGrid;

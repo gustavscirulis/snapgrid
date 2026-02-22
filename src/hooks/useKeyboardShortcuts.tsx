@@ -8,19 +8,27 @@ interface KeyboardShortcutsProps {
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onSwitchSpace?: (index: number) => void;
+  onSelectAll?: () => void;
+  onDeleteSelected?: () => void;
+  onClearSelection?: () => boolean;
 }
 
-export function useKeyboardShortcuts({ 
-  onUndo, 
-  onFocusSearch, 
+export function useKeyboardShortcuts({
+  onUndo,
+  onFocusSearch,
   onUnfocusSearch,
   onOpenSettings,
   onZoomIn,
   onZoomOut,
-  onSwitchSpace
+  onSwitchSpace,
+  onSelectAll,
+  onDeleteSelected,
+  onClearSelection
 }: KeyboardShortcutsProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const isInputFocused = ['INPUT', 'TEXTAREA'].includes((event.target as HTMLElement).tagName);
+
       // Check for Command+Z (Mac) or Ctrl+Z (Windows/Linux)
       if ((event.metaKey || event.ctrlKey) && event.key === 'z') {
         event.preventDefault(); // Prevent default browser undo behavior
@@ -42,8 +50,12 @@ export function useKeyboardShortcuts({
         onOpenSettings?.();
       }
 
-      // Check for Escape to unfocus search
+      // Escape: clear selection first, then unfocus search
       if (event.key === 'Escape') {
+        if (onClearSelection?.()) {
+          // Selection was non-empty and was cleared — stop here
+          return;
+        }
         onUnfocusSearch();
       }
 
@@ -52,7 +64,7 @@ export function useKeyboardShortcuts({
         event.preventDefault(); // Prevent default browser zoom behavior
         onZoomIn?.();
       }
-      
+
       if ((event.metaKey || event.ctrlKey) && event.key === '-') {
         event.preventDefault(); // Prevent default browser zoom behavior
         onZoomOut?.();
@@ -63,9 +75,21 @@ export function useKeyboardShortcuts({
         event.preventDefault();
         onSwitchSpace?.(parseInt(event.key, 10));
       }
+
+      // Cmd+A: Select all (only when not in input)
+      if ((event.metaKey || event.ctrlKey) && event.key === 'a' && !isInputFocused) {
+        event.preventDefault();
+        onSelectAll?.();
+      }
+
+      // Delete/Backspace: Delete selected (only when not in input)
+      if ((event.key === 'Delete' || event.key === 'Backspace') && !isInputFocused) {
+        event.preventDefault();
+        onDeleteSelected?.();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onUndo, onFocusSearch, onUnfocusSearch, onOpenSettings, onZoomIn, onZoomOut, onSwitchSpace]);
-} 
+  }, [onUndo, onFocusSearch, onUnfocusSearch, onOpenSettings, onZoomIn, onZoomOut, onSwitchSpace, onSelectAll, onDeleteSelected, onClearSelection]);
+}

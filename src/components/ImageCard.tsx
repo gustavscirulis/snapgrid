@@ -21,9 +21,11 @@ import {
 interface ImageCardProps {
   image: ImageItem;
   imageRef: React.RefObject<HTMLDivElement>;
-  isSelected: boolean;
+  isModalTarget: boolean;
   isDragged: boolean;
   isAnimating: boolean;
+  isMultiSelected: boolean;
+  selectionCount: number;
   preloader: ReturnType<typeof useImagePreloader>;
   retryAnalysis?: (imageId: string) => Promise<void>;
   activeSpaceId?: string | null;
@@ -31,16 +33,23 @@ interface ImageCardProps {
   onImageClick: (image: ImageItem, ref: React.RefObject<HTMLDivElement>) => void;
   onImageDelete?: (id: string) => void;
   onMouseDown: (e: React.MouseEvent, image: ImageItem) => void;
+  onCmdClick?: (id: string) => void;
+  onShiftClick?: (id: string) => void;
   onAssignToSpace?: (imageId: string, spaceId: string | null) => Promise<void>;
+  onBulkAssignToSpace?: (spaceId: string | null) => Promise<void>;
+  onBulkDelete?: () => void;
   onRemoveFromSpace?: (imageId: string) => void;
+  onBulkRemoveFromSpace?: () => void;
 }
 
 const ImageCard = React.memo<ImageCardProps>(function ImageCard({
   image,
   imageRef,
-  isSelected,
+  isModalTarget,
   isDragged,
   isAnimating,
+  isMultiSelected,
+  selectionCount,
   preloader,
   retryAnalysis,
   activeSpaceId,
@@ -48,32 +57,51 @@ const ImageCard = React.memo<ImageCardProps>(function ImageCard({
   onImageClick,
   onImageDelete,
   onMouseDown,
+  onCmdClick,
+  onShiftClick,
   onAssignToSpace,
+  onBulkAssignToSpace,
+  onBulkDelete,
   onRemoveFromSpace,
+  onBulkRemoveFromSpace,
 }) {
   // Hover state is LOCAL to each card — no parent re-renders
   const [isHovered, setIsHovered] = useState(false);
 
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey) {
+      e.stopPropagation();
+      onCmdClick?.(image.id);
+      return;
+    }
+    if (e.shiftKey) {
+      e.stopPropagation();
+      onShiftClick?.(image.id);
+      return;
+    }
     onImageClick(image, imageRef);
-  }, [image, imageRef, onImageClick]);
+  }, [image, imageRef, onImageClick, onCmdClick, onShiftClick]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     onMouseDown(e, image);
   }, [image, onMouseDown]);
+
+  const showBulkMenu = isMultiSelected && selectionCount > 1;
 
   const cardContent = (
     <div
       ref={imageRef}
       draggable={false}
       onMouseDown={handleMouseDown}
-      className="rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800 shadow-sm hover:shadow-md relative group w-full transition-opacity duration-150"
+      className={`rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800 shadow-sm hover:shadow-md relative group w-full transition-all duration-150 ${
+        isMultiSelected ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-gray-100 dark:ring-offset-zinc-900' : ''
+      }`}
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
-        opacity: isSelected ? 0 : (isDragged ? 0.4 : 1),
-        visibility: isSelected ? 'hidden' : 'visible',
+        opacity: isModalTarget ? 0 : (isDragged ? 0.4 : 1),
+        visibility: isModalTarget ? 'hidden' : 'visible',
         pointerEvents: isAnimating ? 'none' : 'auto',
         cursor: 'default',
       }}
@@ -89,7 +117,7 @@ const ImageCard = React.memo<ImageCardProps>(function ImageCard({
         />
 
         <AnimatePresence>
-          {isHovered && (
+          {isHovered && !isMultiSelected && (
             <motion.div
               id={`pattern-tags-${image.id}`}
               className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent"
@@ -151,7 +179,11 @@ const ImageCard = React.memo<ImageCardProps>(function ImageCard({
     </div>
   );
 
-  if (onAssignToSpace && spaces.length > 0) {
+  // Determine which context menu to show
+  const hasSpaces = spaces.length > 0;
+  const needsContextMenu = hasSpaces && (onAssignToSpace || showBulkMenu);
+
+  if (needsContextMenu) {
     return (
       <div className="masonry-item">
         <ContextMenu>
@@ -159,29 +191,74 @@ const ImageCard = React.memo<ImageCardProps>(function ImageCard({
             {cardContent}
           </ContextMenuTrigger>
           <ContextMenuContent>
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>Move to</ContextMenuSubTrigger>
-              <ContextMenuSubContent>
-                {spaces.map(space => (
-                  <ContextMenuItem
-                    key={space.id}
-                    onClick={() => onAssignToSpace(image.id, space.id)}
-                    className={image.spaceId === space.id ? "font-medium" : ""}
-                  >
-                    {space.name}
-                    {image.spaceId === space.id && (
-                      <span className="ml-auto text-xs text-gray-400">current</span>
-                    )}
-                  </ContextMenuItem>
-                ))}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-            {activeSpaceId && image.spaceId && (
+            {showBulkMenu ? (
+              // Bulk context menu for multi-selection
               <>
-                <ContextMenuSeparator />
-                <ContextMenuItem onClick={() => onAssignToSpace(image.id, null)}>
-                  Remove from Space
-                </ContextMenuItem>
+                {onBulkAssignToSpace && (
+                  <ContextMenuSub>
+                    <ContextMenuSubTrigger>Move {selectionCount} items to</ContextMenuSubTrigger>
+                    <ContextMenuSubContent>
+                      {spaces.map(space => (
+                        <ContextMenuItem
+                          key={space.id}
+                          onClick={() => onBulkAssignToSpace(space.id)}
+                        >
+                          {space.name}
+                        </ContextMenuItem>
+                      ))}
+                    </ContextMenuSubContent>
+                  </ContextMenuSub>
+                )}
+                {activeSpaceId && onBulkRemoveFromSpace && (
+                  <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onClick={onBulkRemoveFromSpace}>
+                      Remove {selectionCount} items from Space
+                    </ContextMenuItem>
+                  </>
+                )}
+                {onBulkDelete && (
+                  <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      onClick={onBulkDelete}
+                      className="text-red-600 dark:text-red-400"
+                    >
+                      Delete {selectionCount} items
+                    </ContextMenuItem>
+                  </>
+                )}
+              </>
+            ) : (
+              // Single-item context menu
+              <>
+                {onAssignToSpace && (
+                  <ContextMenuSub>
+                    <ContextMenuSubTrigger>Move to</ContextMenuSubTrigger>
+                    <ContextMenuSubContent>
+                      {spaces.map(space => (
+                        <ContextMenuItem
+                          key={space.id}
+                          onClick={() => onAssignToSpace(image.id, space.id)}
+                          className={image.spaceId === space.id ? "font-medium" : ""}
+                        >
+                          {space.name}
+                          {image.spaceId === space.id && (
+                            <span className="ml-auto text-xs text-gray-400">current</span>
+                          )}
+                        </ContextMenuItem>
+                      ))}
+                    </ContextMenuSubContent>
+                  </ContextMenuSub>
+                )}
+                {activeSpaceId && image.spaceId && onAssignToSpace && (
+                  <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onClick={() => onAssignToSpace(image.id, null)}>
+                      Remove from Space
+                    </ContextMenuItem>
+                  </>
+                )}
               </>
             )}
           </ContextMenuContent>

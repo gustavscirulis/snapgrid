@@ -3,7 +3,7 @@ import { useImageStore, ImageItem } from "@/hooks/useImageStore";
 import { useSpaces, resolvePromptForSpace } from "@/hooks/useSpaces";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import UploadZone from "@/components/UploadZone";
-import ImageGrid from "@/components/ImageGrid";
+import ImageGrid, { ImageGridHandle } from "@/components/ImageGrid";
 import { SpaceTabBar } from "@/components/SpaceTabBar";
 import { Search, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,11 +21,13 @@ const Index = () => {
     isLoading,
     addImage,
     removeImage,
+    removeImages,
     undoDelete,
     canUndo,
     importFromFilePath,
     retryAnalysis,
     assignImageToSpace,
+    assignImagesToSpace,
     shuffleImages
   } = useImageStore();
 
@@ -46,6 +48,32 @@ const Index = () => {
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
   const [thumbnailSize, setThumbnailSize] = useState<'small' | 'medium' | 'large' | 'xl'>('medium');
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Refs for ImageGrid instances (for keyboard shortcut wiring)
+  const allGridRef = useRef<ImageGridHandle>(null);
+  const spaceGridRefs = useRef<Map<string, React.RefObject<ImageGridHandle>>>(new Map());
+
+  // Scroll container refs for rubber band
+  const allScrollRef = useRef<HTMLDivElement>(null);
+  const spaceScrollRefs = useRef<Map<string, React.RefObject<HTMLDivElement>>>(new Map());
+
+  // Ensure refs exist for each space
+  spaces.forEach(space => {
+    if (!spaceGridRefs.current.has(space.id)) {
+      spaceGridRefs.current.set(space.id, React.createRef<ImageGridHandle>());
+    }
+    if (!spaceScrollRefs.current.has(space.id)) {
+      spaceScrollRefs.current.set(space.id, React.createRef<HTMLDivElement>());
+    }
+  });
+
+  // Get the currently active grid ref
+  const getActiveGridRef = useCallback((): ImageGridHandle | null => {
+    if (activeSpaceId === null) {
+      return allGridRef.current;
+    }
+    return spaceGridRefs.current.get(activeSpaceId)?.current ?? null;
+  }, [activeSpaceId]);
 
   // Refs to track values for callbacks that shouldn't re-register on space/prompt change
   const activeSpaceIdRef = useRef(activeSpaceId);
@@ -133,7 +161,16 @@ const Index = () => {
         const space = spaces[index - 2];
         if (space) setActiveSpaceId(space.id);
       }
-    }
+    },
+    onSelectAll: () => {
+      getActiveGridRef()?.selectAll();
+    },
+    onDeleteSelected: () => {
+      getActiveGridRef()?.deleteSelected();
+    },
+    onClearSelection: () => {
+      return getActiveGridRef()?.clearSelection() ?? false;
+    },
   });
 
   // Prevent scrolling when in empty state
@@ -270,10 +307,19 @@ const Index = () => {
     removeImage(id);
   };
 
+  const handleDeleteImages = useCallback((ids: string[]) => {
+    removeImages(ids);
+  }, [removeImages]);
+
   const handleAssignImageToSpace = useCallback(async (imageId: string, spaceId: string | null) => {
     const prompt = resolvePromptForSpace(spaceId, spaces, allSpacePromptConfig);
     await assignImageToSpace(imageId, spaceId, prompt);
   }, [assignImageToSpace, spaces, allSpacePromptConfig]);
+
+  const handleAssignImagesToSpace = useCallback(async (imageIds: string[], spaceId: string | null) => {
+    const prompt = resolvePromptForSpace(spaceId, spaces, allSpacePromptConfig);
+    await assignImagesToSpace(imageIds, spaceId, prompt);
+  }, [assignImagesToSpace, spaces, allSpacePromptConfig]);
 
   const handleRemoveFromSpace = useCallback(async (id: string) => {
     const prompt = resolvePromptForSpace(null, spaces, allSpacePromptConfig);
@@ -359,12 +405,14 @@ const Index = () => {
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
             >
               {/* "All" page */}
-              <div className="w-full flex-shrink-0 overflow-y-auto h-full relative flex flex-col bg-gray-100 dark:bg-zinc-900 pt-[117px]">
+              <div ref={allScrollRef} className="w-full flex-shrink-0 overflow-y-auto h-full relative flex flex-col bg-gray-100 dark:bg-zinc-900 pt-[117px]">
                 {activeIndex <= 1 ? (
                   <ImageGrid
+                    ref={allGridRef}
                     images={allFilteredImages}
                     onImageClick={handleImageClick}
                     onImageDelete={handleDeleteImage}
+                    onImagesDelete={handleDeleteImages}
                     searchQuery={searchQuery}
                     onOpenSettings={() => setSettingsOpen(true)}
                     settingsOpen={settingsOpen}
@@ -373,6 +421,8 @@ const Index = () => {
                     spaces={spaces}
                     activeSpaceId={null}
                     onAssignToSpace={handleAssignImageToSpace}
+                    onAssignImagesToSpace={handleAssignImagesToSpace}
+                    scrollContainerRef={allScrollRef}
                   />
                 ) : (
                   <div className="flex-1" />
@@ -383,13 +433,18 @@ const Index = () => {
                 const spaceIndex = index + 1; // +1 because "All" is at index 0
                 const isNearActive = Math.abs(spaceIndex - activeIndex) <= 1;
 
+                const gridRef = spaceGridRefs.current.get(space.id)!;
+                const scrollRef = spaceScrollRefs.current.get(space.id)!;
+
                 return (
-                  <div key={space.id} className="w-full flex-shrink-0 overflow-y-auto h-full relative flex flex-col bg-gray-100 dark:bg-zinc-900 pt-[117px]">
+                  <div key={space.id} ref={scrollRef} className="w-full flex-shrink-0 overflow-y-auto h-full relative flex flex-col bg-gray-100 dark:bg-zinc-900 pt-[117px]">
                     {isNearActive ? (
                       <ImageGrid
+                        ref={gridRef}
                         images={spaceFilteredImages.get(space.id) || []}
                         onImageClick={handleImageClick}
                         onImageDelete={handleDeleteImage}
+                        onImagesDelete={handleDeleteImages}
                         searchQuery={searchQuery}
                         onOpenSettings={() => setSettingsOpen(true)}
                         settingsOpen={settingsOpen}
@@ -398,7 +453,9 @@ const Index = () => {
                         spaces={spaces}
                         activeSpaceId={space.id}
                         onAssignToSpace={handleAssignImageToSpace}
+                        onAssignImagesToSpace={handleAssignImagesToSpace}
                         onRemoveFromSpace={handleRemoveFromSpace}
+                        scrollContainerRef={scrollRef}
                       />
                     ) : (
                       <div className="flex-1" />
