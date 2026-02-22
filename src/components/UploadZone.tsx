@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect, createContext, useContext, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { validateMediaFile } from "@/lib/imageUtils";
-import { ImagePlus } from "lucide-react";
+
 
 // Create a context for the drag state
 export const DragContext = createContext<{
@@ -150,24 +150,13 @@ const UploadZone: React.FC<UploadZoneProps> = ({
   return (
     <DragContext.Provider value={{ isDragging, setInternalDragActive: handleSetInternalDragActive, draggedImageId, setDraggedImageId }}>
       <div
-        className={`min-h-screen w-full transition-all duration-300 ${
-          isDragging ? "bg-primary/5 border-primary/30" : ""
-        }`}
+        className="min-h-screen w-full"
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
         {children}
-
-        {isDragging && (
-          <div className="fixed inset-0 bg-background/40 backdrop-blur-sm flex items-center justify-center z-[150] pointer-events-none">
-            <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-2xl flex flex-col items-center animate-bounce-slow">
-              <ImagePlus className="w-16 h-16 text-gray-800 dark:text-gray-200 mb-4" />
-              <p className="text-xl font-medium text-gray-900 dark:text-gray-100">Drop your file here</p>
-            </div>
-          </div>
-        )}
 
         <input
           type="file"
