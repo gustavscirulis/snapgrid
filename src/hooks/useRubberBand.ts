@@ -13,6 +13,7 @@ interface UseRubberBandOptions {
   imageIds: string[];
   onSelectionChange: (ids: Set<string>) => void;
   existingSelection: Set<string>;
+  disabled?: boolean;
 }
 
 interface UseRubberBandReturn {
@@ -38,6 +39,7 @@ export function useRubberBand({
   imageIds,
   onSelectionChange,
   existingSelection,
+  disabled = false,
 }: UseRubberBandOptions): UseRubberBandReturn {
   const [isActive, setIsActive] = useState(false);
   const [rect, setRect] = useState<RubberBandRect | null>(null);
@@ -85,6 +87,8 @@ export function useRubberBand({
   }, [imageRefs]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Don't start rubber band when disabled (e.g. fullscreen modal open)
+    if (disabled) return;
     // Only start rubber band on left click on grid background
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest('.masonry-item')) return;
@@ -107,7 +111,7 @@ export function useRubberBand({
     };
 
     e.preventDefault();
-  }, [existingSelection]);
+  }, [disabled, existingSelection]);
 
   // Global mousemove/mouseup listeners
   useEffect(() => {
