@@ -94,6 +94,7 @@ const ImageGrid = forwardRef<ImageGridHandle, ImageGridProps>(function ImageGrid
     imageIds: orderedImageIds,
     onSelectionChange: selection.setSelection,
     existingSelection: selection.selectedIds,
+    disabled: modalOpen,
   });
 
   // Expose methods to parent via ref
@@ -225,6 +226,7 @@ const ImageGrid = forwardRef<ImageGridHandle, ImageGridProps>(function ImageGrid
       }
     }
 
+    selection.clear();
     setIsAnimating(true);
     setSelectedImage(imageWithDimensions);
     setSelectedImageRef(ref);
@@ -232,7 +234,7 @@ const ImageGrid = forwardRef<ImageGridHandle, ImageGridProps>(function ImageGrid
     setModalOpen(true);
     setClickedImageId(image.id);
     onImageClick(image);
-  }, [onImageClick]);
+  }, [onImageClick, selection]);
 
   const handleAnimationComplete = useCallback((definition: string) => {
     if (definition === "exit") {
