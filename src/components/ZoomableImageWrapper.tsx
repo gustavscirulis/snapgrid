@@ -43,34 +43,42 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
   const lastPosition = useRef({ x: 0, y: 0 });
   const animationRef = useRef<number>();
 
-  // Refs for animation loop (bypass React re-renders during momentum)
+  // Refs that mirror state — used by event handlers attached via addEventListener
+  // (which would otherwise close over stale state values)
+  const scaleRef = useRef(1);
   const velRef = useRef({ x: 0, y: 0 });
   const posRef = useRef({ x: 0, y: 0 });
   const cachedBoundsRef = useRef({ width: 0, height: 0 });
+
+  // Keep refs in sync with state
+  useEffect(() => { scaleRef.current = scale; }, [scale]);
+  useEffect(() => { posRef.current = position; }, [position]);
 
   const MIN_SCALE = 1;
   const MAX_SCALE = 4;
   const FRICTION = 0.95;
   const MIN_VELOCITY = 0.5;
 
-  // Constrain position within bounds using cached dimensions
-  const constrainPosition = useCallback((x: number, y: number, containerWidth?: number, containerHeight?: number) => {
-    const w = containerWidth ?? cachedBoundsRef.current.width;
-    const h = containerHeight ?? cachedBoundsRef.current.height;
-    if (!w || !h) return { x, y };
+  // Constrain position so the zoomed image doesn't pan out of view.
+  // With transform model `translate(x,y) scale(s)` and origin center,
+  // position values are screen-pixel offsets from the natural centered position.
+  const constrainPosition = useCallback((x: number, y: number, currentScale?: number) => {
+    const container = containerRef.current;
+    if (!container) return { x, y };
 
-    const scaledWidth = w * scale;
-    const scaledHeight = h * scale;
+    const rect = container.getBoundingClientRect();
+    const s = currentScale ?? scaleRef.current;
 
-    const minVisibleRatio = 0.5;
-    const maxOffsetX = (scaledWidth - scaledWidth * minVisibleRatio) / scale;
-    const maxOffsetY = (scaledHeight - scaledHeight * minVisibleRatio) / scale;
+    // Max offset = how far the image edge can travel from center before
+    // the opposite edge passes the container center (at least half visible)
+    const maxX = Math.max(0, (rect.width * s - rect.width) / 2);
+    const maxY = Math.max(0, (rect.height * s - rect.height) / 2);
 
     return {
-      x: Math.max(-maxOffsetX, Math.min(maxOffsetX, x)),
-      y: Math.max(-maxOffsetY, Math.min(maxOffsetY, y))
+      x: Math.max(-maxX, Math.min(maxX, x)),
+      y: Math.max(-maxY, Math.min(maxY, y))
     };
-  }, [scale]);
+  }, []);
 
   // Momentum animation — writes directly to DOM, no React state during loop
   const animateMomentum = useCallback(() => {
@@ -94,21 +102,16 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     // Write directly to DOM — no React re-render
     if (innerRef.current) {
       innerRef.current.style.transform =
-        `scale(${scale}) translate(${newPos.x / scale}px, ${newPos.y / scale}px)`;
+        `translate(${newPos.x}px, ${newPos.y}px) scale(${scaleRef.current})`;
     }
 
     animationRef.current = requestAnimationFrame(animateMomentum);
-  }, [constrainPosition, scale]);
+  }, [constrainPosition]);
 
   // Start momentum animation
   const startMomentum = useCallback((velX: number, velY: number) => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
-    }
-    // Cache container dimensions once before the loop
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      cachedBoundsRef.current = { width: rect.width, height: rect.height };
     }
     velRef.current = { x: velX, y: velY };
     posRef.current = { ...position };
@@ -116,40 +119,76 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     animationRef.current = requestAnimationFrame(animateMomentum);
   }, [animateMomentum, position]);
 
+  // Cursor-point zoom: adjusts translate so the image point under the cursor
+  // stays pinned as scale changes
   const handleWheel = useCallback((e: WheelEvent) => {
-    // Don't handle zoom if disabled
     if (disableZoom) return;
-    
-    // Only zoom if Cmd (Meta) or Ctrl is pressed
     if (!e.metaKey && !e.ctrlKey) return;
-    
     e.preventDefault();
-    
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale + delta));
-    
-    setScale(newScale);
-    
-    // If zooming out to 1 or below, reset position to center
-    if (newScale <= 1) {
-      setPosition({ x: 0, y: 0 });
-      onZoomStateChange?.(newScale, { x: 0, y: 0 });
-    } else {
-      onZoomStateChange?.(newScale, position);
+
+    // Cancel any active momentum
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      setIsAnimating(false);
     }
-  }, [scale, disableZoom]);
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const oldScale = scaleRef.current;
+    const oldPos = posRef.current;
+
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, oldScale + delta));
+
+    if (newScale <= 1) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+      posRef.current = { x: 0, y: 0 };
+      scaleRef.current = 1;
+      onZoomStateChange?.(1, { x: 0, y: 0 });
+      return;
+    }
+
+    // Cursor position relative to container
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+
+    // Container center (transform origin)
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    // Point under cursor in image-centered coordinates (before zoom change)
+    const pointX = (cx - centerX - oldPos.x) / oldScale;
+    const pointY = (cy - centerY - oldPos.y) / oldScale;
+
+    // New translate to keep that point under cursor after zoom change
+    const newX = cx - centerX - pointX * newScale;
+    const newY = cy - centerY - pointY * newScale;
+
+    const newPos = { x: newX, y: newY };
+
+    // Update refs immediately for subsequent wheel events in same frame batch
+    scaleRef.current = newScale;
+    posRef.current = newPos;
+
+    setScale(newScale);
+    setPosition(newPos);
+    onZoomStateChange?.(newScale, newPos);
+  }, [disableZoom, onZoomStateChange]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (hasDragged) return; // Don't handle clicks if user just dragged
-    
+
     e.stopPropagation(); // Prevent event bubbling
-    
+
     // Clear any existing timeout
     if (clickTimeoutRef.current) {
       clearTimeout(clickTimeoutRef.current);
       clickTimeoutRef.current = null;
     }
-    
+
     // Set a timeout for single click
     clickTimeoutRef.current = setTimeout(() => {
       // Single click - close modal directly (let parent handle zoom state in exit animation)
@@ -161,13 +200,13 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
 
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent event bubbling
-    
+
     // Clear the single click timeout
     if (clickTimeoutRef.current) {
       clearTimeout(clickTimeoutRef.current);
       clickTimeoutRef.current = null;
     }
-    
+
     // Don't handle zoom if disabled
     if (disableZoom) {
       // For disabled zoom, double-click just closes the modal
@@ -176,12 +215,29 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
       }
       return;
     }
-    
+
     if (scale === 1) {
-      // Zoom in to 2x
-      setScale(2);
-      setPosition({ x: 0, y: 0 }); // Keep centered
-      onZoomStateChange?.(2, { x: 0, y: 0 });
+      // Zoom to 2x centered on the click point
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      const newScale = 2;
+      // Point under cursor in image-centered coords at scale 1
+      const pointX = cx - centerX;
+      const pointY = cy - centerY;
+
+      // Keep that point under cursor at new scale
+      const newX = cx - centerX - pointX * newScale;
+      const newY = cy - centerY - pointY * newScale;
+
+      setScale(newScale);
+      setPosition({ x: newX, y: newY });
+      onZoomStateChange?.(newScale, { x: newX, y: newY });
     } else {
       // Zoom out to fit
       setScale(1);
@@ -192,22 +248,26 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (disableZoom || scale <= 1) return; // Only allow dragging when zoomed in and zoom is enabled
-    
+
     e.preventDefault();
-    
-    // Stop any ongoing momentum animation
+
+    // Stop any ongoing momentum animation and sync DOM position to state
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       setIsAnimating(false);
+      // posRef holds the real position during momentum (written to DOM directly),
+      // so sync it to React state before starting the new drag
+      setPosition({ ...posRef.current });
     }
-    
+
+    const currentPos = posRef.current;
     setIsDragging(true);
     setHasDragged(false); // Reset drag flag
     setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
+      x: e.clientX - currentPos.x,
+      y: e.clientY - currentPos.y
     });
-    
+
     // Initialize velocity tracking
     lastMoveTime.current = Date.now();
     lastPosition.current = { x: e.clientX, y: e.clientY };
@@ -238,11 +298,6 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     lastMoveTime.current = now;
     lastPosition.current = { x: e.clientX, y: e.clientY };
 
-    // Use cached bounds for constrain during drag
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      cachedBoundsRef.current = { width: rect.width, height: rect.height };
-    }
     const constrainedPos = constrainPosition(newX, newY);
     setPosition(constrainedPos);
     onZoomStateChange?.(scale, constrainedPos);
@@ -250,12 +305,12 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-    
+
     // Start momentum animation if there's sufficient velocity and zoom is enabled
     if (!disableZoom && scale > 1 && (Math.abs(velocity.x) > MIN_VELOCITY || Math.abs(velocity.y) > MIN_VELOCITY)) {
       startMomentum(velocity.x, velocity.y);
     }
-    
+
     // Reset hasDragged after a short delay to allow click handler to check it
     setTimeout(() => setHasDragged(false), 10);
   }, [scale, velocity, startMomentum, disableZoom]);
@@ -272,6 +327,19 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     };
   }, [handleWheel]);
 
+  // Reset zoom on window resize (container dimensions change, position becomes stale)
+  useEffect(() => {
+    const handleResize = () => {
+      if (scaleRef.current > 1) {
+        setScale(1);
+        setPosition({ x: 0, y: 0 });
+        onZoomStateChange?.(1, { x: 0, y: 0 });
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [onZoomStateChange]);
+
   // Cleanup animation on unmount
   useEffect(() => {
     return () => {
@@ -281,7 +349,7 @@ export const ZoomableImageWrapper: React.FC<ZoomableImageWrapperProps> = ({
     };
   }, []);
 
-  const transform = `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`;
+  const transform = `translate(${position.x}px, ${position.y}px) scale(${scale})`;
 
   return (
     <div

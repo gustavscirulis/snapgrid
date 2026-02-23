@@ -527,11 +527,12 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
         x: initialX,
         y: initialY,
         borderRadius: "0.5rem",
-        // Only apply inverse transforms when actually zoomed in
+        // Apply inverse zoom transforms so the exit animation undoes the
+        // child's translate(x,y) scale(s) and shrinks back to thumbnail cleanly
         ...(zoomState.scale > 1 ? {
           scale: 1 / zoomState.scale,
-          translateX: -zoomState.position.x / zoomState.scale,
-          translateY: -zoomState.position.y / zoomState.scale,
+          x: initialX - zoomState.position.x / zoomState.scale,
+          y: initialY - zoomState.position.y / zoomState.scale,
         } : {}),
         transition: zoomState.scale > 1 ? {
           type: "spring",
@@ -578,7 +579,7 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
           <div
             className="fixed inset-0 z-50 flex justify-center"
             style={{
-              overflow: 'hidden',
+              overflow: (zoomState.scale > 1 && openAnimComplete) ? 'visible' : 'hidden',
               paddingTop: 0,
               paddingBottom: isTallImage ? '40px' : '20px'
             }}
@@ -599,8 +600,10 @@ const AnimatedImageModal: React.FC<AnimatedImageModalProps> = ({
                 minWidth: initialPosition.width,
                 minHeight: initialPosition.height,
                 transformOrigin: 'center center',
-                overflowY: isTallImage && openAnimComplete ? 'auto' : 'hidden',
-                overflowX: 'hidden',
+                overflowY: (zoomState.scale > 1 && openAnimComplete)
+                  ? 'visible'
+                  : (isTallImage && openAnimComplete ? 'auto' : 'hidden'),
+                overflowX: (zoomState.scale > 1 && openAnimComplete) ? 'visible' : 'hidden',
               }}
               variants={modalVariants}
               initial="initial"
