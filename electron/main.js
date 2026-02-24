@@ -1612,7 +1612,7 @@ ipcMain.handle('queue:start-watching', async () => {
     queueWatcher = chokidar.watch(queueDir, {
       ignored: /(^|[\/\\])\../, // ignore dotfiles
       persistent: true,
-      ignoreInitial: false
+      ignoreInitial: true
     });
 
     queueWatcher.on('add', (filePath) => {
