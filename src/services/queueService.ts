@@ -7,6 +7,7 @@ export interface QueueStats {
 
 export class QueueService {
   private isProcessing = false;
+  private processingFiles = new Set<string>();
   private queueWatcherCleanup: (() => void) | null = null;
 
   async startWatching(): Promise<void> {
@@ -104,17 +105,21 @@ export class QueueService {
   }
 
   private async processFile(filePath: string): Promise<void> {
+    if (this.processingFiles.has(filePath)) {
+      console.log('Already processing queued file:', filePath);
+      return;
+    }
+    this.processingFiles.add(filePath);
     try {
       // Get file info from main process
       const fileResult = await window.electron.queueProcessFile(filePath);
-      
+
       if (!fileResult.success) {
         console.error('Failed to get file info:', fileResult.error);
         return;
       }
 
       // Import the file using existing import logic
-      // We'll need to trigger the addImage function from useImageStore
       const event = new CustomEvent('queue-import-file', {
         detail: { filePath: fileResult.filePath }
       });
@@ -122,6 +127,8 @@ export class QueueService {
 
     } catch (error) {
       console.error('Error processing queued file:', error);
+    } finally {
+      this.processingFiles.delete(filePath);
     }
   }
 
