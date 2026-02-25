@@ -20,6 +20,8 @@ import {
   type AIProvider,
 } from "@/services/modelService";
 import { toast } from "sonner";
+import { toast as radixToast } from "@/hooks/use-toast";
+import { fetchReleaseNotes, buildWhatsNewDescription } from "@/components/UpdateNotification";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Space, AllSpacePromptConfig } from "@/hooks/useSpaces";
 
@@ -801,6 +803,30 @@ const DeveloperSection = ({ onShuffleImages }: { onShuffleImages?: () => void })
           className="h-7 text-xs border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50"
         >
           Reset
+        </Button>
+      </div>
+
+      <div className="flex justify-between items-center gap-4">
+        <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Show "What's New" toast</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async () => {
+            const version = window.electron?.appVersion || '1.0.0';
+            try {
+              const items = await fetchReleaseNotes(version);
+              radixToast({
+                title: `Updated to v${version}`,
+                description: buildWhatsNewDescription(version, items),
+                duration: 8000,
+              });
+            } catch {
+              toast.error('Failed to fetch release notes from GitHub');
+            }
+          }}
+          className="h-7 text-xs border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+        >
+          Show
         </Button>
       </div>
     </section>
