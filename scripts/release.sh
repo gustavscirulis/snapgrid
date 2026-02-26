@@ -4,11 +4,20 @@ set -e
 # SnapGrid Release Script
 # Builds, signs, notarizes, and publishes a draft GitHub release.
 #
+# Usage:
+#   ./scripts/release.sh           - Build, notarize, and publish to GitHub
+#   ./scripts/release.sh --local   - Build and notarize only (no upload)
+#
 # Required .env variables:
 #   APPLE_ID                      - Apple ID email for notarization
 #   APPLE_APP_SPECIFIC_PASSWORD   - App-specific password
 #   APPLE_TEAM_ID                 - Apple Developer Team ID
-#   GH_TOKEN                      - GitHub personal access token (repo scope)
+#   GH_TOKEN                      - GitHub personal access token (repo scope, not needed for --local)
+
+LOCAL_ONLY=false
+if [ "$1" = "--local" ]; then
+  LOCAL_ONLY=true
+fi
 
 # Load .env
 if [ -f .env ]; then
@@ -30,7 +39,7 @@ missing=()
 [ -z "$APPLE_ID" ] && missing+=("APPLE_ID")
 [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] && missing+=("APPLE_APP_SPECIFIC_PASSWORD")
 [ -z "$APPLE_TEAM_ID" ] && missing+=("APPLE_TEAM_ID")
-[ -z "$GH_TOKEN" ] && missing+=("GH_TOKEN")
+[ "$LOCAL_ONLY" = false ] && [ -z "$GH_TOKEN" ] && missing+=("GH_TOKEN")
 
 if [ ${#missing[@]} -gt 0 ]; then
   echo "Error: Missing required environment variables:"
@@ -43,7 +52,11 @@ fi
 # Show version and confirm
 VERSION=$(node -p "require('./package.json').version")
 echo ""
-echo "Publishing SnapGrid v${VERSION} as a draft release..."
+if [ "$LOCAL_ONLY" = true ]; then
+  echo "Building SnapGrid v${VERSION} locally (no upload)..."
+else
+  echo "Publishing SnapGrid v${VERSION} as a draft release..."
+fi
 echo ""
 
 # Generate release notes from git log
@@ -117,22 +130,30 @@ if generate_release_notes; then
   echo ""
 fi
 
-# Build, sign, notarize, and publish
-npm run electron:release
+# Build, sign, and notarize
+if [ "$LOCAL_ONLY" = true ]; then
+  npm run build && npx electron-builder build --publish never
+else
+  npm run electron:release
 
-# Tag the release
-if ! git tag -l "v${VERSION}" | grep -q .; then
-  git tag "v${VERSION}"
-  git push origin "v${VERSION}"
-  echo "Tagged v${VERSION}"
-fi
+  # Tag the release
+  if ! git tag -l "v${VERSION}" | grep -q .; then
+    git tag "v${VERSION}"
+    git push origin "v${VERSION}"
+    echo "Tagged v${VERSION}"
+  fi
 
-# Update the GitHub release with generated notes
-if [ -n "$RELEASE_NOTES" ]; then
-  echo "Updating release notes on GitHub..."
-  gh release edit "v${VERSION}" --notes "$(echo -e "$RELEASE_NOTES")" 2>/dev/null || \
-    echo "Note: Could not update release notes (release may not exist yet). You can manually set them on GitHub."
+  # Update the GitHub release with generated notes
+  if [ -n "$RELEASE_NOTES" ]; then
+    echo "Updating release notes on GitHub..."
+    gh release edit "v${VERSION}" --notes "$(echo -e "$RELEASE_NOTES")" 2>/dev/null || \
+      echo "Note: Could not update release notes (release may not exist yet). You can manually set them on GitHub."
+  fi
 fi
 
 echo ""
-echo "Done! SnapGrid v${VERSION} draft release is ready on GitHub."
+if [ "$LOCAL_ONLY" = true ]; then
+  echo "Done! SnapGrid v${VERSION} build is in the release/ directory."
+else
+  echo "Done! SnapGrid v${VERSION} draft release is ready on GitHub."
+fi
