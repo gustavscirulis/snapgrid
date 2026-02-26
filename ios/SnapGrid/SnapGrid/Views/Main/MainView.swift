@@ -8,6 +8,7 @@ struct MainView: View {
     @State private var searchText = ""
     @State private var isLoading = true
     @State private var error: String?
+    @State private var hasAttemptedRescan = false
 
     private var filteredItems: [SnapGridItem] {
         var result = items
@@ -75,6 +76,7 @@ struct MainView: View {
                         }
                     }
                     .refreshable {
+                        hasAttemptedRescan = false
                         await loadContent()
                     }
                 }
@@ -113,16 +115,26 @@ struct MainView: View {
         let spacesManager = SpacesManager(fileSystem: fileSystem)
 
         do {
-            let loadedItems = try await loader.loadAllItems()
-            print("[MainView] Loaded \(loadedItems.count) items")
+            let result = try await loader.loadAllItems()
+            print("[MainView] Loaded \(result.items.count) items")
 
             // Load spaces from spaces.json (synced by desktop app)
             let loadedSpaces = (try? spacesManager.loadSpaces()) ?? []
             print("[MainView] Loaded \(loadedSpaces.count) spaces")
 
-            self.items = loadedItems
+            self.items = result.items
             self.spaces = loadedSpaces
             self.isLoading = false
+
+            // If some metadata files were still downloading from iCloud, re-scan once after a delay
+            if result.skippedCount > 0 && !hasAttemptedRescan {
+                hasAttemptedRescan = true
+                print("[MainView] \(result.skippedCount) metadata files pending iCloud download, will re-scan in 15s")
+                Task {
+                    try? await Task.sleep(for: .seconds(15))
+                    await loadContent()
+                }
+            }
         } catch {
             print("[MainView] Error loading: \(error)")
             self.error = error.localizedDescription

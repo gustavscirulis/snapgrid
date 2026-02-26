@@ -15,6 +15,7 @@
 		A100000006 /* MetadataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000006 /* MetadataLoader.swift */; };
 		A100000007 /* SpacesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000007 /* SpacesManager.swift */; };
 		A100000008 /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000008 /* ThumbnailCache.swift */; };
+		A100000020 /* iCloudDownloadMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000020 /* iCloudDownloadMonitor.swift */; };
 		A100000009 /* Color+SnapGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000009 /* Color+SnapGrid.swift */; };
 		A100000010 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000010 /* OnboardingView.swift */; };
 		A100000011 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000011 /* MainView.swift */; };
@@ -37,6 +38,7 @@
 		B100000006 /* MetadataLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataLoader.swift; sourceTree = "<group>"; };
 		B100000007 /* SpacesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacesManager.swift; sourceTree = "<group>"; };
 		B100000008 /* ThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCache.swift; sourceTree = "<group>"; };
+		B100000020 /* iCloudDownloadMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudDownloadMonitor.swift; sourceTree = "<group>"; };
 		B100000009 /* Color+SnapGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+SnapGrid.swift"; sourceTree = "<group>"; };
 		B100000010 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		B100000011 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -117,6 +119,7 @@
 			isa = PBXGroup;
 			children = (
 				B100000005 /* FileSystemManager.swift */,
+				B100000020 /* iCloudDownloadMonitor.swift */,
 				B100000006 /* MetadataLoader.swift */,
 				B100000007 /* SpacesManager.swift */,
 				B100000008 /* ThumbnailCache.swift */,
@@ -279,6 +282,7 @@
 				A100000016 /* ImageDetailView.swift in Sources */,
 				A100000017 /* ZoomableImageView.swift in Sources */,
 				A100000018 /* EmptyStateView.swift in Sources */,
+				A100000020 /* iCloudDownloadMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
