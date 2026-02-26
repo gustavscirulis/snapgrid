@@ -6,6 +6,7 @@ struct ImageDetailView: View {
     @State private var image: UIImage?
     @State private var player: AVPlayer?
     @State private var isLoading = true
+    @State private var loadFailed = false
 
     var body: some View {
         ZStack {
@@ -31,6 +32,27 @@ struct ImageDetailView: View {
                     } else if let image {
                         ZoomableImageView(image: image)
                             .aspectRatio(item.aspectRatio, contentMode: .fit)
+                    } else if loadFailed {
+                        Rectangle()
+                            .fill(Color.snapDarkMuted)
+                            .aspectRatio(item.aspectRatio, contentMode: .fit)
+                            .overlay {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "icloud.and.arrow.down")
+                                        .font(.system(size: 28))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                    Text("Couldn't download from iCloud")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                    Button("Retry") {
+                                        loadFailed = false
+                                        isLoading = true
+                                        Task { await loadFullImage() }
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(.white.opacity(0.6))
+                                }
+                            }
                     } else if isLoading {
                         Rectangle()
                             .fill(Color.snapDarkMuted)
@@ -91,7 +113,9 @@ struct ImageDetailView: View {
             isLoading = false
             return
         }
-        image = await ThumbnailCache.shared.loadImage(for: url)
+        let loaded = await ThumbnailCache.shared.loadImageWhenReady(for: url, timeout: 180)
+        image = loaded
+        loadFailed = loaded == nil
         isLoading = false
     }
 }

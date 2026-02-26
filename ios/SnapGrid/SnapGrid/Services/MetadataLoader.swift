@@ -1,5 +1,10 @@
 import Foundation
 
+struct LoadResult {
+    let items: [SnapGridItem]
+    let skippedCount: Int
+}
+
 class MetadataLoader {
     private let fileSystem: FileSystemManager
 
@@ -7,7 +12,7 @@ class MetadataLoader {
         self.fileSystem = fileSystem
     }
 
-    func loadAllItems() async throws -> [SnapGridItem] {
+    func loadAllItems() async throws -> LoadResult {
         guard let metadataDir = fileSystem.metadataDir,
               let imagesDir = fileSystem.imagesDir,
               let thumbnailsDir = fileSystem.thumbnailsDir else {
@@ -56,18 +61,24 @@ class MetadataLoader {
 
                         let id = url.deletingPathExtension().lastPathComponent
                         let ext = item.isVideo ? "mp4" : "png"
+                        let mediaURL = imagesDir.appendingPathComponent("\(id).\(ext)")
 
-                        let mediaFileURL = imagesDir.appendingPathComponent("\(id).\(ext)")
-                        item.mediaURL = mediaFileURL
+                        // Skip orphaned metadata (JSON exists but media file doesn't)
+                        if !fm.fileExists(atPath: mediaURL.path) {
+                            print("[MetadataLoader] Media file missing for: \(id), skipping")
+                            continue
+                        }
+
+                        item.mediaURL = mediaURL
                         if !item.isVideo {
                             item.thumbnailURL = thumbnailsDir.appendingPathComponent("\(id).jpg")
                         }
 
                         // Proactively trigger iCloud download of media file
-                        if let rv = try? mediaFileURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
+                        if let rv = try? mediaURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
                            let status = rv.ubiquitousItemDownloadingStatus,
                            status != .current {
-                            try? fm.startDownloadingUbiquitousItem(at: mediaFileURL)
+                            try? fm.startDownloadingUbiquitousItem(at: mediaURL)
                         }
 
                         loadedItems.append(item)
@@ -82,7 +93,7 @@ class MetadataLoader {
                         ($0.createdDate ?? .distantPast) > ($1.createdDate ?? .distantPast)
                     }
 
-                    continuation.resume(returning: sorted)
+                    continuation.resume(returning: LoadResult(items: sorted, skippedCount: skipped))
                 } catch {
                     print("[MetadataLoader] Error: \(error)")
                     continuation.resume(throwing: error)

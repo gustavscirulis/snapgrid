@@ -4,9 +4,10 @@ struct GridItemView: View {
     let item: SnapGridItem
     let width: CGFloat
     @State private var thumbnail: UIImage?
+    @State private var loadFailed = false
 
     private var height: CGFloat {
-        width / item.aspectRatio
+        width / item.gridAspectRatio
     }
 
     var body: some View {
@@ -16,8 +17,26 @@ struct GridItemView: View {
                 Image(uiImage: thumbnail)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: width, height: height)
+                    .frame(width: width, height: height, alignment: .top)
                     .clipped()
+            } else if loadFailed {
+                Rectangle()
+                    .fill(Color.snapDarkMuted)
+                    .frame(width: width, height: height)
+                    .overlay {
+                        VStack(spacing: 6) {
+                            Image(systemName: "icloud.and.arrow.down")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.white.opacity(0.3))
+                            Text("Tap to retry")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.white.opacity(0.3))
+                        }
+                    }
+                    .onTapGesture {
+                        loadFailed = false
+                        Task { await loadThumbnail() }
+                    }
             } else {
                 Rectangle()
                     .fill(Color.snapDarkMuted)
@@ -52,18 +71,15 @@ struct GridItemView: View {
     }
 
     private func loadThumbnail() async {
-        guard let url = item.thumbnailURL ?? item.mediaURL else { return }
+        guard let url = item.thumbnailURL ?? item.mediaURL else {
+            loadFailed = true
+            return
+        }
 
-        // Try loading — if file isn't downloaded from iCloud yet,
-        // retry a few times with delay to let the download finish
-        for attempt in 0..<5 {
-            if let loaded = await ThumbnailCache.shared.loadImage(for: url) {
-                thumbnail = loaded
-                return
-            }
-            if attempt < 4 {
-                try? await Task.sleep(for: .seconds(Double(attempt + 1)))
-            }
+        if let loaded = await ThumbnailCache.shared.loadImageWhenReady(for: url, timeout: 120) {
+            thumbnail = loaded
+        } else {
+            loadFailed = true
         }
     }
 }
