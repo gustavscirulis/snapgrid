@@ -74,8 +74,10 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
           await window.electron.updateMetadata({
             id: updatedMedia.id,
             metadata: {
-              ...updatedMedia,
-              filePath: savedFilePath
+              patterns: updatedMedia.patterns,
+              imageContext: updatedMedia.imageContext,
+              isAnalyzing: false,
+              filePath: savedFilePath,
             }
           });
         } catch (error) {
@@ -88,17 +90,18 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
     } catch (error) {
       console.error('Media analysis failed:', error);
       toast.error("Analysis failed: " + (error instanceof Error ? error.message : 'Unknown error'));
-      
+
       const updatedMedia = { ...media, isAnalyzing: false, error: 'Analysis failed' };
-      
+
       // Make sure to save the error state in metadata
       if (window.electron && savedFilePath) {
         try {
           await window.electron.updateMetadata({
             id: updatedMedia.id,
             metadata: {
-              ...updatedMedia,
-              filePath: savedFilePath
+              isAnalyzing: false,
+              error: 'Analysis failed',
+              filePath: savedFilePath,
             }
           });
         } catch (metadataError) {
@@ -175,10 +178,9 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
           await window.electron.updateMetadata({
             id: mediaToAnalyze.id,
             metadata: {
-              ...mediaToAnalyze,
               isAnalyzing: false,
               error: 'Analysis failed',
-              filePath: mediaToAnalyze.actualFilePath
+              filePath: mediaToAnalyze.actualFilePath,
             }
           });
         } catch (metadataError) {
