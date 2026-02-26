@@ -4,6 +4,7 @@ import AVKit
 struct ImageDetailView: View {
     let item: SnapGridItem
     @State private var image: UIImage?
+    @State private var player: AVPlayer?
     @State private var isLoading = true
 
     var body: some View {
@@ -14,9 +15,19 @@ struct ImageDetailView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     // Media
-                    if item.isVideo, let url = item.mediaURL {
-                        VideoPlayer(player: AVPlayer(url: url))
-                            .aspectRatio(item.aspectRatio, contentMode: .fit)
+                    if item.isVideo {
+                        if let player {
+                            VideoPlayer(player: player)
+                                .aspectRatio(item.aspectRatio, contentMode: .fit)
+                        } else {
+                            Rectangle()
+                                .fill(Color.snapDarkMuted)
+                                .aspectRatio(item.aspectRatio, contentMode: .fit)
+                                .overlay {
+                                    ProgressView()
+                                        .tint(.white.opacity(0.3))
+                                }
+                        }
                     } else if let image {
                         ZoomableImageView(image: image)
                             .aspectRatio(item.aspectRatio, contentMode: .fit)
@@ -40,8 +51,39 @@ struct ImageDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
-            await loadFullImage()
+            if item.isVideo, let url = item.mediaURL {
+                await prepareVideoPlayer(url: url)
+            } else {
+                await loadFullImage()
+            }
         }
+        .onDisappear {
+            player?.pause()
+            player = nil
+        }
+    }
+
+    private func prepareVideoPlayer(url: URL) async {
+        let fm = FileManager.default
+
+        // Wait for iCloud download if needed
+        if let rv = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
+           let status = rv.ubiquitousItemDownloadingStatus,
+           status != .current {
+            try? fm.startDownloadingUbiquitousItem(at: url)
+            for _ in 0..<30 {
+                try? await Task.sleep(for: .seconds(1))
+                if let rv = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
+                   rv.ubiquitousItemDownloadingStatus == .current {
+                    break
+                }
+            }
+        }
+
+        let newPlayer = AVPlayer(url: url)
+        self.player = newPlayer
+        newPlayer.play()
+        isLoading = false
     }
 
     private func loadFullImage() async {

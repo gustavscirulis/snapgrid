@@ -57,9 +57,17 @@ class MetadataLoader {
                         let id = url.deletingPathExtension().lastPathComponent
                         let ext = item.isVideo ? "mp4" : "png"
 
-                        item.mediaURL = imagesDir.appendingPathComponent("\(id).\(ext)")
+                        let mediaFileURL = imagesDir.appendingPathComponent("\(id).\(ext)")
+                        item.mediaURL = mediaFileURL
                         if !item.isVideo {
                             item.thumbnailURL = thumbnailsDir.appendingPathComponent("\(id).jpg")
+                        }
+
+                        // Proactively trigger iCloud download of media file
+                        if let rv = try? mediaFileURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
+                           let status = rv.ubiquitousItemDownloadingStatus,
+                           status != .current {
+                            try? fm.startDownloadingUbiquitousItem(at: mediaFileURL)
                         }
 
                         loadedItems.append(item)
