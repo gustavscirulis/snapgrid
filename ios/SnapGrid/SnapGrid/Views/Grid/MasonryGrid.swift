@@ -22,9 +22,6 @@ struct MasonryGrid: View {
                 }
             }
         }
-        .navigationDestination(for: SnapGridItem.self) { item in
-            ImageDetailView(item: item)
-        }
     }
 
     /// Distribute items across columns using shortest-column-first algorithm
