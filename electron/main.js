@@ -370,8 +370,22 @@ async function createWindow() {
   appStorageDir = await getAppStorageDir();
   await generateMissingThumbnails(appStorageDir);
   console.log('App storage directory:', appStorageDir);
-  
-  
+
+  // Migrate existing spaces config to iCloud-synced folder for iOS companion app
+  try {
+    const spacesPath = path.join(appStorageDir, 'spaces.json');
+    if (!await fs.pathExists(spacesPath)) {
+      userPreferences.init();
+      const existingSpaces = userPreferences.getPreference('spaces', []);
+      if (Array.isArray(existingSpaces) && existingSpaces.length > 0) {
+        await fs.writeJson(spacesPath, existingSpaces, { spaces: 2 });
+        console.log(`Migrated ${existingSpaces.length} spaces to ${spacesPath}`);
+      }
+    }
+  } catch (migrationError) {
+    console.error('Error migrating spaces to storage dir:', migrationError);
+  }
+
   // Import windowStateKeeper dynamically
   let windowState;
   try {
@@ -1578,6 +1592,17 @@ const userPreferences = {
 ipcMain.handle('set-user-preference', async (event, { key, value }) => {
   try {
     const success = userPreferences.setPreference(key, value);
+
+    // Mirror spaces to iCloud-synced storage folder for iOS companion app
+    if (key === 'spaces' && appStorageDir) {
+      try {
+        const spacesPath = path.join(appStorageDir, 'spaces.json');
+        await fs.writeJson(spacesPath, value, { spaces: 2 });
+      } catch (syncError) {
+        console.error('Error syncing spaces.json to storage dir:', syncError);
+      }
+    }
+
     return { success };
   } catch (error) {
     console.error('Error in set-user-preference:', error);
