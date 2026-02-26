@@ -2,6 +2,10 @@ import SwiftUI
 
 struct MainView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
+    @State private var selectedItem: SnapGridItem?
+    @State private var sourceRect: CGRect = .zero
+    @State private var thumbnailImage: UIImage?
+    @State private var showOverlay = false
     @State private var items: [SnapGridItem] = []
     @State private var spaces: [Space] = []
     @State private var activeSpaceId: String? = nil
@@ -45,58 +49,83 @@ struct MainView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.snapDarkBackground
-                    .ignoresSafeArea()
+        ZStack {
+            NavigationStack {
+                ZStack {
+                    Color.snapDarkBackground
+                        .ignoresSafeArea()
 
-                if isLoading {
-                    ProgressView()
-                        .tint(.white.opacity(0.6))
-                } else if let error {
-                    ErrorStateView(message: error) {
-                        await loadContent()
-                    }
-                } else if items.isEmpty {
-                    EmptyStateView()
-                } else {
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            if !spaces.isEmpty {
-                                SpaceTabBar(
-                                    spaces: spaces,
-                                    activeSpaceId: $activeSpaceId
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white.opacity(0.6))
+                    } else if let error {
+                        ErrorStateView(message: error) {
+                            await loadContent()
+                        }
+                    } else if items.isEmpty {
+                        EmptyStateView()
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                if !spaces.isEmpty {
+                                    SpaceTabBar(
+                                        spaces: spaces,
+                                        activeSpaceId: $activeSpaceId
+                                    )
+                                    .padding(.bottom, 12)
+                                }
+
+                                MasonryGrid(
+                                    items: filteredItems,
+                                    selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                    onItemSelected: { item, rect, thumb in
+                                        selectedItem = item
+                                        sourceRect = rect
+                                        thumbnailImage = thumb
+                                        showOverlay = true
+                                    }
                                 )
-                                .padding(.bottom, 12)
-                            }
-
-                            MasonryGrid(items: filteredItems)
                                 .padding(.horizontal, 12)
+                            }
+                        }
+                        .refreshable {
+                            await loadContent()
                         }
                     }
-                    .refreshable {
-                        await loadContent()
-                    }
                 }
-            }
-            .navigationTitle("SnapGrid")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button(role: .destructive) {
-                            fileSystem.disconnect()
+                .navigationTitle("SnapGrid")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarColorScheme(.dark, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button(role: .destructive) {
+                                fileSystem.disconnect()
+                            } label: {
+                                Label("Disconnect Folder", systemImage: "folder.badge.minus")
+                            }
                         } label: {
-                            Label("Disconnect Folder", systemImage: "folder.badge.minus")
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundStyle(.white.opacity(0.6))
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundStyle(.white.opacity(0.6))
                     }
                 }
+                .searchable(text: $searchText, prompt: "Search patterns, context...")
             }
-            .searchable(text: $searchText, prompt: "Search patterns, context...")
+
+            // Full-screen overlay — above NavigationStack
+            if showOverlay, let item = selectedItem {
+                FullScreenImageOverlay(
+                    item: item,
+                    sourceRect: sourceRect,
+                    thumbnailImage: thumbnailImage,
+                    onClose: {
+                        showOverlay = false
+                        selectedItem = nil
+                        thumbnailImage = nil
+                    }
+                )
+            }
         }
         .task {
             await loadContent()

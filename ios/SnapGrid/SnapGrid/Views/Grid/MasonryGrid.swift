@@ -2,6 +2,8 @@ import SwiftUI
 
 struct MasonryGrid: View {
     let items: [SnapGridItem]
+    var selectedItemId: String?
+    var onItemSelected: ((SnapGridItem, CGRect, UIImage?) -> Void)?
 
     private let columns = 2
     private let spacing: CGFloat = 8
@@ -14,16 +16,15 @@ struct MasonryGrid: View {
             ForEach(0..<columns, id: \.self) { column in
                 LazyVStack(spacing: spacing) {
                     ForEach(itemsForColumn(column)) { item in
-                        NavigationLink(value: item) {
-                            GridItemView(item: item, width: columnWidth)
-                        }
-                        .buttonStyle(.plain)
+                        GridItemView(
+                            item: item,
+                            width: columnWidth,
+                            isSelected: selectedItemId == item.id,
+                            onSelect: onItemSelected
+                        )
                     }
                 }
             }
-        }
-        .navigationDestination(for: SnapGridItem.self) { item in
-            ImageDetailView(item: item)
         }
     }
 

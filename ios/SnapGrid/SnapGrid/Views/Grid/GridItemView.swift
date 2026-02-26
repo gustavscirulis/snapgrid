@@ -3,6 +3,8 @@ import SwiftUI
 struct GridItemView: View {
     let item: SnapGridItem
     let width: CGFloat
+    var isSelected: Bool = false
+    var onSelect: ((SnapGridItem, CGRect, UIImage?) -> Void)?
     @State private var thumbnail: UIImage?
 
     private var height: CGFloat {
@@ -42,10 +44,21 @@ struct GridItemView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
-
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .opacity(isSelected ? 0 : 1)
+        .overlay(
+            // Invisible tap target that captures frame at tap time
+            GeometryReader { geo in
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        let frame = geo.frame(in: .global)
+                        onSelect?(item, frame, thumbnail)
+                    }
+            }
+        )
         .task {
             await loadThumbnail()
         }
