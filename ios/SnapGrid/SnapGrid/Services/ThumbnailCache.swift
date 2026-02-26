@@ -1,4 +1,5 @@
 import UIKit
+import AVFoundation
 import Combine
 
 class ThumbnailCache {
@@ -36,6 +37,18 @@ class ThumbnailCache {
                 }
 
                 // File is local — read it
+                if url.pathExtension.lowercased() == "mp4" {
+                    // Video file: extract a frame with AVAssetImageGenerator
+                    guard let thumbnail = self?.generateVideoThumbnail(for: url) else {
+                        continuation.resume(returning: nil)
+                        return
+                    }
+                    let cost = Int(thumbnail.size.width * thumbnail.size.height * 4)
+                    self?.cache.setObject(thumbnail, forKey: key, cost: cost)
+                    continuation.resume(returning: thumbnail)
+                    return
+                }
+
                 guard let data = try? Data(contentsOf: url),
                       let image = UIImage(data: data) else {
                     continuation.resume(returning: nil)
@@ -115,5 +128,20 @@ class ThumbnailCache {
 
     func clear() {
         cache.removeAllObjects()
+    }
+
+    private func generateVideoThumbnail(for url: URL) -> UIImage? {
+        let asset = AVAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 600, height: 600)
+
+        do {
+            let cgImage = try generator.copyCGImage(at: .zero, actualTime: nil)
+            return UIImage(cgImage: cgImage)
+        } catch {
+            print("[ThumbnailCache] Failed to generate video thumbnail: \(error)")
+            return nil
+        }
     }
 }

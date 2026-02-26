@@ -74,6 +74,13 @@ class MetadataLoader {
                             item.thumbnailURL = thumbnailsDir.appendingPathComponent("\(id).jpg")
                         }
 
+                        // Proactively trigger iCloud download of media file
+                        if let rv = try? mediaURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
+                           let status = rv.ubiquitousItemDownloadingStatus,
+                           status != .current {
+                            try? fm.startDownloadingUbiquitousItem(at: mediaURL)
+                        }
+
                         loadedItems.append(item)
                     }
 
