@@ -379,6 +379,9 @@ async function createWindow() {
       const existingSpaces = userPreferences.getPreference('spaces', []);
       if (Array.isArray(existingSpaces) && existingSpaces.length > 0) {
         await fs.writeJson(spacesPath, existingSpaces, { spaces: 2 });
+        // Clean up redundant copy from user-preferences
+        userPreferences.prefs.delete('spaces');
+        userPreferences.save();
         console.log(`Migrated ${existingSpaces.length} spaces to ${spacesPath}`);
       }
     }
@@ -1591,18 +1594,14 @@ const userPreferences = {
 
 ipcMain.handle('set-user-preference', async (event, { key, value }) => {
   try {
-    const success = userPreferences.setPreference(key, value);
-
-    // Mirror spaces to iCloud-synced storage folder for iOS companion app
+    // Spaces are stored directly in spaces.json (single source of truth for desktop + iOS)
     if (key === 'spaces' && appStorageDir) {
-      try {
-        const spacesPath = path.join(appStorageDir, 'spaces.json');
-        await fs.writeJson(spacesPath, value, { spaces: 2 });
-      } catch (syncError) {
-        console.error('Error syncing spaces.json to storage dir:', syncError);
-      }
+      const spacesPath = path.join(appStorageDir, 'spaces.json');
+      await fs.writeJson(spacesPath, value, { spaces: 2 });
+      return { success: true };
     }
 
+    const success = userPreferences.setPreference(key, value);
     return { success };
   } catch (error) {
     console.error('Error in set-user-preference:', error);
@@ -1612,6 +1611,16 @@ ipcMain.handle('set-user-preference', async (event, { key, value }) => {
 
 ipcMain.handle('get-user-preference', async (event, { key, defaultValue }) => {
   try {
+    // Spaces are read directly from spaces.json (single source of truth for desktop + iOS)
+    if (key === 'spaces' && appStorageDir) {
+      const spacesPath = path.join(appStorageDir, 'spaces.json');
+      if (await fs.pathExists(spacesPath)) {
+        const spaces = await fs.readJson(spacesPath);
+        return { success: true, value: spaces };
+      }
+      return { success: true, value: defaultValue };
+    }
+
     const value = userPreferences.getPreference(key, defaultValue);
     return { success: true, value };
   } catch (error) {
