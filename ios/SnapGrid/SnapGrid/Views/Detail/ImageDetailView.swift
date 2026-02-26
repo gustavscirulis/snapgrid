@@ -4,7 +4,9 @@ import AVKit
 struct ImageDetailView: View {
     let item: SnapGridItem
     @State private var image: UIImage?
+    @State private var player: AVPlayer?
     @State private var isLoading = true
+    @State private var loadFailed = false
 
     var body: some View {
         ZStack {
@@ -14,12 +16,43 @@ struct ImageDetailView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     // Media
-                    if item.isVideo, let url = item.mediaURL {
-                        VideoPlayer(player: AVPlayer(url: url))
-                            .aspectRatio(item.aspectRatio, contentMode: .fit)
+                    if item.isVideo {
+                        if let player {
+                            VideoPlayer(player: player)
+                                .aspectRatio(item.aspectRatio, contentMode: .fit)
+                        } else {
+                            Rectangle()
+                                .fill(Color.snapDarkMuted)
+                                .aspectRatio(item.aspectRatio, contentMode: .fit)
+                                .overlay {
+                                    ProgressView()
+                                        .tint(.white.opacity(0.3))
+                                }
+                        }
                     } else if let image {
                         ZoomableImageView(image: image)
                             .aspectRatio(item.aspectRatio, contentMode: .fit)
+                    } else if loadFailed {
+                        Rectangle()
+                            .fill(Color.snapDarkMuted)
+                            .aspectRatio(item.aspectRatio, contentMode: .fit)
+                            .overlay {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "icloud.and.arrow.down")
+                                        .font(.system(size: 28))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                    Text("Couldn't download from iCloud")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                    Button("Retry") {
+                                        loadFailed = false
+                                        isLoading = true
+                                        Task { await loadFullImage() }
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(.white.opacity(0.6))
+                                }
+                            }
                     } else if isLoading {
                         Rectangle()
                             .fill(Color.snapDarkMuted)
@@ -40,8 +73,39 @@ struct ImageDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
-            await loadFullImage()
+            if item.isVideo, let url = item.mediaURL {
+                await prepareVideoPlayer(url: url)
+            } else {
+                await loadFullImage()
+            }
         }
+        .onDisappear {
+            player?.pause()
+            player = nil
+        }
+    }
+
+    private func prepareVideoPlayer(url: URL) async {
+        let fm = FileManager.default
+
+        // Wait for iCloud download if needed
+        if let rv = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
+           let status = rv.ubiquitousItemDownloadingStatus,
+           status != .current {
+            try? fm.startDownloadingUbiquitousItem(at: url)
+            for _ in 0..<30 {
+                try? await Task.sleep(for: .seconds(1))
+                if let rv = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
+                   rv.ubiquitousItemDownloadingStatus == .current {
+                    break
+                }
+            }
+        }
+
+        let newPlayer = AVPlayer(url: url)
+        self.player = newPlayer
+        newPlayer.play()
+        isLoading = false
     }
 
     private func loadFullImage() async {
@@ -49,7 +113,9 @@ struct ImageDetailView: View {
             isLoading = false
             return
         }
-        image = await ThumbnailCache.shared.loadImage(for: url)
+        let loaded = await ThumbnailCache.shared.loadImageWhenReady(for: url, timeout: 180)
+        image = loaded
+        loadFailed = loaded == nil
         isLoading = false
     }
 }

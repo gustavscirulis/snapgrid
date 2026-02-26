@@ -12,41 +12,66 @@ struct MainView: View {
     @State private var searchText = ""
     @State private var isLoading = true
     @State private var error: String?
+    @State private var hasAttemptedRescan = false
 
-    private var filteredItems: [SnapGridItem] {
-        var result = items
+    // MARK: - Index ↔ activeSpaceId bridging
 
-        // Filter by space
-        if let spaceId = activeSpaceId {
-            result = result.filter { $0.spaceId == spaceId }
-        }
+    private var activeIndex: Int {
+        guard let id = activeSpaceId else { return 0 }
+        return (spaces.firstIndex { $0.id == id } ?? -1) + 1
+    }
 
-        // Filter by search
+    /// Binding that syncs TabView page selection with activeSpaceId.
+    /// The `set` wraps in withAnimation so the underline slides on swipe completion.
+    private var activeIndexBinding: Binding<Int> {
+        Binding(
+            get: { activeIndex },
+            set: { newIndex in
+                withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
+                    if newIndex == 0 {
+                        activeSpaceId = nil
+                    } else if newIndex > 0 && newIndex <= spaces.count {
+                        activeSpaceId = spaces[newIndex - 1].id
+                    }
+                }
+            }
+        )
+    }
+
+    // MARK: - Filtering
+
+    private var searchFilteredItems: [SnapGridItem] {
+        guard !searchText.isEmpty else { return items }
+        let query = searchText.lowercased()
+        return items.filter { matchesSearch($0, query: query) }
+    }
+
+    private func itemsForSpace(_ space: Space) -> [SnapGridItem] {
+        var result = items.filter { $0.spaceId == space.id }
         if !searchText.isEmpty {
             let query = searchText.lowercased()
-            result = result.filter { item in
-                // Search patterns
-                if let patterns = item.patterns,
-                   patterns.contains(where: { $0.name.lowercased().contains(query) }) {
-                    return true
-                }
-                // Search image context
-                if let context = item.imageContext?.lowercased(), context.contains(query) {
-                    return true
-                }
-                // Search title
-                if let title = item.title?.lowercased(), title.contains(query) {
-                    return true
-                }
-                // Type filter
-                if query == "vid" && item.isVideo { return true }
-                if query == "img" && !item.isVideo { return true }
-                return false
-            }
+            result = result.filter { matchesSearch($0, query: query) }
         }
-
         return result
     }
+
+    private func matchesSearch(_ item: SnapGridItem, query: String) -> Bool {
+        if let patterns = item.patterns,
+           patterns.contains(where: { $0.name.lowercased().contains(query) }) {
+            return true
+        }
+        if let context = item.imageContext?.lowercased(), context.contains(query) {
+            return true
+        }
+        if let title = item.title?.lowercased(), title.contains(query) {
+            return true
+        }
+        if query == "vid" && item.isVideo { return true }
+        if query == "img" && !item.isVideo { return true }
+        return false
+    }
+
+    // MARK: - Body
 
     var body: some View {
         ZStack {
@@ -64,32 +89,54 @@ struct MainView: View {
                         }
                     } else if items.isEmpty {
                         EmptyStateView()
-                    } else {
+                    } else if spaces.isEmpty {
                         ScrollView {
-                            VStack(spacing: 0) {
-                                if !spaces.isEmpty {
-                                    SpaceTabBar(
-                                        spaces: spaces,
-                                        activeSpaceId: $activeSpaceId
-                                    )
-                                    .padding(.bottom, 12)
-                                }
-
-                                MasonryGrid(
-                                    items: filteredItems,
-                                    selectedItemId: showOverlay ? selectedItem?.id : nil,
-                                    onItemSelected: { item, rect, thumb in
-                                        selectedItem = item
-                                        sourceRect = rect
-                                        thumbnailImage = thumb
-                                        showOverlay = true
-                                    }
-                                )
-                                .padding(.horizontal, 12)
-                            }
+                            MasonryGrid(
+                                items: searchFilteredItems,
+                                selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                onItemSelected: handleItemSelected
+                            )
+                            .padding(.horizontal, 12)
                         }
                         .refreshable {
+                            hasAttemptedRescan = false
                             await loadContent()
+                        }
+                    } else {
+                        VStack(spacing: 0) {
+                            SpaceTabBar(
+                                spaces: spaces,
+                                activeSpaceId: $activeSpaceId
+                            )
+
+                            TabView(selection: activeIndexBinding) {
+                                ScrollView {
+                                    MasonryGrid(
+                                        items: searchFilteredItems,
+                                        selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                        onItemSelected: handleItemSelected
+                                    )
+                                    .padding(.horizontal, 12)
+                                    .padding(.top, 12)
+                                }
+                                .refreshable { await loadContent() }
+                                .tag(0)
+
+                                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                                    ScrollView {
+                                        MasonryGrid(
+                                            items: itemsForSpace(space),
+                                            selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                            onItemSelected: handleItemSelected
+                                        )
+                                        .padding(.horizontal, 12)
+                                        .padding(.top, 12)
+                                    }
+                                    .refreshable { await loadContent() }
+                                    .tag(index + 1)
+                                }
+                            }
+                            .tabViewStyle(.page(indexDisplayMode: .never))
                         }
                     }
                 }
@@ -132,6 +179,17 @@ struct MainView: View {
         }
     }
 
+    // MARK: - Item Selection
+
+    private func handleItemSelected(_ item: SnapGridItem, _ rect: CGRect, _ thumb: UIImage?) {
+        selectedItem = item
+        sourceRect = rect
+        thumbnailImage = thumb
+        showOverlay = true
+    }
+
+    // MARK: - Data Loading
+
     private func loadContent() async {
         isLoading = items.isEmpty
         error = nil
@@ -142,16 +200,25 @@ struct MainView: View {
         let spacesManager = SpacesManager(fileSystem: fileSystem)
 
         do {
-            let loadedItems = try await loader.loadAllItems()
-            print("[MainView] Loaded \(loadedItems.count) items")
+            let result = try await loader.loadAllItems()
+            print("[MainView] Loaded \(result.items.count) items")
 
-            // Load spaces from spaces.json (synced by desktop app)
             let loadedSpaces = (try? spacesManager.loadSpaces()) ?? []
             print("[MainView] Loaded \(loadedSpaces.count) spaces")
 
-            self.items = loadedItems
+            self.items = result.items
             self.spaces = loadedSpaces
             self.isLoading = false
+
+            // If some metadata files were still downloading from iCloud, re-scan once after a delay
+            if result.skippedCount > 0 && !hasAttemptedRescan {
+                hasAttemptedRescan = true
+                print("[MainView] \(result.skippedCount) metadata files pending iCloud download, will re-scan in 15s")
+                Task {
+                    try? await Task.sleep(for: .seconds(15))
+                    await loadContent()
+                }
+            }
         } catch {
             print("[MainView] Error loading: \(error)")
             self.error = error.localizedDescription

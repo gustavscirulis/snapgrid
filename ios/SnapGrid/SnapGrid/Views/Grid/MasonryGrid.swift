@@ -36,7 +36,7 @@ struct MasonryGrid: View {
         for item in items {
             let shortest = columnHeights.enumerated().min(by: { $0.element < $1.element })?.offset ?? 0
             columnItems[shortest].append(item)
-            let estimatedHeight = 1.0 / item.aspectRatio
+            let estimatedHeight = 1.0 / item.gridAspectRatio
             columnHeights[shortest] += estimatedHeight + spacing
         }
 

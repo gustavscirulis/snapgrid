@@ -21,6 +21,12 @@ struct SnapGridItem: Identifiable, Codable, Hashable {
         return CGFloat(width) / CGFloat(height)
     }
 
+    /// Aspect ratio capped at 1:2 for grid display. Tall screenshots
+    /// (height > width * 2) are capped to prevent dominating the grid.
+    var gridAspectRatio: CGFloat {
+        max(aspectRatio, 0.5)
+    }
+
     var createdDate: Date? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
