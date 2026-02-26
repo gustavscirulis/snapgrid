@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ZoomableImageView: View {
     let image: UIImage
+    @Binding var isZoomed: Bool
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
@@ -9,6 +10,11 @@ struct ZoomableImageView: View {
 
     private let minScale: CGFloat = 1.0
     private let maxScale: CGFloat = 4.0
+
+    init(image: UIImage, isZoomed: Binding<Bool> = .constant(false)) {
+        self.image = image
+        self._isZoomed = isZoomed
+    }
 
     var body: some View {
         Image(uiImage: image)
@@ -21,9 +27,11 @@ struct ZoomableImageView: View {
                     .onChanged { value in
                         let newScale = lastScale * value.magnification
                         scale = min(max(newScale, minScale), maxScale)
+                        isZoomed = scale > minScale
                     }
                     .onEnded { _ in
                         lastScale = scale
+                        isZoomed = scale > minScale
                         if scale <= minScale {
                             withAnimation(.spring(response: 0.3)) {
                                 offset = .zero
@@ -52,9 +60,11 @@ struct ZoomableImageView: View {
                         lastScale = minScale
                         offset = .zero
                         lastOffset = .zero
+                        isZoomed = false
                     } else {
                         scale = 2.5
                         lastScale = 2.5
+                        isZoomed = true
                     }
                 }
             }

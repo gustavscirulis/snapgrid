@@ -28,3 +28,8 @@ dist-ssr
 
 # Release files
 release/*
+
+# Xcode user-specific files
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/

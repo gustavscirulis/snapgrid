@@ -2,6 +2,10 @@ import SwiftUI
 
 struct MainView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
+    @State private var selectedItem: SnapGridItem?
+    @State private var sourceRect: CGRect = .zero
+    @State private var thumbnailImage: UIImage?
+    @State private var showOverlay = false
     @State private var items: [SnapGridItem] = []
     @State private var spaces: [Space] = []
     @State private var activeSpaceId: String? = nil
@@ -70,84 +74,118 @@ struct MainView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.snapDarkBackground
-                    .ignoresSafeArea()
+        ZStack {
+            NavigationStack {
+                ZStack {
+                    Color.snapDarkBackground
+                        .ignoresSafeArea()
 
-                if isLoading {
-                    ProgressView()
-                        .tint(.white.opacity(0.6))
-                } else if let error {
-                    ErrorStateView(message: error) {
-                        await loadContent()
-                    }
-                } else if items.isEmpty {
-                    EmptyStateView()
-                } else if spaces.isEmpty {
-                    ScrollView {
-                        MasonryGrid(items: searchFilteredItems)
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white.opacity(0.6))
+                    } else if let error {
+                        ErrorStateView(message: error) {
+                            await loadContent()
+                        }
+                    } else if items.isEmpty {
+                        EmptyStateView()
+                    } else if spaces.isEmpty {
+                        ScrollView {
+                            MasonryGrid(
+                                items: searchFilteredItems,
+                                selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                onItemSelected: handleItemSelected
+                            )
                             .padding(.horizontal, 12)
-                    }
-                    .refreshable {
-                        hasAttemptedRescan = false
-                        await loadContent()
-                    }
-                } else {
-                    VStack(spacing: 0) {
-                        SpaceTabBar(
-                            spaces: spaces,
-                            activeSpaceId: $activeSpaceId
-                        )
+                        }
+                        .refreshable {
+                            hasAttemptedRescan = false
+                            await loadContent()
+                        }
+                    } else {
+                        VStack(spacing: 0) {
+                            SpaceTabBar(
+                                spaces: spaces,
+                                activeSpaceId: $activeSpaceId
+                            )
 
-                        TabView(selection: activeIndexBinding) {
-                            ScrollView {
-                                MasonryGrid(items: searchFilteredItems)
+                            TabView(selection: activeIndexBinding) {
+                                ScrollView {
+                                    MasonryGrid(
+                                        items: searchFilteredItems,
+                                        selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                        onItemSelected: handleItemSelected
+                                    )
                                     .padding(.horizontal, 12)
                                     .padding(.top, 12)
-                            }
-                            .refreshable { await loadContent() }
-                            .tag(0)
-
-                            ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
-                                ScrollView {
-                                    MasonryGrid(items: itemsForSpace(space))
-                                        .padding(.horizontal, 12)
-                                        .padding(.top, 12)
                                 }
                                 .refreshable { await loadContent() }
-                                .tag(index + 1)
+                                .tag(0)
+
+                                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                                    ScrollView {
+                                        MasonryGrid(
+                                            items: itemsForSpace(space),
+                                            selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                            onItemSelected: handleItemSelected
+                                        )
+                                        .padding(.horizontal, 12)
+                                        .padding(.top, 12)
+                                    }
+                                    .refreshable { await loadContent() }
+                                    .tag(index + 1)
+                                }
                             }
+                            .tabViewStyle(.page(indexDisplayMode: .never))
                         }
-                        .tabViewStyle(.page(indexDisplayMode: .never))
                     }
                 }
-            }
-            .navigationDestination(for: SnapGridItem.self) { item in
-                ImageDetailView(item: item)
-            }
-            .navigationTitle("SnapGrid")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button(role: .destructive) {
-                            fileSystem.disconnect()
+                .navigationTitle("SnapGrid")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarColorScheme(.dark, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button(role: .destructive) {
+                                fileSystem.disconnect()
+                            } label: {
+                                Label("Disconnect Folder", systemImage: "folder.badge.minus")
+                            }
                         } label: {
-                            Label("Disconnect Folder", systemImage: "folder.badge.minus")
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundStyle(.white.opacity(0.6))
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundStyle(.white.opacity(0.6))
                     }
                 }
+                .searchable(text: $searchText, prompt: "Search patterns, context...")
             }
-            .searchable(text: $searchText, prompt: "Search patterns, context...")
+
+            // Full-screen overlay — above NavigationStack
+            if showOverlay, let item = selectedItem {
+                FullScreenImageOverlay(
+                    item: item,
+                    sourceRect: sourceRect,
+                    thumbnailImage: thumbnailImage,
+                    onClose: {
+                        showOverlay = false
+                        selectedItem = nil
+                        thumbnailImage = nil
+                    }
+                )
+            }
         }
         .task {
             await loadContent()
         }
+    }
+
+    // MARK: - Item Selection
+
+    private func handleItemSelected(_ item: SnapGridItem, _ rect: CGRect, _ thumb: UIImage?) {
+        selectedItem = item
+        sourceRect = rect
+        thumbnailImage = thumb
+        showOverlay = true
     }
 
     // MARK: - Data Loading
