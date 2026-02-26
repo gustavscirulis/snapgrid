@@ -1,0 +1,519 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		04949283870877DAA125B2B8 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E871BF2FEF3C938859731553 /* EmptyStateView.swift */; };
+		071B2A3BF29E5D8C82A0F4DB /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA0DBF4BD46715A129146550 /* AppState.swift */; };
+		0FB79B182FF2453212D42811 /* SpaceTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4091FEF7AEC687AE2DA55B3D /* SpaceTabBar.swift */; };
+		20978B2B412744B389E3D316 /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BA6AB7DC0A84E670681EB6C /* MediaItem.swift */; };
+		210A13790BE0E2F8D5123662 /* NSImage+Thumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE5033083DAF80AD07ABC32 /* NSImage+Thumbnail.swift */; };
+		22F185FF7233F7D6E314433B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF20E3B5FA0802105388A2AC /* ContentView.swift */; };
+		27A5C73EBCC0338561829D33 /* ThumbnailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F7E099305244B612B096B86 /* ThumbnailService.swift */; };
+		34F4BEE7907CD4E3B3A6BCB4 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A1525A6C63DFE52779E656 /* KeychainService.swift */; };
+		3D2BE0DF8B994AFDFD7BD472 /* GeneralSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B91561419FB6DD4EEB954BE /* GeneralSettingsTab.swift */; };
+		45D276D4D94785E34DC0F0C4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A8584DB6A15E23CD509BC39 /* Assets.xcassets */; };
+		52559E4B91F49A6CEDD07719 /* SnapGridApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0777D2662B06A89DA07B35C3 /* SnapGridApp.swift */; };
+		572A0BCDDD41A4C5E4D7B75E /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68305A61078FFD8F1E7C722F /* FlowLayout.swift */; };
+		67A2F4EA7A945C87AD04E886 /* SpacesSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1E6270DBFF25C7C3C0324E /* SpacesSettingsTab.swift */; };
+		76828B68E2CA3213D835B691 /* PatternTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 649D56F9B7920BF3924A8E4E /* PatternTagsView.swift */; };
+		8350DC604AC401431E9CD255 /* Space.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6477AAD40C3308F596D68729 /* Space.swift */; };
+		8F71F68AF462303D3E8EFF3F /* MasonryGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5AD67C6232580C3B0D9E982 /* MasonryGridView.swift */; };
+		9101F365F60BDAB8F4E28C3E /* VideoFrameExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E5C14CF112B283919BE0F7D /* VideoFrameExtractor.swift */; };
+		9335A02A9FAC24E723471D1A /* MediaDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3884239912FC80F912C14715 /* MediaDetailView.swift */; };
+		93739E5784974939896FFF0D /* AIAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A8B38057F541288379ABCA2 /* AIAnalysisService.swift */; };
+		968DDBB08FE3CED44009BC7D /* MediaStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 963A5601AC378837EA06DF0E /* MediaStorageService.swift */; };
+		BA67E76C4D3CB12E2DF2B9A9 /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAF0B485D040D2E5532516AE /* ImportService.swift */; };
+		C353401A790BF3AACFC694AC /* Color+Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3B7921F371383918892A5D /* Color+Theme.swift */; };
+		D016DE668FB1A40FFB11BD0D /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DF384E9543E7A79145F99F8 /* SettingsView.swift */; };
+		D9FE517E672AA97AAD667259 /* AnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D1884A0E94D6BC1F407855 /* AnalysisResult.swift */; };
+		E287F102701B8A0ADF31921D /* ZoomableImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A7AD2552C0E5EF0A3708956 /* ZoomableImageView.swift */; };
+		E317897879AD400BF3F5A524 /* GridItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4945D23305D50B9C7D0873C9 /* GridItemView.swift */; };
+		EBADE0138240682283D710C5 /* QueueWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF248F13852E08164664EF6D /* QueueWatcher.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0777D2662B06A89DA07B35C3 /* SnapGridApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapGridApp.swift; sourceTree = "<group>"; };
+		0A8B38057F541288379ABCA2 /* AIAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAnalysisService.swift; sourceTree = "<group>"; };
+		1A8584DB6A15E23CD509BC39 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		2E5C14CF112B283919BE0F7D /* VideoFrameExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFrameExtractor.swift; sourceTree = "<group>"; };
+		2F7E099305244B612B096B86 /* ThumbnailService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailService.swift; sourceTree = "<group>"; };
+		3884239912FC80F912C14715 /* MediaDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetailView.swift; sourceTree = "<group>"; };
+		3A7AD2552C0E5EF0A3708956 /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
+		3BA6AB7DC0A84E670681EB6C /* MediaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItem.swift; sourceTree = "<group>"; };
+		3CE5033083DAF80AD07ABC32 /* NSImage+Thumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSImage+Thumbnail.swift"; sourceTree = "<group>"; };
+		4091FEF7AEC687AE2DA55B3D /* SpaceTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceTabBar.swift; sourceTree = "<group>"; };
+		47A1525A6C63DFE52779E656 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		4945D23305D50B9C7D0873C9 /* GridItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridItemView.swift; sourceTree = "<group>"; };
+		4A1E6270DBFF25C7C3C0324E /* SpacesSettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacesSettingsTab.swift; sourceTree = "<group>"; };
+		6477AAD40C3308F596D68729 /* Space.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Space.swift; sourceTree = "<group>"; };
+		649D56F9B7920BF3924A8E4E /* PatternTagsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternTagsView.swift; sourceTree = "<group>"; };
+		68305A61078FFD8F1E7C722F /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
+		79AADB26603B741C1AC17342 /* SnapGrid.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SnapGrid.entitlements; sourceTree = "<group>"; };
+		7B91561419FB6DD4EEB954BE /* GeneralSettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsTab.swift; sourceTree = "<group>"; };
+		82D1884A0E94D6BC1F407855 /* AnalysisResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisResult.swift; sourceTree = "<group>"; };
+		963A5601AC378837EA06DF0E /* MediaStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaStorageService.swift; sourceTree = "<group>"; };
+		9DF384E9543E7A79145F99F8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AAF0B485D040D2E5532516AE /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
+		BF248F13852E08164664EF6D /* QueueWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueWatcher.swift; sourceTree = "<group>"; };
+		CF20E3B5FA0802105388A2AC /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		D5AD67C6232580C3B0D9E982 /* MasonryGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MasonryGridView.swift; sourceTree = "<group>"; };
+		D5F15FD60A40A9E4169DC73A /* SnapGrid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapGrid.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E871BF2FEF3C938859731553 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		EA0DBF4BD46715A129146550 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		EA3B7921F371383918892A5D /* Color+Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Theme.swift"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		091D3AD4EC70D1A844326918 /* SnapGrid */ = {
+			isa = PBXGroup;
+			children = (
+				9830D6AA2031ECC6E249A924 /* App */,
+				82A18CB1ED4B25374A3B428D /* Extensions */,
+				0F7861BC7FDE906139C3348D /* Models */,
+				72DCB930274F633D6FA91DF1 /* Resources */,
+				52526CFFC95213E919F150DD /* Services */,
+				D521F92D89485C9D8D5879DD /* Views */,
+			);
+			path = SnapGrid;
+			sourceTree = "<group>";
+		};
+		0F7861BC7FDE906139C3348D /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				82D1884A0E94D6BC1F407855 /* AnalysisResult.swift */,
+				3BA6AB7DC0A84E670681EB6C /* MediaItem.swift */,
+				6477AAD40C3308F596D68729 /* Space.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		13C800D7951450CF02E86C36 /* Spaces */ = {
+			isa = PBXGroup;
+			children = (
+				4091FEF7AEC687AE2DA55B3D /* SpaceTabBar.swift */,
+			);
+			path = Spaces;
+			sourceTree = "<group>";
+		};
+		455AE9CECACB2D90B8221050 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D5F15FD60A40A9E4169DC73A /* SnapGrid.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		52526CFFC95213E919F150DD /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				0A8B38057F541288379ABCA2 /* AIAnalysisService.swift */,
+				AAF0B485D040D2E5532516AE /* ImportService.swift */,
+				47A1525A6C63DFE52779E656 /* KeychainService.swift */,
+				963A5601AC378837EA06DF0E /* MediaStorageService.swift */,
+				BF248F13852E08164664EF6D /* QueueWatcher.swift */,
+				2F7E099305244B612B096B86 /* ThumbnailService.swift */,
+				2E5C14CF112B283919BE0F7D /* VideoFrameExtractor.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		6B5584A04B49DC464AAE11FF /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				68305A61078FFD8F1E7C722F /* FlowLayout.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		72DCB930274F633D6FA91DF1 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				1A8584DB6A15E23CD509BC39 /* Assets.xcassets */,
+				79AADB26603B741C1AC17342 /* SnapGrid.entitlements */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		82A18CB1ED4B25374A3B428D /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				EA3B7921F371383918892A5D /* Color+Theme.swift */,
+				3CE5033083DAF80AD07ABC32 /* NSImage+Thumbnail.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		9652652A26D0DE7923CD04CD /* Grid */ = {
+			isa = PBXGroup;
+			children = (
+				E871BF2FEF3C938859731553 /* EmptyStateView.swift */,
+				4945D23305D50B9C7D0873C9 /* GridItemView.swift */,
+				D5AD67C6232580C3B0D9E982 /* MasonryGridView.swift */,
+			);
+			path = Grid;
+			sourceTree = "<group>";
+		};
+		9830D6AA2031ECC6E249A924 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				EA0DBF4BD46715A129146550 /* AppState.swift */,
+				0777D2662B06A89DA07B35C3 /* SnapGridApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		C53D6B47B446B4DA138608AB /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				7B91561419FB6DD4EEB954BE /* GeneralSettingsTab.swift */,
+				9DF384E9543E7A79145F99F8 /* SettingsView.swift */,
+				4A1E6270DBFF25C7C3C0324E /* SpacesSettingsTab.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		CC3C002E3A2CA4BFEECFB0FD /* Detail */ = {
+			isa = PBXGroup;
+			children = (
+				3884239912FC80F912C14715 /* MediaDetailView.swift */,
+				649D56F9B7920BF3924A8E4E /* PatternTagsView.swift */,
+				3A7AD2552C0E5EF0A3708956 /* ZoomableImageView.swift */,
+			);
+			path = Detail;
+			sourceTree = "<group>";
+		};
+		D521F92D89485C9D8D5879DD /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F75D91B6546A6E29D51691C6 /* ContentView */,
+				CC3C002E3A2CA4BFEECFB0FD /* Detail */,
+				9652652A26D0DE7923CD04CD /* Grid */,
+				C53D6B47B446B4DA138608AB /* Settings */,
+				6B5584A04B49DC464AAE11FF /* Shared */,
+				13C800D7951450CF02E86C36 /* Spaces */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		F75D91B6546A6E29D51691C6 /* ContentView */ = {
+			isa = PBXGroup;
+			children = (
+				CF20E3B5FA0802105388A2AC /* ContentView.swift */,
+			);
+			path = ContentView;
+			sourceTree = "<group>";
+		};
+		FFD93DF4A621A23EC00FD90B = {
+			isa = PBXGroup;
+			children = (
+				091D3AD4EC70D1A844326918 /* SnapGrid */,
+				455AE9CECACB2D90B8221050 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		29295E63862509E6582B2F27 /* SnapGrid */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 58347A6C11A883F29256938F /* Build configuration list for PBXNativeTarget "SnapGrid" */;
+			buildPhases = (
+				0BFF5256FBA045A681CEB7C6 /* Sources */,
+				AC4E22D188D6E8D2C093C5B8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SnapGrid;
+			packageProductDependencies = (
+			);
+			productName = SnapGrid;
+			productReference = D5F15FD60A40A9E4169DC73A /* SnapGrid.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		395E601C6E933F8AF520C045 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					29295E63862509E6582B2F27 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 00B33F9117438FAB18818194 /* Build configuration list for PBXProject "SnapGrid" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = FFD93DF4A621A23EC00FD90B;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				29295E63862509E6582B2F27 /* SnapGrid */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AC4E22D188D6E8D2C093C5B8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				45D276D4D94785E34DC0F0C4 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0BFF5256FBA045A681CEB7C6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				93739E5784974939896FFF0D /* AIAnalysisService.swift in Sources */,
+				D9FE517E672AA97AAD667259 /* AnalysisResult.swift in Sources */,
+				071B2A3BF29E5D8C82A0F4DB /* AppState.swift in Sources */,
+				C353401A790BF3AACFC694AC /* Color+Theme.swift in Sources */,
+				22F185FF7233F7D6E314433B /* ContentView.swift in Sources */,
+				04949283870877DAA125B2B8 /* EmptyStateView.swift in Sources */,
+				572A0BCDDD41A4C5E4D7B75E /* FlowLayout.swift in Sources */,
+				3D2BE0DF8B994AFDFD7BD472 /* GeneralSettingsTab.swift in Sources */,
+				E317897879AD400BF3F5A524 /* GridItemView.swift in Sources */,
+				BA67E76C4D3CB12E2DF2B9A9 /* ImportService.swift in Sources */,
+				34F4BEE7907CD4E3B3A6BCB4 /* KeychainService.swift in Sources */,
+				8F71F68AF462303D3E8EFF3F /* MasonryGridView.swift in Sources */,
+				9335A02A9FAC24E723471D1A /* MediaDetailView.swift in Sources */,
+				20978B2B412744B389E3D316 /* MediaItem.swift in Sources */,
+				968DDBB08FE3CED44009BC7D /* MediaStorageService.swift in Sources */,
+				210A13790BE0E2F8D5123662 /* NSImage+Thumbnail.swift in Sources */,
+				76828B68E2CA3213D835B691 /* PatternTagsView.swift in Sources */,
+				EBADE0138240682283D710C5 /* QueueWatcher.swift in Sources */,
+				D016DE668FB1A40FFB11BD0D /* SettingsView.swift in Sources */,
+				52559E4B91F49A6CEDD07719 /* SnapGridApp.swift in Sources */,
+				8350DC604AC401431E9CD255 /* Space.swift in Sources */,
+				0FB79B182FF2453212D42811 /* SpaceTabBar.swift in Sources */,
+				67A2F4EA7A945C87AD04E886 /* SpacesSettingsTab.swift in Sources */,
+				27A5C73EBCC0338561829D33 /* ThumbnailService.swift in Sources */,
+				9101F365F60BDAB8F4E28C3E /* VideoFrameExtractor.swift in Sources */,
+				E287F102701B8A0ADF31921D /* ZoomableImageView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		2EC846868EAFA3407A3FBD74 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		7602CBFF91808FAF9ADEE10B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = SnapGrid/Resources/SnapGrid.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_GENERATION_MODE = GeneratedByXcode;
+				INFOPLIST_KEY_CFBundleDisplayName = SnapGrid;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 SnapGrid";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapgrid.app;
+				SDKROOT = macosx;
+				SWIFT_STRICT_CONCURRENCY = complete;
+			};
+			name = Debug;
+		};
+		78D9B10D8E62FE77FF24B3DD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		BAF17D53CBB4311AC0FE1E0F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = SnapGrid/Resources/SnapGrid.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_GENERATION_MODE = GeneratedByXcode;
+				INFOPLIST_KEY_CFBundleDisplayName = SnapGrid;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 SnapGrid";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapgrid.app;
+				SDKROOT = macosx;
+				SWIFT_STRICT_CONCURRENCY = complete;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		00B33F9117438FAB18818194 /* Build configuration list for PBXProject "SnapGrid" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2EC846868EAFA3407A3FBD74 /* Debug */,
+				78D9B10D8E62FE77FF24B3DD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		58347A6C11A883F29256938F /* Build configuration list for PBXNativeTarget "SnapGrid" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7602CBFF91808FAF9ADEE10B /* Debug */,
+				BAF17D53CBB4311AC0FE1E0F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 395E601C6E933F8AF520C045 /* Project object */;
+}
