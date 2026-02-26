@@ -6,7 +6,7 @@ struct GridItemView: View {
     @State private var thumbnail: UIImage?
 
     private var height: CGFloat {
-        width / item.aspectRatio
+        width / item.gridAspectRatio
     }
 
     var body: some View {
@@ -16,7 +16,7 @@ struct GridItemView: View {
                 Image(uiImage: thumbnail)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: width, height: height)
+                    .frame(width: width, height: height, alignment: .top)
                     .clipped()
             } else {
                 Rectangle()
