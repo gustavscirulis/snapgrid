@@ -55,34 +55,28 @@ struct FullScreenImageOverlay: View {
                 .onTapGesture { close() }
 
             if animationComplete {
-                // Phase B: fully open — scrollable content with metadata
-                scrollableContent
-                    .offset(y: dragOffset)
-                    .gesture(dismissDragGesture)
+                // Phase B: fully open — scrollable content with native toolbar
+                NavigationStack {
+                    scrollableContent
+                        .ignoresSafeArea(edges: .top)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbarColorScheme(.dark, for: .navigationBar)
+                        .toolbarBackground(.hidden, for: .navigationBar)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button(action: close) {
+                                    Image(systemName: "xmark")
+                                        .foregroundStyle(.white.opacity(0.6))
+                                }
+                            }
+                        }
+                }
+                .offset(y: dragOffset)
+                .gesture(dismissDragGesture)
+                .transition(.opacity)
             } else {
                 // Phase A/C: animating — positioned image only
                 animatingImage
-            }
-
-            // Close button
-            if animationComplete {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button(action: close) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(10)
-                                .background(.ultraThinMaterial.opacity(0.6))
-                                .clipShape(Circle())
-                        }
-                        .padding(.top, 54)
-                        .padding(.trailing, 16)
-                    }
-                    Spacer()
-                }
-                .transition(.opacity)
             }
         }
         .ignoresSafeArea()
