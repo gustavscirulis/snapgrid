@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
+@MainActor
 class FileSystemManager: ObservableObject {
     @Published var rootURL: URL?
     @Published var isAccessGranted = false

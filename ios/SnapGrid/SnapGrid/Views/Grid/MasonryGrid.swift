@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MasonryGrid: View {
     let items: [SnapGridItem]
+    let availableWidth: CGFloat
     var selectedItemId: String?
     var onItemSelected: ((SnapGridItem, CGRect, UIImage?) -> Void)?
 
@@ -9,8 +10,7 @@ struct MasonryGrid: View {
     private let spacing: CGFloat = 8
 
     var body: some View {
-        let screenWidth = UIScreen.main.bounds.width - 24 // 12pt padding on each side
-        let columnWidth = (screenWidth - spacing * CGFloat(columns - 1)) / CGFloat(columns)
+        let columnWidth = (availableWidth - spacing * CGFloat(columns - 1)) / CGFloat(columns)
 
         HStack(alignment: .top, spacing: spacing) {
             ForEach(0..<columns, id: \.self) { column in

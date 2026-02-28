@@ -140,7 +140,9 @@ class ThumbnailCache {
             let cgImage = try generator.copyCGImage(at: .zero, actualTime: nil)
             return UIImage(cgImage: cgImage)
         } catch {
+            #if DEBUG
             print("[ThumbnailCache] Failed to generate video thumbnail: \(error)")
+            #endif
             return nil
         }
     }

@@ -27,11 +27,17 @@ struct SnapGridItem: Identifiable, Codable, Hashable {
         max(aspectRatio, 0.5)
     }
 
+    private static let isoFormatterWithFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let isoFormatterBasic = ISO8601DateFormatter()
+
     var createdDate: Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: createdAt)
-            ?? ISO8601DateFormatter().date(from: createdAt)
+        Self.isoFormatterWithFractional.date(from: createdAt)
+            ?? Self.isoFormatterBasic.date(from: createdAt)
     }
 
     // Local file URLs — set after loading, not from JSON
