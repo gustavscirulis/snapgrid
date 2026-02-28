@@ -74,58 +74,50 @@ struct MainView: View {
     // MARK: - Body
 
     var body: some View {
-        ZStack {
-            NavigationStack {
-                ZStack {
-                    Color.snapDarkBackground
-                        .ignoresSafeArea()
+        GeometryReader { geo in
+            let gridWidth = geo.size.width - 24 // 12pt padding on each side
 
-                    if isLoading {
-                        ProgressView()
-                            .tint(.white.opacity(0.6))
-                    } else if let error {
-                        ErrorStateView(message: error) {
-                            await loadContent()
-                        }
-                    } else if items.isEmpty {
-                        EmptyStateView()
-                    } else if spaces.isEmpty {
-                        ScrollView {
-                            MasonryGrid(
-                                items: searchFilteredItems,
-                                selectedItemId: showOverlay ? selectedItem?.id : nil,
-                                onItemSelected: handleItemSelected
-                            )
-                            .padding(.horizontal, 12)
-                        }
-                        .refreshable {
-                            hasAttemptedRescan = false
-                            await loadContent()
-                        }
-                    } else {
-                        VStack(spacing: 0) {
-                            SpaceTabBar(
-                                spaces: spaces,
-                                activeSpaceId: $activeSpaceId
-                            )
+            ZStack {
+                NavigationStack {
+                    ZStack {
+                        Color.snapDarkBackground
+                            .ignoresSafeArea()
 
-                            TabView(selection: activeIndexBinding) {
-                                ScrollView {
-                                    MasonryGrid(
-                                        items: searchFilteredItems,
-                                        selectedItemId: showOverlay ? selectedItem?.id : nil,
-                                        onItemSelected: handleItemSelected
-                                    )
-                                    .padding(.horizontal, 12)
-                                    .padding(.top, 12)
-                                }
-                                .refreshable { await loadContent() }
-                                .tag(0)
+                        if isLoading {
+                            ProgressView()
+                                .tint(.white.opacity(0.6))
+                        } else if let error {
+                            ErrorStateView(message: error) {
+                                await loadContent()
+                            }
+                        } else if items.isEmpty {
+                            EmptyStateView()
+                        } else if spaces.isEmpty {
+                            ScrollView {
+                                MasonryGrid(
+                                    items: searchFilteredItems,
+                                    availableWidth: gridWidth,
+                                    selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                    onItemSelected: handleItemSelected
+                                )
+                                .padding(.horizontal, 12)
+                            }
+                            .refreshable {
+                                hasAttemptedRescan = false
+                                await loadContent()
+                            }
+                        } else {
+                            VStack(spacing: 0) {
+                                SpaceTabBar(
+                                    spaces: spaces,
+                                    activeSpaceId: $activeSpaceId
+                                )
 
-                                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                                TabView(selection: activeIndexBinding) {
                                     ScrollView {
                                         MasonryGrid(
-                                            items: itemsForSpace(space),
+                                            items: searchFilteredItems,
+                                            availableWidth: gridWidth,
                                             selectedItemId: showOverlay ? selectedItem?.id : nil,
                                             onItemSelected: handleItemSelected
                                         )
@@ -133,45 +125,61 @@ struct MainView: View {
                                         .padding(.top, 12)
                                     }
                                     .refreshable { await loadContent() }
-                                    .tag(index + 1)
-                                }
-                            }
-                            .tabViewStyle(.page(indexDisplayMode: .never))
-                        }
-                    }
-                }
-                .navigationTitle("SnapGrid")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbarColorScheme(.dark, for: .navigationBar)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Button(role: .destructive) {
-                                fileSystem.disconnect()
-                            } label: {
-                                Label("Disconnect Folder", systemImage: "folder.badge.minus")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .foregroundStyle(.white.opacity(0.6))
-                        }
-                    }
-                }
-                .searchable(text: $searchText, prompt: "Search patterns, context...")
-            }
+                                    .tag(0)
 
-            // Full-screen overlay — above NavigationStack
-            if showOverlay, let item = selectedItem {
-                FullScreenImageOverlay(
-                    item: item,
-                    sourceRect: sourceRect,
-                    thumbnailImage: thumbnailImage,
-                    onClose: {
-                        showOverlay = false
-                        selectedItem = nil
-                        thumbnailImage = nil
+                                    ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                                        ScrollView {
+                                            MasonryGrid(
+                                                items: itemsForSpace(space),
+                                                availableWidth: gridWidth,
+                                                selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                                onItemSelected: handleItemSelected
+                                            )
+                                            .padding(.horizontal, 12)
+                                            .padding(.top, 12)
+                                        }
+                                        .refreshable { await loadContent() }
+                                        .tag(index + 1)
+                                    }
+                                }
+                                .tabViewStyle(.page(indexDisplayMode: .never))
+                            }
+                        }
                     }
-                )
+                    .navigationTitle("SnapGrid")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbarColorScheme(.dark, for: .navigationBar)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Menu {
+                                Button(role: .destructive) {
+                                    fileSystem.disconnect()
+                                } label: {
+                                    Label("Disconnect Folder", systemImage: "folder.badge.minus")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                                    .foregroundStyle(.white.opacity(0.6))
+                            }
+                        }
+                    }
+                    .searchable(text: $searchText, prompt: "Search patterns, context...")
+                }
+
+                // Full-screen overlay — above NavigationStack
+                if showOverlay, let item = selectedItem {
+                    FullScreenImageOverlay(
+                        item: item,
+                        sourceRect: sourceRect,
+                        screenSize: geo.size,
+                        thumbnailImage: thumbnailImage,
+                        onClose: {
+                            showOverlay = false
+                            selectedItem = nil
+                            thumbnailImage = nil
+                        }
+                    )
+                }
             }
         }
         .task {
@@ -195,10 +203,21 @@ struct MainView: View {
         isLoading = isInitialLoad
         error = nil
 
-        print("[MainView] Loading content... rootURL=\(fileSystem.rootURL?.path ?? "nil")")
+        guard let metadataDir = fileSystem.metadataDir,
+              let imagesDir = fileSystem.imagesDir,
+              let thumbnailsDir = fileSystem.thumbnailsDir,
+              let rootURL = fileSystem.rootURL else {
+            self.error = "No access to SnapGrid folder"
+            self.isLoading = false
+            return
+        }
 
-        let loader = MetadataLoader(fileSystem: fileSystem)
-        let spacesManager = SpacesManager(fileSystem: fileSystem)
+        #if DEBUG
+        print("[MainView] Loading content... rootURL=\(rootURL.path)")
+        #endif
+
+        let loader = MetadataLoader(metadataDir: metadataDir, imagesDir: imagesDir, thumbnailsDir: thumbnailsDir)
+        let spacesManager = SpacesManager(rootURL: rootURL)
 
         // Load spaces early so tabs appear alongside the first items
         let loadedSpaces = (try? spacesManager.loadSpaces()) ?? []
@@ -223,19 +242,25 @@ struct MainView: View {
                 self.isLoading = false
             }
 
+            #if DEBUG
             print("[MainView] Loaded \(items.count) items, \(loadedSpaces.count) spaces")
+            #endif
 
             // If some metadata files were still downloading from iCloud, re-scan once after a delay
             if let skipped = lastUpdate?.skippedCount, skipped > 0, !hasAttemptedRescan {
                 hasAttemptedRescan = true
+                #if DEBUG
                 print("[MainView] \(skipped) metadata files pending iCloud download, will re-scan in 15s")
+                #endif
                 Task {
                     try? await Task.sleep(for: .seconds(15))
                     await loadContent()
                 }
             }
         } catch {
+            #if DEBUG
             print("[MainView] Error loading: \(error)")
+            #endif
             self.error = error.localizedDescription
             self.isLoading = false
         }

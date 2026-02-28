@@ -11,21 +11,13 @@ struct LoadUpdate {
     let skippedCount: Int
 }
 
-class MetadataLoader {
-    private let fileSystem: FileSystemManager
-
-    init(fileSystem: FileSystemManager) {
-        self.fileSystem = fileSystem
-    }
+struct MetadataLoader {
+    let metadataDir: URL
+    let imagesDir: URL
+    let thumbnailsDir: URL
 
     /// Stream items progressively in batches so the UI can update as items are decoded.
     func loadItemsProgressively(batchSize: Int = 20) -> AsyncThrowingStream<LoadUpdate, Error> {
-        guard let metadataDir = fileSystem.metadataDir,
-              let imagesDir = fileSystem.imagesDir,
-              let thumbnailsDir = fileSystem.thumbnailsDir else {
-            return AsyncThrowingStream { $0.finish(throwing: LoaderError.noAccess) }
-        }
-
         return AsyncThrowingStream { continuation in
             Task.detached(priority: .userInitiated) {
                 do {
@@ -43,7 +35,9 @@ class MetadataLoader {
                         let name = url.lastPathComponent
                         return name.hasSuffix(".json") || name.hasSuffix(".json.icloud")
                     }
+                    #if DEBUG
                     print("[MetadataLoader] Found \(jsonFiles.count) metadata files")
+                    #endif
 
                     let decoder = JSONDecoder()
                     var loadedItems: [SnapGridItem] = []
@@ -76,12 +70,16 @@ class MetadataLoader {
                         }
 
                         guard let data = try? Data(contentsOf: url) else {
+                            #if DEBUG
                             print("[MetadataLoader] Could not read: \(url.lastPathComponent)")
+                            #endif
                             continue
                         }
 
                         guard var item = try? decoder.decode(SnapGridItem.self, from: data) else {
+                            #if DEBUG
                             print("[MetadataLoader] Could not decode: \(url.lastPathComponent)")
+                            #endif
                             continue
                         }
 
@@ -105,7 +103,9 @@ class MetadataLoader {
                             }
                         } else {
                             // Truly orphaned — no local file, no iCloud placeholder, no iCloud metadata
+                            #if DEBUG
                             print("[MetadataLoader] Media truly missing for: \(id), skipping")
+                            #endif
                             continue
                         }
 
@@ -132,14 +132,18 @@ class MetadataLoader {
                     }
                     continuation.yield(LoadUpdate(items: sorted, skippedCount: skipped))
 
+                    #if DEBUG
                     if skipped > 0 {
                         print("[MetadataLoader] Skipped \(skipped) metadata files not yet downloaded from iCloud")
                     }
                     print("[MetadataLoader] Loaded \(loadedItems.count) items")
+                    #endif
 
                     continuation.finish()
                 } catch {
+                    #if DEBUG
                     print("[MetadataLoader] Error: \(error)")
+                    #endif
                     continuation.finish(throwing: error)
                 }
             }
