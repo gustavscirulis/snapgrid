@@ -199,7 +199,8 @@ struct MainView: View {
     // MARK: - Data Loading
 
     private func loadContent() async {
-        isLoading = items.isEmpty
+        let isInitialLoad = items.isEmpty
+        isLoading = isInitialLoad
         error = nil
 
         guard let metadataDir = fileSystem.metadataDir,
@@ -218,26 +219,38 @@ struct MainView: View {
         let loader = MetadataLoader(metadataDir: metadataDir, imagesDir: imagesDir, thumbnailsDir: thumbnailsDir)
         let spacesManager = SpacesManager(rootURL: rootURL)
 
+        // Load spaces early so tabs appear alongside the first items
+        let loadedSpaces = (try? spacesManager.loadSpaces()) ?? []
+        self.spaces = loadedSpaces
+
+        var lastUpdate: LoadUpdate?
+
         do {
-            let result = try await loader.loadAllItems()
-            #if DEBUG
-            print("[MainView] Loaded \(result.items.count) items")
-            #endif
+            for try await update in loader.loadItemsProgressively() {
+                lastUpdate = update
+                // On initial load, show items progressively as they're decoded.
+                // On refresh, keep existing items visible until fully loaded.
+                if isInitialLoad {
+                    self.items = update.items
+                    self.isLoading = false
+                }
+            }
 
-            let loadedSpaces = (try? spacesManager.loadSpaces()) ?? []
-            #if DEBUG
-            print("[MainView] Loaded \(loadedSpaces.count) spaces")
-            #endif
+            // Apply final result (handles both initial load and refresh)
+            if let final_ = lastUpdate {
+                self.items = final_.items
+                self.isLoading = false
+            }
 
-            self.items = result.items
-            self.spaces = loadedSpaces
-            self.isLoading = false
+            #if DEBUG
+            print("[MainView] Loaded \(items.count) items, \(loadedSpaces.count) spaces")
+            #endif
 
             // If some metadata files were still downloading from iCloud, re-scan once after a delay
-            if result.skippedCount > 0 && !hasAttemptedRescan {
+            if let skipped = lastUpdate?.skippedCount, skipped > 0, !hasAttemptedRescan {
                 hasAttemptedRescan = true
                 #if DEBUG
-                print("[MainView] \(result.skippedCount) metadata files pending iCloud download, will re-scan in 15s")
+                print("[MainView] \(skipped) metadata files pending iCloud download, will re-scan in 15s")
                 #endif
                 Task {
                     try? await Task.sleep(for: .seconds(15))
