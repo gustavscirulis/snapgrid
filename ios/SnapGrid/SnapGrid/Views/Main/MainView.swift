@@ -133,6 +133,7 @@ struct MainView: View {
                                     onItemSelected: handleItemSelected
                                 )
                                 .padding(.horizontal, 12)
+                                .padding(.bottom, 70)
                             }
                             .refreshable {
                                 hasAttemptedRescan = false
@@ -156,6 +157,7 @@ struct MainView: View {
                                         )
                                         .padding(.horizontal, 12)
                                         .padding(.top, 12)
+                                        .padding(.bottom, 70)
                                     }
                                     .refreshable { await loadContent() }
                                     .tag(0)
@@ -171,6 +173,7 @@ struct MainView: View {
                                             )
                                             .padding(.horizontal, 12)
                                             .padding(.top, 12)
+                                            .padding(.bottom, 70)
                                         }
                                         .refreshable { await loadContent() }
                                         .tag(index + 1)
@@ -189,6 +192,7 @@ struct MainView: View {
                             }
                         }
                     }
+                    .ignoresSafeArea(edges: .bottom)
                     .navigationTitle("SnapGrid")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbarColorScheme(.dark, for: .navigationBar)
