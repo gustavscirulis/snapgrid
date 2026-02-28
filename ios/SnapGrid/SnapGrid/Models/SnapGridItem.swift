@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 
 struct SnapGridItem: Identifiable, Codable, Hashable {
-    let id: String
+    var id: String = ""  // Derived from filename in MetadataLoader; not required in JSON
     let type: String
     let width: Int
     let height: Int
@@ -39,8 +39,9 @@ struct SnapGridItem: Identifiable, Codable, Hashable {
     var mediaURL: URL?
 
     enum CodingKeys: String, CodingKey {
-        case id, type, width, height, createdAt, title, description
+        case type, width, height, createdAt, title, description
         case patterns, imageContext, spaceId, duration
+        // id is intentionally excluded — derived from the metadata filename
     }
 
     func hash(into hasher: inout Hasher) {

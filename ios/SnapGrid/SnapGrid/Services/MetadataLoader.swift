@@ -5,6 +5,12 @@ struct LoadResult {
     let skippedCount: Int
 }
 
+/// Progressive update emitted during streaming load.
+struct LoadUpdate {
+    let items: [SnapGridItem]
+    let skippedCount: Int
+}
+
 class MetadataLoader {
     private let fileSystem: FileSystemManager
 
@@ -12,34 +18,54 @@ class MetadataLoader {
         self.fileSystem = fileSystem
     }
 
-    func loadAllItems() async throws -> LoadResult {
+    /// Stream items progressively in batches so the UI can update as items are decoded.
+    func loadItemsProgressively(batchSize: Int = 20) -> AsyncThrowingStream<LoadUpdate, Error> {
         guard let metadataDir = fileSystem.metadataDir,
               let imagesDir = fileSystem.imagesDir,
               let thumbnailsDir = fileSystem.thumbnailsDir else {
-            throw LoaderError.noAccess
+            return AsyncThrowingStream { $0.finish(throwing: LoaderError.noAccess) }
         }
 
-        // Move all file I/O off the main thread
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
+        return AsyncThrowingStream { continuation in
+            Task.detached(priority: .userInitiated) {
                 do {
                     let fm = FileManager.default
 
+                    // Don't skip hidden files — iCloud placeholders are hidden (.filename.icloud)
                     let contents = try fm.contentsOfDirectory(
                         at: metadataDir,
                         includingPropertiesForKeys: [.ubiquitousItemDownloadingStatusKey],
-                        options: [.skipsHiddenFiles]
+                        options: []
                     )
 
-                    let jsonFiles = contents.filter { $0.pathExtension == "json" }
+                    // Match both downloaded .json files and iCloud placeholders (.json.icloud)
+                    let jsonFiles = contents.filter { url in
+                        let name = url.lastPathComponent
+                        return name.hasSuffix(".json") || name.hasSuffix(".json.icloud")
+                    }
                     print("[MetadataLoader] Found \(jsonFiles.count) metadata files")
 
                     let decoder = JSONDecoder()
                     var loadedItems: [SnapGridItem] = []
                     var skipped = 0
+                    var lastYieldCount = 0
 
                     for url in jsonFiles {
-                        // Check if the file is downloaded from iCloud
+                        // iCloud placeholder files (.json.icloud) can't be read directly.
+                        // Trigger download and skip — the 15s rescan will pick them up.
+                        let fileName = url.lastPathComponent
+                        if fileName.hasSuffix(".json.icloud") {
+                            var realName = String(fileName.dropLast(".icloud".count))
+                            if realName.hasPrefix(".") {
+                                realName = String(realName.dropFirst())
+                            }
+                            let realURL = url.deletingLastPathComponent().appendingPathComponent(realName)
+                            try? fm.startDownloadingUbiquitousItem(at: realURL)
+                            skipped += 1
+                            continue
+                        }
+
+                        // Check if the JSON file is downloaded from iCloud
                         if let resourceValues = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
                            let status = resourceValues.ubiquitousItemDownloadingStatus,
                            status != .current {
@@ -60,12 +86,26 @@ class MetadataLoader {
                         }
 
                         let id = url.deletingPathExtension().lastPathComponent
+                        item.id = id
                         let ext = item.isVideo ? "mp4" : "png"
                         let mediaURL = imagesDir.appendingPathComponent("\(id).\(ext)")
 
-                        // Skip orphaned metadata (JSON exists but media file doesn't)
-                        if !fm.fileExists(atPath: mediaURL.path) {
-                            print("[MetadataLoader] Media file missing for: \(id), skipping")
+                        // Check if media exists locally, as iCloud placeholder, or in iCloud
+                        let iCloudPlaceholder = imagesDir.appendingPathComponent(".\(id).\(ext).icloud")
+                        if fm.fileExists(atPath: mediaURL.path) {
+                            // File is downloaded locally — nothing to do
+                        } else if fm.fileExists(atPath: iCloudPlaceholder.path) {
+                            // File exists as iCloud placeholder — trigger download
+                            try? fm.startDownloadingUbiquitousItem(at: mediaURL)
+                        } else if let rv = try? mediaURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
+                                  rv.ubiquitousItemDownloadingStatus != nil {
+                            // System knows about this file in iCloud
+                            if rv.ubiquitousItemDownloadingStatus != .current {
+                                try? fm.startDownloadingUbiquitousItem(at: mediaURL)
+                            }
+                        } else {
+                            // Truly orphaned — no local file, no iCloud placeholder, no iCloud metadata
+                            print("[MetadataLoader] Media truly missing for: \(id), skipping")
                             continue
                         }
 
@@ -74,29 +114,33 @@ class MetadataLoader {
                             item.thumbnailURL = thumbnailsDir.appendingPathComponent("\(id).jpg")
                         }
 
-                        // Proactively trigger iCloud download of media file
-                        if let rv = try? mediaURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
-                           let status = rv.ubiquitousItemDownloadingStatus,
-                           status != .current {
-                            try? fm.startDownloadingUbiquitousItem(at: mediaURL)
-                        }
-
                         loadedItems.append(item)
+
+                        // Yield a sorted snapshot every batchSize items
+                        if loadedItems.count - lastYieldCount >= batchSize {
+                            let sorted = loadedItems.sorted {
+                                ($0.createdDate ?? .distantPast) > ($1.createdDate ?? .distantPast)
+                            }
+                            continuation.yield(LoadUpdate(items: sorted, skippedCount: skipped))
+                            lastYieldCount = loadedItems.count
+                        }
                     }
 
-                    if skipped > 0 {
-                        print("[MetadataLoader] Skipped \(skipped) files not yet downloaded from iCloud")
-                    }
-                    print("[MetadataLoader] Loaded \(loadedItems.count) items")
-
+                    // Final yield with all items
                     let sorted = loadedItems.sorted {
                         ($0.createdDate ?? .distantPast) > ($1.createdDate ?? .distantPast)
                     }
+                    continuation.yield(LoadUpdate(items: sorted, skippedCount: skipped))
 
-                    continuation.resume(returning: LoadResult(items: sorted, skippedCount: skipped))
+                    if skipped > 0 {
+                        print("[MetadataLoader] Skipped \(skipped) metadata files not yet downloaded from iCloud")
+                    }
+                    print("[MetadataLoader] Loaded \(loadedItems.count) items")
+
+                    continuation.finish()
                 } catch {
                     print("[MetadataLoader] Error: \(error)")
-                    continuation.resume(throwing: error)
+                    continuation.finish(throwing: error)
                 }
             }
         }

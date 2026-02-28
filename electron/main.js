@@ -6,6 +6,7 @@ import fs from 'fs-extra';
 import os from 'os';
 import {promises as fsPromises} from 'fs'; // Import fsPromises
 import chokidar from 'chokidar';
+import { execFile } from 'child_process';
 
 // electron-updater is CJS, so we use createRequire to import it in ESM context
 const _require = createRequire(import.meta.url);
@@ -27,17 +28,24 @@ const THUMB_JPEG_QUALITY = 90;
 /**
  * Generates a JPEG thumbnail from an image buffer.
  * Resizes to max THUMB_MAX_WIDTH wide (preserving aspect ratio) and compresses as JPEG.
+ * Falls back to macOS sips for formats nativeImage can't decode (e.g. WebP).
  * @param {Buffer} sourceBuffer - The original image buffer
  * @param {string} destPath - Where to write the thumbnail
+ * @param {string} [sourcePath] - Original file path (needed for sips fallback)
  */
-async function generateThumbnail(sourceBuffer, destPath) {
+async function generateThumbnail(sourceBuffer, destPath, sourcePath) {
   if (!sourceBuffer || sourceBuffer.length === 0) {
     throw new Error('Empty or missing source buffer');
   }
 
   const image = nativeImage.createFromBuffer(sourceBuffer);
   if (image.isEmpty()) {
-    throw new Error(`nativeImage could not decode buffer (${sourceBuffer.length} bytes)`);
+    // nativeImage can't decode this format — try macOS sips (handles WebP, HEIC, etc.)
+    if (!sourcePath) {
+      throw new Error(`nativeImage could not decode buffer (${sourceBuffer.length} bytes)`);
+    }
+    await generateThumbnailWithSips(sourcePath, destPath);
+    return;
   }
 
   const { width, height } = image.getSize();
@@ -50,6 +58,25 @@ async function generateThumbnail(sourceBuffer, destPath) {
 
   const jpegBuffer = resized.toJPEG(THUMB_JPEG_QUALITY);
   await fs.writeFile(destPath, jpegBuffer);
+}
+
+/**
+ * Fallback thumbnail generation using macOS sips.
+ * Handles formats nativeImage can't decode (WebP, HEIC, etc.).
+ */
+function generateThumbnailWithSips(sourcePath, destPath) {
+  return new Promise((resolve, reject) => {
+    execFile('sips', [
+      '-s', 'format', 'jpeg',
+      '-s', 'formatOptions', String(THUMB_JPEG_QUALITY),
+      '--resampleWidth', String(THUMB_MAX_WIDTH),
+      sourcePath,
+      '--out', destPath
+    ], (error) => {
+      if (error) reject(new Error(`sips failed: ${error.message}`));
+      else resolve();
+    });
+  });
 }
 
 /**
@@ -75,11 +102,10 @@ async function generateMissingThumbnails(storageDir) {
       try {
         const filePath = path.join(imagesDir, file);
         const sourceBuffer = await fs.readFile(filePath);
-        await generateThumbnail(sourceBuffer, thumbnailPath);
+        await generateThumbnail(sourceBuffer, thumbnailPath, filePath);
         generated++;
       } catch (err) {
-        // nativeImage can't decode WebP or other unsupported formats — skip silently
-        // These files will use the original as their grid image (no thumbnail)
+        console.warn(`Thumbnail generation failed for ${file}: ${err.message}`);
         skipped++;
       }
     }
@@ -89,6 +115,46 @@ async function generateMissingThumbnails(storageDir) {
     }
   } catch (error) {
     console.error('Error generating missing thumbnails:', error);
+  }
+}
+
+/**
+ * Moves orphaned metadata files (JSON without a corresponding media file)
+ * into an `orphaned-metadata/` folder so they don't slow down each load.
+ * Non-destructive: files are moved, not deleted.
+ */
+async function quarantineOrphanedMetadata(storageDir) {
+  const metadataDir = path.join(storageDir, 'metadata');
+  const imagesDir = path.join(storageDir, 'images');
+  const orphanedDir = path.join(storageDir, 'orphaned-metadata');
+
+  try {
+    const files = await fs.readdir(metadataDir);
+    const jsonFiles = files.filter(f => f.endsWith('.json'));
+
+    let moved = 0;
+    for (const file of jsonFiles) {
+      const id = path.basename(file, '.json');
+      const isVideo = id.startsWith('vid_');
+      const ext = isVideo ? '.mp4' : '.png';
+      const mediaPath = path.join(imagesDir, `${id}${ext}`);
+
+      if (!(await fs.pathExists(mediaPath))) {
+        await fs.ensureDir(orphanedDir);
+        await fs.move(
+          path.join(metadataDir, file),
+          path.join(orphanedDir, file),
+          { overwrite: true }
+        );
+        moved++;
+      }
+    }
+
+    if (moved > 0) {
+      console.log(`Quarantined ${moved} orphaned metadata files to orphaned-metadata/`);
+    }
+  } catch (error) {
+    console.error('Error quarantining orphaned metadata:', error);
   }
 }
 
@@ -369,6 +435,7 @@ function initAutoUpdater() {
 async function createWindow() {
   appStorageDir = await getAppStorageDir();
   await generateMissingThumbnails(appStorageDir);
+  await quarantineOrphanedMetadata(appStorageDir);
   console.log('App storage directory:', appStorageDir);
 
   // Migrate existing spaces config to iCloud-synced folder for iOS companion app
@@ -1200,6 +1267,7 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
     const metadataPath = path.join(metadataDir, `${id}.json`);
     await fs.writeJson(metadataPath, {
       ...metadata,
+      id, // Include id so iOS app can decode metadata
       filePath: filePath, // Include actual file path in metadata
       type: isVideo ? 'video' : 'image' // Ensure type is correctly set
     });
@@ -1211,7 +1279,7 @@ ipcMain.handle('save-image', async (event, { id, dataUrl, metadata }) => {
         const thumbnailsDir = path.join(appStorageDir, 'thumbnails');
         thumbnailPath = path.join(thumbnailsDir, `${id}.jpg`);
         const imageBuffer = await fs.readFile(filePath);
-        await generateThumbnail(imageBuffer, thumbnailPath);
+        await generateThumbnail(imageBuffer, thumbnailPath, filePath);
         console.log(`Thumbnail generated: ${thumbnailPath}`);
       } catch (thumbError) {
         console.error('Error generating thumbnail:', thumbError);

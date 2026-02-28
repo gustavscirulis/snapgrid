@@ -84,15 +84,22 @@ struct GridItemView: View {
     }
 
     private func loadThumbnail() async {
-        guard let url = item.thumbnailURL ?? item.mediaURL else {
-            loadFailed = true
+        let cache = ThumbnailCache.shared
+
+        // Try thumbnail first (fast, no wait — avoids 120s timeout for missing files)
+        if let thumbURL = item.thumbnailURL,
+           let loaded = await cache.loadImage(for: thumbURL) {
+            thumbnail = loaded
             return
         }
 
-        if let loaded = await ThumbnailCache.shared.loadImageWhenReady(for: url, timeout: 120) {
+        // Fall back to media file (wait for iCloud download if needed)
+        if let mediaURL = item.mediaURL,
+           let loaded = await cache.loadImageWhenReady(for: mediaURL, timeout: 180) {
             thumbnail = loaded
-        } else {
-            loadFailed = true
+            return
         }
+
+        loadFailed = true
     }
 }
