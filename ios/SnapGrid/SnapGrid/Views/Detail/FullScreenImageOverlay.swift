@@ -56,10 +56,25 @@ struct FullScreenImageOverlay: View {
                 .onTapGesture { close() }
 
             if animationComplete {
-                // Phase B: fully open — scrollable content with metadata
-                scrollableContent
-                    .offset(y: dragOffset)
-                    .gesture(dismissDragGesture)
+                // Phase B: fully open — scrollable content with native toolbar
+                NavigationStack {
+                    scrollableContent
+                        .ignoresSafeArea(edges: .top)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbarColorScheme(.dark, for: .navigationBar)
+                        .toolbarBackground(.hidden, for: .navigationBar)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button(action: close) {
+                                    Image(systemName: "xmark")
+                                        .foregroundStyle(.white.opacity(0.6))
+                                }
+                            }
+                        }
+                }
+                .offset(y: dragOffset)
+                .gesture(dismissDragGesture)
+                .transition(.opacity)
             } else {
                 // Phase A/C: animating — positioned image only
                 animatingImage
