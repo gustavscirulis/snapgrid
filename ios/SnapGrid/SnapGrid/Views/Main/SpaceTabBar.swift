@@ -3,6 +3,7 @@ import SwiftUI
 struct SpaceTabBar: View {
     let spaces: [Space]
     @Binding var activeSpaceId: String?
+    var scrollProgress: CGFloat
 
     private var activeIndex: Int {
         guard let id = activeSpaceId else { return 0 }
@@ -28,7 +29,6 @@ struct SpaceTabBar: View {
                     let frames = anchors.mapValues { proxy[$0] }
                     tabUnderline(frames: frames, containerHeight: proxy.size.height)
                 }
-                .animation(.spring(duration: 0.35, bounce: 0.15), value: activeIndex)
             }
         }
         .overlay(alignment: .bottom) {
@@ -40,13 +40,26 @@ struct SpaceTabBar: View {
 
     @ViewBuilder
     private func tabUnderline(frames: [Int: CGRect], containerHeight: CGFloat) -> some View {
-        if let frame = frames[activeIndex] {
-            let inset: CGFloat = 12
+        let inset: CGFloat = 12
+        let floorIndex = max(0, Int(scrollProgress))
+        let ceilIndex = floorIndex + 1
+        let fraction = scrollProgress - CGFloat(floorIndex)
+
+        if let fromFrame = frames[floorIndex] {
+            let toFrame = frames[ceilIndex] ?? fromFrame
+
+            let currentWidth = lerp(from: fromFrame.width - inset * 2, to: toFrame.width - inset * 2, t: fraction)
+            let currentX = lerp(from: fromFrame.midX, to: toFrame.midX, t: fraction)
+
             Capsule()
                 .fill(Color.white)
-                .frame(width: max(0, frame.width - inset * 2), height: 2)
-                .position(x: frame.midX, y: containerHeight - 1)
+                .frame(width: max(0, currentWidth), height: 2)
+                .position(x: currentX, y: containerHeight - 1)
         }
+    }
+
+    private func lerp(from: CGFloat, to: CGFloat, t: CGFloat) -> CGFloat {
+        from + (to - from) * t
     }
 }
 

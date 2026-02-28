@@ -1,5 +1,36 @@
 import SwiftUI
 
+// MARK: - Preference key for continuous TabView scroll tracking
+
+private struct PageOffsetData: Equatable {
+    let pageIndex: Int
+    let minX: CGFloat
+}
+
+private struct PageOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: PageOffsetData? = nil
+    static func reduce(value: inout PageOffsetData?, nextValue: () -> PageOffsetData?) {
+        value = nextValue() ?? value
+    }
+}
+
+private struct PageOffsetReporter: View {
+    let pageIndex: Int
+
+    var body: some View {
+        GeometryReader { geo in
+            Color.clear
+                .preference(
+                    key: PageOffsetPreferenceKey.self,
+                    value: PageOffsetData(
+                        pageIndex: pageIndex,
+                        minX: geo.frame(in: .named("pagerContainer")).minX
+                    )
+                )
+        }
+    }
+}
+
 struct MainView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
     @State private var selectedItem: SnapGridItem?
@@ -13,6 +44,7 @@ struct MainView: View {
     @State private var isLoading = true
     @State private var error: String?
     @State private var hasAttemptedRescan = false
+    @State private var tabScrollProgress: CGFloat = 0
 
     // MARK: - Index ↔ activeSpaceId bridging
 
@@ -110,7 +142,8 @@ struct MainView: View {
                             VStack(spacing: 0) {
                                 SpaceTabBar(
                                     spaces: spaces,
-                                    activeSpaceId: $activeSpaceId
+                                    activeSpaceId: $activeSpaceId,
+                                    scrollProgress: tabScrollProgress
                                 )
 
                                 TabView(selection: activeIndexBinding) {
@@ -126,6 +159,7 @@ struct MainView: View {
                                     }
                                     .refreshable { await loadContent() }
                                     .tag(0)
+                                    .background(PageOffsetReporter(pageIndex: 0))
 
                                     ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
                                         ScrollView {
@@ -140,9 +174,18 @@ struct MainView: View {
                                         }
                                         .refreshable { await loadContent() }
                                         .tag(index + 1)
+                                        .background(PageOffsetReporter(pageIndex: index + 1))
                                     }
                                 }
                                 .tabViewStyle(.page(indexDisplayMode: .never))
+                                .coordinateSpace(name: "pagerContainer")
+                                .onPreferenceChange(PageOffsetPreferenceKey.self) { data in
+                                    guard let data = data else { return }
+                                    let containerWidth = geo.size.width
+                                    guard containerWidth > 0 else { return }
+                                    let progress = CGFloat(data.pageIndex) - data.minX / containerWidth
+                                    tabScrollProgress = min(max(progress, 0), CGFloat(spaces.count))
+                                }
                             }
                         }
                     }
