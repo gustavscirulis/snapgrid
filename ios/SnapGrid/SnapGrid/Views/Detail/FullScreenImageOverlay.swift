@@ -2,12 +2,14 @@ import SwiftUI
 import AVKit
 
 struct FullScreenImageOverlay: View {
-    let item: SnapGridItem
+    let items: [SnapGridItem]
+    let startIndex: Int
     let sourceRect: CGRect
     let screenSize: CGSize
     let thumbnailImage: UIImage?
     var onClose: () -> Void
 
+    @State private var currentIndex: Int = 0
     @State private var isPresented = false
     @State private var animationComplete = false
     @State private var image: UIImage?
@@ -28,9 +30,13 @@ struct FullScreenImageOverlay: View {
     @State private var zoomPanOffset: CGSize = .zero
     @State private var zoomPanLastOffset: CGSize = .zero
 
+    // Horizontal swipe state
+    @State private var swipeOffset: CGFloat = 0
+    @State private var adjacentImages: [String: UIImage] = [:]  // keyed by item id
+
     // Gesture mode tracking — locked per gesture
     @State private var gestureActive = false
-    private enum GestureMode { case none, dismiss, scroll, zoomPan }
+    private enum GestureMode { case none, dismiss, scroll, zoomPan, swipe }
     @State private var gestureMode: GestureMode = .none
 
     private let spring = Animation.spring(response: 0.35, dampingFraction: 0.86)
@@ -40,6 +46,11 @@ struct FullScreenImageOverlay: View {
     private let minZoomScale: CGFloat = 1.0
     private let maxZoomScale: CGFloat = 4.0
     private let doubleTapZoomScale: CGFloat = 2.5
+
+    /// Current item derived from index
+    private var item: SnapGridItem {
+        items[currentIndex]
+    }
 
     /// How far to scroll up to fully reveal metadata
     private var metadataSnapOffset: CGFloat {
@@ -90,27 +101,57 @@ struct FullScreenImageOverlay: View {
 
             if animationComplete {
                 // Visual content (non-interactive — gestures are on the layer above)
-                VStack(spacing: 0) {
-                    mediaContent
-                        .frame(width: screenSize.width, height: screenSize.height)
-                        .clipped()
+                ZStack(alignment: .top) {
+                    // Previous image (visible during swipe)
+                    if currentIndex > 0 {
+                        adjacentPageContent(for: items[currentIndex - 1])
+                            .frame(width: screenSize.width, height: screenSize.height)
+                            .offset(x: -screenSize.width + swipeOffset)
+                    }
 
-                    MetadataPanel(item: item)
-                        .padding(.top, 16)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 60)
-                        .frame(width: screenSize.width)
+                    // Current item content
+                    VStack(spacing: 0) {
+                        mediaContent
+                            .frame(width: screenSize.width, height: screenSize.height)
+                            .clipped()
+
+                        MetadataPanel(item: item)
+                            .padding(.top, 16)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 60)
+                            .frame(width: screenSize.width)
+                    }
+                    .offset(x: swipeOffset, y: -contentOffset + dismissOffset)
+                    .scaleEffect(dismissOffset > 0 ? dismissScale : 1.0)
+
+                    // Next image (visible during swipe)
+                    if currentIndex < items.count - 1 {
+                        adjacentPageContent(for: items[currentIndex + 1])
+                            .frame(width: screenSize.width, height: screenSize.height)
+                            .offset(x: screenSize.width + swipeOffset)
+                    }
                 }
-                .offset(y: -contentOffset + dismissOffset)
-                .scaleEffect(dismissOffset > 0 ? dismissScale : 1.0)
                 .allowsHitTesting(false)
                 .transition(.opacity)
 
                 // Pattern pills (non-interactive)
-                if !isZoomed && contentOffset < 10 && dismissOffset == 0 {
+                if !isZoomed && contentOffset < 10 && dismissOffset == 0 && swipeOffset == 0 {
                     patternOverlay
                         .allowsHitTesting(false)
                         .transition(.opacity)
+                }
+
+                // Page counter
+                if items.count > 1 && !isZoomed && contentOffset < 10 && dismissOffset == 0 {
+                    VStack {
+                        Text("\(currentIndex + 1) / \(items.count)")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .padding(.top, 60)
+                        Spacer()
+                    }
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
                 }
 
                 // Full-screen gesture layer — covers everything so drags work anywhere
@@ -146,14 +187,40 @@ struct FullScreenImageOverlay: View {
         }
         .ignoresSafeArea()
         .onAppear {
+            currentIndex = startIndex
             impactFeedback.prepare()
             loadFullImage()
             prepareVideoIfNeeded()
+            preloadAdjacentImages()
             withAnimation(spring) {
                 isPresented = true
             } completion: {
                 animationComplete = true
             }
+        }
+    }
+
+    // MARK: - Adjacent page content (simple image, no zoom/scroll)
+
+    @ViewBuilder
+    private func adjacentPageContent(for adjacentItem: SnapGridItem) -> some View {
+        if let img = adjacentImages[adjacentItem.id] {
+            Image(uiImage: img)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        } else if let thumbURL = adjacentItem.thumbnailURL,
+                  let data = try? Data(contentsOf: thumbURL),
+                  let uiImg = UIImage(data: data) {
+            Image(uiImage: uiImg)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        } else {
+            Rectangle()
+                .fill(Color.snapDarkMuted)
+                .overlay {
+                    ProgressView()
+                        .tint(.white.opacity(0.3))
+                }
         }
     }
 
@@ -232,11 +299,12 @@ struct FullScreenImageOverlay: View {
         }
     }
 
-    // MARK: - Unified interaction gesture (handles dismiss, scroll, and zoom pan)
+    // MARK: - Unified interaction gesture (handles dismiss, scroll, zoom pan, and swipe)
 
     private var interactionGesture: some Gesture {
         DragGesture()
             .onChanged { value in
+                let tx = value.translation.width
                 let ty = value.translation.height
 
                 // Determine gesture mode on first call
@@ -245,7 +313,14 @@ struct FullScreenImageOverlay: View {
                     if isZoomed {
                         gestureMode = .zoomPan
                         zoomPanLastOffset = zoomPanOffset
-                    } else if contentOffset <= 0 && ty > 0 {
+                    } else if contentOffset > 0 {
+                        // Metadata is visible — only allow vertical scroll
+                        gestureMode = .scroll
+                        contentOffsetAtGestureStart = contentOffset
+                    } else if abs(tx) > abs(ty) {
+                        // Horizontal movement dominates — swipe between images
+                        gestureMode = .swipe
+                    } else if ty > 0 {
                         gestureMode = .dismiss
                     } else {
                         gestureMode = .scroll
@@ -259,6 +334,14 @@ struct FullScreenImageOverlay: View {
                         width: zoomPanLastOffset.width + value.translation.width,
                         height: zoomPanLastOffset.height + value.translation.height
                     )
+                case .swipe:
+                    var proposed = tx
+                    // Rubber-band at edges
+                    if (currentIndex == 0 && proposed > 0) ||
+                       (currentIndex == items.count - 1 && proposed < 0) {
+                        proposed = proposed * 0.3
+                    }
+                    swipeOffset = proposed
                 case .dismiss:
                     dismissOffset = max(0, ty)
                 case .scroll:
@@ -287,6 +370,40 @@ struct FullScreenImageOverlay: View {
                 switch mode {
                 case .zoomPan:
                     zoomPanLastOffset = zoomPanOffset
+
+                case .swipe:
+                    let velocity = value.predictedEndTranslation.width - value.translation.width
+                    let threshold = screenSize.width * 0.3
+                    let velocityThreshold: CGFloat = 200
+
+                    var newIndex = currentIndex
+                    if swipeOffset < -threshold || velocity < -velocityThreshold {
+                        // Swiped left → next image
+                        newIndex = min(currentIndex + 1, items.count - 1)
+                    } else if swipeOffset > threshold || velocity > velocityThreshold {
+                        // Swiped right → previous image
+                        newIndex = max(currentIndex - 1, 0)
+                    }
+
+                    if newIndex != currentIndex {
+                        // Navigate to new image
+                        let targetOffset: CGFloat = newIndex > currentIndex ? -screenSize.width : screenSize.width
+                        impactFeedback.impactOccurred()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
+                            swipeOffset = targetOffset
+                        } completion: {
+                            withAnimation(nil) {
+                                currentIndex = newIndex
+                                swipeOffset = 0
+                            }
+                            resetImageState()
+                        }
+                    } else {
+                        // Snap back
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) {
+                            swipeOffset = 0
+                        }
+                    }
 
                 case .dismiss:
                     if dismissOffset > 100 || value.predictedEndTranslation.height > 300 {
@@ -392,8 +509,19 @@ struct FullScreenImageOverlay: View {
     private func close() {
         player?.pause()
         impactFeedback.impactOccurred()
-        // Switch to animating image instantly, but keep dismissOffset
-        // so the image stays at its dragged position (no visual jump)
+
+        if currentIndex != startIndex {
+            // Swiped to a different image — fade out instead of hero animation
+            withAnimation(.easeOut(duration: 0.25)) {
+                animationComplete = false
+                isPresented = false
+            } completion: {
+                onClose()
+            }
+            return
+        }
+
+        // Original image — hero animation back to grid
         withAnimation(nil) {
             animationComplete = false
             contentOffset = 0
@@ -402,13 +530,31 @@ struct FullScreenImageOverlay: View {
             zoomPanOffset = .zero
             isZoomed = false
         }
-        // Animate from current position (including dismissOffset) to grid
         withAnimation(spring) {
             isPresented = false
             dismissOffset = 0
         } completion: {
             onClose()
         }
+    }
+
+    private func resetImageState() {
+        image = nil
+        isLoading = true
+        isZoomed = false
+        zoomScale = minZoomScale
+        zoomLastScale = minZoomScale
+        zoomPanOffset = .zero
+        zoomPanLastOffset = .zero
+        contentOffset = 0
+        contentOffsetAtGestureStart = 0
+        dismissOffset = 0
+        player?.pause()
+        player = nil
+
+        loadFullImage()
+        prepareVideoIfNeeded()
+        preloadAdjacentImages()
     }
 
     private func loadFullImage() {
@@ -427,5 +573,30 @@ struct FullScreenImageOverlay: View {
         let newPlayer = AVPlayer(url: url)
         self.player = newPlayer
         newPlayer.play()
+    }
+
+    private func preloadAdjacentImages() {
+        // Preload previous
+        if currentIndex > 0 {
+            let prevItem = items[currentIndex - 1]
+            if adjacentImages[prevItem.id] == nil, let url = prevItem.mediaURL ?? prevItem.thumbnailURL {
+                Task {
+                    if let img = await ThumbnailCache.shared.loadImage(for: url) {
+                        adjacentImages[prevItem.id] = img
+                    }
+                }
+            }
+        }
+        // Preload next
+        if currentIndex < items.count - 1 {
+            let nextItem = items[currentIndex + 1]
+            if adjacentImages[nextItem.id] == nil, let url = nextItem.mediaURL ?? nextItem.thumbnailURL {
+                Task {
+                    if let img = await ThumbnailCache.shared.loadImage(for: url) {
+                        adjacentImages[nextItem.id] = img
+                    }
+                }
+            }
+        }
     }
 }

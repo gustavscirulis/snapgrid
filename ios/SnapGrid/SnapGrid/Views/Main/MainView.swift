@@ -33,7 +33,8 @@ private struct PageOffsetReporter: View {
 
 struct MainView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
-    @State private var selectedItem: SnapGridItem?
+    @State private var selectedIndex: Int?
+    @State private var selectedItemId: String?
     @State private var sourceRect: CGRect = .zero
     @State private var thumbnailImage: UIImage?
     @State private var showOverlay = false
@@ -103,6 +104,14 @@ struct MainView: View {
         return false
     }
 
+    /// Items visible in the currently active space/tab (used for full-screen swipe navigation)
+    private var currentVisibleItems: [SnapGridItem] {
+        if let activeSpaceId, let space = spaces.first(where: { $0.id == activeSpaceId }) {
+            return itemsForSpace(space)
+        }
+        return searchFilteredItems
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -129,7 +138,7 @@ struct MainView: View {
                                 MasonryGrid(
                                     items: searchFilteredItems,
                                     availableWidth: gridWidth,
-                                    selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                    selectedItemId: showOverlay ? selectedItemId : nil,
                                     onItemSelected: handleItemSelected
                                 )
                                 .padding(.horizontal, 12)
@@ -151,7 +160,7 @@ struct MainView: View {
                                         MasonryGrid(
                                             items: searchFilteredItems,
                                             availableWidth: gridWidth,
-                                            selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                            selectedItemId: showOverlay ? selectedItemId : nil,
                                             onItemSelected: handleItemSelected
                                         )
                                         .padding(.horizontal, 12)
@@ -166,7 +175,7 @@ struct MainView: View {
                                             MasonryGrid(
                                                 items: itemsForSpace(space),
                                                 availableWidth: gridWidth,
-                                                selectedItemId: showOverlay ? selectedItem?.id : nil,
+                                                selectedItemId: showOverlay ? selectedItemId : nil,
                                                 onItemSelected: handleItemSelected
                                             )
                                             .padding(.horizontal, 12)
@@ -210,15 +219,17 @@ struct MainView: View {
                 }
 
                 // Full-screen overlay — above NavigationStack
-                if showOverlay, let item = selectedItem {
+                if showOverlay, let startIndex = selectedIndex {
                     FullScreenImageOverlay(
-                        item: item,
+                        items: currentVisibleItems,
+                        startIndex: startIndex,
                         sourceRect: sourceRect,
                         screenSize: geo.size,
                         thumbnailImage: thumbnailImage,
                         onClose: {
                             showOverlay = false
-                            selectedItem = nil
+                            selectedIndex = nil
+                            selectedItemId = nil
                             thumbnailImage = nil
                         }
                     )
@@ -234,7 +245,9 @@ struct MainView: View {
 
     private func handleItemSelected(_ item: SnapGridItem, _ rect: CGRect, _ thumb: UIImage?) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        selectedItem = item
+        let visibleItems = currentVisibleItems
+        selectedIndex = visibleItems.firstIndex(where: { $0.id == item.id }) ?? 0
+        selectedItemId = item.id
         sourceRect = rect
         thumbnailImage = thumb
         showOverlay = true
