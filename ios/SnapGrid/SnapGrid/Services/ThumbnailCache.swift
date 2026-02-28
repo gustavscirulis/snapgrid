@@ -1,4 +1,5 @@
 import UIKit
+import ImageIO
 import AVFoundation
 import Combine
 
@@ -6,20 +7,37 @@ class ThumbnailCache {
     static let shared = ThumbnailCache()
 
     private let cache = NSCache<NSString, UIImage>()
+    private let loadSemaphore = DispatchSemaphore(value: 4)
     private let ioQueue = DispatchQueue(label: "com.snapgrid.thumbnailcache", qos: .userInitiated, attributes: .concurrent)
+    private var memoryWarningObserver: NSObjectProtocol?
 
     private init() {
         cache.countLimit = 500
         cache.totalCostLimit = 100 * 1024 * 1024 // 100 MB
+
+        memoryWarningObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            self?.cache.removeAllObjects()
+        }
+    }
+
+    deinit {
+        if let observer = memoryWarningObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     func image(for url: URL) -> UIImage? {
         cache.object(forKey: url.absoluteString as NSString)
     }
 
-    /// Try to load image immediately. Returns nil if file needs iCloud download.
-    func loadImage(for url: URL) async -> UIImage? {
-        let key = url.absoluteString as NSString
+    /// Try to load image immediately, downsampled to targetPixelWidth.
+    /// Returns nil if file needs iCloud download.
+    func loadImage(for url: URL, targetPixelWidth: CGFloat = 0) async -> UIImage? {
+        let key = cacheKey(for: url, targetPixelWidth: targetPixelWidth)
 
         if let cached = cache.object(forKey: key) {
             return cached
@@ -27,35 +45,48 @@ class ThumbnailCache {
 
         return await withCheckedContinuation { continuation in
             ioQueue.async { [weak self] in
+                guard let self else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
                 let monitor = iCloudDownloadMonitor.shared
 
-                // Check if this is an iCloud file that hasn't been downloaded yet
                 if !monitor.isDownloaded(url) {
                     monitor.requestDownload(for: url)
                     continuation.resume(returning: nil)
                     return
                 }
 
-                // File is local — read it
+                // Throttle concurrent loads
+                self.loadSemaphore.wait()
+                defer { self.loadSemaphore.signal() }
+
                 if url.pathExtension.lowercased() == "mp4" {
-                    // Video file: extract a frame with AVAssetImageGenerator
-                    guard let thumbnail = self?.generateVideoThumbnail(for: url) else {
+                    guard let thumbnail = self.generateVideoThumbnail(for: url) else {
                         continuation.resume(returning: nil)
                         return
                     }
                     let cost = Int(thumbnail.size.width * thumbnail.size.height * 4)
-                    self?.cache.setObject(thumbnail, forKey: key, cost: cost)
+                    self.cache.setObject(thumbnail, forKey: key, cost: cost)
                     continuation.resume(returning: thumbnail)
                     return
                 }
 
-                guard let data = try? Data(contentsOf: url),
-                      let image = UIImage(data: data) else {
+                let image: UIImage?
+                if targetPixelWidth > 0 {
+                    image = self.downsampledImage(at: url, targetPixelWidth: targetPixelWidth)
+                } else {
+                    image = self.downsampledImage(at: url, targetPixelWidth: 0)
+                }
+
+                guard let image else {
                     continuation.resume(returning: nil)
                     return
                 }
 
-                self?.cache.setObject(image, forKey: key, cost: data.count)
+                let cost = Int(image.size.width * image.size.height * image.scale * image.scale * 4)
+                self.cache.setObject(image, forKey: key, cost: cost)
                 continuation.resume(returning: image)
             }
         }
@@ -63,16 +94,14 @@ class ThumbnailCache {
 
     /// Wait for a file to download from iCloud, then load it.
     /// Returns nil only if the timeout expires.
-    func loadImageWhenReady(for url: URL, timeout: TimeInterval = 120) async -> UIImage? {
-        // Fast path: try immediate load
-        if let image = await loadImage(for: url) {
+    func loadImageWhenReady(for url: URL, timeout: TimeInterval = 120, targetPixelWidth: CGFloat = 0) async -> UIImage? {
+        if let image = await loadImage(for: url, targetPixelWidth: targetPixelWidth) {
             return image
         }
 
         let monitor = iCloudDownloadMonitor.shared
         monitor.requestDownload(for: url)
 
-        // Slow path: wait for the monitor to signal this file is ready
         let resumeLock = NSLock()
         var resumed = false
         var cancellable: AnyCancellable?
@@ -92,7 +121,6 @@ class ThumbnailCache {
         }
 
         return await withCheckedContinuation { continuation in
-            // Handle task cancellation (e.g. view scrolled off screen)
             if Task.isCancelled {
                 continuation.resume(returning: nil)
                 return
@@ -108,7 +136,7 @@ class ThumbnailCache {
                         return
                     }
                     Task {
-                        let image = await self.loadImage(for: readyURL)
+                        let image = await self.loadImage(for: readyURL, targetPixelWidth: targetPixelWidth)
                         resumeOnce(with: image, continuation: continuation)
                     }
                 }
@@ -119,8 +147,7 @@ class ThumbnailCache {
                     resumeOnce(with: nil, continuation: continuation)
                     return
                 }
-                // One last attempt before giving up
-                let lastTry = await self.loadImage(for: url)
+                let lastTry = await self.loadImage(for: url, targetPixelWidth: targetPixelWidth)
                 resumeOnce(with: lastTry, continuation: continuation)
             }
         }
@@ -128,6 +155,64 @@ class ThumbnailCache {
 
     func clear() {
         cache.removeAllObjects()
+    }
+
+    /// Prefetch thumbnails for a batch of items in the background.
+    /// Loads at lower priority so it doesn't block on-screen cells.
+    func prefetchThumbnails(for items: [SnapGridItem], targetPixelWidth: CGFloat) {
+        Task.detached(priority: .utility) {
+            for item in items {
+                if Task.isCancelled { break }
+                // Try thumbnail file first, then media file
+                if let thumbURL = item.thumbnailURL {
+                    _ = await self.loadImage(for: thumbURL, targetPixelWidth: targetPixelWidth)
+                } else if let mediaURL = item.mediaURL {
+                    _ = await self.loadImage(for: mediaURL, targetPixelWidth: targetPixelWidth)
+                }
+            }
+        }
+    }
+
+    // MARK: - Private
+
+    private func cacheKey(for url: URL, targetPixelWidth: CGFloat) -> NSString {
+        if targetPixelWidth > 0 {
+            return "\(url.absoluteString)@\(Int(targetPixelWidth))w" as NSString
+        }
+        return url.absoluteString as NSString
+    }
+
+    /// Decode an image downsampled to the target pixel width using ImageIO.
+    /// Pass 0 for full resolution.
+    private func downsampledImage(at url: URL, targetPixelWidth: CGFloat) -> UIImage? {
+        let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions as CFDictionary) else {
+            return nil
+        }
+
+        let maxPixelSize: Int
+        if targetPixelWidth > 0 {
+            maxPixelSize = Int(targetPixelWidth)
+        } else {
+            // Full resolution — still use ImageIO for memory-efficient decoding
+            maxPixelSize = 0
+        }
+
+        var options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true
+        ]
+
+        if maxPixelSize > 0 {
+            options[kCGImageSourceThumbnailMaxPixelSize] = maxPixelSize
+        }
+
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return nil
+        }
+
+        return UIImage(cgImage: cgImage)
     }
 
     private func generateVideoThumbnail(for url: URL) -> UIImage? {

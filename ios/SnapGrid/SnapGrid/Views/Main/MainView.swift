@@ -233,6 +233,7 @@ struct MainView: View {
     // MARK: - Item Selection
 
     private func handleItemSelected(_ item: SnapGridItem, _ rect: CGRect, _ thumb: UIImage?) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         selectedItem = item
         sourceRect = rect
         thumbnailImage = thumb
@@ -283,6 +284,10 @@ struct MainView: View {
             if let final_ = lastUpdate {
                 self.items = final_.items
                 self.isLoading = false
+                // Prefetch all thumbnails in the background at grid size
+                let screenWidth = await MainActor.run { UIScreen.main.bounds.width }
+                let columnWidth = (screenWidth - 24 - 8) / 2 // 12pt padding each side, 8pt spacing
+                ThumbnailCache.shared.prefetchThumbnails(for: final_.items, targetPixelWidth: columnWidth * 2)
             }
 
             #if DEBUG
