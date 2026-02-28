@@ -68,7 +68,10 @@ private struct TabButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            UISelectionFeedbackGenerator().selectionChanged()
+            action()
+        } label: {
             Text(title)
                 .font(.system(size: 16, weight: isActive ? .medium : .regular))
                 .foregroundStyle(isActive ? .white : .white.opacity(0.5))

@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import Combine
 
 struct ImageDetailView: View {
     let item: SnapGridItem
@@ -7,6 +8,8 @@ struct ImageDetailView: View {
     @State private var player: AVPlayer?
     @State private var isLoading = true
     @State private var loadFailed = false
+    @State private var isZoomed = false
+    @State private var panOffset: CGSize = .zero
 
     var body: some View {
         ZStack {
@@ -30,7 +33,7 @@ struct ImageDetailView: View {
                                 }
                         }
                     } else if let image {
-                        ZoomableImageView(image: image)
+                        ZoomableImageView(image: image, isZoomed: $isZoomed, panOffset: $panOffset)
                             .aspectRatio(item.aspectRatio, contentMode: .fit)
                     } else if loadFailed {
                         Rectangle()
@@ -86,18 +89,36 @@ struct ImageDetailView: View {
     }
 
     private func prepareVideoPlayer(url: URL) async {
-        let fm = FileManager.default
+        let monitor = iCloudDownloadMonitor.shared
 
         // Wait for iCloud download if needed
-        if let rv = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
-           let status = rv.ubiquitousItemDownloadingStatus,
-           status != .current {
-            try? fm.startDownloadingUbiquitousItem(at: url)
-            for _ in 0..<30 {
-                try? await Task.sleep(for: .seconds(1))
-                if let rv = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
-                   rv.ubiquitousItemDownloadingStatus == .current {
-                    break
+        if !monitor.isDownloaded(url) {
+            monitor.requestDownload(for: url)
+            // Wait for the monitor to signal this file is ready (up to 60s)
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                var cancellable: AnyCancellable?
+                var timeoutTask: Task<Void, Never>?
+                let lock = NSLock()
+                var resumed = false
+
+                func resumeOnce() {
+                    lock.lock()
+                    guard !resumed else { lock.unlock(); return }
+                    resumed = true
+                    lock.unlock()
+                    cancellable?.cancel()
+                    timeoutTask?.cancel()
+                    continuation.resume()
+                }
+
+                cancellable = monitor.fileReady
+                    .filter { $0.absoluteString == url.absoluteString }
+                    .first()
+                    .sink { _ in resumeOnce() }
+
+                timeoutTask = Task {
+                    try? await Task.sleep(for: .seconds(60))
+                    resumeOnce()
                 }
             }
         }
