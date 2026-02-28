@@ -76,6 +76,7 @@ private struct TabButton: View {
                 .padding(.vertical, 12)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
         .anchorPreference(key: TabAnchorPreferenceKey.self, value: .bounds) { anchor in
             [index: anchor]
         }

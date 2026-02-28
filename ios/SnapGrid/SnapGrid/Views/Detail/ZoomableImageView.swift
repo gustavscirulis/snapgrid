@@ -68,5 +68,8 @@ struct ZoomableImageView: View {
                     }
                 }
             }
+            .accessibilityLabel("Zoomable image")
+            .accessibilityHint("Pinch to zoom, double tap to toggle zoom")
+            .accessibilityAddTraits(.isImage)
     }
 }

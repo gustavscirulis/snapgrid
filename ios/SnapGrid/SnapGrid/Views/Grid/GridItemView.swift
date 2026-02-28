@@ -66,6 +66,8 @@ struct GridItemView: View {
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityLabel(item.title ?? (item.isVideo ? "Video" : "Image"))
+        .accessibilityHint("Double tap to view full screen")
         .opacity(isSelected ? 0 : 1)
         .overlay(
             // Invisible tap target that captures frame at tap time

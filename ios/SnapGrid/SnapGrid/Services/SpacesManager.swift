@@ -1,17 +1,9 @@
 import Foundation
 
-class SpacesManager {
-    private let fileSystem: FileSystemManager
-
-    init(fileSystem: FileSystemManager) {
-        self.fileSystem = fileSystem
-    }
+struct SpacesManager {
+    let rootURL: URL
 
     func loadSpaces() throws -> [Space] {
-        guard let rootURL = fileSystem.rootURL else {
-            return []
-        }
-
         let spacesURL = rootURL.appendingPathComponent("spaces.json")
 
         guard FileManager.default.fileExists(atPath: spacesURL.path) else {

@@ -4,6 +4,7 @@ import AVKit
 struct FullScreenImageOverlay: View {
     let item: SnapGridItem
     let sourceRect: CGRect
+    let screenSize: CGSize
     let thumbnailImage: UIImage?
     var onClose: () -> Void
 
@@ -13,17 +14,17 @@ struct FullScreenImageOverlay: View {
     @State private var isLoading = true
     @State private var dragOffset: CGFloat = 0
     @State private var isZoomed = false
+    @State private var player: AVPlayer?
 
     private let spring = Animation.spring(response: 0.35, dampingFraction: 0.86)
-    private var screen: CGRect { UIScreen.main.bounds }
 
     /// Full-screen frame: image fitted to screen width, centered vertically
     private var fullScreenFrame: CGRect {
         let aspect = item.aspectRatio
-        let w = screen.width
+        let w = screenSize.width
         let h = w / aspect
-        let y = (screen.height - h) / 2
-        return CGRect(x: 0, y: max(y, 0), width: w, height: min(h, screen.height))
+        let y = (screenSize.height - h) / 2
+        return CGRect(x: 0, y: max(y, 0), width: w, height: min(h, screenSize.height))
     }
 
     /// The current animated rect (switches between source and full-screen)
@@ -78,18 +79,42 @@ struct FullScreenImageOverlay: View {
                 // Phase A/C: animating — positioned image only
                 animatingImage
             }
+
+            // Close button
+            if animationComplete {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(action: close) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(10)
+                                .background(.ultraThinMaterial.opacity(0.6))
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel("Close")
+                        .padding(.top, 54)
+                        .padding(.trailing, 16)
+                    }
+                    Spacer()
+                }
+                .transition(.opacity)
+            }
         }
         .ignoresSafeArea()
         .onAppear {
             loadFullImage()
+            prepareVideoIfNeeded()
             // Trigger open animation on next frame
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 withAnimation(spring) {
                     isPresented = true
                 }
             }
             // After spring settles, switch to scroll content (instant, no animation)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(0.45))
                 animationComplete = true
             }
         }
@@ -122,7 +147,7 @@ struct FullScreenImageOverlay: View {
             VStack(spacing: 0) {
                 // Media fills viewport
                 mediaContent
-                    .frame(width: screen.width, height: screen.height)
+                    .frame(width: screenSize.width, height: screenSize.height)
                     .clipped()
 
                 // Metadata below the fold
@@ -137,8 +162,8 @@ struct FullScreenImageOverlay: View {
 
     @ViewBuilder
     private var mediaContent: some View {
-        if item.isVideo, let url = item.mediaURL {
-            VideoPlayer(player: AVPlayer(url: url))
+        if item.isVideo, let player {
+            VideoPlayer(player: player)
         } else if let displayImage {
             ZoomableImageView(image: displayImage, isZoomed: $isZoomed)
         } else {
@@ -175,19 +200,21 @@ struct FullScreenImageOverlay: View {
     // MARK: - Actions
 
     private func close() {
+        player?.pause()
         // Phase C: swap back to positioned image for close animation
         withAnimation(nil) {
             animationComplete = false
             dragOffset = 0
         }
         // Animate back to source rect
-        DispatchQueue.main.async {
+        Task { @MainActor in
             withAnimation(spring) {
                 isPresented = false
             }
         }
         // After animation completes, remove overlay entirely
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(0.4))
             onClose()
         }
     }
@@ -201,5 +228,12 @@ struct FullScreenImageOverlay: View {
             image = await ThumbnailCache.shared.loadImage(for: url)
             isLoading = false
         }
+    }
+
+    private func prepareVideoIfNeeded() {
+        guard item.isVideo, let url = item.mediaURL else { return }
+        let newPlayer = AVPlayer(url: url)
+        self.player = newPlayer
+        newPlayer.play()
     }
 }
