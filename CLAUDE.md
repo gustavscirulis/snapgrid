@@ -1,72 +1,52 @@
-# SnapGrid Development Context
+# SnapGrid
 
-## Critical Architecture
+Visual media library app for collecting screenshots and videos, with AI-powered pattern analysis. Three platform-specific apps share the same `~/Documents/SnapGrid/` storage.
 
-**Electron + React Hybrid**
-- Main Process: `/electron/main.js` (ES modules, file system, IPC)
-- Renderer: React app with Vite
-- Security: `contextIsolation: true`, custom `local-file://` protocol
-- **NEVER use `require()` in renderer - everything via IPC**
+| Project | Location | Stack |
+|---------|----------|-------|
+| Desktop Electron app | `/electron/` + `/src/` | Electron, React, TypeScript, Vite |
+| Companion iOS app | `/ios/SnapGrid/` | SwiftUI, iOS 17+ |
+| Experimental native Mac app | `/SnapGrid/` | SwiftUI + SwiftData, macOS 15+ |
 
-**State Management**
-- No Redux - uses modular hooks: `useImageStore()` composes `useImageCollection()`, `useImageAnalysis()`, `useImageFileSystem()`, `useImageQueue()`
+## Shared File Storage
 
-**File Storage**
+All three apps read/write the same structure. iOS syncs via iCloud.
+
 ```
 ~/Documents/SnapGrid/
-├── images/     (PNG/MP4 files)
-├── metadata/   (JSON, same ID as media)
+├── images/     (PNG/MP4 — videos use vid_ prefix)
+├── metadata/   (JSON, same ID as media file)
 ├── .trash/     (auto-emptied)
 └── queue/      (mobile import, auto-watched)
 ```
 
-## Key Constraints
+## Electron App
 
-**Router**: MUST use `HashRouter` - `BrowserRouter` breaks in Electron production
-
-**File Handling**:
-- Videos: `vid_` prefix, `.mp4` extension
-- Images: no prefix, `.png` extension  
-- Always save media + metadata JSON with same ID
-- Handle both base64 and file paths in `save-image` IPC
-
-**API Keys**: MUST use secure storage via IPC (`setApiKey`/`getApiKey`)
-
-## Development Commands
+MUST use `HashRouter` — `BrowserRouter` breaks in Electron production.
+NEVER use `require()` in renderer — all communication via IPC (`electron/preload.cjs`).
+API keys use secure storage via IPC (`setApiKey`/`getApiKey`).
+State management uses modular hooks, not Redux (see `src/hooks/`).
 
 ```bash
 npm run electron:dev    # Development (Vite + Electron)
-npm run build          # Check TypeScript compilation
+npm run build          # TypeScript check
 npm run lint           # Before committing
 ```
 
-## Critical Patterns
+## iOS App
 
-**IPC Pattern**:
-```typescript
-// Preload: expose to renderer
-contextBridge.exposeInMainWorld('electron', {
-  method: (param) => ipcRenderer.invoke('handler', param)
-});
+Read-only companion viewer. Shares storage with desktop app via iCloud sync. Zero external dependencies.
 
-// Main: return { success, data?, error? }
-ipcMain.handle('handler', async (event, param) => { ... });
-```
+**iCloud handling is critical** — files may exist as `.icloud` placeholders. All loading code must detect placeholders, trigger downloads with `startDownloadingUbiquitousItem()`, and wait for completion.
 
-**File Import Flow**:
-1. Add to collection (immediate UI)
-2. Save to disk (IPC)  
-3. Analyze with AI (if API key exists)
-4. Update with results
+**Folder access** uses security-scoped URL bookmarks via `FileSystemManager`. User picks the SnapGrid folder once on first launch.
 
-**Electron Detection**:
-```typescript
-const isElectron = window?.electron && typeof window.electron !== 'undefined';
-```
+**FullScreenImageOverlay gestures** use a mode-locking pattern (dismiss/scroll/swipe/zoom lock on first touch). Respect this when modifying gesture code.
 
-## Essential Dependencies
+Open `ios/SnapGrid/SnapGrid.xcodeproj` in Xcode 15.4+. Bundle ID: `com.snapgrid.ios`.
 
-- **electron-window-state**: Window persistence (complex dynamic import)
-- **chokidar**: File watching for queue
-- **@radix-ui/***: Complete UI system
-- **framer-motion**: App-wide animations
+## Mac App (Experimental)
+
+Native SwiftUI + SwiftData rewrite. Uses XcodeGen (`SnapGrid/project.yml`).
+
+Open `SnapGrid/SnapGrid.xcodeproj` in Xcode. Bundle ID: `com.snapgrid.app`.
