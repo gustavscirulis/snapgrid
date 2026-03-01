@@ -38,6 +38,7 @@ const Index = () => {
     createSpace,
     renameSpace,
     deleteSpace,
+    reorderSpaces,
     updateSpacePrompt,
     allSpacePromptConfig,
     updateAllSpacePrompt,
@@ -390,6 +391,7 @@ const Index = () => {
             onRenameSpace={renameSpace}
             onDeleteSpace={deleteSpace}
             onAssignToSpace={handleAssignImageToSpace}
+            onReorderSpaces={reorderSpaces}
           />
         </div>
 
@@ -478,6 +480,7 @@ const Index = () => {
           onDeleteSpace={deleteSpace}
           onUpdateSpacePrompt={updateSpacePrompt}
           onUpdateAllSpacePrompt={updateAllSpacePrompt}
+          onReorderSpaces={reorderSpaces}
           onShuffleImages={shuffleImages}
         />
       </div>
