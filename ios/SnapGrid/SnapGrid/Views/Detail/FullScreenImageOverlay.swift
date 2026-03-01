@@ -7,6 +7,8 @@ struct FullScreenImageOverlay: View {
     let sourceRect: CGRect
     let screenSize: CGSize
     let thumbnailImage: UIImage?
+    let gridItemRects: [String: CGRect]
+    var onDismissing: ((String) -> Void)?
     var onClose: () -> Void
 
     @State private var currentIndex: Int = 0
@@ -29,6 +31,9 @@ struct FullScreenImageOverlay: View {
     @State private var zoomLastScale: CGFloat = 1.0
     @State private var zoomPanOffset: CGSize = .zero
     @State private var zoomPanLastOffset: CGSize = .zero
+
+    // Hero animation target (resolved at dismiss time)
+    @State private var heroTargetRect: CGRect?
 
     // Horizontal swipe state
     @State private var swipeOffset: CGFloat = 0
@@ -68,7 +73,10 @@ struct FullScreenImageOverlay: View {
     }
 
     private var currentRect: CGRect {
-        isPresented ? fullScreenFrame : sourceRect
+        if isPresented {
+            return fullScreenFrame
+        }
+        return heroTargetRect ?? sourceRect
     }
 
     private var currentCornerRadius: CGFloat {
@@ -262,7 +270,7 @@ struct FullScreenImageOverlay: View {
                 Image(uiImage: displayImage)
                     .resizable()
                     .aspectRatio(contentMode: isPresented ? .fit : .fill)
-                    .frame(width: currentRect.width, height: currentRect.height)
+                    .frame(width: currentRect.width, height: currentRect.height, alignment: .top)
                     .clipped()
             } else {
                 Rectangle()
@@ -389,6 +397,7 @@ struct FullScreenImageOverlay: View {
                         // Navigate to new image
                         let targetOffset: CGFloat = newIndex > currentIndex ? -screenSize.width : screenSize.width
                         impactFeedback.impactOccurred()
+                        onDismissing?(items[newIndex].id)
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
                             swipeOffset = targetOffset
                         } completion: {
@@ -510,31 +519,52 @@ struct FullScreenImageOverlay: View {
         player?.pause()
         impactFeedback.impactOccurred()
 
-        if currentIndex != startIndex {
-            // Swiped to a different image — fade out instead of hero animation
-            withAnimation(.easeOut(duration: 0.25)) {
+        let currentItemId = items[currentIndex].id
+        let targetRect = gridItemRects[currentItemId]
+
+        if let targetRect {
+            // Grid cell is visible — hero animation back to it
+            // Apply correction: sourceRect is ground truth for the original item.
+            // Preference-based rects may have a systematic offset (e.g. from
+            // off-screen TabView pages), so anchor to sourceRect.
+            let originalItemId = items[startIndex].id
+            var correctedRect = targetRect
+            if let originalGridRect = gridItemRects[originalItemId] {
+                let xCorrection = sourceRect.midX - originalGridRect.midX
+                let yCorrection = sourceRect.midY - originalGridRect.midY
+                correctedRect = CGRect(
+                    x: targetRect.origin.x + xCorrection,
+                    y: targetRect.origin.y + yCorrection,
+                    width: targetRect.width,
+                    height: targetRect.height
+                )
+            }
+
+            onDismissing?(currentItemId)
+            heroTargetRect = correctedRect
+
+            withAnimation(nil) {
                 animationComplete = false
+                contentOffset = 0
+                zoomScale = minZoomScale
+                zoomLastScale = minZoomScale
+                zoomPanOffset = .zero
+                isZoomed = false
+            }
+            withAnimation(spring) {
+                isPresented = false
+                dismissOffset = 0
+            } completion: {
+                onClose()
+            }
+        } else {
+            // Grid cell not visible — slide down and fade
+            withAnimation(.easeOut(duration: 0.25)) {
+                dismissOffset = screenSize.height
                 isPresented = false
             } completion: {
                 onClose()
             }
-            return
-        }
-
-        // Original image — hero animation back to grid
-        withAnimation(nil) {
-            animationComplete = false
-            contentOffset = 0
-            zoomScale = minZoomScale
-            zoomLastScale = minZoomScale
-            zoomPanOffset = .zero
-            isZoomed = false
-        }
-        withAnimation(spring) {
-            isPresented = false
-            dismissOffset = 0
-        } completion: {
-            onClose()
         }
     }
 
