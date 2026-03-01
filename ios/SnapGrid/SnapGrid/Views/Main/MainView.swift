@@ -42,6 +42,7 @@ struct MainView: View {
     @State private var spaces: [Space] = []
     @State private var activeSpaceId: String? = nil
     @State private var searchText = ""
+    @State private var gridItemRects: [String: CGRect] = [:]
     @State private var isLoading = true
     @State private var error: String?
     @State private var hasAttemptedRescan = false
@@ -220,6 +221,9 @@ struct MainView: View {
                         }
                     }
                     .searchable(text: $searchText, prompt: "Search patterns, context...")
+                    .onPreferenceChange(GridItemRectsPreferenceKey.self) { rects in
+                        gridItemRects = rects
+                    }
                 }
 
                 // Full-screen overlay — above NavigationStack
@@ -230,6 +234,10 @@ struct MainView: View {
                         sourceRect: sourceRect,
                         screenSize: geo.size,
                         thumbnailImage: thumbnailImage,
+                        gridItemRects: gridItemRects,
+                        onDismissing: { currentItemId in
+                            selectedItemId = currentItemId
+                        },
                         onClose: {
                             showOverlay = false
                             selectedIndex = nil

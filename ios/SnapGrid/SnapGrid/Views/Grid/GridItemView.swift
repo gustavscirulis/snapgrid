@@ -1,5 +1,12 @@
 import SwiftUI
 
+struct GridItemRectsPreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
+    }
+}
+
 struct GridItemView: View {
     let item: SnapGridItem
     let width: CGFloat
@@ -79,6 +86,10 @@ struct GridItemView: View {
                         let frame = geo.frame(in: .global)
                         onSelect?(item, frame, thumbnail)
                     }
+                    .preference(
+                        key: GridItemRectsPreferenceKey.self,
+                        value: [item.id: geo.frame(in: .global)]
+                    )
             }
         )
         .task {
