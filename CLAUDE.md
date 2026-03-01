@@ -1,142 +1,52 @@
-# SnapGrid Development Context
+# SnapGrid
 
-## Project Overview
+Visual media library app for collecting screenshots and videos, with AI-powered pattern analysis. Three platform-specific apps share the same `~/Documents/SnapGrid/` storage.
 
-This monorepo contains three projects that share design patterns (masonry grid, AI image analysis, spaces) but have independent, platform-specific implementations:
-
-| Project | Location | Tech Stack |
-|---------|----------|------------|
+| Project | Location | Stack |
+|---------|----------|-------|
 | Desktop Electron app | `/electron/` + `/src/` | Electron, React, TypeScript, Vite |
-| Companion iOS app | `/ios/SnapGrid/` | SwiftUI |
+| Companion iOS app | `/ios/SnapGrid/` | SwiftUI, iOS 17+ |
 | Experimental native Mac app | `/SnapGrid/` | SwiftUI + SwiftData, macOS 15+ |
 
----
+## Shared File Storage
 
-## Electron App
+All three apps read/write the same structure. iOS syncs via iCloud.
 
-### Critical Architecture
-
-**Electron + React Hybrid**
-- Main Process: `/electron/main.js` (ES modules, file system, IPC)
-- Renderer: React app with Vite
-- Security: `contextIsolation: true`, custom `local-file://` protocol
-- **NEVER use `require()` in renderer - everything via IPC**
-
-**State Management**
-- No Redux - uses modular hooks: `useImageStore()` composes `useImageCollection()`, `useImageAnalysis()`, `useImageFileSystem()`, `useImageQueue()`
-
-**File Storage**
 ```
 ~/Documents/SnapGrid/
-├── images/     (PNG/MP4 files)
-├── metadata/   (JSON, same ID as media)
+├── images/     (PNG/MP4 — videos use vid_ prefix)
+├── metadata/   (JSON, same ID as media file)
 ├── .trash/     (auto-emptied)
 └── queue/      (mobile import, auto-watched)
 ```
 
-### Key Constraints
+## Electron App
 
-**Router**: MUST use `HashRouter` - `BrowserRouter` breaks in Electron production
-
-**File Handling**:
-- Videos: `vid_` prefix, `.mp4` extension
-- Images: no prefix, `.png` extension  
-- Always save media + metadata JSON with same ID
-- Handle both base64 and file paths in `save-image` IPC
-
-**API Keys**: MUST use secure storage via IPC (`setApiKey`/`getApiKey`)
-
-### Development Commands
+MUST use `HashRouter` — `BrowserRouter` breaks in Electron production.
+NEVER use `require()` in renderer — all communication via IPC (`electron/preload.cjs`).
+API keys use secure storage via IPC (`setApiKey`/`getApiKey`).
+State management uses modular hooks, not Redux (see `src/hooks/`).
 
 ```bash
 npm run electron:dev    # Development (Vite + Electron)
-npm run build          # Check TypeScript compilation
+npm run build          # TypeScript check
 npm run lint           # Before committing
 ```
 
-### Critical Patterns
-
-**IPC Pattern**:
-```typescript
-// Preload: expose to renderer
-contextBridge.exposeInMainWorld('electron', {
-  method: (param) => ipcRenderer.invoke('handler', param)
-});
-
-// Main: return { success, data?, error? }
-ipcMain.handle('handler', async (event, param) => { ... });
-```
-
-**File Import Flow**:
-1. Add to collection (immediate UI)
-2. Save to disk (IPC)  
-3. Analyze with AI (if API key exists)
-4. Update with results
-
-**Electron Detection**:
-```typescript
-const isElectron = window?.electron && typeof window.electron !== 'undefined';
-```
-
-### Essential Dependencies
-
-- **electron-window-state**: Window persistence (complex dynamic import)
-- **chokidar**: File watching for queue
-- **@radix-ui/***: Complete UI system
-- **framer-motion**: App-wide animations
-
----
-
 ## iOS App
 
-Read-only companion viewer for the SnapGrid library. Shares the same `~/Documents/SnapGrid/` file structure with the desktop app via iCloud sync. No external dependencies — pure SwiftUI + native iOS frameworks.
+Read-only companion viewer. Shares storage with desktop app via iCloud sync. Zero external dependencies.
 
-### Architecture
+**iCloud handling is critical** — files may exist as `.icloud` placeholders. All loading code must detect placeholders, trigger downloads with `startDownloadingUbiquitousItem()`, and wait for completion.
 
-**Entry point**: `ios/SnapGrid/SnapGrid/App/SnapGridApp.swift`
-- `FileSystemManager` is the root `@StateObject`, injected via `.environmentObject`
-- `ContentView` gates between `OnboardingView` (folder picker) and `MainView`
-- Dark mode forced: `.preferredColorScheme(.dark)`
+**Folder access** uses security-scoped URL bookmarks via `FileSystemManager`. User picks the SnapGrid folder once on first launch.
 
-**State management**: No SwiftData or Redux — uses `ObservableObject` with `@Published` properties + `@State` in views.
+**FullScreenImageOverlay gestures** use a mode-locking pattern (dismiss/scroll/swipe/zoom lock on first touch). Respect this when modifying gesture code.
 
-**Key files**:
-```
-ios/SnapGrid/SnapGrid/
-├── App/              SnapGridApp.swift, ContentView.swift
-├── Models/           Space.swift, SnapGridItem.swift
-├── Services/
-│   ├── FileSystemManager.swift    # Folder access + URL bookmarks
-│   ├── MetadataLoader.swift       # Progressive async item streaming
-│   ├── SpacesManager.swift        # Load/derive spaces
-│   ├── ThumbnailCache.swift       # Singleton, 4-concurrent loads, ImageIO downsampling
-│   └── iCloudDownloadMonitor.swift # Polls every 3s for iCloud file readiness
-├── Views/
-│   ├── Main/         MainView.swift, SpaceTabBar.swift
-│   ├── Grid/         MasonryGrid.swift, GridItemView.swift, PatternPills.swift
-│   ├── Detail/       FullScreenImageOverlay.swift, ImageDetailView.swift, ZoomableImageView.swift
-│   ├── Onboarding/   OnboardingView.swift
-│   └── Shared/       EmptyStateView.swift
-└── Extensions/       Color+SnapGrid.swift
-```
+Open `ios/SnapGrid/SnapGrid.xcodeproj` in Xcode 15.4+. Bundle ID: `com.snapgrid.ios`.
 
-### Key Constraints
+## Mac App (Experimental)
 
-**Folder access**: Uses `UIDocumentPickerViewController` + security-scoped URL bookmarks. User picks the SnapGrid folder once; bookmark is persisted in UserDefaults. `FileSystemManager.restoreAccess()` handles stale bookmarks.
+Native SwiftUI + SwiftData rewrite. Uses XcodeGen (`SnapGrid/project.yml`).
 
-**iCloud handling is critical**: Files may exist as `.icloud` placeholders. All loading code must:
-- Detect `.json.icloud` / `.png.icloud` placeholder files
-- Trigger downloads with `startDownloadingUbiquitousItem()`
-- Wait for completion (MetadataLoader re-scans after 15s; ThumbnailCache waits up to 180s via `iCloudDownloadMonitor`)
-
-**Thumbnail loading**: `ThumbnailCache.shared` uses a 4-concurrent semaphore, ImageIO downsampling, and NSCache (500 items / 100MB). Always use `loadImage()` for fast path or `loadImageWhenReady()` when iCloud download may be needed.
-
-**Gesture system in FullScreenImageOverlay**: Uses a mode-locking pattern — once a gesture starts (dismiss/scroll/swipe/zoom), it locks to that mode until finger releases. Rubber-banding at zoom limits and swipe edges.
-
-### Development
-
-- Open `ios/SnapGrid/SnapGrid.xcodeproj` in Xcode 15.4+
-- Build target: `SnapGrid` (iOS 17.0+)
-- Bundle ID: `com.snapgrid.ios`
-- No CocoaPods/SPM — zero external dependencies
-- Team ID `HJ4HYUU2Y6` with automatic signing
+Open `SnapGrid/SnapGrid.xcodeproj` in Xcode. Bundle ID: `com.snapgrid.app`.
