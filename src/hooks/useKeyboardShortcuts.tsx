@@ -35,10 +35,9 @@ export function useKeyboardShortcuts({
         onUndo();
       }
 
-      // Check for Command+F, Command+K, or "/" to focus search
+      // Check for Command+F or Command+K to focus search
       if (
-        ((event.metaKey || event.ctrlKey) && (event.key === 'f' || event.key === 'k')) ||
-        event.key === '/'
+        (event.metaKey || event.ctrlKey) && (event.key === 'f' || event.key === 'k')
       ) {
         event.preventDefault(); // Prevent default browser search behavior
         onFocusSearch();
