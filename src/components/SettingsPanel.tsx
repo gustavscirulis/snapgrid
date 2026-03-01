@@ -52,6 +52,7 @@ interface SettingsPanelProps {
   onDeleteSpace: (id: string) => Promise<void>;
   onUpdateSpacePrompt: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
   onUpdateAllSpacePrompt: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  onReorderSpaces?: (fromIndex: number, toIndex: number) => void;
   onShuffleImages?: () => void;
 }
 
@@ -66,6 +67,7 @@ export function SettingsPanel({
   onDeleteSpace,
   onUpdateSpacePrompt,
   onUpdateAllSpacePrompt,
+  onReorderSpaces,
   onShuffleImages,
 }: SettingsPanelProps) {
   const [isDevMode, setIsDevMode] = useState(false);
@@ -174,6 +176,7 @@ export function SettingsPanel({
                     onDeleteSpace={onDeleteSpace}
                     onUpdateSpacePrompt={onUpdateSpacePrompt}
                     onUpdateAllSpacePrompt={onUpdateAllSpacePrompt}
+                    onReorderSpaces={onReorderSpaces}
                   />
                 </motion.div>
               )}
@@ -844,6 +847,7 @@ interface SpacesTabProps {
   onDeleteSpace: (id: string) => Promise<void>;
   onUpdateSpacePrompt: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
   onUpdateAllSpacePrompt: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  onReorderSpaces?: (fromIndex: number, toIndex: number) => void;
 }
 
 const SpacesTab = ({
@@ -855,6 +859,7 @@ const SpacesTab = ({
   onDeleteSpace,
   onUpdateSpacePrompt,
   onUpdateAllSpacePrompt,
+  onReorderSpaces,
 }: SpacesTabProps) => {
   // Which space is selected for editing (null = "All")
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(activeSpaceId);
@@ -939,6 +944,121 @@ const SpacesTab = ({
     }
   };
 
+  // Drag reorder state (vertical variant of SpaceTabBar pattern)
+  const [reorderDragId, setReorderDragId] = useState<string | null>(null);
+  const [dragTranslateY, setDragTranslateY] = useState(0);
+  const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null);
+  const dragTargetIndexRef = useRef<number | null>(null);
+  const reorderDragRef = useRef<{
+    spaceId: string;
+    originalIndex: number;
+    startY: number;
+    isDragging: boolean;
+    itemPositions: { top: number; midY: number; height: number }[];
+    draggedHeight: number;
+    gap: number;
+  } | null>(null);
+  const itemRefsMap = useRef<Map<string, HTMLElement>>(new Map());
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const state = reorderDragRef.current;
+      if (!state) return;
+
+      if (!state.isDragging) {
+        const dy = e.clientY - state.startY;
+        if (dy * dy < 25) return;
+
+        state.isDragging = true;
+        const positions = spaces.map(s => {
+          const el = itemRefsMap.current.get(s.id);
+          if (!el) return { top: 0, midY: 0, height: 0 };
+          const rect = el.getBoundingClientRect();
+          return { top: rect.top, midY: rect.top + rect.height / 2, height: rect.height };
+        });
+        state.itemPositions = positions;
+        state.draggedHeight = positions[state.originalIndex]?.height ?? 0;
+        state.gap = positions.length >= 2
+          ? Math.abs(positions[1].top - (positions[0].top + positions[0].height))
+          : 4;
+
+        setReorderDragId(state.spaceId);
+        document.body.style.cursor = 'grabbing';
+      }
+
+      setDragTranslateY(e.clientY - state.startY);
+
+      let targetIndex = 0;
+      for (let i = 0; i < state.itemPositions.length; i++) {
+        if (e.clientY >= state.itemPositions[i].midY) {
+          targetIndex = i;
+        }
+      }
+      dragTargetIndexRef.current = targetIndex;
+      setDragTargetIndex(targetIndex);
+    };
+
+    const handleMouseUp = () => {
+      const state = reorderDragRef.current;
+      if (!state) return;
+
+      if (state.isDragging && onReorderSpaces) {
+        const target = dragTargetIndexRef.current ?? state.originalIndex;
+        if (target !== state.originalIndex) {
+          onReorderSpaces(state.originalIndex, target);
+        }
+      }
+
+      reorderDragRef.current = null;
+      dragTargetIndexRef.current = null;
+      setReorderDragId(null);
+      setDragTranslateY(0);
+      setDragTargetIndex(null);
+      document.body.style.cursor = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [spaces, onReorderSpaces]);
+
+  const handleItemMouseDown = useCallback((e: React.MouseEvent, spaceId: string, spaceIndex: number) => {
+    if (e.button !== 0 || editingNameId) return;
+    reorderDragRef.current = {
+      spaceId,
+      originalIndex: spaceIndex,
+      startY: e.clientY,
+      isDragging: false,
+      itemPositions: [],
+      draggedHeight: 0,
+      gap: 4,
+    };
+  }, [editingNameId]);
+
+  const getItemShiftY = useCallback((spaceIndex: number): number => {
+    if (dragTargetIndex === null || !reorderDragRef.current) return 0;
+    const { originalIndex, draggedHeight, gap } = reorderDragRef.current;
+    if (spaceIndex === originalIndex) return 0;
+
+    const shiftAmount = draggedHeight + gap;
+
+    if (originalIndex < dragTargetIndex) {
+      if (spaceIndex > originalIndex && spaceIndex <= dragTargetIndex) {
+        return -shiftAmount;
+      }
+    } else if (originalIndex > dragTargetIndex) {
+      if (spaceIndex >= dragTargetIndex && spaceIndex < originalIndex) {
+        return shiftAmount;
+      }
+    }
+    return 0;
+  }, [dragTargetIndex]);
+
+  const isReorderDragging = reorderDragId !== null;
+
   // Build the list: "All" + named spaces
   const spaceItems: { id: string | null; name: string; hasCustomPrompt: boolean }[] = [
     { id: null, name: "All", hasCustomPrompt: allSpacePromptConfig.useCustomPrompt ?? false },
@@ -953,16 +1073,24 @@ const SpacesTab = ({
     <div className="space-y-4">
       {/* Space list */}
       <div className="space-y-1">
-        {spaceItems.map((item) => {
+        {spaceItems.map((item, itemIndex) => {
           const isSelected = selectedSpaceId === item.id;
           const isEditing = item.id !== null && editingNameId === item.id;
+          const spaceIndex = itemIndex - 1; // index within spaces array (-1 for "All")
 
-          return (
+          const isBeingDragged = reorderDragId === item.id;
+
+          const itemDiv = (
             <div
-              key={item.id ?? "__all__"}
+              ref={item.id !== null ? (el: HTMLDivElement | null) => {
+                if (el) itemRefsMap.current.set(item.id!, el);
+                else itemRefsMap.current.delete(item.id!);
+              } : undefined}
               onClick={() => {
+                if (reorderDragRef.current?.isDragging) return;
                 if (!isEditing) setSelectedSpaceId(item.id);
               }}
+              onMouseDown={item.id !== null ? (e: React.MouseEvent) => handleItemMouseDown(e, item.id!, spaceIndex) : undefined}
               className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
                 isSelected
                   ? "bg-gray-100 dark:bg-zinc-800"
@@ -1020,6 +1148,39 @@ const SpacesTab = ({
               )}
             </div>
           );
+
+          if (item.id !== null) {
+            const yOffset = isBeingDragged ? dragTranslateY : getItemShiftY(spaceIndex);
+            return (
+              <motion.div
+                key={item.id}
+                animate={{
+                  y: yOffset,
+                  scale: isBeingDragged ? 1.02 : 1,
+                  boxShadow: isBeingDragged
+                    ? '0 4px 12px rgba(0,0,0,0.12)'
+                    : '0 0px 0px rgba(0,0,0,0)',
+                }}
+                transition={{
+                  y: isBeingDragged
+                    ? { duration: 0 }
+                    : isReorderDragging
+                      ? { type: "spring", damping: 30, stiffness: 400 }
+                      : { duration: 0 },
+                  scale: { type: "spring", damping: 30, stiffness: 400 },
+                  boxShadow: { type: "spring", damping: 30, stiffness: 400 },
+                }}
+                style={{
+                  zIndex: isBeingDragged ? 10 : undefined,
+                  position: 'relative',
+                }}
+              >
+                {itemDiv}
+              </motion.div>
+            );
+          }
+
+          return <React.Fragment key="__all__">{itemDiv}</React.Fragment>;
         })}
 
         {/* Add space button */}

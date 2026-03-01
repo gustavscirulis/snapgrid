@@ -25,6 +25,7 @@ export interface UseSpacesReturn {
   deleteSpace: (id: string) => Promise<void>;
   updateSpacePrompt: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
   allSpacePromptConfig: AllSpacePromptConfig;
+  reorderSpaces: (fromIndex: number, toIndex: number) => Promise<void>;
   updateAllSpacePrompt: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
   isLoading: boolean;
 }
@@ -151,6 +152,16 @@ export function useSpaces(): UseSpacesReturn {
     }
   }, [spaces, activeSpaceId, persistSpaces]);
 
+  const reorderSpaces = useCallback(async (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    const reordered = [...spaces];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    const updated = reordered.map((s, i) => ({ ...s, order: i }));
+    setSpaces(updated);
+    await persistSpaces(updated);
+  }, [spaces, persistSpaces]);
+
   const updateSpacePrompt = useCallback(async (
     id: string,
     customPrompt: string | undefined,
@@ -182,6 +193,7 @@ export function useSpaces(): UseSpacesReturn {
     createSpace,
     renameSpace,
     deleteSpace,
+    reorderSpaces,
     updateSpacePrompt,
     allSpacePromptConfig,
     updateAllSpacePrompt,
