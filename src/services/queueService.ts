@@ -89,7 +89,7 @@ export class QueueService {
 
       toast({
         title: "Queue processed",
-        description: `Successfully imported ${result.files.length} images from queue`,
+        description: `Successfully imported ${result.files.length} file${result.files.length === 1 ? '' : 's'} from queue`,
       });
 
     } catch (error) {

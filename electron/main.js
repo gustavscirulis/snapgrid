@@ -1757,13 +1757,13 @@ ipcMain.handle('queue:list-files', async () => {
   try {
     const queueDir = path.join(appStorageDir, 'queue');
     const files = await fs.readdir(queueDir);
-    const imageFiles = files.filter(file => 
-      /\.(jpg|jpeg|png|gif|webp|bmp|tiff)$/i.test(file)
+    const mediaFiles = files.filter(file =>
+      /\.(jpg|jpeg|png|gif|webp|bmp|tiff|mp4|webm|mov|avi)$/i.test(file)
     );
-    
-    return { 
-      success: true, 
-      files: imageFiles.map(file => path.join(queueDir, file))
+
+    return {
+      success: true,
+      files: mediaFiles.map(file => path.join(queueDir, file))
     };
   } catch (error) {
     console.error('Error listing queue files:', error);
