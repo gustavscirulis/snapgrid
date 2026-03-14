@@ -13,8 +13,6 @@ export function useImageQueue(
   onQueueImportRef.current = onQueueImport;
 
   useEffect(() => {
-    queueService.startWatching();
-
     const handleQueueImport = (event: CustomEvent) => {
       const { filePath } = event.detail;
       onQueueImportRef.current(filePath).then(() => {
@@ -24,7 +22,13 @@ export function useImageQueue(
       });
     };
 
+    // Register event listener BEFORE starting watcher so no events are missed
     window.addEventListener('queue-import-file', handleQueueImport as EventListener);
+
+    // Start watcher, then sweep any pre-existing files in the queue
+    queueService.startWatching().then(() => {
+      queueService.processAllFiles();
+    });
 
     return () => {
       queueService.stopWatching();
