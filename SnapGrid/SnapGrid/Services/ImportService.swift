@@ -95,7 +95,13 @@ final class ImportService {
             return
         }
 
-        let model = UserDefaults.standard.string(forKey: "\(provider.rawValue)Model") ?? provider.defaultModel
+        let storedModel = UserDefaults.standard.string(forKey: "\(provider.rawValue)Model") ?? ModelDiscoveryService.autoModelValue
+        let model: String
+        if storedModel == ModelDiscoveryService.autoModelValue {
+            model = await ModelDiscoveryService.shared.resolveAutoModel(for: provider)
+        } else {
+            model = storedModel
+        }
         print("[Analysis] Starting analysis with \(provider.rawValue)/\(model) for \(item.id)")
 
         item.isAnalyzing = true
@@ -105,20 +111,24 @@ final class ImportService {
             let result: AnalysisResult
             let storage = self.storage
 
+            // Build space prompt (applies to both images and videos)
+            var spacePrompt: String?
+            if let space = item.space, space.useCustomPrompt, let prompt = space.customPrompt {
+                spacePrompt = "This item belongs to a collection called \"\(space.name)\". \(prompt)"
+            } else if UserDefaults.standard.bool(forKey: "useAllSpacePrompt") {
+                let allPrompt = UserDefaults.standard.string(forKey: "allSpacePrompt") ?? ""
+                if !allPrompt.isEmpty {
+                    spacePrompt = allPrompt
+                }
+            }
+
             if item.isVideo {
                 let frames = try await VideoFrameExtractor.extractAnalysisFrames(from: storage.mediaURL(filename: item.filename))
-                result = try await analysisService.analyzeVideo(frames: frames, provider: provider, model: model)
+                result = try await analysisService.analyzeVideo(frames: frames, provider: provider, model: model, spacePrompt: spacePrompt)
             } else {
                 guard let image = NSImage(contentsOf: storage.mediaURL(filename: item.filename)) else {
                     throw ImportError.cannotReadDimensions
                 }
-
-                // Get space-specific prompt
-                var spacePrompt: String?
-                if let space = item.space, space.useCustomPrompt, let prompt = space.customPrompt {
-                    spacePrompt = "This image belongs to a collection called \"\(space.name)\". \(prompt)"
-                }
-
                 result = try await analysisService.analyze(image: image, provider: provider, model: model, spacePrompt: spacePrompt)
             }
 
@@ -132,6 +142,17 @@ final class ImportService {
             item.isAnalyzing = false
             item.analysisError = error.localizedDescription
             try? context.save()
+        }
+    }
+
+    func analyzeUnanalyzedItems(from items: [MediaItem], context: ModelContext) async {
+        let unanalyzed = items.filter { $0.analysisResult == nil && $0.analysisError == nil && !$0.isAnalyzing }
+        guard !unanalyzed.isEmpty else { return }
+
+        print("[Analysis] Batch analyzing \(unanalyzed.count) unanalyzed items")
+        for item in unanalyzed {
+            await analyzeItem(item, context: context)
+            try? await Task.sleep(for: .milliseconds(300))
         }
     }
 

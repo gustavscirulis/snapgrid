@@ -10,6 +10,8 @@ final class MediaStorageService: Sendable {
     let mediaDir: URL
     let thumbnailDir: URL
     let queueDir: URL
+    let trashMediaDir: URL
+    let trashThumbnailDir: URL
 
     private init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -17,10 +19,12 @@ final class MediaStorageService: Sendable {
         mediaDir = baseURL.appendingPathComponent("media", isDirectory: true)
         thumbnailDir = baseURL.appendingPathComponent("thumbnails", isDirectory: true)
         queueDir = baseURL.appendingPathComponent("queue", isDirectory: true)
+        trashMediaDir = baseURL.appendingPathComponent(".trash/media", isDirectory: true)
+        trashThumbnailDir = baseURL.appendingPathComponent(".trash/thumbnails", isDirectory: true)
 
         // Create directories on init
         let fm = FileManager.default
-        for dir in [baseURL, mediaDir, thumbnailDir, queueDir] {
+        for dir in [baseURL, mediaDir, thumbnailDir, queueDir, trashMediaDir, trashThumbnailDir] {
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
     }
@@ -71,5 +75,65 @@ final class MediaStorageService: Sendable {
 
     func thumbnailExists(id: String) -> Bool {
         FileManager.default.fileExists(atPath: thumbnailDir.appendingPathComponent("\(id).jpg").path)
+    }
+
+    // MARK: - Trash
+
+    func moveToTrash(filename: String, id: String) throws {
+        let fm = FileManager.default
+        let mediaSrc = mediaDir.appendingPathComponent(filename)
+        let mediaDst = trashMediaDir.appendingPathComponent(filename)
+        if fm.fileExists(atPath: mediaSrc.path) {
+            if fm.fileExists(atPath: mediaDst.path) { try fm.removeItem(at: mediaDst) }
+            try fm.moveItem(at: mediaSrc, to: mediaDst)
+        }
+
+        let thumbSrc = thumbnailDir.appendingPathComponent("\(id).jpg")
+        let thumbDst = trashThumbnailDir.appendingPathComponent("\(id).jpg")
+        if fm.fileExists(atPath: thumbSrc.path) {
+            if fm.fileExists(atPath: thumbDst.path) { try fm.removeItem(at: thumbDst) }
+            try fm.moveItem(at: thumbSrc, to: thumbDst)
+        }
+    }
+
+    func restoreFromTrash(filename: String, id: String) throws {
+        let fm = FileManager.default
+        let mediaSrc = trashMediaDir.appendingPathComponent(filename)
+        let mediaDst = mediaDir.appendingPathComponent(filename)
+        if fm.fileExists(atPath: mediaSrc.path) {
+            try fm.moveItem(at: mediaSrc, to: mediaDst)
+        }
+
+        let thumbSrc = trashThumbnailDir.appendingPathComponent("\(id).jpg")
+        let thumbDst = thumbnailDir.appendingPathComponent("\(id).jpg")
+        if fm.fileExists(atPath: thumbSrc.path) {
+            try fm.moveItem(at: thumbSrc, to: thumbDst)
+        }
+    }
+
+    func emptyTrash() {
+        let fm = FileManager.default
+        for dir in [trashMediaDir, trashThumbnailDir] {
+            if let files = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+                for file in files {
+                    try? fm.removeItem(at: file)
+                }
+            }
+        }
+    }
+
+    func emptyOldTrash(olderThan interval: TimeInterval = 30 * 24 * 3600) {
+        let fm = FileManager.default
+        let cutoff = Date().addingTimeInterval(-interval)
+
+        for dir in [trashMediaDir, trashThumbnailDir] {
+            guard let files = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey]) else { continue }
+            for file in files {
+                guard let attrs = try? fm.attributesOfItem(atPath: file.path),
+                      let modified = attrs[.modificationDate] as? Date,
+                      modified < cutoff else { continue }
+                try? fm.removeItem(at: file)
+            }
+        }
     }
 }

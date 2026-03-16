@@ -35,19 +35,35 @@ final class AIAnalysisService: Sendable {
     static let shared = AIAnalysisService()
 
     private let systemPrompt = """
-    You are analyzing a UI screenshot or design image. Respond ONLY with valid JSON (no markdown, no code fences).
+    You are an expert AI in analyzing images. Your task is to analyze the content of images and provide appropriate descriptions.
 
-    Return this exact JSON structure:
+    Provide your response in the following JSON format:
     {
-      "imageContext": "A detailed description of the entire image, including layout, components, colors, typography, and interactions visible",
-      "imageSummary": "A 1-2 word summary of the image type (e.g., 'Login Form', 'Dashboard', 'Navigation Menu')",
+      "imageContext": "Detailed description of the entire image, including its purpose and main characteristics",
+      "imageSummary": "Very brief summary (1-2 words) of the main content or purpose",
       "patterns": [
-        { "name": "Pattern name (1-2 words)", "confidence": 0.95 }
+        {
+          "name": "Main object, subject, or element",
+          "confidence": 0.95
+        }
       ]
     }
 
-    For patterns: identify UI patterns, components, and design elements. Return up to 6 patterns with confidence >= 0.7. Sort by confidence descending.
+    Guidelines:
+      1. The "imageSummary" should be a very brief (1-2 words) description of what the image shows
+      2. The "imageContext" should provide detailed information about the entire image
+      3. List the most prominent objects, subjects, or elements visible in the image
+      4. Use specific, descriptive language appropriate to the content (e.g. technical terms for UI screenshots, descriptive language for photos)
+      5. Each pattern should be 1-2 words maximum, not duplicative of imageSummary
+      6. Include confidence scores between 0.8 and 1.0
+      7. List patterns in order of confidence/importance
+      8. Ensure that the patterns are unique and not duplicates of each other and imageSummary
+      9. Provide exactly 6 patterns, ordered by confidence
     """
+
+    private let userText = "Analyze this image and provide a detailed breakdown of its content. If it's a UI screenshot, focus on UI patterns and components. If it's a general scene, focus on objects and subjects. Respond with a strict, valid JSON object in the format specified in the system prompt. Do not include markdown formatting, explanations, or code block symbols. Use title case for pattern/object names. Provide up to 6 patterns/objects, ordered by confidence."
+
+    private let maxRetries = 2
 
     func analyze(image: NSImage, provider: AIProvider, model: String, spacePrompt: String? = nil) async throws -> AnalysisResult {
         guard let apiKey = try KeychainService.get(service: provider.keychainService) else {
@@ -60,19 +76,46 @@ final class AIAnalysisService: Sendable {
 
         let prompt = buildPrompt(spacePrompt: spacePrompt)
 
-        let responseText: String
-        switch provider {
-        case .openai:
-            responseText = try await callOpenAI(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
-        case .anthropic:
-            responseText = try await callAnthropic(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
-        case .gemini:
-            responseText = try await callGemini(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
-        case .openrouter:
-            responseText = try await callOpenRouter(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
+        var lastError: Error?
+        for attempt in 0...maxRetries {
+            if attempt > 0 {
+                let delay = Double(attempt) * 2.0
+                try? await Task.sleep(for: .seconds(delay))
+                print("[Analysis] Retry attempt \(attempt)")
+            }
+            do {
+                let responseText: String
+                switch provider {
+                case .openai:
+                    responseText = try await callOpenAI(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
+                case .anthropic:
+                    responseText = try await callAnthropic(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
+                case .gemini:
+                    responseText = try await callGemini(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
+                case .openrouter:
+                    responseText = try await callOpenRouter(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
+                }
+                return try parseResponse(responseText, provider: provider.rawValue, model: model)
+            } catch {
+                lastError = error
+                // Only retry on transient network/server errors
+                if !isRetryable(error) { throw error }
+            }
         }
+        throw lastError!
+    }
 
-        return try parseResponse(responseText, provider: provider.rawValue, model: model)
+    private func isRetryable(_ error: Error) -> Bool {
+        // NSURLError connection lost, timed out, network connection lost
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            return [-1001, -1005, -1009].contains(nsError.code)
+        }
+        // 502/503/429 from API
+        if case AnalysisError.apiError(let code, _) = error {
+            return [429, 502, 503].contains(code)
+        }
+        return false
     }
 
     func analyzeVideo(frames: [NSImage], provider: AIProvider, model: String, spacePrompt: String? = nil) async throws -> AnalysisResult {
@@ -114,6 +157,7 @@ final class AIAnalysisService: Sendable {
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 120
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -122,11 +166,11 @@ final class AIAnalysisService: Sendable {
             "messages": [
                 ["role": "system", "content": prompt],
                 ["role": "user", "content": [
+                    ["type": "text", "text": userText],
                     ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(base64Image)"]]
                 ]]
             ],
-            "max_tokens": 1000,
-            "temperature": 0.3
+            "max_completion_tokens": 800
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -146,13 +190,14 @@ final class AIAnalysisService: Sendable {
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 120
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
             "model": model,
-            "max_tokens": 1000,
+            "max_tokens": 800,
             "system": prompt,
             "messages": [
                 ["role": "user", "content": [
@@ -160,7 +205,8 @@ final class AIAnalysisService: Sendable {
                         "type": "base64",
                         "media_type": "image/jpeg",
                         "data": base64Image
-                    ]]
+                    ]],
+                    ["type": "text", "text": userText]
                 ]]
             ]
         ]
@@ -181,21 +227,24 @@ final class AIAnalysisService: Sendable {
         let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 120
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
             "contents": [
                 ["parts": [
-                    ["text": prompt],
+                    ["text": userText],
                     ["inlineData": [
                         "mimeType": "image/jpeg",
                         "data": base64Image
                     ]]
                 ]]
             ],
+            "systemInstruction": [
+                "parts": [["text": prompt]]
+            ],
             "generationConfig": [
-                "temperature": 0.3,
-                "maxOutputTokens": 1000
+                "maxOutputTokens": 800
             ]
         ]
 
@@ -217,8 +266,10 @@ final class AIAnalysisService: Sendable {
         let url = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 120
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("https://snapgrid.app", forHTTPHeaderField: "HTTP-Referer")
         request.setValue("SnapGrid", forHTTPHeaderField: "X-Title")
 
         let body: [String: Any] = [
@@ -226,11 +277,11 @@ final class AIAnalysisService: Sendable {
             "messages": [
                 ["role": "system", "content": prompt],
                 ["role": "user", "content": [
+                    ["type": "text", "text": userText],
                     ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(base64Image)"]]
                 ]]
             ],
-            "max_tokens": 1000,
-            "temperature": 0.3
+            "max_tokens": 1200
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -255,10 +306,47 @@ final class AIAnalysisService: Sendable {
         return systemPrompt + "\n\nAdditional instructions:\n" + spacePrompt
     }
 
+    /// Max dimension recommended by Anthropic — larger images are resized server-side anyway.
+    private let maxImageDimension: CGFloat = 1568
+
     private func imageToBase64(_ image: NSImage) -> String? {
         guard let tiffData = image.tiffRepresentation,
-              let bitmapRep = NSBitmapImageRep(data: tiffData),
-              let jpegData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.85]) else {
+              let bitmapRep = NSBitmapImageRep(data: tiffData) else {
+            return nil
+        }
+
+        let w = CGFloat(bitmapRep.pixelsWide)
+        let h = CGFloat(bitmapRep.pixelsHigh)
+        let longest = max(w, h)
+
+        let targetRep: NSBitmapImageRep
+        if longest > maxImageDimension {
+            let scale = maxImageDimension / longest
+            let newW = Int(w * scale)
+            let newH = Int(h * scale)
+            guard let resized = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: newW,
+                pixelsHigh: newH,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+            ) else { return nil }
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: resized)
+            NSGraphicsContext.current?.imageInterpolation = .high
+            bitmapRep.draw(in: NSRect(x: 0, y: 0, width: newW, height: newH))
+            NSGraphicsContext.restoreGraphicsState()
+            targetRep = resized
+        } else {
+            targetRep = bitmapRep
+        }
+
+        guard let jpegData = targetRep.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) else {
             return nil
         }
         return jpegData.base64EncodedString()
