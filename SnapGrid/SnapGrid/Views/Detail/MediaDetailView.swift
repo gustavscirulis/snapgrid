@@ -6,9 +6,15 @@ struct MediaDetailView: View {
     let allItems: [MediaItem]
     let onClose: () -> Void
     let onNavigate: (String) -> Void
+    let onRetryAnalysis: (MediaItem) -> Void
 
     @State private var image: NSImage?
     @State private var isLoading = true
+
+    /// AnimatedImageModal.tsx:65 — originalHeight > originalWidth * 2
+    private var isTallImage: Bool {
+        !item.isVideo && item.aspectRatio < 0.5
+    }
 
     private var currentIndex: Int? {
         allItems.firstIndex(where: { $0.id == item.id })
@@ -17,7 +23,7 @@ struct MediaDetailView: View {
     var body: some View {
         ZStack {
             // Backdrop
-            Color.black.opacity(0.85)
+            Color.black.opacity(0.80)  // AnimatedImageModal.tsx:571 — bg-black/80
                 .ignoresSafeArea()
                 .onTapGesture { onClose() }
 
@@ -44,16 +50,28 @@ struct MediaDetailView: View {
                     VideoPlayer(player: AVPlayer(url: MediaStorageService.shared.mediaURL(filename: item.filename)))
                         .aspectRatio(item.aspectRatio, contentMode: .fit)
                         .frame(maxWidth: 1200, maxHeight: 800)
+                    Spacer()
                 } else if let image {
-                    ZoomableImageView(image: image)
-                        .aspectRatio(item.aspectRatio, contentMode: .fit)
-                        .frame(maxWidth: 1200, maxHeight: 800)
+                    if isTallImage {
+                        // AnimatedImageModal.tsx:67-79 — tall images scroll vertically, fit to width
+                        ScrollView(.vertical) {
+                            ZoomableImageView(image: image)
+                                .aspectRatio(item.aspectRatio, contentMode: .fit)
+                                .frame(maxWidth: 1200)
+                        }
+                    } else {
+                        ZoomableImageView(image: image)
+                            .aspectRatio(item.aspectRatio, contentMode: .fit)
+                            .frame(maxWidth: 1200, maxHeight: 800)
+                        Spacer()
+                    }
                 } else if isLoading {
                     ProgressView()
                         .frame(maxWidth: 400, maxHeight: 400)
+                    Spacer()
+                } else {
+                    Spacer()
                 }
-
-                Spacer()
 
                 // Metadata panel
                 if let result = item.analysisResult {
@@ -86,6 +104,36 @@ struct MediaDetailView: View {
                                 .lineLimit(3)
                                 .frame(maxWidth: 600)
                         }
+                    }
+                    .padding()
+                    .padding(.bottom, 8)
+                } else if item.analysisError != nil {
+                    VStack(spacing: 8) {
+                        Text("Analysis failed")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                        if let error = item.analysisError {
+                            Text(error)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.white.opacity(0.4))
+                                .lineLimit(2)
+                        }
+                        Button("Retry Analysis") {
+                            onRetryAnalysis(item)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                    .padding()
+                    .padding(.bottom, 8)
+                } else if item.isAnalyzing {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.white)
+                        Text("Analyzing...")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.white.opacity(0.6))
                     }
                     .padding()
                     .padding(.bottom, 8)

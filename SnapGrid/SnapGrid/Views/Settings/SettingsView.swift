@@ -12,7 +12,12 @@ struct SettingsView: View {
                 .tabItem {
                     Label("Spaces", systemImage: "square.grid.2x2")
                 }
+
+            DeveloperSettingsTab()
+                .tabItem {
+                    Label("Developer", systemImage: "wrench.and.screwdriver")
+                }
         }
-        .frame(width: 500, height: 400)
+        .frame(width: 600, height: 450)
     }
 }

@@ -23,6 +23,13 @@ struct SnapGridApp: App {
                 }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             }
+
+            CommandGroup(replacing: .undoRedo) {
+                Button("Undo") {
+                    NotificationCenter.default.post(name: .undoDelete, object: nil)
+                }
+                .keyboardShortcut("z")
+            }
         }
 
         Settings {
@@ -33,4 +40,6 @@ struct SnapGridApp: App {
 
 extension Notification.Name {
     static let importFiles = Notification.Name("importFiles")
+    static let undoDelete = Notification.Name("undoDelete")
+    static let apiKeySaved = Notification.Name("apiKeySaved")
 }

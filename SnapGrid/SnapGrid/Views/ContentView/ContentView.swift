@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -7,7 +8,10 @@ struct ContentView: View {
     @Query(sort: \Space.order) private var spaces: [Space]
     @State private var appState = AppState()
     @State private var importService = ImportService()
+    @State private var queueWatcher = QueueWatcher(queueURL: MediaStorageService.shared.queueDir)
     @State private var isDragTargeted = false
+    @State private var spaceSlideEdge: Edge = .trailing
+    @AppStorage("appTheme") private var themeSetting: String = AppTheme.system.rawValue
 
     private var filteredItems: [MediaItem] {
         var items = allItems
@@ -46,10 +50,13 @@ struct ContentView: View {
                 // Space tab bar
                 SpaceTabBar(
                     spaces: spaces,
-                    activeSpaceId: $appState.activeSpaceId,
+                    activeSpaceId: appState.activeSpaceId,
+                    onSelectSpace: switchToSpace,
                     onCreateSpace: createSpace,
                     onDeleteSpace: deleteSpace,
-                    onRenameSpace: renameSpace
+                    onRenameSpace: renameSpace,
+                    onReorderSpaces: reorderSpaces,
+                    onAssignToSpace: assignToSpace
                 )
                 .padding(.top, 8)
 
@@ -57,6 +64,20 @@ struct ContentView: View {
                 if allItems.isEmpty {
                     EmptyStateView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if filteredItems.isEmpty && appState.activeSpaceId != nil {
+                    // Space-specific empty state
+                    VStack(spacing: 12) {
+                        Image(systemName: "rectangle.stack.badge.plus")
+                            .font(.system(size: 32, weight: .light))
+                            .foregroundStyle(.secondary)
+                        Text("No items in this space")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                        Text("Drop images here or move existing images to this space")
+                            .font(.subheadline)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if filteredItems.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "magnifyingglass")
@@ -72,11 +93,28 @@ struct ContentView: View {
                         items: filteredItems,
                         thumbnailSize: appState.thumbnailSize,
                         selectedIds: appState.selectedIds,
-                        onSelect: { id in appState.detailItem = id },
+                        spaces: spaces,
+                        activeSpaceId: appState.activeSpaceId,
+                        onSelect: { id in
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                appState.detailItem = id
+                            }
+                        },
                         onToggleSelect: { id in appState.toggleSelection(id) },
+                        onShiftSelect: { id in
+                            appState.rangeSelect(
+                                targetId: id,
+                                orderedIds: filteredItems.map(\.id)
+                            )
+                        },
                         onDelete: deleteItems,
-                        onAssignToSpace: assignToSpace
+                        onAssignToSpace: assignToSpace,
+                        onRetryAnalysis: retryAnalysis,
+                        onSetSelection: { ids in appState.selectedIds = ids }
                     )
+                    .id(appState.activeSpaceId ?? "all")
+                    .transition(.move(edge: spaceSlideEdge))
+                    .clipped()
                 }
             }
 
@@ -86,11 +124,30 @@ struct ContentView: View {
                 MediaDetailView(
                     item: item,
                     allItems: filteredItems,
-                    onClose: { appState.detailItem = nil },
-                    onNavigate: { appState.detailItem = $0 }
+                    onClose: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            appState.detailItem = nil
+                        }
+                    },
+                    onNavigate: { appState.detailItem = $0 },
+                    onRetryAnalysis: retryAnalysis
                 )
-                .transition(.opacity)
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
+
+            // Selection badge
+            if !appState.selectedIds.isEmpty {
+                VStack {
+                    Spacer()
+                    SelectionBadge(count: appState.selectedIds.count)
+                        .padding(.bottom, 24)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: appState.selectedIds.count)
+            }
+
+            // Toast notifications
+            ToastOverlay(toasts: appState.toasts)
 
             // Drag overlay
             if isDragTargeted {
@@ -108,12 +165,91 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .importFiles)) { _ in
             openImportPanel()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .undoDelete)) { _ in
+            undoLastDelete()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .apiKeySaved)) { _ in
+            Task {
+                await importService.analyzeUnanalyzedItems(from: Array(allItems), context: modelContext)
+            }
+        }
+        .task {
+            MediaStorageService.shared.emptyOldTrash()
+            DataCleanupService.cleanOrphanedRecords(context: modelContext)
+
+            // Wire QueueWatcher — mirrors electron/main.js:1705-1738 chokidar watcher
+            // and queueService.ts:107-144 (import, toast, remove source)
+            queueWatcher.onNewFiles = { urls in
+                Task {
+                    await importService.importFiles(urls, into: modelContext, spaceId: appState.activeSpaceId)
+                    // Remove processed files from queue (queueService.ts:135-144)
+                    for url in urls {
+                        try? FileManager.default.removeItem(at: url)
+                    }
+                    appState.showToast("Imported \(urls.count) item\(urls.count == 1 ? "" : "s") from queue")
+                }
+            }
+            queueWatcher.startWatching()
+        }
         .onDeleteCommand {
             deleteSelectedItems()
         }
+        .onExitCommand {
+            if !appState.selectedIds.isEmpty {
+                appState.clearSelection()
+            } else if appState.detailItem != nil {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    appState.detailItem = nil
+                }
+            }
+        }
+        .onKeyPress(characters: .init(charactersIn: "123456789"), phases: .down) { press in
+            guard press.modifiers.contains(.command) else { return .ignored }
+            let digit = Int(String(press.characters.first!))!
+            if digit == 1 {
+                switchToSpace(nil)
+            } else {
+                let idx = digit - 2
+                if idx < spaces.count {
+                    switchToSpace(spaces[idx].id)
+                }
+            }
+            return .handled
+        }
+        .onKeyPress(.init("="), phases: .down) { press in
+            guard press.modifiers.contains(.command) else { return .ignored }
+            appState.zoomIn()
+            return .handled
+        }
+        .onKeyPress(.init("-"), phases: .down) { press in
+            guard press.modifiers.contains(.command) else { return .ignored }
+            appState.zoomOut()
+            return .handled
+        }
+        .onKeyPress(.init("a"), phases: .down) { press in
+            guard press.modifiers.contains(.command) else { return .ignored }
+            appState.selectAll(filteredItems.map(\.id))
+            return .handled
+        }
         .environment(appState)
         .environment(importService)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme((AppTheme(rawValue: themeSetting) ?? .system).colorScheme)
+    }
+
+    // MARK: - Space Navigation
+
+    private func switchToSpace(_ newId: String?) {
+        let oldIndex = spaceIndex(for: appState.activeSpaceId)
+        let newIndex = spaceIndex(for: newId)
+        spaceSlideEdge = newIndex > oldIndex ? .trailing : .leading
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            appState.activeSpaceId = newId
+        }
+    }
+
+    private func spaceIndex(for id: String?) -> Int {
+        guard let id else { return 0 }
+        return (spaces.firstIndex(where: { $0.id == id }) ?? -1) + 1
     }
 
     // MARK: - Actions
@@ -138,7 +274,12 @@ struct ContentView: View {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.png, .jpeg, .gif, .mpeg4Movie, .movie]
+        // electron/main.js:1761 — jpg|jpeg|png|gif|webp|bmp|tiff|mp4|webm|mov|avi
+        // UploadZone.tsx:165 — image/*,video/*
+        panel.allowedContentTypes = [
+            .png, .jpeg, .gif, .bmp, .tiff, .webP, .heic,     // Images
+            .mpeg4Movie, .movie, .avi                           // Videos (.webm has no UTType)
+        ]
 
         panel.begin { response in
             if response == .OK {
@@ -151,21 +292,59 @@ struct ContentView: View {
 
     private func deleteItems(_ ids: Set<String>) {
         let items = allItems.filter { ids.contains($0.id) }
-        let batch = items.map { (id: $0.id, filename: $0.filename) }
+        let batch = items.map { item in
+            DeletedItemInfo(
+                id: item.id,
+                filename: item.filename,
+                mediaType: item.mediaType,
+                width: item.width,
+                height: item.height,
+                duration: item.duration,
+                analysisResult: item.analysisResult,
+                spaceId: item.space?.id
+            )
+        }
         appState.pushDeleteBatch(batch)
 
         for item in items {
-            try? MediaStorageService.shared.deleteMedia(filename: item.filename)
-            try? MediaStorageService.shared.deleteThumbnail(id: item.id)
+            try? MediaStorageService.shared.moveToTrash(filename: item.filename, id: item.id)
             modelContext.delete(item)
         }
         try? modelContext.save()
         appState.clearSelection()
+        appState.showToast("Moved \(items.count) item\(items.count == 1 ? "" : "s") to trash")
     }
 
     private func deleteSelectedItems() {
         guard !appState.selectedIds.isEmpty else { return }
         deleteItems(appState.selectedIds)
+    }
+
+    private func undoLastDelete() {
+        guard let batch = appState.popDeleteBatch() else { return }
+
+        for info in batch {
+            try? MediaStorageService.shared.restoreFromTrash(filename: info.filename, id: info.id)
+
+            let item = MediaItem(
+                id: info.id,
+                mediaType: info.mediaType,
+                filename: info.filename,
+                width: info.width,
+                height: info.height,
+                duration: info.duration
+            )
+            item.analysisResult = info.analysisResult
+
+            if let spaceId = info.spaceId {
+                let descriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
+                item.space = try? modelContext.fetch(descriptor).first
+            }
+
+            modelContext.insert(item)
+        }
+        try? modelContext.save()
+        appState.showToast("Restored \(batch.count) item\(batch.count == 1 ? "" : "s")")
     }
 
     private func createSpace() {
@@ -179,7 +358,7 @@ struct ContentView: View {
             modelContext.delete(space)
             try? modelContext.save()
             if appState.activeSpaceId == id {
-                appState.activeSpaceId = nil
+                switchToSpace(nil)
             }
         }
     }
@@ -191,11 +370,47 @@ struct ContentView: View {
         }
     }
 
+    private func reorderSpaces(from fromIndex: Int, to toIndex: Int) {
+        guard fromIndex != toIndex,
+              fromIndex >= 0, fromIndex < spaces.count,
+              toIndex >= 0, toIndex < spaces.count else { return }
+
+        // Recompute order values
+        var ordered = spaces.sorted(by: { $0.order < $1.order })
+        let moved = ordered.remove(at: fromIndex)
+        ordered.insert(moved, at: toIndex)
+
+        for (i, space) in ordered.enumerated() {
+            space.order = i
+        }
+        try? modelContext.save()
+    }
+
     private func assignToSpace(itemIds: Set<String>, spaceId: String?) {
         let space = spaceId.flatMap { sid in spaces.first(where: { $0.id == sid }) }
-        for item in allItems where itemIds.contains(item.id) {
+        let itemsToUpdate = allItems.filter { itemIds.contains($0.id) }
+
+        for item in itemsToUpdate {
             item.space = space
         }
         try? modelContext.save()
+
+        // Re-analyze items if target space has a custom prompt
+        if let space, space.useCustomPrompt, space.customPrompt != nil {
+            for item in itemsToUpdate {
+                Task {
+                    await importService.analyzeItem(item, context: modelContext)
+                }
+            }
+        }
+    }
+
+    private func retryAnalysis(_ item: MediaItem) {
+        item.analysisError = nil
+        item.analysisResult = nil
+        try? modelContext.save()
+        Task {
+            await importService.analyzeItem(item, context: modelContext)
+        }
     }
 }

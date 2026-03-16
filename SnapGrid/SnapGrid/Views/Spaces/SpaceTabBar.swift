@@ -1,26 +1,31 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SpaceTabBar: View {
     let spaces: [Space]
-    @Binding var activeSpaceId: String?
+    let activeSpaceId: String?
+    let onSelectSpace: (String?) -> Void
     let onCreateSpace: () -> Void
     let onDeleteSpace: (String) -> Void
     let onRenameSpace: (String, String) -> Void
+    let onReorderSpaces: (Int, Int) -> Void
+    let onAssignToSpace: (Set<String>, String?) -> Void
 
     @State private var editingSpaceId: String?
     @State private var editName: String = ""
+    @State private var dropTargetId: String?
+    @Namespace private var tabNamespace
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 4) {
                 // "All" tab
-                TabButton(
-                    title: "All",
-                    isActive: activeSpaceId == nil,
-                    action: { activeSpaceId = nil }
-                )
+                tabView(id: nil, title: "All", isActive: activeSpaceId == nil)
+                    .onDrop(of: [.text], isTargeted: allTabTargeted) { providers in
+                        handleDrop(providers, spaceId: nil)
+                    }
 
-                ForEach(spaces) { space in
+                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
                     if editingSpaceId == space.id {
                         TextField("Name", text: $editName, onCommit: {
                             onRenameSpace(space.id, editName)
@@ -35,25 +40,50 @@ struct SpaceTabBar: View {
                         .frame(width: 120)
                         .onExitCommand { editingSpaceId = nil }
                     } else {
-                        TabButton(
-                            title: space.name,
-                            isActive: activeSpaceId == space.id,
-                            action: { activeSpaceId = space.id }
-                        )
-                        .contextMenu {
-                            Button("Rename") {
+                        tabView(id: space.id, title: space.name, isActive: activeSpaceId == space.id)
+                            .contextMenu {
+                                Button("Rename") {
+                                    editName = space.name
+                                    editingSpaceId = space.id
+                                }
+                                Divider()
+                                Button("Delete", role: .destructive) {
+                                    onDeleteSpace(space.id)
+                                }
+                            }
+                            .onTapGesture(count: 2) {
                                 editName = space.name
                                 editingSpaceId = space.id
                             }
-                            Divider()
-                            Button("Delete", role: .destructive) {
-                                onDeleteSpace(space.id)
+                            .draggable(space.id) {
+                                Text(space.name)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Color.snapForeground)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 7)
+                                    .background(Color.snapMuted)
+                                    .clipShape(RoundedRectangle(cornerRadius: 7))
                             }
-                        }
-                        .onTapGesture(count: 2) {
-                            editName = space.name
-                            editingSpaceId = space.id
-                        }
+                            .dropDestination(for: String.self) { items, _ in
+                                guard let droppedId = items.first else { return false }
+
+                                // Check if this is a space reorder (dropped id is a space id)
+                                if let fromIndex = spaces.firstIndex(where: { $0.id == droppedId }) {
+                                    onReorderSpaces(fromIndex, index)
+                                    return true
+                                }
+
+                                // Otherwise treat as item assignment (comma-separated item IDs)
+                                let itemIds = Set(droppedId.split(separator: ",").map(String.init))
+                                if !itemIds.isEmpty {
+                                    onAssignToSpace(itemIds, space.id)
+                                    return true
+                                }
+
+                                return false
+                            } isTargeted: { targeted in
+                                dropTargetId = targeted ? space.id : nil
+                            }
                     }
                 }
 
@@ -61,9 +91,9 @@ struct SpaceTabBar: View {
                 Button(action: onCreateSpace) {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(Color.snapMutedForeground)
                         .frame(width: 28, height: 28)
-                        .background(Color.white.opacity(0.06))
+                        .background(Color.snapMuted.opacity(0.6))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
@@ -71,24 +101,79 @@ struct SpaceTabBar: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
         }
+        .overlay(alignment: .bottom) {
+            Divider().opacity(0.5)  // SpaceTabBar.tsx — border-gray-200/50 dark:border-zinc-800/50
+        }
     }
-}
 
-private struct TabButton: View {
-    let title: String
-    let isActive: Bool
-    let action: () -> Void
+    // MARK: - Tab View
 
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 13, weight: isActive ? .semibold : .regular))
-                .foregroundStyle(isActive ? .white : .white.opacity(0.5))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(isActive ? Color.white.opacity(0.12) : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
+    // SpaceTabBar.tsx:283,318-319 — bottom bar indicator with gray text colors
+    @ViewBuilder
+    private func tabView(id: String?, title: String, isActive: Bool) -> some View {
+        let isDropTarget = dropTargetId == id
+
+        Button {
+            onSelectSpace(id)
+        } label: {
+            VStack(spacing: 0) {
+                Text(title)
+                    .font(.system(size: 13, weight: isActive ? .medium : .regular))
+                    .foregroundStyle(
+                        isActive ? Color.snapForeground :       // SpaceTabBar.tsx:318 — text-gray-900/gray-100
+                        isDropTarget ? Color.snapForeground.opacity(0.7) :
+                        Color.snapMutedForeground               // SpaceTabBar.tsx:319 — text-gray-500/gray-400
+                    )
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+
+                // Bottom bar indicator
+                if isActive {
+                    Rectangle()
+                        .fill(Color.snapForeground)  // SpaceTabBar.tsx:283 — bg-gray-900 dark:bg-gray-100
+                        .frame(height: 2)
+                        .clipShape(Capsule())
+                        .matchedGeometryEffect(id: "activeTab", in: tabNamespace)
+                        .padding(.horizontal, 12)  // SpaceTabBar.tsx:283 — left-3 right-3
+                } else {
+                    Rectangle()
+                        .fill(Color.clear)
+                        .frame(height: 2)
+                        .padding(.horizontal, 12)
+                }
+            }
+            .background {
+                if isDropTarget && !isActive {
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(Color.snapMuted.opacity(0.5))  // SpaceTabBar.tsx — drop highlight
+                }
+            }
         }
         .buttonStyle(.plain)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: activeSpaceId)
+    }
+
+    // MARK: - Drop Helpers
+
+    private var allTabTargeted: Binding<Bool> {
+        Binding(
+            get: { dropTargetId == nil && false },
+            set: { dropTargetId = $0 ? "ALL" : nil }
+        )
+    }
+
+    private func handleDrop(_ providers: [NSItemProvider], spaceId: String?) -> Bool {
+        for provider in providers {
+            _ = provider.loadObject(ofClass: NSString.self) { string, _ in
+                guard let text = string as? String else { return }
+                let itemIds = Set(text.split(separator: ",").map(String.init))
+                if !itemIds.isEmpty {
+                    Task { @MainActor in
+                        onAssignToSpace(itemIds, spaceId)
+                    }
+                }
+            }
+        }
+        return true
     }
 }
