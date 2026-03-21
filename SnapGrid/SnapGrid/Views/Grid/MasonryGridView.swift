@@ -102,6 +102,7 @@ struct MasonryGridView: View {
                                         spaces: spaces,
                                         activeSpaceId: activeSpaceId,
                                         selectedCount: selectedIds.contains(item.id) ? selectedIds.count : 1,
+                                        effectiveIds: effectiveIds,
                                         hiddenItemId: hiddenItemId,
                                         onSelect: { frame in onSelect(item.id, frame) },
                                         onToggleSelect: { onToggleSelect(item.id) },
