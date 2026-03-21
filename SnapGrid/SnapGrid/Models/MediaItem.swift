@@ -17,7 +17,7 @@ class MediaItem {
     var space: Space?
 
     // AI analysis
-    var analysisResult: AnalysisResult?
+    @Relationship(deleteRule: .cascade) var analysisResult: AnalysisResult?
     var isAnalyzing: Bool = false
     var analysisError: String?
 

@@ -24,6 +24,22 @@ enum DataCleanupService {
             try? context.save()
             print("[DataCleanup] Removed \(removed) orphaned records")
         }
+
+        // Clean up AnalysisResult records that lost their parent MediaItem
+        if let allResults = try? context.fetch(FetchDescriptor<AnalysisResult>()) {
+            let itemResults = Set(items.compactMap { $0.analysisResult?.persistentModelID })
+            var orphanedResults = 0
+            for result in allResults {
+                if !itemResults.contains(result.persistentModelID) {
+                    context.delete(result)
+                    orphanedResults += 1
+                }
+            }
+            if orphanedResults > 0 {
+                try? context.save()
+                print("[DataCleanup] Removed \(orphanedResults) orphaned AnalysisResult records")
+            }
+        }
     }
 
     /// Delete the SwiftData store entirely and return true if recovery was needed.

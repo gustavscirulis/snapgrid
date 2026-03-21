@@ -36,7 +36,7 @@ struct MasonryGridView: View {
     var body: some View {
         GeometryReader { geometry in
             let spacing: CGFloat = 16  // masonry-grid.css:10,16 — 16px column/row gaps
-            let horizontalPadding: CGFloat = 16  // ImageGrid.tsx:598 — px-4
+            let horizontalPadding: CGFloat = 24
             let availableWidth = geometry.size.width - horizontalPadding * 2
             let columns = thumbnailSize.columns(forWidth: geometry.size.width)
             let columnWidth = (availableWidth - spacing * CGFloat(columns - 1)) / CGFloat(columns)
@@ -123,8 +123,8 @@ struct MasonryGridView: View {
                         }
                     }
                     .padding(.horizontal, horizontalPadding)  // ImageGrid.tsx:598 — px-4
-                    .padding(.top, 20)                        // ImageGrid.tsx:598 — pt-5
-                    .padding(.bottom, 16)                     // ImageGrid.tsx:598 — pb-4
+                    .padding(.top, 24)
+                    .padding(.bottom, 24)
 
                     // Rubber band visual — ImageGrid.tsx:715: border-blue-400 bg-blue-400/10
                     if let rect = rubberBandRect {
