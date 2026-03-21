@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import AVFoundation
 
 struct GridItemView: View {
     let item: MediaItem
@@ -16,9 +17,11 @@ struct GridItemView: View {
     let onAssignToSpace: (String?) -> Void
     let onRetryAnalysis: () -> Void
 
+    @Environment(VideoPreviewManager.self) private var videoPreview
     @State private var isHovered = false
     @State private var thumbnail: NSImage?
     @State private var globalFrame: CGRect = .zero
+    @State private var hoverTask: Task<Void, Never>?
 
     private var height: CGFloat {
         width / item.aspectRatio
@@ -50,8 +53,17 @@ struct GridItemView: View {
                 }
             }
 
-            // Video badge
-            if item.isVideo {
+            // Inline video preview on hover
+            if item.isVideo && videoPreview.activeItemId == item.id,
+               let player = videoPreview.player {
+                InlineVideoPreview(player: player)
+                    .frame(width: width, height: height)
+                    .clipped()
+                    .allowsHitTesting(false)
+            }
+
+            // Video badge (hidden during active preview)
+            if item.isVideo && videoPreview.activeItemId != item.id {
                 VStack {
                     Spacer()
                     HStack {
@@ -182,7 +194,24 @@ struct GridItemView: View {
             y: isHovered ? 4 : 1
         )
         .animation(.spring(response: 0.2, dampingFraction: 0.85), value: isHovered)
-        .onHover { isHovered = $0 }
+        .onHover { hovering in
+            isHovered = hovering
+            hoverTask?.cancel()
+            if item.isVideo {
+                if hovering {
+                    hoverTask = Task {
+                        try? await Task.sleep(for: .milliseconds(200))
+                        guard !Task.isCancelled else { return }
+                        videoPreview.startPreview(
+                            itemId: item.id,
+                            url: MediaStorageService.shared.mediaURL(filename: item.filename)
+                        )
+                    }
+                } else {
+                    videoPreview.stopPreview()
+                }
+            }
+        }
         .draggable(TransferableFileURL(url: MediaStorageService.shared.mediaURL(filename: item.filename))) {
             // Multi-select: stacked preview with count badge
             if isBulk, let thumbnail {
