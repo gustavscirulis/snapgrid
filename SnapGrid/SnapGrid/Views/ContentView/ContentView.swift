@@ -98,10 +98,7 @@ struct ContentView: View {
                let sourceFrame = appState.detailSourceFrame {
                 HeroDetailOverlay(
                     item: item,
-                    allItems: activeFilteredItems,
                     sourceFrame: sourceFrame,
-                    onNavigate: { appState.detailItem = $0 },
-                    onRetryAnalysis: retryAnalysis,
                     onAnimationComplete: {
                         appState.detailItem = nil
                         appState.detailSourceFrame = nil
@@ -131,7 +128,9 @@ struct ContentView: View {
                     .ignoresSafeArea()
             }
         }
-        .searchable(text: $appState.searchText, placement: .toolbar, prompt: "Search patterns, descriptions...")
+        .if(appState.detailItem == nil) { view in
+            view.searchable(text: self.$appState.searchText, placement: .toolbar, prompt: "Search patterns, descriptions...")
+        }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Spacer()
@@ -175,11 +174,10 @@ struct ContentView: View {
         }
         .onExitCommand {
             if appState.detailItem != nil {
-                // HeroDetailOverlay handles its own close via .onExitCommand
-                // This branch handles the fallback case (no source frame)
-                if appState.detailSourceFrame == nil {
-                    appState.detailItem = nil
-                }
+                // Fallback: overlay normally handles its own close via focus +
+                // .onExitCommand. If focus is lost, dismiss immediately.
+                appState.detailItem = nil
+                appState.detailSourceFrame = nil
             } else if !appState.selectedIds.isEmpty {
                 appState.clearSelection()
             }
@@ -442,4 +440,5 @@ struct ContentView: View {
             await importService.analyzeItem(item, context: modelContext)
         }
     }
+
 }
