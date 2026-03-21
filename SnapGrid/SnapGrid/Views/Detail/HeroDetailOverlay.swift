@@ -33,6 +33,15 @@ struct HeroDetailOverlay: View {
     @State private var detailPlayer: AVPlayer?
     @FocusState private var isFocused: Bool
 
+    init(item: MediaItem, sourceFrame: CGRect, onAnimationComplete: @escaping () -> Void) {
+        self.item = item
+        self.sourceFrame = sourceFrame
+        self.onAnimationComplete = onAnimationComplete
+        if !item.isVideo {
+            _image = State(initialValue: ImageCacheService.shared.image(forKey: item.id))
+        }
+    }
+
     var body: some View {
         GeometryReader { geo in
             let windowSize = geo.size
@@ -89,11 +98,16 @@ struct HeroDetailOverlay: View {
                     detailPlayer = player
                     player.play()
                 }
-            } else {
+            } else if image == nil {
+                // No thumbnail in cache — load from disk before animating
                 await loadImage()
             }
             withAnimation(SnapSpring.hero) {
                 isExpanded = true
+            }
+            // Load full-resolution image (init seeds thumbnail from cache for instant display)
+            if !item.isVideo {
+                await loadFullResImage()
             }
         }
     }
@@ -145,12 +159,20 @@ struct HeroDetailOverlay: View {
     private func loadImage() async {
         guard !item.isVideo else { return }
 
-        // Check memory cache first
+        // Check memory cache first (thumbnail quality)
         if let cached = ImageCacheService.shared.image(forKey: item.id) {
             self.image = cached
             return
         }
 
+        let url = MediaStorageService.shared.mediaURL(filename: item.filename)
+        if let loaded = NSImage(contentsOf: url) {
+            self.image = loaded
+        }
+    }
+
+    /// Loads the original full-resolution image, replacing the thumbnail used during animation.
+    private func loadFullResImage() async {
         let url = MediaStorageService.shared.mediaURL(filename: item.filename)
         if let loaded = NSImage(contentsOf: url) {
             self.image = loaded
