@@ -24,6 +24,9 @@ class MediaItem {
     // Video
     var duration: Double?
 
+    // Import tracking
+    var sourceId: String?
+
     var aspectRatio: CGFloat {
         guard height > 0 else { return 1.0 }
         return CGFloat(width) / CGFloat(height)

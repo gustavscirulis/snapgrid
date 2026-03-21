@@ -11,7 +11,12 @@ struct ContentView: View {
     @State private var importService = ImportService()
     @State private var queueWatcher = QueueWatcher(queueURL: MediaStorageService.shared.queueDir)
     @State private var isDragTargeted = false
+    @State private var showElectronImport = false
     @AppStorage("appTheme") private var themeSetting: String = AppTheme.system.rawValue
+
+    private var hasElectronLibrary: Bool {
+        ElectronImportService().detectElectronLibrary() != nil
+    }
 
     private func itemsForSpace(_ spaceId: String?) -> [MediaItem] {
         var items = allItems
@@ -70,7 +75,7 @@ struct ContentView: View {
 
                 // Main content — horizontal carousel of space pages
                 if allItems.isEmpty {
-                    EmptyStateView(isDragTargeted: isDragTargeted)
+                    EmptyStateView(isDragTargeted: isDragTargeted, hasElectronLibrary: hasElectronLibrary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     GeometryReader { geo in
@@ -143,6 +148,13 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .importFiles)) { _ in
             openImportPanel()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .importElectronLibrary)) { _ in
+            showElectronImport = true
+        }
+        .sheet(isPresented: $showElectronImport) {
+            ElectronImportView(isPresented: $showElectronImport)
+                .presentationBackground(Color.snapCard)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .undoDelete)) { _ in
             undoLastDelete()
         }
@@ -168,6 +180,11 @@ struct ContentView: View {
                 }
             }
             queueWatcher.startWatching()
+        }
+        .task {
+            for await _ in NotificationCenter.default.notifications(named: .willResetAllData) {
+                handleResetAllData()
+            }
         }
         .onDeleteCommand {
             deleteSelectedItems()
@@ -430,6 +447,13 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    private func handleResetAllData() {
+        appState.detailItem = nil
+        appState.detailSourceFrame = nil
+        appState.clearSelection()
+        appState.activeSpaceId = nil
     }
 
     private func retryAnalysis(_ item: MediaItem) {

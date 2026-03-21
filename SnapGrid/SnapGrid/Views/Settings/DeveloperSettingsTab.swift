@@ -58,7 +58,7 @@ struct DeveloperSettingsTab: View {
                         resetAllData()
                     }
                 } message: {
-                    Text("This will delete all imported media, analysis results, and spaces. This cannot be undone.")
+                    Text("This will delete all imported media, analysis results, and spaces. The app will restart. This cannot be undone.")
                 }
             }
         }
@@ -66,11 +66,10 @@ struct DeveloperSettingsTab: View {
     }
 
     private func resetAllData() {
-        // Delete all SwiftData records
-        try? modelContext.delete(model: MediaItem.self)
-        try? modelContext.delete(model: Space.self)
-        try? modelContext.delete(model: AnalysisResult.self)
-        try? modelContext.save()
+        // Delete the SwiftData store files directly — trying to delete objects
+        // through the context crashes because @Query views race to read properties
+        // on invalidated objects during the SwiftUI render cycle.
+        _ = DataCleanupService.deleteCorruptedStore()
 
         // Clear file storage
         let fm = FileManager.default
@@ -82,5 +81,17 @@ struct DeveloperSettingsTab: View {
                 }
             }
         }
+
+        // Clear image cache
+        ImageCacheService.shared.clearAll()
+
+        // Relaunch — the store will be recreated on next launch
+        let url = Bundle.main.bundleURL
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        task.arguments = ["-n", url.path]
+        try? task.run()
+
+        NSApplication.shared.terminate(nil)
     }
 }

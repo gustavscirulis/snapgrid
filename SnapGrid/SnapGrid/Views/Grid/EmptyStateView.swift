@@ -8,6 +8,7 @@ struct EmptyStateView: View {
 
     var mode: Mode = .appLevel
     var isDragTargeted: Bool = false
+    var hasElectronLibrary: Bool = false
 
     // Random-looking heights for skeleton placeholders
     private let skeletonHeights: [CGFloat] = [
@@ -57,15 +58,23 @@ struct EmptyStateView: View {
                             .foregroundStyle(Color.snapMutedForeground)
                     }
 
+                    if mode == .appLevel, hasElectronLibrary {
+                        Button {
+                            NotificationCenter.default.post(name: .importElectronLibrary, object: nil)
+                        } label: {
+                            Label("Import from SnapGrid 1", systemImage: "square.and.arrow.down.on.square")
+                        }
+                        .controlSize(.large)
+                    }
+
                     if mode == .appLevel,
                        !KeychainService.exists(service: AIProvider.openai.keychainService),
                        !KeychainService.exists(service: AIProvider.anthropic.keychainService),
                        !KeychainService.exists(service: AIProvider.gemini.keychainService),
                        !KeychainService.exists(service: AIProvider.openrouter.keychainService) {
-                        VStack(spacing: 8) {
+                        VStack(spacing: 12) {
                             Divider()
-                                .frame(width: 200)
-                                .padding(.vertical, 8)
+                                .frame(width: 160)
 
                             Text("Add an AI API key in Settings (\u{2318},) to enable automatic image analysis")
                                 .font(.system(size: 13))
