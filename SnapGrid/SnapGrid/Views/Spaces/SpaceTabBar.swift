@@ -38,8 +38,8 @@ struct SpaceTabBar: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 24)
+            .padding(.top, 6)
         }
         .overlay(alignment: .bottom) {
             Divider().opacity(0.5)  // SpaceTabBar.tsx — border-gray-200/50 dark:border-zinc-800/50
@@ -128,7 +128,8 @@ struct SpaceTabBar: View {
                         Color.snapMutedForeground               // SpaceTabBar.tsx:319 — text-gray-500/gray-400
                     )
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 7)
+                    .padding(.top, 7)
+                    .padding(.bottom, 16)
 
                 // Bottom bar indicator
                 if isActive {
