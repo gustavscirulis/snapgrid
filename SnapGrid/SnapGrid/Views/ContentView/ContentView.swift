@@ -7,6 +7,7 @@ struct ContentView: View {
     @Query(sort: \MediaItem.createdAt, order: .reverse) private var allItems: [MediaItem]
     @Query(sort: \Space.order) private var spaces: [Space]
     @State private var appState = AppState()
+    @State private var videoPreview = VideoPreviewManager()
     @State private var importService = ImportService()
     @State private var queueWatcher = QueueWatcher(queueURL: MediaStorageService.shared.queueDir)
     @State private var isDragTargeted = false
@@ -212,6 +213,7 @@ struct ContentView: View {
             return .handled
         }
         .environment(appState)
+        .environment(videoPreview)
         .environment(importService)
         .preferredColorScheme((AppTheme(rawValue: themeSetting) ?? .system).colorScheme)
     }

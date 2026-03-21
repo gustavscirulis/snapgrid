@@ -33,10 +33,12 @@ struct HeroDetailOverlay: View {
     let onRetryAnalysis: (MediaItem) -> Void
     let onAnimationComplete: () -> Void
 
+    @Environment(VideoPreviewManager.self) private var videoPreview
     @State private var isExpanded = false
     @State private var isClosing = false
     @State private var showUI = false
     @State private var image: NSImage?
+    @State private var detailPlayer: AVPlayer?
 
     private var isTallImage: Bool {
         !item.isVideo && item.aspectRatio < 0.5
@@ -69,10 +71,10 @@ struct HeroDetailOverlay: View {
                         .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 12))
                         .position(x: currentFrame.midX, y: currentFrame.midY)
                         .id(item.id)
-                } else if item.isVideo {
-                    // Video: use simple centered appearance (no hero morph)
+                } else if item.isVideo, let player = detailPlayer {
+                    // Video: use shared player for seamless handoff from hover preview
                     if isExpanded {
-                        VideoPlayer(player: AVPlayer(url: MediaStorageService.shared.mediaURL(filename: item.filename)))
+                        VideoPlayer(player: player)
                             .aspectRatio(item.aspectRatio, contentMode: .fit)
                             .frame(maxWidth: finalFrame.width, maxHeight: finalFrame.height)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -119,8 +121,20 @@ struct HeroDetailOverlay: View {
             return .handled
         }
         .task {
-            await loadImage()
-            // Start the hero animation after image is loaded
+            if item.isVideo {
+                // Claim the hover preview player (seamless handoff, continues from current position)
+                if let claimed = videoPreview.claimForDetail() {
+                    detailPlayer = claimed
+                } else {
+                    // No hover preview active (e.g., opened via keyboard) — create fresh
+                    let player = AVPlayer(url: MediaStorageService.shared.mediaURL(filename: item.filename))
+                    detailPlayer = player
+                    player.play()
+                }
+            } else {
+                await loadImage()
+            }
+            // Start the hero animation after content is ready
             withAnimation(heroSpring) {
                 isExpanded = true
             }
@@ -133,7 +147,20 @@ struct HeroDetailOverlay: View {
         .onChange(of: item.id) {
             // Arrow key navigation: crossfade, don't re-run hero
             image = nil
-            Task { await loadImage() }
+            if item.isVideo {
+                detailPlayer = videoPreview.switchDetailPlayer(
+                    itemId: item.id,
+                    url: MediaStorageService.shared.mediaURL(filename: item.filename)
+                )
+            } else {
+                // Navigated from video to image — clean up video player
+                if detailPlayer != nil {
+                    detailPlayer?.pause()
+                    detailPlayer = nil
+                    videoPreview.releaseFromDetail()
+                }
+                Task { await loadImage() }
+            }
         }
     }
 
@@ -177,6 +204,8 @@ struct HeroDetailOverlay: View {
 
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(400))
+            videoPreview.releaseFromDetail()
+            detailPlayer = nil
             onAnimationComplete()
         }
     }
