@@ -54,6 +54,20 @@ struct SnapGridApp: App {
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             }
 
+            CommandMenu("Spaces") {
+                Button("All") {
+                    NotificationCenter.default.post(name: .switchToSpaceByIndex, object: nil, userInfo: ["digit": 1])
+                }
+                .keyboardShortcut("1")
+
+                ForEach(2...9, id: \.self) { digit in
+                    Button("Space \(digit - 1)") {
+                        NotificationCenter.default.post(name: .switchToSpaceByIndex, object: nil, userInfo: ["digit": digit])
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character(String(digit))))
+                }
+            }
+
             CommandGroup(replacing: .undoRedo) {
                 Button("Undo") {
                     NotificationCenter.default.post(name: .undoDelete, object: nil)
@@ -75,4 +89,5 @@ extension Notification.Name {
     static let apiKeySaved = Notification.Name("apiKeySaved")
     static let importElectronLibrary = Notification.Name("importElectronLibrary")
     static let willResetAllData = Notification.Name("willResetAllData")
+    static let switchToSpaceByIndex = Notification.Name("switchToSpaceByIndex")
 }

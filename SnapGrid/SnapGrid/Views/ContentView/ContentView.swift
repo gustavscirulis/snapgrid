@@ -199,9 +199,8 @@ struct ContentView: View {
                 appState.clearSelection()
             }
         }
-        .onKeyPress(characters: .init(charactersIn: "123456789"), phases: .down) { press in
-            guard press.modifiers.contains(.command) else { return .ignored }
-            let digit = Int(String(press.characters.first!))!
+        .onReceive(NotificationCenter.default.publisher(for: .switchToSpaceByIndex)) { notification in
+            guard let digit = notification.userInfo?["digit"] as? Int else { return }
             if digit == 1 {
                 switchToSpace(nil)
             } else {
@@ -210,7 +209,6 @@ struct ContentView: View {
                     switchToSpace(spaces[idx].id)
                 }
             }
-            return .handled
         }
         .onKeyPress(.init("="), phases: .down) { press in
             guard press.modifiers.contains(.command) else { return .ignored }

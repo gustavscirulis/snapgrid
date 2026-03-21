@@ -21,7 +21,7 @@ struct SpaceTabBar: View {
             HStack(spacing: 4) {
                 // "All" tab
                 tabView(id: nil, title: "All", isActive: activeSpaceId == nil)
-                    .onDrop(of: [.text], isTargeted: allTabTargeted) { providers in
+                    .onDrop(of: [.plainText], isTargeted: allTabTargeted) { providers in
                         handleDrop(providers, spaceId: nil)
                     }
 
@@ -88,23 +88,11 @@ struct SpaceTabBar: View {
                         .background(Color.snapMuted)
                         .clipShape(RoundedRectangle(cornerRadius: 7))
                 }
-                .dropDestination(for: String.self) { items, _ in
-                    guard let droppedId = items.first else { return false }
-
-                    if let fromIndex = spaces.firstIndex(where: { $0.id == droppedId }) {
-                        onReorderSpaces(fromIndex, index)
-                        return true
-                    }
-
-                    let itemIds = Set(droppedId.split(separator: ",").map(String.init))
-                    if !itemIds.isEmpty {
-                        onAssignToSpace(itemIds, space.id)
-                        return true
-                    }
-
-                    return false
-                } isTargeted: { targeted in
-                    dropTargetId = targeted ? space.id : nil
+                .onDrop(of: [.plainText], isTargeted: Binding(
+                    get: { dropTargetId == space.id },
+                    set: { dropTargetId = $0 ? space.id : nil }
+                )) { providers in
+                    handleSpaceDrop(providers, spaceId: space.id, spaceIndex: index)
                 }
         }
     }
@@ -168,13 +156,25 @@ struct SpaceTabBar: View {
     }
 
     private func handleDrop(_ providers: [NSItemProvider], spaceId: String?) -> Bool {
+        handleSpaceDrop(providers, spaceId: spaceId, spaceIndex: nil)
+    }
+
+    private func handleSpaceDrop(_ providers: [NSItemProvider], spaceId: String?, spaceIndex: Int?) -> Bool {
         for provider in providers {
             _ = provider.loadObject(ofClass: NSString.self) { string, _ in
                 guard let text = string as? String else { return }
-                let itemIds = Set(text.split(separator: ",").map(String.init))
-                if !itemIds.isEmpty {
-                    Task { @MainActor in
-                        onAssignToSpace(itemIds, spaceId)
+                Task { @MainActor in
+                    if text.hasPrefix("snapgrid:") {
+                        // Grid item IDs from .onDrag
+                        let idsString = String(text.dropFirst("snapgrid:".count))
+                        let itemIds = Set(idsString.split(separator: ",").map(String.init))
+                        if !itemIds.isEmpty {
+                            onAssignToSpace(itemIds, spaceId)
+                        }
+                    } else if let spaceIndex,
+                              let fromIndex = spaces.firstIndex(where: { $0.id == text }) {
+                        // Space tab reorder from .draggable(space.id)
+                        onReorderSpaces(fromIndex, spaceIndex)
                     }
                 }
             }

@@ -9,6 +9,7 @@ struct GridItemView: View {
     let spaces: [Space]
     let activeSpaceId: String?
     let selectedCount: Int
+    let effectiveIds: Set<String>
     let hiddenItemId: String?
     let onSelect: (CGRect) -> Void
     let onToggleSelect: () -> Void
@@ -142,9 +143,9 @@ struct GridItemView: View {
                         // Gradient backdrop + staggered pattern tags (hover only)
                         ZStack(alignment: .bottomLeading) {
                             LinearGradient(
-                                colors: [.black.opacity(0.5), .black.opacity(0.15), .clear],
+                                colors: [.black.opacity(0.35), .black.opacity(0.1), .clear],
                                 startPoint: .bottom,
-                                endPoint: .init(x: 0.5, y: 0.3)
+                                endPoint: .init(x: 0.5, y: 0.55)
                             )
                             .opacity(isHovered ? 1 : 0)
                             .offset(y: isHovered ? 0 : 20)
@@ -262,55 +263,41 @@ struct GridItemView: View {
                 }
             }
         }
-        .draggable(TransferableFileURL(url: MediaStorageService.shared.mediaURL(filename: item.filename))) {
-            // Multi-select: stacked preview with count badge
-            if isBulk, let thumbnail {
-                ZStack {
-                    // Stack layers (up to 3 behind the front)
-                    ForEach(Array((0..<min(selectedCount, 3)).reversed()), id: \.self) { i in
-                        if i > 0 {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.snapMuted)
-                                .frame(width: 100, height: 100 / item.aspectRatio)
-                                .rotationEffect(.degrees(Double(i) * 3))
-                                .opacity(1.0 - Double(i) * 0.2)
-                        }
-                    }
-
-                    // Front image
+        .onDrag {
+            let url = MediaStorageService.shared.mediaURL(filename: item.filename)
+            let provider = NSItemProvider(contentsOf: url) ?? NSItemProvider()
+            if let name = item.analysisResult?.patterns.first?.name {
+                let ext = url.pathExtension
+                provider.suggestedName = ext.isEmpty ? name : "\(name).\(ext)"
+            }
+            // Register item IDs as plain text for space tab drops
+            let idString = "snapgrid:" + effectiveIds.joined(separator: ",")
+            provider.registerObject(idString as NSString, visibility: .all)
+            return provider
+        } preview: {
+            ZStack(alignment: .topTrailing) {
+                if let thumbnail {
                     Image(nsImage: thumbnail)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 100, height: 100 / item.aspectRatio)
+                        .frame(width: 96, height: 96 / item.aspectRatio)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                    // Count badge
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Text("\(selectedCount)")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 24, height: 24)
-                                .background(Color.snapAccent)
-                                .clipShape(Circle())
-                        }
-                        Spacer()
-                    }
-                    .offset(x: 8, y: -8)
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.snapMuted)
+                        .frame(width: 96, height: 64)
                 }
-                .frame(width: 120, height: (100 / item.aspectRatio) + 16)
-            } else if let thumbnail {
-                Image(nsImage: thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 120, height: 120 / item.aspectRatio)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.snapMuted)
-                    .frame(width: 120, height: 80)
+                if isBulk {
+                    Text("\(selectedCount)")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 20, height: 20)
+                        .background(Color.snapAccent)
+                        .clipShape(Circle())
+                        .offset(x: 6, y: -6)
+                }
             }
+            .opacity(0.85)
         }
         .opacity(item.id == hiddenItemId ? 0 : 1)
         .onGeometryChange(for: CGRect.self) { proxy in
