@@ -27,7 +27,6 @@
 		65160672513A59B8ED353208 /* SelectionBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFDD4D2B1F3CCB3ED261F5C /* SelectionBadge.swift */; };
 		67A2F4EA7A945C87AD04E886 /* SpacesSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1E6270DBFF25C7C3C0324E /* SpacesSettingsTab.swift */; };
 		76828B68E2CA3213D835B691 /* PatternTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 649D56F9B7920BF3924A8E4E /* PatternTagsView.swift */; };
-		798C8FFCDDBFB7C32E78C37A /* View+ConditionalModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686AAE3C7EDF40017EAE75F2 /* View+ConditionalModifier.swift */; };
 		8167D57BFF6AAEC5E1CF20E1 /* AnimationTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 468F744BF11C8965B74EF95F /* AnimationTokens.swift */; };
 		8350DC604AC401431E9CD255 /* Space.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6477AAD40C3308F596D68729 /* Space.swift */; };
 		8F71F68AF462303D3E8EFF3F /* MasonryGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5AD67C6232580C3B0D9E982 /* MasonryGridView.swift */; };
@@ -72,7 +71,6 @@
 		6477AAD40C3308F596D68729 /* Space.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Space.swift; sourceTree = "<group>"; };
 		649D56F9B7920BF3924A8E4E /* PatternTagsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternTagsView.swift; sourceTree = "<group>"; };
 		68305A61078FFD8F1E7C722F /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
-		686AAE3C7EDF40017EAE75F2 /* View+ConditionalModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+ConditionalModifier.swift"; sourceTree = "<group>"; };
 		6B6205D7E807323F142415FE /* View+DoubleClick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+DoubleClick.swift"; sourceTree = "<group>"; };
 		79AADB26603B741C1AC17342 /* SnapGrid.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SnapGrid.entitlements; sourceTree = "<group>"; };
 		7B91561419FB6DD4EEB954BE /* GeneralSettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsTab.swift; sourceTree = "<group>"; };
@@ -186,7 +184,6 @@
 			children = (
 				EA3B7921F371383918892A5D /* Color+Theme.swift */,
 				3CE5033083DAF80AD07ABC32 /* NSImage+Thumbnail.swift */,
-				686AAE3C7EDF40017EAE75F2 /* View+ConditionalModifier.swift */,
 				6B6205D7E807323F142415FE /* View+DoubleClick.swift */,
 			);
 			path = Extensions;
@@ -374,7 +371,6 @@
 				D8DEDAFF16754653D39B7B56 /* TransferableFileURL.swift in Sources */,
 				9101F365F60BDAB8F4E28C3E /* VideoFrameExtractor.swift in Sources */,
 				429D34E9222F716D0D0BE26C /* VideoPreviewManager.swift in Sources */,
-				798C8FFCDDBFB7C32E78C37A /* View+ConditionalModifier.swift in Sources */,
 				3C8305A01967D9D664D9AA3D /* View+DoubleClick.swift in Sources */,
 				E287F102701B8A0ADF31921D /* ZoomableImageView.swift in Sources */,
 			);

@@ -23,6 +23,23 @@ struct GridItemView: View {
     @State private var globalFrame: CGRect = .zero
     @State private var hoverTask: Task<Void, Never>?
 
+    init(item: MediaItem, width: CGFloat, isSelected: Bool, spaces: [Space], activeSpaceId: String?, selectedCount: Int, hiddenItemId: String?, onSelect: @escaping (CGRect) -> Void, onToggleSelect: @escaping () -> Void, onShiftSelect: @escaping () -> Void, onDelete: @escaping () -> Void, onAssignToSpace: @escaping (String?) -> Void, onRetryAnalysis: @escaping () -> Void) {
+        self.item = item
+        self.width = width
+        self.isSelected = isSelected
+        self.spaces = spaces
+        self.activeSpaceId = activeSpaceId
+        self.selectedCount = selectedCount
+        self.hiddenItemId = hiddenItemId
+        self.onSelect = onSelect
+        self.onToggleSelect = onToggleSelect
+        self.onShiftSelect = onShiftSelect
+        self.onDelete = onDelete
+        self.onAssignToSpace = onAssignToSpace
+        self.onRetryAnalysis = onRetryAnalysis
+        _thumbnail = State(initialValue: ImageCacheService.shared.image(forKey: item.id))
+    }
+
     private var height: CGFloat {
         width / item.aspectRatio
     }
@@ -337,6 +354,7 @@ struct GridItemView: View {
             }
         }
         .task {
+            guard thumbnail == nil else { return }
             await loadThumbnail()
         }
     }
