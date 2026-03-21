@@ -14,6 +14,7 @@ struct MasonryGridView: View {
     let onAssignToSpace: (Set<String>, String?) -> Void
     let onRetryAnalysis: (MediaItem) -> Void
     let onSetSelection: (Set<String>) -> Void
+    var coordinateSpaceName: String = "gridContent"
 
     // Rubber band state
     @State private var itemFrames: [String: CGRect] = [:]
@@ -47,7 +48,7 @@ struct MasonryGridView: View {
                         .contentShape(Rectangle())
                         .frame(minHeight: geometry.size.height)
                         .gesture(
-                            DragGesture(minimumDistance: 0, coordinateSpace: .named("gridContent"))
+                            DragGesture(minimumDistance: 0, coordinateSpace: .named(coordinateSpaceName))
                                 .onChanged { value in
                                     if rubberBandStart == nil {
                                         rubberBandStart = value.startLocation
@@ -113,7 +114,7 @@ struct MasonryGridView: View {
                                         GeometryReader { geo in
                                             Color.clear.preference(
                                                 key: ItemFramePreferenceKey.self,
-                                                value: [item.id: geo.frame(in: .named("gridContent"))]
+                                                value: [item.id: geo.frame(in: .named(coordinateSpaceName))]
                                             )
                                         }
                                     )

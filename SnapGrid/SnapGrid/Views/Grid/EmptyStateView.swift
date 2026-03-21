@@ -1,7 +1,13 @@
 import SwiftUI
 
 struct EmptyStateView: View {
-    @State private var isDragTargeted = false
+    enum Mode {
+        case appLevel
+        case spaceLevel
+    }
+
+    var mode: Mode = .appLevel
+    var isDragTargeted: Bool = false
 
     // Random-looking heights for skeleton placeholders
     private let skeletonHeights: [CGFloat] = [
@@ -37,23 +43,24 @@ struct EmptyStateView: View {
 
                 // Onboarding card centered on top
                 VStack(spacing: 24) {
-                    Image(systemName: "photo.on.rectangle.angled")
+                    Image(systemName: mode == .appLevel ? "photo.on.rectangle.angled" : "rectangle.stack.badge.plus")
                         .font(.system(size: 56, weight: .light))
-                        .foregroundStyle(Color.snapMutedForeground.opacity(0.5))  // EmptyStateCard.tsx — adaptive icon
+                        .foregroundStyle(Color.snapMutedForeground.opacity(0.5))
 
                     VStack(spacing: 8) {
-                        Text("Drop screenshots here")
+                        Text(mode == .appLevel ? "Drop screenshots here" : "No items in this space")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(Color.snapForeground)  // EmptyStateCard.tsx — text-gray-700 dark:text-gray-200
+                            .foregroundStyle(Color.snapForeground)
 
-                        Text("Or use File \u{2192} Import (\u{2318}O) to get started")
+                        Text(mode == .appLevel ? "Or use File \u{2192} Import (\u{2318}O) to get started" : "Drop images here or move items from All")
                             .font(.system(size: 14))
-                            .foregroundStyle(Color.snapMutedForeground)  // EmptyStateCard.tsx — text-gray-500 dark:text-gray-400
+                            .foregroundStyle(Color.snapMutedForeground)
                     }
 
-                    if !KeychainService.exists(service: AIProvider.openai.keychainService) &&
-                       !KeychainService.exists(service: AIProvider.anthropic.keychainService) &&
-                       !KeychainService.exists(service: AIProvider.gemini.keychainService) &&
+                    if mode == .appLevel,
+                       !KeychainService.exists(service: AIProvider.openai.keychainService),
+                       !KeychainService.exists(service: AIProvider.anthropic.keychainService),
+                       !KeychainService.exists(service: AIProvider.gemini.keychainService),
                        !KeychainService.exists(service: AIProvider.openrouter.keychainService) {
                         VStack(spacing: 8) {
                             Divider()
