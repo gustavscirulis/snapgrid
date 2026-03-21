@@ -10,6 +10,11 @@
       "source": "ibelick/ui-skills",
       "sourceType": "github",
       "computedHash": "426dcf33f23419643f2aab71e2253e1a5b5684a808fabb8a4ad135e489ed7a0f"
+    },
+    "swiftui-expert-skill": {
+      "source": "avdlee/swiftui-agent-skill",
+      "sourceType": "github",
+      "computedHash": "2e48033f8c90095c5391ad0a3568ff31b3655e0273992c9d3bffd068b17dfd0f"
     }
   }
 }
