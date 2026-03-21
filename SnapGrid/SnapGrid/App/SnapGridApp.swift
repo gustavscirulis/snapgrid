@@ -15,7 +15,15 @@ struct SnapGridApp: App {
             let config = ModelConfiguration("SnapGrid", url: storeURL)
             container = try ModelContainer(for: MediaItem.self, Space.self, AnalysisResult.self, configurations: config)
         } catch {
-            fatalError("Failed to create ModelContainer: \(error)")
+            // Store is corrupted — delete and recreate
+            print("[SnapGridApp] Store corrupted, recreating: \(error)")
+            _ = DataCleanupService.deleteCorruptedStore()
+            do {
+                let config = ModelConfiguration("SnapGrid", url: storeURL)
+                container = try ModelContainer(for: MediaItem.self, Space.self, AnalysisResult.self, configurations: config)
+            } catch {
+                fatalError("Failed to create ModelContainer after recovery: \(error)")
+            }
         }
     }
 
@@ -32,6 +40,11 @@ struct SnapGridApp: App {
                     NotificationCenter.default.post(name: .importFiles, object: nil)
                 }
                 .keyboardShortcut("o")
+
+                Button("Import from SnapGrid 1...") {
+                    NotificationCenter.default.post(name: .importElectronLibrary, object: nil)
+                }
+                .keyboardShortcut("i", modifiers: [.command, .shift])
 
                 Button("Open Storage Location") {
                     NSWorkspace.shared.open(MediaStorageService.shared.baseURL)
@@ -58,4 +71,6 @@ extension Notification.Name {
     static let importFiles = Notification.Name("importFiles")
     static let undoDelete = Notification.Name("undoDelete")
     static let apiKeySaved = Notification.Name("apiKeySaved")
+    static let importElectronLibrary = Notification.Name("importElectronLibrary")
+    static let willResetAllData = Notification.Name("willResetAllData")
 }
