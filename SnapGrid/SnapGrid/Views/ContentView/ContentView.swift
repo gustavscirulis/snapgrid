@@ -157,7 +157,12 @@ struct ContentView: View {
                     .ignoresSafeArea()
             }
         }
-        .searchable(text: $appState.searchText, prompt: "Search patterns, descriptions...")
+        .searchable(text: $appState.searchText, placement: .toolbar, prompt: "Search patterns, descriptions...")
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Spacer()
+            }
+        }
         .onDrop(of: [.fileURL], isTargeted: $isDragTargeted) { providers in
             handleDrop(providers)
             return true
