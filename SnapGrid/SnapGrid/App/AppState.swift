@@ -115,12 +115,27 @@ struct ToastMessage: Identifiable {
 enum ThumbnailSize: String, CaseIterable {
     case small, medium, large, extraLarge
 
-    var columnWidth: CGFloat {
+    func columns(forWidth width: CGFloat) -> Int {
         switch self {
-        case .small: return 150
-        case .medium: return 220
-        case .large: return 320
-        case .extraLarge: return 450
+        case .small:
+            if width >= 1536 { return 6 }
+            if width >= 1280 { return 5 }
+            if width >= 1024 { return 4 }
+            if width >= 640  { return 3 }
+            return 2
+        case .medium:
+            if width >= 1536 { return 4 }
+            if width >= 1280 { return 3 }
+            if width >= 1024 { return 2 }
+            return 1
+        case .large:
+            if width >= 1536 { return 3 }
+            if width >= 1280 { return 2 }
+            if width >= 1024 { return 2 }
+            return 1
+        case .extraLarge:
+            if width >= 1280 { return 2 }
+            return 1
         }
     }
 
