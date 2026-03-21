@@ -26,65 +26,7 @@ struct SpaceTabBar: View {
                     }
 
                 ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
-                    if editingSpaceId == space.id {
-                        TextField("Name", text: $editName, onCommit: {
-                            onRenameSpace(space.id, editName)
-                            editingSpaceId = nil
-                        })
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13, weight: .medium))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.snapMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .frame(width: 120)
-                        .onExitCommand { editingSpaceId = nil }
-                    } else {
-                        tabView(id: space.id, title: space.name, isActive: activeSpaceId == space.id)
-                            .contextMenu {
-                                Button("Rename") {
-                                    editName = space.name
-                                    editingSpaceId = space.id
-                                }
-                                Divider()
-                                Button("Delete", role: .destructive) {
-                                    onDeleteSpace(space.id)
-                                }
-                            }
-                            .onTapGesture(count: 2) {
-                                editName = space.name
-                                editingSpaceId = space.id
-                            }
-                            .draggable(space.id) {
-                                Text(space.name)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(Color.snapForeground)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 7)
-                                    .background(Color.snapMuted)
-                                    .clipShape(RoundedRectangle(cornerRadius: 7))
-                            }
-                            .dropDestination(for: String.self) { items, _ in
-                                guard let droppedId = items.first else { return false }
-
-                                // Check if this is a space reorder (dropped id is a space id)
-                                if let fromIndex = spaces.firstIndex(where: { $0.id == droppedId }) {
-                                    onReorderSpaces(fromIndex, index)
-                                    return true
-                                }
-
-                                // Otherwise treat as item assignment (comma-separated item IDs)
-                                let itemIds = Set(droppedId.split(separator: ",").map(String.init))
-                                if !itemIds.isEmpty {
-                                    onAssignToSpace(itemIds, space.id)
-                                    return true
-                                }
-
-                                return false
-                            } isTargeted: { targeted in
-                                dropTargetId = targeted ? space.id : nil
-                            }
-                    }
+                    spaceTab(space: space, index: index)
                 }
 
                 // Add button
@@ -103,6 +45,69 @@ struct SpaceTabBar: View {
         }
         .overlay(alignment: .bottom) {
             Divider().opacity(0.5)  // SpaceTabBar.tsx — border-gray-200/50 dark:border-zinc-800/50
+        }
+    }
+
+    // MARK: - Space Tab
+
+    @ViewBuilder
+    private func spaceTab(space: Space, index: Int) -> some View {
+        if editingSpaceId == space.id {
+            TextField("Name", text: $editName, onCommit: {
+                onRenameSpace(space.id, editName)
+                editingSpaceId = nil
+            })
+            .textFieldStyle(.plain)
+            .font(.system(size: 13, weight: .medium))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.snapMuted)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .frame(width: 120)
+            .onExitCommand { editingSpaceId = nil }
+        } else {
+            tabView(id: space.id, title: space.name, isActive: activeSpaceId == space.id)
+                .contextMenu {
+                    Button("Rename") {
+                        editName = space.name
+                        editingSpaceId = space.id
+                    }
+                    Divider()
+                    Button("Delete", role: .destructive) {
+                        onDeleteSpace(space.id)
+                    }
+                }
+                .onDoubleClick {
+                    editName = space.name
+                    editingSpaceId = space.id
+                }
+                .draggable(space.id) {
+                    Text(space.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.snapForeground)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Color.snapMuted)
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                }
+                .dropDestination(for: String.self) { items, _ in
+                    guard let droppedId = items.first else { return false }
+
+                    if let fromIndex = spaces.firstIndex(where: { $0.id == droppedId }) {
+                        onReorderSpaces(fromIndex, index)
+                        return true
+                    }
+
+                    let itemIds = Set(droppedId.split(separator: ",").map(String.init))
+                    if !itemIds.isEmpty {
+                        onAssignToSpace(itemIds, space.id)
+                        return true
+                    }
+
+                    return false
+                } isTargeted: { targeted in
+                    dropTargetId = targeted ? space.id : nil
+                }
         }
     }
 

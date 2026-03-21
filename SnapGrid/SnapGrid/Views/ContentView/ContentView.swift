@@ -10,13 +10,12 @@ struct ContentView: View {
     @State private var importService = ImportService()
     @State private var queueWatcher = QueueWatcher(queueURL: MediaStorageService.shared.queueDir)
     @State private var isDragTargeted = false
-    @State private var spaceSlideEdge: Edge = .trailing
     @AppStorage("appTheme") private var themeSetting: String = AppTheme.system.rawValue
 
-    private var filteredItems: [MediaItem] {
+    private func itemsForSpace(_ spaceId: String?) -> [MediaItem] {
         var items = allItems
 
-        if let spaceId = appState.activeSpaceId {
+        if let spaceId {
             items = items.filter { $0.space?.id == spaceId }
         }
 
@@ -42,6 +41,14 @@ struct ContentView: View {
         return items
     }
 
+    private var activeFilteredItems: [MediaItem] {
+        itemsForSpace(appState.activeSpaceId)
+    }
+
+    private var activeIndex: Int {
+        spaceIndex(for: appState.activeSpaceId)
+    }
+
     var body: some View {
         ZStack {
             Color.snapBackground.ignoresSafeArea()
@@ -60,60 +67,26 @@ struct ContentView: View {
                 )
                 .padding(.top, 8)
 
-                // Main content
+                // Main content — horizontal carousel of space pages
                 if allItems.isEmpty {
-                    EmptyStateView()
+                    EmptyStateView(isDragTargeted: isDragTargeted)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if filteredItems.isEmpty && appState.activeSpaceId != nil {
-                    // Space-specific empty state
-                    VStack(spacing: 12) {
-                        Image(systemName: "rectangle.stack.badge.plus")
-                            .font(.system(size: 32, weight: .light))
-                            .foregroundStyle(.secondary)
-                        Text("No items in this space")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                        Text("Drop images here or move existing images to this space")
-                            .font(.subheadline)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if filteredItems.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 32, weight: .light))
-                            .foregroundStyle(.secondary)
-                        Text("No results found")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    MasonryGridView(
-                        items: filteredItems,
-                        thumbnailSize: appState.thumbnailSize,
-                        selectedIds: appState.selectedIds,
-                        spaces: spaces,
-                        activeSpaceId: appState.activeSpaceId,
-                        hiddenItemId: appState.detailItem,
-                        onSelect: { id, frame in
-                            appState.detailSourceFrame = frame
-                            appState.detailItem = id
-                        },
-                        onToggleSelect: { id in appState.toggleSelection(id) },
-                        onShiftSelect: { id in
-                            appState.rangeSelect(
-                                targetId: id,
-                                orderedIds: filteredItems.map(\.id)
-                            )
-                        },
-                        onDelete: deleteItems,
-                        onAssignToSpace: assignToSpace,
-                        onRetryAnalysis: retryAnalysis,
-                        onSetSelection: { ids in appState.selectedIds = ids }
-                    )
-                    .id(appState.activeSpaceId ?? "all")
-                    .transition(.move(edge: spaceSlideEdge))
+                    GeometryReader { geo in
+                        let pageWidth = geo.size.width
+                        let pageHeight = geo.size.height
+
+                        HStack(spacing: 0) {
+                            // "All" page (index 0)
+                            spacePageView(spaceId: nil, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: 0)
+
+                            // Per-space pages (index 1+)
+                            ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                                spacePageView(spaceId: space.id, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: index + 1)
+                            }
+                        }
+                        .offset(x: -CGFloat(activeIndex) * pageWidth)
+                    }
                     .clipped()
                 }
             }
@@ -124,7 +97,7 @@ struct ContentView: View {
                let sourceFrame = appState.detailSourceFrame {
                 HeroDetailOverlay(
                     item: item,
-                    allItems: filteredItems,
+                    allItems: activeFilteredItems,
                     sourceFrame: sourceFrame,
                     onNavigate: { appState.detailItem = $0 },
                     onRetryAnalysis: retryAnalysis,
@@ -235,7 +208,7 @@ struct ContentView: View {
         }
         .onKeyPress(.init("a"), phases: .down) { press in
             guard press.modifiers.contains(.command) else { return .ignored }
-            appState.selectAll(filteredItems.map(\.id))
+            appState.selectAll(activeFilteredItems.map(\.id))
             return .handled
         }
         .environment(appState)
@@ -246,9 +219,6 @@ struct ContentView: View {
     // MARK: - Space Navigation
 
     private func switchToSpace(_ newId: String?) {
-        let oldIndex = spaceIndex(for: appState.activeSpaceId)
-        let newIndex = spaceIndex(for: newId)
-        spaceSlideEdge = newIndex > oldIndex ? .trailing : .leading
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
             appState.activeSpaceId = newId
         }
@@ -257,6 +227,55 @@ struct ContentView: View {
     private func spaceIndex(for id: String?) -> Int {
         guard let id else { return 0 }
         return (spaces.firstIndex(where: { $0.id == id }) ?? -1) + 1
+    }
+
+    @ViewBuilder
+    private func spacePageView(spaceId: String?, pageWidth: CGFloat, pageHeight: CGFloat, pageIndex: Int) -> some View {
+        let items = itemsForSpace(spaceId)
+
+        Color.clear
+            .frame(width: pageWidth, height: pageHeight)
+            .overlay {
+                if items.isEmpty && spaceId != nil {
+                    EmptyStateView(mode: .spaceLevel, isDragTargeted: isDragTargeted)
+                } else if items.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 32, weight: .light))
+                            .foregroundStyle(.secondary)
+                        Text("No results found")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    MasonryGridView(
+                        items: items,
+                        thumbnailSize: appState.thumbnailSize,
+                        selectedIds: appState.selectedIds,
+                        spaces: spaces,
+                        activeSpaceId: spaceId,
+                        hiddenItemId: appState.detailItem,
+                        onSelect: { id, frame in
+                            appState.detailSourceFrame = frame
+                            appState.detailItem = id
+                        },
+                        onToggleSelect: { id in appState.toggleSelection(id) },
+                        onShiftSelect: { id in
+                            appState.rangeSelect(
+                                targetId: id,
+                                orderedIds: items.map(\.id)
+                            )
+                        },
+                        onDelete: deleteItems,
+                        onAssignToSpace: assignToSpace,
+                        onRetryAnalysis: retryAnalysis,
+                        onSetSelection: { ids in appState.selectedIds = ids },
+                        coordinateSpaceName: "gridContent-\(spaceId ?? "all")"
+                    )
+                }
+            }
+            .clipped()
+            .allowsHitTesting(pageIndex == activeIndex)
     }
 
     // MARK: - Actions
@@ -358,6 +377,7 @@ struct ContentView: View {
         let space = Space(name: "New Space", order: spaces.count)
         modelContext.insert(space)
         try? modelContext.save()
+        switchToSpace(space.id)
     }
 
     private func deleteSpace(_ id: String) {
