@@ -7,15 +7,11 @@ import AVKit
  * OPEN
  *    0ms   thumbnail hidden, backdrop 0 → 0.8, image springs
  *          from sourceFrame → finalFrame, cornerRadius 12 → 16
- *  360ms   spring settles, close button + metadata fade in
  *
  * CLOSE
- *    0ms   UI hidden, backdrop 0.8 → 0, image springs back
+ *    0ms   backdrop 0.8 → 0, image springs back
  *          to sourceFrame, cornerRadius 16 → 12
  *  400ms   overlay removed, thumbnail reappears
- *
- * NAVIGATE (arrow keys)
- *    0ms   image crossfades (0.2s), metadata crossfades
  * ───────────────────────────────────────────────────────── */
 
 // MARK: - Spring Config
@@ -27,26 +23,15 @@ private let heroSpring = Animation.spring(response: 0.36, dampingFraction: 0.87)
 
 struct HeroDetailOverlay: View {
     let item: MediaItem
-    let allItems: [MediaItem]
     let sourceFrame: CGRect
-    let onNavigate: (String) -> Void
-    let onRetryAnalysis: (MediaItem) -> Void
     let onAnimationComplete: () -> Void
 
     @Environment(VideoPreviewManager.self) private var videoPreview
     @State private var isExpanded = false
     @State private var isClosing = false
-    @State private var showUI = false
     @State private var image: NSImage?
     @State private var detailPlayer: AVPlayer?
-
-    private var isTallImage: Bool {
-        !item.isVideo && item.aspectRatio < 0.5
-    }
-
-    private var currentIndex: Int? {
-        allItems.firstIndex(where: { $0.id == item.id })
-    }
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         GeometryReader { geo in
@@ -69,6 +54,7 @@ struct HeroDetailOverlay: View {
                         .frame(width: currentFrame.width, height: currentFrame.height)
                         .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 12))
+                        .onTapGesture { triggerClose() }
                         .position(x: currentFrame.midX, y: currentFrame.midY)
                         .id(item.id)
                 } else if item.isVideo, let player = detailPlayer {
@@ -81,46 +67,18 @@ struct HeroDetailOverlay: View {
                             .position(x: finalFrame.midX, y: finalFrame.midY)
                     }
                 }
-
-                // Close button + metadata (fade in after expansion)
-                if showUI && !isClosing {
-                    VStack(spacing: 0) {
-                        // Close button
-                        HStack {
-                            Spacer()
-                            Button(action: triggerClose) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.7))
-                                    .frame(width: 32, height: 32)
-                                    .background(.white.opacity(0.1))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .padding()
-                        }
-
-                        Spacer()
-
-                        // Metadata panel
-                        metadataPanel
-                    }
-                    .transition(.opacity)
-                    .allowsHitTesting(true)
-                }
             }
         }
+        .focusable()
+        .focused($isFocused)
+        .focusEffectDisabled()
         .ignoresSafeArea()
-        .onExitCommand { triggerClose() }
-        .onKeyPress(.leftArrow) {
-            navigatePrevious()
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
-            navigateNext()
+        .onKeyPress(.escape) {
+            triggerClose()
             return .handled
         }
         .task {
+            isFocused = true
             if item.isVideo {
                 // Claim the hover preview player (seamless handoff, continues from current position)
                 if let claimed = videoPreview.claimForDetail() {
@@ -134,32 +92,8 @@ struct HeroDetailOverlay: View {
             } else {
                 await loadImage()
             }
-            // Start the hero animation after content is ready
             withAnimation(heroSpring) {
                 isExpanded = true
-            }
-            // Show UI after spring settles
-            try? await Task.sleep(for: .milliseconds(380))
-            withAnimation(.easeOut(duration: 0.2)) {
-                showUI = true
-            }
-        }
-        .onChange(of: item.id) {
-            // Arrow key navigation: crossfade, don't re-run hero
-            image = nil
-            if item.isVideo {
-                detailPlayer = videoPreview.switchDetailPlayer(
-                    itemId: item.id,
-                    url: MediaStorageService.shared.mediaURL(filename: item.filename)
-                )
-            } else {
-                // Navigated from video to image — clean up video player
-                if detailPlayer != nil {
-                    detailPlayer?.pause()
-                    detailPlayer = nil
-                    videoPreview.releaseFromDetail()
-                }
-                Task { await loadImage() }
             }
         }
     }
@@ -196,7 +130,6 @@ struct HeroDetailOverlay: View {
     private func triggerClose() {
         guard !isClosing else { return }
         isClosing = true
-        showUI = false
 
         withAnimation(heroSpring) {
             isExpanded = false
@@ -208,18 +141,6 @@ struct HeroDetailOverlay: View {
             detailPlayer = nil
             onAnimationComplete()
         }
-    }
-
-    // MARK: - Navigation
-
-    private func navigatePrevious() {
-        guard let idx = currentIndex, idx > 0 else { return }
-        onNavigate(allItems[idx - 1].id)
-    }
-
-    private func navigateNext() {
-        guard let idx = currentIndex, idx < allItems.count - 1 else { return }
-        onNavigate(allItems[idx + 1].id)
     }
 
     // MARK: - Image Loading
@@ -236,74 +157,6 @@ struct HeroDetailOverlay: View {
         let url = MediaStorageService.shared.mediaURL(filename: item.filename)
         if let loaded = NSImage(contentsOf: url) {
             self.image = loaded
-        }
-    }
-
-    // MARK: - Metadata Panel
-
-    @ViewBuilder
-    private var metadataPanel: some View {
-        if let result = item.analysisResult {
-            VStack(spacing: 12) {
-                if !result.patterns.isEmpty {
-                    FlowLayout(spacing: 6) {
-                        ForEach(result.patterns, id: \.name) { pattern in
-                            HStack(spacing: 4) {
-                                Text(pattern.name)
-                                    .font(.system(size: 13, weight: .medium))
-                                Text("\(Int(pattern.confidence * 100))%")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.white.opacity(0.4))
-                            }
-                            .foregroundStyle(.white.opacity(0.8))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.snapMuted)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                    }
-                }
-
-                if !result.imageContext.isEmpty {
-                    Text(result.imageContext)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .lineLimit(3)
-                        .frame(maxWidth: 600)
-                }
-            }
-            .padding()
-            .padding(.bottom, 8)
-        } else if item.analysisError != nil {
-            VStack(spacing: 8) {
-                Text("Analysis failed")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
-                if let error = item.analysisError {
-                    Text(error)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.4))
-                        .lineLimit(2)
-                }
-                Button("Retry Analysis") {
-                    onRetryAnalysis(item)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-            }
-            .padding()
-            .padding(.bottom, 8)
-        } else if item.isAnalyzing {
-            HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(.white)
-                Text("Analyzing...")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.6))
-            }
-            .padding()
-            .padding(.bottom, 8)
         }
     }
 }
