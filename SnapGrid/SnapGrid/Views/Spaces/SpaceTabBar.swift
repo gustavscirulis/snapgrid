@@ -35,8 +35,6 @@ struct SpaceTabBar: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color.snapMutedForeground)
                         .frame(width: 28, height: 28)
-                        .background(Color.snapMuted.opacity(0.6))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
             }
@@ -116,7 +114,7 @@ struct SpaceTabBar: View {
     // SpaceTabBar.tsx:283,318-319 — bottom bar indicator with gray text colors
     @ViewBuilder
     private func tabView(id: String?, title: String, isActive: Bool) -> some View {
-        let isDropTarget = dropTargetId == id
+        let isDropTarget = (id == nil && dropTargetId == "ALL") || (id != nil && dropTargetId == id)
 
         Button {
             onSelectSpace(id)
@@ -129,7 +127,7 @@ struct SpaceTabBar: View {
                         isDropTarget ? Color.snapForeground.opacity(0.7) :
                         Color.snapMutedForeground               // SpaceTabBar.tsx:319 — text-gray-500/gray-400
                     )
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 8)
                     .padding(.vertical, 7)
 
                 // Bottom bar indicator
@@ -139,14 +137,15 @@ struct SpaceTabBar: View {
                         .frame(height: 2)
                         .clipShape(Capsule())
                         .matchedGeometryEffect(id: "activeTab", in: tabNamespace)
-                        .padding(.horizontal, 12)  // SpaceTabBar.tsx:283 — left-3 right-3
+                        .padding(.horizontal, 6)
                 } else {
                     Rectangle()
                         .fill(Color.clear)
                         .frame(height: 2)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 6)
                 }
             }
+            .contentShape(Rectangle())
             .background {
                 if isDropTarget && !isActive {
                     RoundedRectangle(cornerRadius: 7)
