@@ -24,13 +24,14 @@ struct GridItemView: View {
     @State private var globalFrame: CGRect = .zero
     @State private var hoverTask: Task<Void, Never>?
 
-    init(item: MediaItem, width: CGFloat, isSelected: Bool, spaces: [Space], activeSpaceId: String?, selectedCount: Int, hiddenItemId: String?, onSelect: @escaping (CGRect) -> Void, onToggleSelect: @escaping () -> Void, onShiftSelect: @escaping () -> Void, onDelete: @escaping () -> Void, onAssignToSpace: @escaping (String?) -> Void, onRetryAnalysis: @escaping () -> Void) {
+    init(item: MediaItem, width: CGFloat, isSelected: Bool, spaces: [Space], activeSpaceId: String?, selectedCount: Int, effectiveIds: Set<String>, hiddenItemId: String?, onSelect: @escaping (CGRect) -> Void, onToggleSelect: @escaping () -> Void, onShiftSelect: @escaping () -> Void, onDelete: @escaping () -> Void, onAssignToSpace: @escaping (String?) -> Void, onRetryAnalysis: @escaping () -> Void) {
         self.item = item
         self.width = width
         self.isSelected = isSelected
         self.spaces = spaces
         self.activeSpaceId = activeSpaceId
         self.selectedCount = selectedCount
+        self.effectiveIds = effectiveIds
         self.hiddenItemId = hiddenItemId
         self.onSelect = onSelect
         self.onToggleSelect = onToggleSelect
@@ -420,3 +421,4 @@ struct ShimmerText: View {
         }
     }
 }
+
