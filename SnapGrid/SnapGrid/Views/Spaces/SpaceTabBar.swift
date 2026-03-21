@@ -155,7 +155,7 @@ struct SpaceTabBar: View {
             }
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: activeSpaceId)
+        .animation(SnapSpring.standard, value: activeSpaceId)
     }
 
     // MARK: - Drop Helpers

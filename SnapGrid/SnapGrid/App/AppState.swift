@@ -21,12 +21,12 @@ final class AppState {
 
     func showToast(_ message: String) {
         let toast = ToastMessage(message: message)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(SnapSpring.standard) {
             toasts.append(toast)
         }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(3))
-            withAnimation(.easeOut(duration: 0.2)) {
+            withAnimation(SnapSpring.fast) {
                 toasts.removeAll { $0.id == toast.id }
             }
         }
