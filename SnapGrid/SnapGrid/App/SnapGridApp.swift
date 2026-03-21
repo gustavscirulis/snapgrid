@@ -34,6 +34,8 @@ struct SnapGridApp: App {
         .modelContainer(container)
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 800)
+        .windowResizability(.contentMinSize)
+        .defaultPosition(.center)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Import Images...") {

@@ -133,6 +133,7 @@ struct ContentView: View {
                     .ignoresSafeArea()
             }
         }
+        .frame(minWidth: 540, minHeight: 400)
         .if(appState.detailItem == nil) { view in
             view.searchable(text: self.$appState.searchText, placement: .toolbar, prompt: "Search patterns, descriptions...")
         }
