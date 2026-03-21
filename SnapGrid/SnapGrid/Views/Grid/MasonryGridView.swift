@@ -6,7 +6,8 @@ struct MasonryGridView: View {
     let selectedIds: Set<String>
     let spaces: [Space]
     let activeSpaceId: String?
-    let onSelect: (String) -> Void
+    let hiddenItemId: String?
+    let onSelect: (String, CGRect) -> Void
     let onToggleSelect: (String) -> Void
     let onShiftSelect: (String) -> Void
     let onDelete: (Set<String>) -> Void
@@ -100,7 +101,8 @@ struct MasonryGridView: View {
                                         spaces: spaces,
                                         activeSpaceId: activeSpaceId,
                                         selectedCount: selectedIds.contains(item.id) ? selectedIds.count : 1,
-                                        onSelect: { onSelect(item.id) },
+                                        hiddenItemId: hiddenItemId,
+                                        onSelect: { frame in onSelect(item.id, frame) },
                                         onToggleSelect: { onToggleSelect(item.id) },
                                         onShiftSelect: { onShiftSelect(item.id) },
                                         onDelete: { onDelete(effectiveIds) },

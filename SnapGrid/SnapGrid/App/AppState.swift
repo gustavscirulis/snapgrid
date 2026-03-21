@@ -10,6 +10,7 @@ final class AppState {
     var searchText: String = ""
     var thumbnailSize: ThumbnailSize = .medium
     var detailItem: String? = nil  // MediaItem id
+    var detailSourceFrame: CGRect? = nil  // Global frame of tapped thumbnail for hero animation
     var isSettingsOpen: Bool = false
 
     // Undo stack — stores enough info to fully restore deleted items

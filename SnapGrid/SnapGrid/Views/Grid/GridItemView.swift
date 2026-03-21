@@ -8,7 +8,8 @@ struct GridItemView: View {
     let spaces: [Space]
     let activeSpaceId: String?
     let selectedCount: Int
-    let onSelect: () -> Void
+    let hiddenItemId: String?
+    let onSelect: (CGRect) -> Void
     let onToggleSelect: () -> Void
     let onShiftSelect: () -> Void
     let onDelete: () -> Void
@@ -17,6 +18,7 @@ struct GridItemView: View {
 
     @State private var isHovered = false
     @State private var thumbnail: NSImage?
+    @State private var globalFrame: CGRect = .zero
 
     private var height: CGFloat {
         width / item.aspectRatio
@@ -78,7 +80,7 @@ struct GridItemView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(8)
-                .transition(.opacity)
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
             }
 
             // Remove from space button (hover only, top-left)
@@ -111,8 +113,8 @@ struct GridItemView: View {
                     ShimmerText("Analyzing...")
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(.ultraThinMaterial.opacity(0.9))
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .background(.black.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                         .padding(8)
                 } else if item.analysisError != nil {
                     Button(action: onRetryAnalysis) {
@@ -126,36 +128,42 @@ struct GridItemView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(.red.opacity(0.7))
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
                     .padding(8)
-                } else if isHovered, let patterns = item.analysisResult?.patterns, !patterns.isEmpty {
-                    // Gradient backdrop + pattern tags (hover only)
+                } else if let patterns = item.analysisResult?.patterns, !patterns.isEmpty {
+                    // Gradient backdrop + staggered pattern tags (hover only)
                     ZStack(alignment: .bottomLeading) {
                         LinearGradient(
-                            colors: [.black.opacity(0.7), .clear],
+                            colors: [.black.opacity(0.5), .black.opacity(0.15), .clear],
                             startPoint: .bottom,
-                            endPoint: .center
+                            endPoint: .init(x: 0.5, y: 0.3)
                         )
+                        .opacity(isHovered ? 1 : 0)
 
                         HStack {
-                            FlowLayout(spacing: 4) {
-                                ForEach(patterns.prefix(4), id: \.name) { pattern in
+                            FlowLayout(spacing: 5) {
+                                ForEach(Array(patterns.prefix(4).enumerated()), id: \.element.name) { index, pattern in
                                     Text(pattern.name)
-                                        .font(.system(size: 11, weight: .medium))
+                                        .font(.system(size: 11))
                                         .foregroundStyle(.white.opacity(0.9))
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 3)
-                                        .background(.ultraThinMaterial.opacity(0.8))
-                                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                                        .opacity(isHovered ? 1 : 0)
+                                        .offset(y: isHovered ? 0 : 8)
+                                        .animation(
+                                            .spring(response: 0.25, dampingFraction: 0.8)
+                                                .delay(Double(index) * 0.025),
+                                            value: isHovered
+                                        )
                                 }
                             }
                             Spacer()
                         }
                         .padding(8)
                     }
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
             .frame(width: width, height: height, alignment: .bottomLeading)
@@ -173,7 +181,7 @@ struct GridItemView: View {
             x: 0,
             y: isHovered ? 4 : 1
         )
-        .animation(.easeOut(duration: 0.15), value: isHovered)
+        .animation(.spring(response: 0.2, dampingFraction: 0.85), value: isHovered)
         .onHover { isHovered = $0 }
         .draggable(TransferableFileURL(url: MediaStorageService.shared.mediaURL(filename: item.filename))) {
             // Multi-select: stacked preview with count badge
@@ -225,6 +233,16 @@ struct GridItemView: View {
                     .frame(width: 120, height: 80)
             }
         }
+        .opacity(item.id == hiddenItemId ? 0 : 1)
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { globalFrame = geo.frame(in: .global) }
+                    .onChange(of: geo.frame(in: .global)) { _, newValue in
+                        globalFrame = newValue
+                    }
+            }
+        )
         .onTapGesture {
             let flags = NSEvent.modifierFlags
             if flags.contains(.command) {
@@ -232,7 +250,7 @@ struct GridItemView: View {
             } else if flags.contains(.shift) {
                 onShiftSelect()
             } else {
-                onSelect()
+                onSelect(globalFrame)
             }
         }
         .contextMenu {

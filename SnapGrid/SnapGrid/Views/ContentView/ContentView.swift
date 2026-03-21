@@ -95,10 +95,10 @@ struct ContentView: View {
                         selectedIds: appState.selectedIds,
                         spaces: spaces,
                         activeSpaceId: appState.activeSpaceId,
-                        onSelect: { id in
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                appState.detailItem = id
-                            }
+                        hiddenItemId: appState.detailItem,
+                        onSelect: { id, frame in
+                            appState.detailSourceFrame = frame
+                            appState.detailItem = id
                         },
                         onToggleSelect: { id in appState.toggleSelection(id) },
                         onShiftSelect: { id in
@@ -118,21 +118,21 @@ struct ContentView: View {
                 }
             }
 
-            // Detail overlay
+            // Detail overlay — hero animation from thumbnail to centered view
             if let detailId = appState.detailItem,
-               let item = allItems.first(where: { $0.id == detailId }) {
-                MediaDetailView(
+               let item = allItems.first(where: { $0.id == detailId }),
+               let sourceFrame = appState.detailSourceFrame {
+                HeroDetailOverlay(
                     item: item,
                     allItems: filteredItems,
-                    onClose: {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            appState.detailItem = nil
-                        }
-                    },
+                    sourceFrame: sourceFrame,
                     onNavigate: { appState.detailItem = $0 },
-                    onRetryAnalysis: retryAnalysis
+                    onRetryAnalysis: retryAnalysis,
+                    onAnimationComplete: {
+                        appState.detailItem = nil
+                        appState.detailSourceFrame = nil
+                    }
                 )
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
 
             // Selection badge
@@ -200,12 +200,14 @@ struct ContentView: View {
             deleteSelectedItems()
         }
         .onExitCommand {
-            if !appState.selectedIds.isEmpty {
-                appState.clearSelection()
-            } else if appState.detailItem != nil {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            if appState.detailItem != nil {
+                // HeroDetailOverlay handles its own close via .onExitCommand
+                // This branch handles the fallback case (no source frame)
+                if appState.detailSourceFrame == nil {
                     appState.detailItem = nil
                 }
+            } else if !appState.selectedIds.isEmpty {
+                appState.clearSelection()
             }
         }
         .onKeyPress(characters: .init(charactersIn: "123456789"), phases: .down) { press in
