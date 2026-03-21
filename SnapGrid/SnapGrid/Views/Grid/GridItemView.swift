@@ -73,6 +73,7 @@ struct GridItemView: View {
                     InlineVideoPreview(player: player)
                         .frame(width: width, height: height)
                         .clipped()
+                        .transition(.opacity)
                 }
 
                 // Video badge (hidden during active preview)
@@ -130,7 +131,7 @@ struct GridItemView: View {
                             )
                             .opacity(isHovered ? 1 : 0)
                             .offset(y: isHovered ? 0 : 20)
-                            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isHovered)
+                            .animation(SnapSpring.standard, value: isHovered)
 
                             HStack {
                                 FlowLayout(spacing: 5) {
@@ -144,7 +145,7 @@ struct GridItemView: View {
                                             .opacity(isHovered ? 1 : 0)
                                             .offset(y: isHovered ? 0 : 8)
                                             .animation(
-                                                .spring(response: 0.25, dampingFraction: 0.8)
+                                                SnapSpring.fast
                                                     .delay(Double(index) * 0.025),
                                                 value: isHovered
                                             )
@@ -157,7 +158,7 @@ struct GridItemView: View {
                     }
                 }
                 .frame(width: width, height: height, alignment: .bottomLeading)
-                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: item.isAnalyzing)
+                .animation(SnapSpring.standard, value: item.isAnalyzing)
             }
             .allowsHitTesting(false)
         }
@@ -190,7 +191,7 @@ struct GridItemView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(8)
-                .transition(.opacity)
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
             }
         }
         .overlay(alignment: .bottomLeading) {
@@ -210,6 +211,7 @@ struct GridItemView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(8)
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -224,7 +226,7 @@ struct GridItemView: View {
             x: 0,
             y: isHovered ? 4 : 1
         )
-        .animation(.spring(response: 0.2, dampingFraction: 0.85), value: isHovered)
+        .animation(SnapSpring.fast, value: isHovered)
         .onHover { hovering in
             isHovered = hovering
             hoverTask?.cancel()

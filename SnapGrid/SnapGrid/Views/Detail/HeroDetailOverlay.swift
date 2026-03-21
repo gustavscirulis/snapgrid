@@ -17,7 +17,7 @@ import AVKit
 // MARK: - Spring Config
 
 /// Matches Electron's framer-motion { damping: 30, stiffness: 300 }
-private let heroSpring = Animation.spring(response: 0.36, dampingFraction: 0.87)
+/// See AnimationTokens.swift — SnapSpring.hero
 
 // MARK: - HeroDetailOverlay
 
@@ -92,7 +92,7 @@ struct HeroDetailOverlay: View {
             } else {
                 await loadImage()
             }
-            withAnimation(heroSpring) {
+            withAnimation(SnapSpring.hero) {
                 isExpanded = true
             }
         }
@@ -131,12 +131,9 @@ struct HeroDetailOverlay: View {
         guard !isClosing else { return }
         isClosing = true
 
-        withAnimation(heroSpring) {
+        withAnimation(SnapSpring.hero) {
             isExpanded = false
-        }
-
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(400))
+        } completion: {
             videoPreview.releaseFromDetail()
             detailPlayer = nil
             onAnimationComplete()

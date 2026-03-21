@@ -28,6 +28,7 @@
 		67A2F4EA7A945C87AD04E886 /* SpacesSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1E6270DBFF25C7C3C0324E /* SpacesSettingsTab.swift */; };
 		76828B68E2CA3213D835B691 /* PatternTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 649D56F9B7920BF3924A8E4E /* PatternTagsView.swift */; };
 		798C8FFCDDBFB7C32E78C37A /* View+ConditionalModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686AAE3C7EDF40017EAE75F2 /* View+ConditionalModifier.swift */; };
+		8167D57BFF6AAEC5E1CF20E1 /* AnimationTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 468F744BF11C8965B74EF95F /* AnimationTokens.swift */; };
 		8350DC604AC401431E9CD255 /* Space.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6477AAD40C3308F596D68729 /* Space.swift */; };
 		8F71F68AF462303D3E8EFF3F /* MasonryGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5AD67C6232580C3B0D9E982 /* MasonryGridView.swift */; };
 		90E631F7D9C9E3645285E61A /* DeveloperSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0EEC1133F2A0A3770E116D /* DeveloperSettingsTab.swift */; };
@@ -63,6 +64,7 @@
 		3BA6AB7DC0A84E670681EB6C /* MediaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItem.swift; sourceTree = "<group>"; };
 		3CE5033083DAF80AD07ABC32 /* NSImage+Thumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSImage+Thumbnail.swift"; sourceTree = "<group>"; };
 		4091FEF7AEC687AE2DA55B3D /* SpaceTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceTabBar.swift; sourceTree = "<group>"; };
+		468F744BF11C8965B74EF95F /* AnimationTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationTokens.swift; sourceTree = "<group>"; };
 		47A1525A6C63DFE52779E656 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		4945D23305D50B9C7D0873C9 /* GridItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridItemView.swift; sourceTree = "<group>"; };
 		4A1E6270DBFF25C7C3C0324E /* SpacesSettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacesSettingsTab.swift; sourceTree = "<group>"; };
@@ -161,6 +163,7 @@
 		6B5584A04B49DC464AAE11FF /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				468F744BF11C8965B74EF95F /* AnimationTokens.swift */,
 				9DB5BFB2BC5A94B434803361 /* ElectronImportView.swift */,
 				68305A61078FFD8F1E7C722F /* FlowLayout.swift */,
 				B7D4CBFC319B4BECC6C6B35F /* InlineVideoPreview.swift */,
@@ -334,6 +337,7 @@
 			files = (
 				93739E5784974939896FFF0D /* AIAnalysisService.swift in Sources */,
 				D9FE517E672AA97AAD667259 /* AnalysisResult.swift in Sources */,
+				8167D57BFF6AAEC5E1CF20E1 /* AnimationTokens.swift in Sources */,
 				071B2A3BF29E5D8C82A0F4DB /* AppState.swift in Sources */,
 				C353401A790BF3AACFC694AC /* Color+Theme.swift in Sources */,
 				22F185FF7233F7D6E314433B /* ContentView.swift in Sources */,

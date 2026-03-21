@@ -119,7 +119,7 @@ struct ContentView: View {
                         .padding(.bottom, 24)
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: appState.selectedIds.count)
+                .animation(SnapSpring.standard, value: appState.selectedIds.isEmpty)
             }
 
             // Toast notifications
@@ -131,6 +131,7 @@ struct ContentView: View {
                     .stroke(Color.snapAccent, lineWidth: 3)
                     .background(Color.snapAccent.opacity(0.1))
                     .ignoresSafeArea()
+                    .transition(.opacity)
             }
         }
         .frame(minWidth: 540, minHeight: 400)
@@ -237,7 +238,7 @@ struct ContentView: View {
     // MARK: - Space Navigation
 
     private func switchToSpace(_ newId: String?) {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+        withAnimation(SnapSpring.standard) {
             appState.activeSpaceId = newId
         }
     }
