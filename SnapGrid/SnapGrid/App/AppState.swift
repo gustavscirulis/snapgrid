@@ -119,23 +119,22 @@ enum ThumbnailSize: String, CaseIterable {
     func columns(forWidth width: CGFloat) -> Int {
         switch self {
         case .small:
-            if width >= 1536 { return 6 }
-            if width >= 1280 { return 5 }
-            if width >= 1024 { return 4 }
-            if width >= 640  { return 3 }
+            if width >= 1200 { return 6 }
+            if width >= 1000 { return 5 }
+            if width >= 800  { return 4 }
+            if width >= 480  { return 3 }
             return 2
         case .medium:
-            if width >= 1536 { return 4 }
-            if width >= 1280 { return 3 }
-            if width >= 1024 { return 2 }
+            if width >= 1200 { return 4 }
+            if width >= 900  { return 3 }
+            if width >= 500  { return 2 }
             return 1
         case .large:
-            if width >= 1536 { return 3 }
-            if width >= 1280 { return 2 }
-            if width >= 1024 { return 2 }
+            if width >= 1100 { return 3 }
+            if width >= 600  { return 2 }
             return 1
         case .extraLarge:
-            if width >= 1280 { return 2 }
+            if width >= 700  { return 2 }
             return 1
         }
     }
