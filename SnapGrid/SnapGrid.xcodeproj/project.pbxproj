@@ -37,6 +37,7 @@
 		D016DE668FB1A40FFB11BD0D /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DF384E9543E7A79145F99F8 /* SettingsView.swift */; };
 		D8DEDAFF16754653D39B7B56 /* TransferableFileURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E3151FA585E1C6ACA7945E /* TransferableFileURL.swift */; };
 		D9FE517E672AA97AAD667259 /* AnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D1884A0E94D6BC1F407855 /* AnalysisResult.swift */; };
+		DAFFFC8B024C7865A3859024 /* HeroDetailOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAA221ED457C361084B34E7 /* HeroDetailOverlay.swift */; };
 		E287F102701B8A0ADF31921D /* ZoomableImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A7AD2552C0E5EF0A3708956 /* ZoomableImageView.swift */; };
 		E317897879AD400BF3F5A524 /* GridItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4945D23305D50B9C7D0873C9 /* GridItemView.swift */; };
 		EBADE0138240682283D710C5 /* QueueWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF248F13852E08164664EF6D /* QueueWatcher.swift */; };
@@ -73,6 +74,7 @@
 		AAF0B485D040D2E5532516AE /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
 		AB0EEC1133F2A0A3770E116D /* DeveloperSettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperSettingsTab.swift; sourceTree = "<group>"; };
 		AB57D4AB7F12528E5ECD77DF /* ImageCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheService.swift; sourceTree = "<group>"; };
+		ADAA221ED457C361084B34E7 /* HeroDetailOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroDetailOverlay.swift; sourceTree = "<group>"; };
 		BBFDD4D2B1F3CCB3ED261F5C /* SelectionBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionBadge.swift; sourceTree = "<group>"; };
 		BF248F13852E08164664EF6D /* QueueWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueWatcher.swift; sourceTree = "<group>"; };
 		CF20E3B5FA0802105388A2AC /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -204,6 +206,7 @@
 		CC3C002E3A2CA4BFEECFB0FD /* Detail */ = {
 			isa = PBXGroup;
 			children = (
+				ADAA221ED457C361084B34E7 /* HeroDetailOverlay.swift */,
 				3884239912FC80F912C14715 /* MediaDetailView.swift */,
 				649D56F9B7920BF3924A8E4E /* PatternTagsView.swift */,
 				3A7AD2552C0E5EF0A3708956 /* ZoomableImageView.swift */,
@@ -322,6 +325,7 @@
 				572A0BCDDD41A4C5E4D7B75E /* FlowLayout.swift in Sources */,
 				3D2BE0DF8B994AFDFD7BD472 /* GeneralSettingsTab.swift in Sources */,
 				E317897879AD400BF3F5A524 /* GridItemView.swift in Sources */,
+				DAFFFC8B024C7865A3859024 /* HeroDetailOverlay.swift in Sources */,
 				ED7E6EF1043AE2A69F053E6C /* ImageCacheService.swift in Sources */,
 				BA67E76C4D3CB12E2DF2B9A9 /* ImportService.swift in Sources */,
 				34F4BEE7907CD4E3B3A6BCB4 /* KeychainService.swift in Sources */,
