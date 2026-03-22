@@ -10,13 +10,35 @@ import SwiftUI
 /// to .resizeAspectFill without amplifying tiny aspect-ratio mismatches.
 private class VideoHostView: NSView {
     let playerLayer: AVPlayerLayer
+    let gradientLayer: CAGradientLayer
+
+    /// Show/hide the bottom scrim gradient (used during grid hover).
+    /// Rendered as a CALayer so it composites above the AVPlayerLayer —
+    /// plain SwiftUI views can't reliably render above NSViewRepresentable content.
+    var showGradient: Bool = false {
+        didSet { gradientLayer.isHidden = !showGradient }
+    }
 
     init(player: AVPlayer) {
         playerLayer = AVPlayerLayer(player: player)
         playerLayer.videoGravity = .resizeAspect
+
+        gradientLayer = CAGradientLayer()
+        // macOS CALayer y-axis: 0 = bottom, 1 = top
+        gradientLayer.colors = [
+            CGColor(gray: 0, alpha: 0.35),    // darkest at bottom
+            CGColor(gray: 0, alpha: 0.1),     // subtle mid
+            CGColor(gray: 0, alpha: 0),       // clear
+        ]
+        gradientLayer.locations = [0, 0.25, 0.45]
+        gradientLayer.startPoint = CGPoint(x: 0.5, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 0.5, y: 1)
+        gradientLayer.isHidden = true
+
         super.init(frame: .zero)
         wantsLayer = true
         layer?.addSublayer(playerLayer)
+        layer?.addSublayer(gradientLayer)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -26,21 +48,33 @@ private class VideoHostView: NSView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         playerLayer.frame = bounds
+        gradientLayer.frame = bounds
         CATransaction.commit()
     }
+
+    // Prevent this NSView from intercepting AppKit hit tests.
+    // The floating layer is purely visual — all interaction goes through
+    // SwiftUI views overlaid on top (VideoControlsOverlay in detail mode).
+    // Without this, the NSView can steal hover tracking from grid items
+    // underneath, causing spurious onHover(false) events.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// Single AVPlayerLayer that lives at the ContentView level.
 /// Never destroyed during hover→detail→grid transitions — only repositioned.
 private struct VideoPlayerNSView: NSViewRepresentable {
     let player: AVPlayer
+    var showGradient: Bool = false
 
     func makeNSView(context: Context) -> VideoHostView {
-        VideoHostView(player: player)
+        let view = VideoHostView(player: player)
+        view.showGradient = showGradient
+        return view
     }
 
     func updateNSView(_ nsView: VideoHostView, context: Context) {
         nsView.playerLayer.player = player
+        nsView.showGradient = showGradient
     }
 }
 
@@ -54,14 +88,39 @@ struct FloatingVideoLayer: View {
 
     var body: some View {
         if videoPreview.displayState != .hidden, let player = videoPreview.player {
-            ZStack {
-                VideoPlayerNSView(player: player)
-
-                // Controls overlay — only in detail mode
-                if videoPreview.displayState == .detail {
-                    VideoControlsOverlay(player: player)
+            VideoPlayerNSView(player: player, showGradient: videoPreview.displayState == .grid)
+                // Pattern pills overlay — .ultraThinMaterial creates an NSVisualEffectView
+                // that composites correctly above the NSView-backed video layer.
+                // The gradient scrim is a CAGradientLayer inside VideoHostView for the
+                // same reason — plain SwiftUI views can't render above NSViewRepresentable.
+                .overlay {
+                    if videoPreview.displayState == .grid, !videoPreview.gridPatternNames.isEmpty {
+                        VStack {
+                            Spacer()
+                            HStack {
+                                FlowLayout(spacing: 5) {
+                                    ForEach(videoPreview.gridPatternNames, id: \.self) { name in
+                                        Text(name)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.white.opacity(0.9))
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                                    }
+                                }
+                                Spacer()
+                            }
+                            .padding(8)
+                        }
+                        .allowsHitTesting(false)
+                    }
                 }
-            }
+                // Controls overlay — only in detail mode
+                .overlay {
+                    if videoPreview.displayState == .detail {
+                        VideoControlsOverlay(player: player)
+                    }
+                }
             .frame(width: videoPreview.currentFrame.width, height: videoPreview.currentFrame.height)
             .clipShape(RoundedRectangle(cornerRadius: videoPreview.cornerRadius))
             .position(x: videoPreview.currentFrame.midX, y: videoPreview.currentFrame.midY)
