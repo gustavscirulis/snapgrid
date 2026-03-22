@@ -35,13 +35,16 @@ final class VideoPreviewManager {
     /// The grid cell's live global frame — updated continuously by GridItemView
     private(set) var gridItemFrame: CGRect = .zero
 
+    /// Pattern names to display on the floating layer during grid hover
+    private(set) var gridPatternNames: [String] = []
+
     private var isHandedOffToDetail = false
     private var loopObserver: NSObjectProtocol?
 
     // MARK: - Grid Hover
 
     /// Start hover preview — creates player, positions floating layer at grid cell
-    func startPreview(itemId: String, url: URL, frame: CGRect) {
+    func startPreview(itemId: String, url: URL, frame: CGRect, patternNames: [String] = []) {
         if activeItemId == itemId, player != nil {
             gridItemFrame = frame
             if displayState == .grid {
@@ -57,6 +60,7 @@ final class VideoPreviewManager {
         player = newPlayer
         activeItemId = itemId
         gridItemFrame = frame
+        gridPatternNames = patternNames
         currentFrame = frame
         cornerRadius = 12
         displayState = .grid
@@ -161,6 +165,7 @@ final class VideoPreviewManager {
         player?.pause()
         player = nil
         activeItemId = nil
+        gridPatternNames = []
     }
 
     private func addLoopObserver(for player: AVPlayer?) {

@@ -51,6 +51,22 @@ struct GridItemView: View {
         isSelected && selectedCount > 1
     }
 
+    /// Hover state that stays true while the floating video layer covers this item.
+    /// The NSView-backed AVPlayerLayer causes a spurious onHover(false) when it appears
+    /// on top; this keeps hover UI visible for the duration of the grid preview.
+    private var effectiveHover: Bool {
+        isHovered || (item.isVideo && videoPreview.activeItemId == item.id && videoPreview.displayState == .grid)
+    }
+
+    /// Whether to show the SwiftUI gradient scrim behind pattern pills.
+    /// Suppressed for video items when the floating video layer provides its own CAGradientLayer.
+    /// Guarded by `item.isVideo` so non-video items never subscribe to `activeItemId` changes.
+    private var showHoverGradient: Bool {
+        guard effectiveHover else { return false }
+        guard item.isVideo else { return true }
+        return videoPreview.activeItemId != item.id
+    }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             // LAYER 1: Background selection button
@@ -144,25 +160,20 @@ struct GridItemView: View {
                                 startPoint: .bottom,
                                 endPoint: .init(x: 0.5, y: 0.55)
                             )
-                            .opacity(isHovered ? 1 : 0)
-                            .offset(y: isHovered ? 0 : 20)
-                            .animation(SnapSpring.standard, value: isHovered)
+                            .opacity(showHoverGradient ? 1 : 0)
+                            .offset(y: effectiveHover ? 0 : 20)
+                            .animation(SnapSpring.standard, value: effectiveHover)
 
                             HStack {
                                 FlowLayout(spacing: 5) {
                                     ForEach(Array(patterns.prefix(4).enumerated()), id: \.element.name) { index, pattern in
-                                        Text(pattern.name)
-                                            .font(.system(size: 11))
-                                            .foregroundStyle(.white.opacity(0.9))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-                                            .opacity(isHovered ? 1 : 0)
-                                            .offset(y: isHovered ? 0 : 8)
+                                        PatternPill(name: pattern.name)
+                                            .opacity(effectiveHover ? 1 : 0)
+                                            .offset(y: effectiveHover ? 0 : 8)
                                             .animation(
                                                 SnapSpring.fast
                                                     .delay(Double(index) * 0.025),
-                                                value: isHovered
+                                                value: effectiveHover
                                             )
                                     }
                                 }
@@ -180,7 +191,7 @@ struct GridItemView: View {
         .frame(width: width, height: height)
         // LAYER 3: Interactive action buttons as overlays
         .overlay(alignment: .topTrailing) {
-            if isHovered {
+            if effectiveHover {
                 Button(action: onDelete) {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .bold))
@@ -195,7 +206,7 @@ struct GridItemView: View {
             }
         }
         .overlay(alignment: .topLeading) {
-            if isHovered && activeSpaceId != nil {
+            if effectiveHover && activeSpaceId != nil {
                 Button { onAssignToSpace(nil) } label: {
                     Image(systemName: "arrow.uturn.backward")
                         .font(.system(size: 9, weight: .bold))
@@ -235,12 +246,12 @@ struct GridItemView: View {
                 .strokeBorder(isSelected ? Color.blue : Color.clear, lineWidth: 2)
         )
         .shadow(  // ImageCard.tsx:96 — shadow-sm / hover:shadow-md
-            color: .black.opacity(isHovered ? 0.1 : 0.05),
-            radius: isHovered ? 6 : 2,
+            color: .black.opacity(effectiveHover ? 0.1 : 0.05),
+            radius: effectiveHover ? 6 : 2,
             x: 0,
-            y: isHovered ? 4 : 1
+            y: effectiveHover ? 4 : 1
         )
-        .animation(SnapSpring.fast, value: isHovered)
+        .animation(SnapSpring.fast, value: effectiveHover)
         .onHover { hovering in
             isHovered = hovering
             hoverTask?.cancel()
@@ -252,8 +263,18 @@ struct GridItemView: View {
                         videoPreview.startPreview(
                             itemId: item.id,
                             url: MediaStorageService.shared.mediaURL(filename: item.filename),
-                            frame: globalFrame
+                            frame: globalFrame,
+                            patternNames: item.analysisResult?.patterns.prefix(4).map(\.name) ?? []
                         )
+                    }
+                } else if videoPreview.activeItemId == item.id {
+                    // Floating video layer can cause spurious onHover(false) —
+                    // debounce the stop so effectiveHover keeps UI stable.
+                    // A genuine hover-in (same or different item) cancels this.
+                    hoverTask = Task {
+                        try? await Task.sleep(for: .milliseconds(100))
+                        guard !Task.isCancelled else { return }
+                        videoPreview.stopPreview()
                     }
                 } else {
                     videoPreview.stopPreview()
