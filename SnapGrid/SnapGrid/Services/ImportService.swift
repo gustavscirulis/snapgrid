@@ -23,6 +23,47 @@ final class ImportService {
         }
     }
 
+    /// Import a raw NSImage (e.g. from pasteboard or browser drag) — converts to PNG and runs the full pipeline.
+    func importImage(_ image: NSImage, into context: ModelContext, spaceId: String? = nil) async {
+        do {
+            guard let tiffData = image.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiffData),
+                  let pngData = bitmap.representation(using: .png, properties: [:]) else {
+                throw ImportError.cannotReadDimensions
+            }
+
+            guard let pixelSize = image.pixelSize else {
+                throw ImportError.cannotReadDimensions
+            }
+
+            let id = UUID().uuidString
+            let filename = "\(id).png"
+            let width = Int(pixelSize.width)
+            let height = Int(pixelSize.height)
+
+            _ = try storage.saveMedia(data: pngData, filename: filename)
+            _ = try ThumbnailService.generateThumbnail(from: image, id: id)
+
+            let item = MediaItem(id: id, mediaType: .image, filename: filename, width: width, height: height)
+
+            if let spaceId {
+                let descriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
+                if let space = try? context.fetch(descriptor).first {
+                    item.space = space
+                }
+            }
+
+            context.insert(item)
+            try context.save()
+
+            Task { @MainActor [weak self] in
+                await self?.analyzeItem(item, context: context)
+            }
+        } catch {
+            print("[ImportService] Failed to import pasted image: \(error)")
+        }
+    }
+
     private func importSingleFile(_ url: URL, into context: ModelContext, spaceId: String?) async throws {
         let ext = url.pathExtension.lowercased()
         let isVideo = videoTypes.contains(ext)
