@@ -55,17 +55,33 @@ struct SnapGridApp: App {
             }
 
             CommandMenu("Spaces") {
-                Button("All") {
-                    NotificationCenter.default.post(name: .switchToSpaceByIndex, object: nil, userInfo: ["digit": 1])
-                }
-                .keyboardShortcut("1")
+                SpacesMenuContent()
+                    .modelContainer(container)
 
-                ForEach(2...9, id: \.self) { digit in
-                    Button("Space \(digit - 1)") {
-                        NotificationCenter.default.post(name: .switchToSpaceByIndex, object: nil, userInfo: ["digit": digit])
-                    }
-                    .keyboardShortcut(KeyEquivalent(Character(String(digit))))
+                Divider()
+
+                Button("New Space") {
+                    NotificationCenter.default.post(name: .createNewSpace, object: nil)
                 }
+                .keyboardShortcut("n")
+            }
+
+            CommandGroup(replacing: .pasteboard) {
+                Button("Find") {
+                    NotificationCenter.default.post(name: .focusSearch, object: nil)
+                }
+                .keyboardShortcut("f")
+
+                Button("Select All") {
+                    // If a text field is focused (e.g. search), do standard text select all;
+                    // otherwise select all grid images
+                    if let firstResponder = NSApp.keyWindow?.firstResponder, firstResponder is NSText {
+                        firstResponder.tryToPerform(#selector(NSText.selectAll(_:)), with: nil)
+                    } else {
+                        NotificationCenter.default.post(name: .selectAll, object: nil)
+                    }
+                }
+                .keyboardShortcut("a")
             }
 
             CommandGroup(replacing: .undoRedo) {
@@ -83,6 +99,24 @@ struct SnapGridApp: App {
     }
 }
 
+private struct SpacesMenuContent: View {
+    @Query(sort: \Space.order) private var spaces: [Space]
+
+    var body: some View {
+        Button("All") {
+            NotificationCenter.default.post(name: .switchToSpaceByIndex, object: nil, userInfo: ["digit": 1])
+        }
+        .keyboardShortcut("1")
+
+        ForEach(Array(spaces.prefix(8).enumerated()), id: \.element.id) { index, space in
+            Button(space.name) {
+                NotificationCenter.default.post(name: .switchToSpaceByIndex, object: nil, userInfo: ["digit": index + 2])
+            }
+            .keyboardShortcut(KeyEquivalent(Character(String(index + 2))))
+        }
+    }
+}
+
 extension Notification.Name {
     static let importFiles = Notification.Name("importFiles")
     static let undoDelete = Notification.Name("undoDelete")
@@ -90,4 +124,7 @@ extension Notification.Name {
     static let importElectronLibrary = Notification.Name("importElectronLibrary")
     static let willResetAllData = Notification.Name("willResetAllData")
     static let switchToSpaceByIndex = Notification.Name("switchToSpaceByIndex")
+    static let createNewSpace = Notification.Name("createNewSpace")
+    static let focusSearch = Notification.Name("focusSearch")
+    static let selectAll = Notification.Name("selectAll")
 }

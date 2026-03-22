@@ -234,10 +234,9 @@ struct GridItemView: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(isSelected ? 1 : 0)  // ring-offset-1 gap
         .overlay(
-            RoundedRectangle(cornerRadius: 13)  // 12 + 1px offset
-                .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)  // ImageCard.tsx:97 — ring-2 ring-blue-500
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(isSelected ? Color.blue : Color.clear, lineWidth: 2)
         )
         .shadow(  // ImageCard.tsx:96 — shadow-sm / hover:shadow-md
             color: .black.opacity(isHovered ? 0.1 : 0.05),
