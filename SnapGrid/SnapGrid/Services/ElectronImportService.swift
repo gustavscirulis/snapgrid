@@ -267,13 +267,25 @@ final class ElectronImportService {
 
         let (metadata, isVideo, newId, filename) = result
 
+        // For videos, use poster frame dimensions as authoritative (handles PAR, rotation)
+        var width = metadata.width ?? 0
+        var height = metadata.height ?? 0
+        if isVideo, width > 0, height > 0 {
+            if let posterFrame = try? await VideoFrameExtractor.extractPosterFrame(from: storage.mediaURL(filename: filename)),
+               let pixelSize = posterFrame.pixelSize,
+               Int(pixelSize.width) > 0, Int(pixelSize.height) > 0 {
+                width = Int(pixelSize.width)
+                height = Int(pixelSize.height)
+            }
+        }
+
         // Create and insert model objects on main actor
         let item = MediaItem(
             id: newId,
             mediaType: isVideo ? .video : .image,
             filename: filename,
-            width: metadata.width ?? 0,
-            height: metadata.height ?? 0,
+            width: width,
+            height: height,
             createdAt: Self.parseDate(metadata.createdAt),
             duration: metadata.duration
         )

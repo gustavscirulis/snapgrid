@@ -1,7 +1,53 @@
+import AVFoundation
 import Foundation
 import SwiftData
 
 enum DataCleanupService {
+
+    private static let videoDimensionsMigratedKey = "videoDimensionsMigrated_v1"
+
+    /// One-time migration: re-derive video dimensions from poster frames
+    /// so that stored width/height matches the true display aspect ratio.
+    @MainActor
+    static func migrateVideoDimensions(context: ModelContext) async {
+        guard !UserDefaults.standard.bool(forKey: videoDimensionsMigratedKey) else { return }
+
+        guard let items = try? context.fetch(FetchDescriptor<MediaItem>()) else { return }
+        let videos = items.filter { $0.isVideo }
+        guard !videos.isEmpty else {
+            UserDefaults.standard.set(true, forKey: videoDimensionsMigratedKey)
+            return
+        }
+
+        var updated = 0
+        let storage = MediaStorageService.shared
+
+        for video in videos {
+            let url = storage.mediaURL(filename: video.filename)
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+
+            if let posterFrame = try? await VideoFrameExtractor.extractPosterFrame(from: url),
+               let pixelSize = posterFrame.pixelSize,
+               Int(pixelSize.width) > 0, Int(pixelSize.height) > 0 {
+                let newW = Int(pixelSize.width)
+                let newH = Int(pixelSize.height)
+                if newW != video.width || newH != video.height {
+                    video.width = newW
+                    video.height = newH
+                    updated += 1
+                }
+                // Also regenerate thumbnail to ensure it matches
+                _ = try? ThumbnailService.generateThumbnail(from: posterFrame, id: video.id)
+            }
+        }
+
+        if updated > 0 {
+            try? context.save()
+            print("[DataCleanup] Migrated dimensions for \(updated) videos")
+        }
+
+        UserDefaults.standard.set(true, forKey: videoDimensionsMigratedKey)
+    }
 
     /// Remove SwiftData records whose media files no longer exist on disk.
     @MainActor

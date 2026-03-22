@@ -61,6 +61,11 @@ struct GridItemView: View {
                 } else if flags.contains(.shift) {
                     onShiftSelect()
                 } else {
+                    // Pre-claim the video player BEFORE overlay appears —
+                    // prevents onHover(false) race from destroying it
+                    if item.isVideo {
+                        videoPreview.claimForDetail()
+                    }
                     onSelect(globalFrame)
                 }
             } label: {
@@ -86,16 +91,7 @@ struct GridItemView: View {
 
             // LAYER 2: Non-interactive visual overlays
             Group {
-                // Inline video preview on hover
-                if item.isVideo && videoPreview.activeItemId == item.id,
-                   let player = videoPreview.player {
-                    InlineVideoPreview(player: player)
-                        .frame(width: width, height: height)
-                        .clipped()
-                        .transition(.opacity)
-                }
-
-                // Video badge (hidden during active preview)
+                // Video badge (hidden during active preview — floating layer renders video)
                 if item.isVideo && videoPreview.activeItemId != item.id {
                     VStack {
                         Spacer()
@@ -255,7 +251,8 @@ struct GridItemView: View {
                         guard !Task.isCancelled else { return }
                         videoPreview.startPreview(
                             itemId: item.id,
-                            url: MediaStorageService.shared.mediaURL(filename: item.filename)
+                            url: MediaStorageService.shared.mediaURL(filename: item.filename),
+                            frame: globalFrame
                         )
                     }
                 } else {
@@ -304,6 +301,10 @@ struct GridItemView: View {
             proxy.frame(in: .global)
         } action: { newValue in
             globalFrame = newValue
+            // Keep the floating video layer in sync with scroll/resize
+            if item.isVideo && videoPreview.activeItemId == item.id {
+                videoPreview.updateGridFrame(newValue)
+            }
         }
         .contextMenu {
             // Move to space submenu
