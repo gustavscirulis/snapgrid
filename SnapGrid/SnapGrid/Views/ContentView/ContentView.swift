@@ -143,7 +143,7 @@ struct ContentView: View {
                 Spacer()
             }
         }
-        .onDrop(of: [.fileURL], isTargeted: $isDragTargeted) { providers in
+        .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
             handleDrop(providers)
             return true
         }
@@ -177,7 +177,8 @@ struct ContentView: View {
                         switchToSpace(spaces[idx].id)
                     }
                 }
-            }
+            },
+            onPasteImages: { handlePaste() }
         ))
         .sheet(isPresented: $showElectronImport) {
             ElectronImportView(isPresented: $showElectronImport)
@@ -302,15 +303,72 @@ struct ContentView: View {
     private func handleDrop(_ providers: [NSItemProvider]) {
         Task {
             var urls: [URL] = []
+            var images: [NSImage] = []
+
             for provider in providers {
-                if let item = try? await provider.loadItem(forTypeIdentifier: "public.file-url"),
+                // Try file URL first (local file drags from Finder)
+                if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier),
+                   let item = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier),
                    let data = item as? Data,
-                   let url = URL(dataRepresentation: data, relativeTo: nil) {
+                   let url = URL(dataRepresentation: data, relativeTo: nil),
+                   url.isFileURL {
                     urls.append(url)
                 }
+                // Fall back to image data (browser drags) — uses NSItemProviderReading
+                // to handle any image format the provider offers
+                else if provider.canLoadObject(ofClass: NSImage.self),
+                        let image = try? await loadImageFromProvider(provider) {
+                    images.append(image)
+                }
             }
+
             if !urls.isEmpty {
                 await importService.importFiles(urls, into: modelContext, spaceId: appState.activeSpaceId)
+            }
+            for image in images {
+                await importService.importImage(image, into: modelContext, spaceId: appState.activeSpaceId)
+            }
+        }
+    }
+
+    private func loadImageFromProvider(_ provider: NSItemProvider) async throws -> NSImage {
+        try await withCheckedThrowingContinuation { continuation in
+            provider.loadObject(ofClass: NSImage.self) { object, error in
+                if let image = object as? NSImage {
+                    continuation.resume(returning: image)
+                } else {
+                    continuation.resume(throwing: error ?? NSError(domain: "SnapGrid", code: -1))
+                }
+            }
+        }
+    }
+
+    private func handlePaste() {
+        let pasteboard = NSPasteboard.general
+
+        // Try file URLs first (e.g. copied files from Finder)
+        if let urls = pasteboard.readObjects(forClasses: [NSURL.self],
+                                              options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           !urls.isEmpty {
+            let supportedExts: Set<String> = ["png","jpg","jpeg","gif","bmp","tiff","webp","heic",
+                                               "mp4","webm","mov","avi","m4v"]
+            let validURLs = urls.filter { supportedExts.contains($0.pathExtension.lowercased()) }
+            if !validURLs.isEmpty {
+                Task {
+                    await importService.importFiles(validURLs, into: modelContext, spaceId: appState.activeSpaceId)
+                    appState.showToast("Pasted \(validURLs.count) item\(validURLs.count == 1 ? "" : "s")")
+                }
+                return
+            }
+        }
+
+        // Fall back to image data (e.g. copied from browser, Preview, screenshot)
+        if let images = pasteboard.readObjects(forClasses: [NSImage.self]) as? [NSImage], !images.isEmpty {
+            Task {
+                for image in images {
+                    await importService.importImage(image, into: modelContext, spaceId: appState.activeSpaceId)
+                }
+                appState.showToast("Pasted \(images.count) image\(images.count == 1 ? "" : "s")")
             }
         }
     }
@@ -491,6 +549,7 @@ private struct NotificationModifier: ViewModifier {
     let onFocusSearch: () -> Void
     let onSelectAll: () -> Void
     let onSwitchToSpace: (Int) -> Void
+    let onPasteImages: () -> Void
 
     func body(content: Content) -> some View {
         content
@@ -518,6 +577,9 @@ private struct NotificationModifier: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .switchToSpaceByIndex)) { notification in
                 guard let digit = notification.userInfo?["digit"] as? Int else { return }
                 onSwitchToSpace(digit)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .pasteImages)) { _ in
+                onPasteImages()
             }
     }
 }

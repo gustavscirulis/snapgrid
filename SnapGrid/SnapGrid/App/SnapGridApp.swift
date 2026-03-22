@@ -67,6 +67,15 @@ struct SnapGridApp: App {
             }
 
             CommandGroup(replacing: .pasteboard) {
+                Button("Paste") {
+                    if let firstResponder = NSApp.keyWindow?.firstResponder, firstResponder is NSText {
+                        firstResponder.tryToPerform(#selector(NSText.paste(_:)), with: nil)
+                    } else {
+                        NotificationCenter.default.post(name: .pasteImages, object: nil)
+                    }
+                }
+                .keyboardShortcut("v")
+
                 Button("Find") {
                     NotificationCenter.default.post(name: .focusSearch, object: nil)
                 }
@@ -127,4 +136,5 @@ extension Notification.Name {
     static let createNewSpace = Notification.Name("createNewSpace")
     static let focusSearch = Notification.Name("focusSearch")
     static let selectAll = Notification.Name("selectAll")
+    static let pasteImages = Notification.Name("pasteImages")
 }
