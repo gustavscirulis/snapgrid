@@ -58,6 +58,15 @@ struct GridItemView: View {
         isHovered || (item.isVideo && videoPreview.activeItemId == item.id && videoPreview.displayState == .grid)
     }
 
+    /// Whether to show the SwiftUI gradient scrim behind pattern pills.
+    /// Suppressed for video items when the floating video layer provides its own CAGradientLayer.
+    /// Guarded by `item.isVideo` so non-video items never subscribe to `activeItemId` changes.
+    private var showHoverGradient: Bool {
+        guard effectiveHover else { return false }
+        guard item.isVideo else { return true }
+        return videoPreview.activeItemId != item.id
+    }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             // LAYER 1: Background selection button
@@ -151,19 +160,14 @@ struct GridItemView: View {
                                 startPoint: .bottom,
                                 endPoint: .init(x: 0.5, y: 0.55)
                             )
-                            .opacity(effectiveHover && videoPreview.activeItemId != item.id ? 1 : 0)
+                            .opacity(showHoverGradient ? 1 : 0)
                             .offset(y: effectiveHover ? 0 : 20)
                             .animation(SnapSpring.standard, value: effectiveHover)
 
                             HStack {
                                 FlowLayout(spacing: 5) {
                                     ForEach(Array(patterns.prefix(4).enumerated()), id: \.element.name) { index, pattern in
-                                        Text(pattern.name)
-                                            .font(.system(size: 11))
-                                            .foregroundStyle(.white.opacity(0.9))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                                        PatternPill(name: pattern.name)
                                             .opacity(effectiveHover ? 1 : 0)
                                             .offset(y: effectiveHover ? 0 : 8)
                                             .animation(

@@ -24,6 +24,7 @@
 		52559E4B91F49A6CEDD07719 /* SnapGridApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0777D2662B06A89DA07B35C3 /* SnapGridApp.swift */; };
 		572A0BCDDD41A4C5E4D7B75E /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68305A61078FFD8F1E7C722F /* FlowLayout.swift */; };
 		58E281026420E8D7C519E0D6 /* ElectronImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6242DCFA059749F058CC6487 /* ElectronImportService.swift */; };
+		5C1E7DB8A91CE5B34721F868 /* PatternPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35770E61695F4882C7E976DF /* PatternPill.swift */; };
 		65160672513A59B8ED353208 /* SelectionBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFDD4D2B1F3CCB3ED261F5C /* SelectionBadge.swift */; };
 		67A2F4EA7A945C87AD04E886 /* SpacesSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1E6270DBFF25C7C3C0324E /* SpacesSettingsTab.swift */; };
 		76828B68E2CA3213D835B691 /* PatternTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 649D56F9B7920BF3924A8E4E /* PatternTagsView.swift */; };
@@ -59,6 +60,7 @@
 		2E5C14CF112B283919BE0F7D /* VideoFrameExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFrameExtractor.swift; sourceTree = "<group>"; };
 		2EE366A7E490EA25CA0D6525 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
 		2F7E099305244B612B096B86 /* ThumbnailService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailService.swift; sourceTree = "<group>"; };
+		35770E61695F4882C7E976DF /* PatternPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternPill.swift; sourceTree = "<group>"; };
 		3884239912FC80F912C14715 /* MediaDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetailView.swift; sourceTree = "<group>"; };
 		3A7AD2552C0E5EF0A3708956 /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
 		3BA6AB7DC0A84E670681EB6C /* MediaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItem.swift; sourceTree = "<group>"; };
@@ -165,6 +167,7 @@
 				9DB5BFB2BC5A94B434803361 /* ElectronImportView.swift */,
 				1CE02953B123E7318BEBBA18 /* FloatingVideoLayer.swift */,
 				68305A61078FFD8F1E7C722F /* FlowLayout.swift */,
+				35770E61695F4882C7E976DF /* PatternPill.swift */,
 				2EE366A7E490EA25CA0D6525 /* ToastView.swift */,
 			);
 			path = Shared;
@@ -357,6 +360,7 @@
 				968DDBB08FE3CED44009BC7D /* MediaStorageService.swift in Sources */,
 				439744C29794B39D02563DE6 /* ModelDiscoveryService.swift in Sources */,
 				210A13790BE0E2F8D5123662 /* NSImage+Thumbnail.swift in Sources */,
+				5C1E7DB8A91CE5B34721F868 /* PatternPill.swift in Sources */,
 				76828B68E2CA3213D835B691 /* PatternTagsView.swift in Sources */,
 				EBADE0138240682283D710C5 /* QueueWatcher.swift in Sources */,
 				F882C50D1073D1CF18EDC49A /* RubberBandOverlay.swift in Sources */,
