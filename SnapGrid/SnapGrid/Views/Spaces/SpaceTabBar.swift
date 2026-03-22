@@ -1,6 +1,15 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Tab Frame Preference Key
+
+private struct TabFrameKey: PreferenceKey {
+    nonisolated(unsafe) static var defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
 struct SpaceTabBar: View {
     let spaces: [Space]
     let activeSpaceId: String?
@@ -17,6 +26,18 @@ struct SpaceTabBar: View {
     @State private var dropTargetId: String?
     @FocusState private var isEditingFocused: Bool
     @Namespace private var tabNamespace
+
+    // Drag-to-reorder state
+    @State private var draggingSpaceId: String?
+    @State private var dragOffset: CGFloat = 0
+    @State private var targetIndex: Int?
+    @State private var tabFrames: [String: CGRect] = [:]
+
+    // Snapshotted at drag start (mirrors Electron's reorderDragRef)
+    @State private var dragOriginalIndex: Int = 0
+    @State private var dragSnapshotMidpoints: [CGFloat] = []
+    @State private var dragSnapshotWidth: CGFloat = 0
+    @State private var didDrag: Bool = false
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -43,9 +64,11 @@ struct SpaceTabBar: View {
             }
             .padding(.horizontal, 24)
             .padding(.top, 6)
+            .coordinateSpace(name: "tabBar")
+            .onPreferenceChange(TabFrameKey.self) { tabFrames = $0 }
         }
         .overlay(alignment: .bottom) {
-            Divider().opacity(0.5)  // SpaceTabBar.tsx — border-gray-200/50 dark:border-zinc-800/50
+            Divider().opacity(0.5)
         }
         .onChange(of: pendingEditSpaceId) { _, newValue in
             if let spaceId = newValue,
@@ -78,6 +101,9 @@ struct SpaceTabBar: View {
             .onExitCommand { editingSpaceId = nil }
             .onAppear { isEditingFocused = true }
         } else {
+            let isDragging = draggingSpaceId == space.id
+            let xOffset = isDragging ? dragOffset : shiftOffset(for: index)
+
             tabView(id: space.id, title: space.name, isActive: activeSpaceId == space.id)
                 .contextMenu {
                     Button("Rename") {
@@ -93,41 +119,111 @@ struct SpaceTabBar: View {
                     editName = space.name
                     editingSpaceId = space.id
                 }
-                .draggable(space.id) {
-                    Text(space.name)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.snapForeground)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(Color.snapMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 7))
-                }
                 .onDrop(of: [.plainText], isTargeted: Binding(
                     get: { dropTargetId == space.id },
                     set: { dropTargetId = $0 ? space.id : nil }
                 )) { providers in
-                    handleSpaceDrop(providers, spaceId: space.id, spaceIndex: index)
+                    handleDrop(providers, spaceId: space.id)
                 }
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: TabFrameKey.self,
+                            value: [space.id: geo.frame(in: .named("tabBar"))]
+                        )
+                    }
+                )
+                .offset(x: xOffset)
+                .scaleEffect(isDragging ? 1.05 : 1.0)
+                .shadow(color: .black.opacity(isDragging ? 0.12 : 0), radius: 8, y: 4)
+                .zIndex(isDragging ? 10 : 0)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 5, coordinateSpace: .named("tabBar"))
+                        .onChanged { value in
+                            if draggingSpaceId == nil {
+                                // Snapshot all tab positions at drag start
+                                draggingSpaceId = space.id
+                                dragOriginalIndex = index
+                                dragSnapshotMidpoints = spaces.compactMap { tabFrames[$0.id]?.midX }
+                                dragSnapshotWidth = tabFrames[space.id]?.width ?? 0
+                            }
+                            dragOffset = value.translation.width
+
+                            // Determine target from cursor vs snapshotted midpoints
+                            let cursorX = value.location.x
+                            var newTarget = 0
+                            for (i, midX) in dragSnapshotMidpoints.enumerated() {
+                                if cursorX >= midX {
+                                    newTarget = i
+                                }
+                            }
+                            if newTarget != targetIndex {
+                                withAnimation(SnapSpring.standard) {
+                                    targetIndex = newTarget
+                                }
+                            }
+                        }
+                        .onEnded { _ in
+                            didDrag = true
+                            if let target = targetIndex, target != dragOriginalIndex {
+                                onReorderSpaces(dragOriginalIndex, target)
+                                draggingSpaceId = nil
+                                dragOffset = 0
+                                targetIndex = nil
+                            } else {
+                                withAnimation(SnapSpring.fast) {
+                                    draggingSpaceId = nil
+                                    dragOffset = 0
+                                    targetIndex = nil
+                                }
+                            }
+                        }
+                )
         }
+    }
+
+    // MARK: - Reorder Shift Computation
+
+    private func shiftOffset(for index: Int) -> CGFloat {
+        guard draggingSpaceId != nil,
+              let target = targetIndex else { return 0 }
+
+        let draggedIndex = dragOriginalIndex
+        if index == draggedIndex { return 0 }
+
+        let shiftAmount = dragSnapshotWidth + 4 // 4 = HStack spacing
+
+        if draggedIndex < target {
+            // Moving right: tabs between draggedIndex+1..target shift left
+            if index > draggedIndex && index <= target {
+                return -shiftAmount
+            }
+        } else if draggedIndex > target {
+            // Moving left: tabs between target..draggedIndex-1 shift right
+            if index >= target && index < draggedIndex {
+                return shiftAmount
+            }
+        }
+        return 0
     }
 
     // MARK: - Tab View
 
-    // SpaceTabBar.tsx:283,318-319 — bottom bar indicator with gray text colors
     @ViewBuilder
     private func tabView(id: String?, title: String, isActive: Bool) -> some View {
         let isDropTarget = (id == nil && dropTargetId == "ALL") || (id != nil && dropTargetId == id)
 
         Button {
+            if didDrag { didDrag = false; return }
             onSelectSpace(id)
         } label: {
             VStack(spacing: 0) {
                 Text(title)
                     .font(.system(size: 13, weight: isActive ? .medium : .regular))
                     .foregroundStyle(
-                        isActive ? Color.snapForeground :       // SpaceTabBar.tsx:318 — text-gray-900/gray-100
+                        isActive ? Color.snapForeground :
                         isDropTarget ? Color.snapForeground.opacity(0.7) :
-                        Color.snapMutedForeground               // SpaceTabBar.tsx:319 — text-gray-500/gray-400
+                        Color.snapMutedForeground
                     )
                     .padding(.horizontal, 8)
                     .padding(.top, 7)
@@ -136,7 +232,7 @@ struct SpaceTabBar: View {
                 // Bottom bar indicator
                 if isActive {
                     Rectangle()
-                        .fill(Color.snapForeground)  // SpaceTabBar.tsx:283 — bg-gray-900 dark:bg-gray-100
+                        .fill(Color.snapForeground)
                         .frame(height: 2)
                         .clipShape(Capsule())
                         .matchedGeometryEffect(id: "activeTab", in: tabNamespace)
@@ -152,7 +248,7 @@ struct SpaceTabBar: View {
             .background {
                 if isDropTarget && !isActive {
                     RoundedRectangle(cornerRadius: 7)
-                        .fill(Color.snapMuted.opacity(0.5))  // SpaceTabBar.tsx — drop highlight
+                        .fill(Color.snapMuted.opacity(0.5))
                 }
             }
         }
@@ -170,25 +266,16 @@ struct SpaceTabBar: View {
     }
 
     private func handleDrop(_ providers: [NSItemProvider], spaceId: String?) -> Bool {
-        handleSpaceDrop(providers, spaceId: spaceId, spaceIndex: nil)
-    }
-
-    private func handleSpaceDrop(_ providers: [NSItemProvider], spaceId: String?, spaceIndex: Int?) -> Bool {
         for provider in providers {
             _ = provider.loadObject(ofClass: NSString.self) { string, _ in
                 guard let text = string as? String else { return }
                 Task { @MainActor in
                     if text.hasPrefix("snapgrid:") {
-                        // Grid item IDs from .onDrag
                         let idsString = String(text.dropFirst("snapgrid:".count))
                         let itemIds = Set(idsString.split(separator: ",").map(String.init))
                         if !itemIds.isEmpty {
                             onAssignToSpace(itemIds, spaceId)
                         }
-                    } else if let spaceIndex,
-                              let fromIndex = spaces.firstIndex(where: { $0.id == text }) {
-                        // Space tab reorder from .draggable(space.id)
-                        onReorderSpaces(fromIndex, spaceIndex)
                     }
                 }
             }
