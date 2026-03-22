@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var importService = ImportService()
     @State private var queueWatcher = QueueWatcher(queueURL: MediaStorageService.shared.queueDir)
     @State private var isDragTargeted = false
+    @State private var pendingEditSpaceId: String?
     @State private var showElectronImport = false
     @AppStorage("appTheme") private var themeSetting: String = AppTheme.system.rawValue
 
@@ -64,6 +65,7 @@ struct ContentView: View {
                 SpaceTabBar(
                     spaces: spaces,
                     activeSpaceId: appState.activeSpaceId,
+                    pendingEditSpaceId: $pendingEditSpaceId,
                     onSelectSpace: switchToSpace,
                     onCreateSpace: createSpace,
                     onDeleteSpace: deleteSpace,
@@ -393,6 +395,7 @@ struct ContentView: View {
         modelContext.insert(space)
         try? modelContext.save()
         switchToSpace(space.id)
+        pendingEditSpaceId = space.id
     }
 
     private func deleteSpace(_ id: String) {

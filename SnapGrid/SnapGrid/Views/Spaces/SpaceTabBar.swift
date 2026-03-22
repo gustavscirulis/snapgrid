@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct SpaceTabBar: View {
     let spaces: [Space]
     let activeSpaceId: String?
+    @Binding var pendingEditSpaceId: String?
     let onSelectSpace: (String?) -> Void
     let onCreateSpace: () -> Void
     let onDeleteSpace: (String) -> Void
@@ -14,11 +15,12 @@ struct SpaceTabBar: View {
     @State private var editingSpaceId: String?
     @State private var editName: String = ""
     @State private var dropTargetId: String?
+    @FocusState private var isEditingFocused: Bool
     @Namespace private var tabNamespace
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
                 // "All" tab
                 tabView(id: nil, title: "All", isActive: activeSpaceId == nil)
                     .onDrop(of: [.plainText], isTargeted: allTabTargeted) { providers in
@@ -34,7 +36,8 @@ struct SpaceTabBar: View {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color.snapMutedForeground)
-                        .frame(width: 28, height: 28)
+                        .padding(12)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -43,6 +46,15 @@ struct SpaceTabBar: View {
         }
         .overlay(alignment: .bottom) {
             Divider().opacity(0.5)  // SpaceTabBar.tsx — border-gray-200/50 dark:border-zinc-800/50
+        }
+        .onChange(of: pendingEditSpaceId) { _, newValue in
+            if let spaceId = newValue,
+               let space = spaces.first(where: { $0.id == spaceId }) {
+                editName = space.name
+                editingSpaceId = spaceId
+                pendingEditSpaceId = nil
+                isEditingFocused = true
+            }
         }
     }
 
@@ -55,6 +67,7 @@ struct SpaceTabBar: View {
                 onRenameSpace(space.id, editName)
                 editingSpaceId = nil
             })
+            .focused($isEditingFocused)
             .textFieldStyle(.plain)
             .font(.system(size: 13, weight: .medium))
             .padding(.horizontal, 12)
@@ -63,6 +76,7 @@ struct SpaceTabBar: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .frame(width: 120)
             .onExitCommand { editingSpaceId = nil }
+            .onAppear { isEditingFocused = true }
         } else {
             tabView(id: space.id, title: space.name, isActive: activeSpaceId == space.id)
                 .contextMenu {
