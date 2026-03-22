@@ -1,25 +1,23 @@
 import SwiftUI
-import AVKit
+import AVFoundation
 
 /* ─────────────────────────────────────────────────────────
  * ANIMATION STORYBOARD — Thumbnail → Detail Hero
  *
  * OPEN
- *    0ms   thumbnail hidden, backdrop 0 → 0.8, image springs
- *          from sourceFrame → finalFrame, cornerRadius 12 → 16
+ *    0ms   thumbnail hidden, backdrop 0 → 0.8
+ *          images: hero image springs from sourceFrame → finalFrame
+ *          videos: floating layer springs from gridFrame → finalFrame
  *
  * CLOSE
- *    0ms   backdrop 0.8 → 0, image springs back
- *          to sourceFrame, cornerRadius 16 → 12
- *  400ms   overlay removed, thumbnail reappears
+ *    0ms   backdrop 0.8 → 0
+ *          images: hero springs back to sourceFrame
+ *          videos: floating layer springs back to gridFrame
+ *  ~360ms  overlay removed, grid cell reappears
+ *
+ * The floating video layer is a SEPARATE view in ContentView's ZStack.
+ * This overlay only manages the backdrop, image hero, and close triggers.
  * ───────────────────────────────────────────────────────── */
-
-// MARK: - Spring Config
-
-/// Matches Electron's framer-motion { damping: 30, stiffness: 300 }
-/// See AnimationTokens.swift — SnapSpring.hero
-
-// MARK: - HeroDetailOverlay
 
 struct HeroDetailOverlay: View {
     let item: MediaItem
@@ -30,7 +28,6 @@ struct HeroDetailOverlay: View {
     @State private var isExpanded = false
     @State private var isClosing = false
     @State private var image: NSImage?
-    @State private var detailPlayer: AVPlayer?
     @FocusState private var isFocused: Bool
 
     init(item: MediaItem, sourceFrame: CGRect, onAnimationComplete: @escaping () -> Void) {
@@ -55,8 +52,8 @@ struct HeroDetailOverlay: View {
                     .ignoresSafeArea()
                     .onTapGesture { triggerClose() }
 
-                // Image container
-                if let image {
+                // Image — hero animation (non-video only)
+                if let image, !item.isVideo {
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -66,15 +63,57 @@ struct HeroDetailOverlay: View {
                         .onTapGesture { triggerClose() }
                         .position(x: currentFrame.midX, y: currentFrame.midY)
                         .id(item.id)
-                } else if item.isVideo, let player = detailPlayer {
-                    // Video: use shared player for seamless handoff from hover preview
-                    if isExpanded {
-                        VideoPlayer(player: player)
-                            .aspectRatio(item.aspectRatio, contentMode: .fit)
-                            .frame(maxWidth: finalFrame.width, maxHeight: finalFrame.height)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .position(x: finalFrame.midX, y: finalFrame.midY)
+                }
+
+                // Video — tap target only. The FloatingVideoLayer renders the actual video.
+                if item.isVideo {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .frame(width: finalFrame.width, height: finalFrame.height)
+                        .position(x: finalFrame.midX, y: finalFrame.midY)
+                        .onTapGesture { triggerClose() }
+                }
+            }
+            // Keep floating video layer in sync with window resizes
+            .onChange(of: finalFrame) { _, newFrame in
+                if item.isVideo && isExpanded && !isClosing {
+                    videoPreview.updateDetailFrame(newFrame)
+                }
+            }
+            .task {
+                isFocused = true
+
+                if item.isVideo {
+                    let hasHoverPreview = videoPreview.player != nil
+                        && videoPreview.activeItemId == item.id
+
+                    let url = MediaStorageService.shared.mediaURL(filename: item.filename)
+
+                    if hasHoverPreview {
+                        // Hover preview exists — animate both backdrop and video together
+                        withAnimation(SnapSpring.hero) {
+                            isExpanded = true
+                            videoPreview.transitionToDetail(
+                                itemId: item.id, url: url, finalFrame: finalFrame
+                            )
+                        }
+                    } else {
+                        // No hover (keyboard open) — place video at detail frame instantly
+                        videoPreview.transitionToDetail(
+                            itemId: item.id, url: url, finalFrame: finalFrame
+                        )
+                        withAnimation(SnapSpring.hero) {
+                            isExpanded = true
+                        }
                     }
+                } else {
+                    if image == nil {
+                        await loadImage()
+                    }
+                    withAnimation(SnapSpring.hero) {
+                        isExpanded = true
+                    }
+                    await loadFullResImage()
                 }
             }
         }
@@ -86,41 +125,15 @@ struct HeroDetailOverlay: View {
             triggerClose()
             return .handled
         }
-        .task {
-            isFocused = true
-            if item.isVideo {
-                // Claim the hover preview player (seamless handoff, continues from current position)
-                if let claimed = videoPreview.claimForDetail() {
-                    detailPlayer = claimed
-                } else {
-                    // No hover preview active (e.g., opened via keyboard) — create fresh
-                    let player = AVPlayer(url: MediaStorageService.shared.mediaURL(filename: item.filename))
-                    detailPlayer = player
-                    player.play()
-                }
-            } else if image == nil {
-                // No thumbnail in cache — load from disk before animating
-                await loadImage()
-            }
-            withAnimation(SnapSpring.hero) {
-                isExpanded = true
-            }
-            // Load full-resolution image (init seeds thumbnail from cache for instant display)
-            if !item.isVideo {
-                await loadFullResImage()
-            }
-        }
     }
 
     // MARK: - Final Frame Computation
 
-    /// Matches AnimatedImageModal.tsx:20-97
     private func computeFinalFrame(windowSize: CGSize, item: MediaItem) -> CGRect {
         let maxW = windowSize.width * 0.95
         let maxH = (windowSize.height * 0.95) - 80
 
         if !item.isVideo && item.aspectRatio < 0.5 {
-            // Tall image: fit to width, cap height
             let w = min(CGFloat(item.width), maxW)
             let h = min(w / item.aspectRatio, windowSize.height - 80)
             return CGRect(x: (windowSize.width - w) / 2, y: 40, width: w, height: h)
@@ -128,7 +141,7 @@ struct HeroDetailOverlay: View {
 
         let widthScale = maxW / CGFloat(item.width)
         let heightScale = maxH / CGFloat(item.height)
-        let scale = min(widthScale, heightScale, 1.0)
+        let scale = item.isVideo ? min(widthScale, heightScale) : min(widthScale, heightScale, 1.0)
         let w = CGFloat(item.width) * scale
         let h = CGFloat(item.height) * scale
         return CGRect(
@@ -147,9 +160,13 @@ struct HeroDetailOverlay: View {
 
         withAnimation(SnapSpring.hero) {
             isExpanded = false
+            if item.isVideo {
+                videoPreview.transitionToGrid()
+            }
         } completion: {
-            videoPreview.releaseFromDetail()
-            detailPlayer = nil
+            if item.isVideo {
+                videoPreview.completeTransitionToGrid()
+            }
             onAnimationComplete()
         }
     }
@@ -158,20 +175,16 @@ struct HeroDetailOverlay: View {
 
     private func loadImage() async {
         guard !item.isVideo else { return }
-
-        // Check memory cache first (thumbnail quality)
         if let cached = ImageCacheService.shared.image(forKey: item.id) {
             self.image = cached
             return
         }
-
         let url = MediaStorageService.shared.mediaURL(filename: item.filename)
         if let loaded = NSImage(contentsOf: url) {
             self.image = loaded
         }
     }
 
-    /// Loads the original full-resolution image, replacing the thumbnail used during animation.
     private func loadFullResImage() async {
         let url = MediaStorageService.shared.mediaURL(filename: item.filename)
         if let loaded = NSImage(contentsOf: url) {

@@ -1,5 +1,5 @@
 import SwiftUI
-import AVKit
+import AVFoundation
 
 struct MediaDetailView: View {
     let item: MediaItem
@@ -9,6 +9,7 @@ struct MediaDetailView: View {
     let onRetryAnalysis: (MediaItem) -> Void
 
     @State private var image: NSImage?
+    @State private var videoPlayer: AVPlayer?
     @State private var isLoading = true
 
     /// AnimatedImageModal.tsx:65 — originalHeight > originalWidth * 2
@@ -46,10 +47,14 @@ struct MediaDetailView: View {
                 Spacer()
 
                 // Media content
-                if item.isVideo {
-                    VideoPlayer(player: AVPlayer(url: MediaStorageService.shared.mediaURL(filename: item.filename)))
+                if item.isVideo, let player = videoPlayer {
+                    VideoControlsOverlay(player: player)
                         .aspectRatio(item.aspectRatio, contentMode: .fit)
                         .frame(maxWidth: 1200, maxHeight: 800)
+                    Spacer()
+                } else if item.isVideo {
+                    ProgressView()
+                        .frame(maxWidth: 400, maxHeight: 400)
                     Spacer()
                 } else if let image {
                     if isTallImage {
@@ -150,12 +155,28 @@ struct MediaDetailView: View {
             return .handled
         }
         .task {
-            await loadImage()
+            if item.isVideo {
+                let player = AVPlayer(url: MediaStorageService.shared.mediaURL(filename: item.filename))
+                videoPlayer = player
+                player.play()
+            } else {
+                await loadImage()
+            }
         }
         .onChange(of: item.id) {
             isLoading = true
             image = nil
-            Task { await loadImage() }
+            videoPlayer?.pause()
+            videoPlayer = nil
+            Task {
+                if item.isVideo {
+                    let player = AVPlayer(url: MediaStorageService.shared.mediaURL(filename: item.filename))
+                    videoPlayer = player
+                    player.play()
+                } else {
+                    await loadImage()
+                }
+            }
         }
     }
 

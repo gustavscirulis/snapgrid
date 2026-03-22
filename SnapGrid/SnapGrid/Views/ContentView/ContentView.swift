@@ -113,6 +113,10 @@ struct ContentView: View {
                 )
             }
 
+            // Floating video layer — ONE AVPlayerLayer that moves between grid and detail.
+            // Placed after HeroDetailOverlay so it renders above the backdrop.
+            FloatingVideoLayer()
+
             // Selection badge
             if !appState.selectedIds.isEmpty {
                 VStack {
@@ -187,6 +191,7 @@ struct ContentView: View {
         .task {
             MediaStorageService.shared.emptyOldTrash()
             DataCleanupService.cleanOrphanedRecords(context: modelContext)
+            await DataCleanupService.migrateVideoDimensions(context: modelContext)
 
             // Wire QueueWatcher — mirrors electron/main.js:1705-1738 chokidar watcher
             // and queueService.ts:107-144 (import, toast, remove source)

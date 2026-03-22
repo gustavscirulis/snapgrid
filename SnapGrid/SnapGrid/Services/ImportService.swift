@@ -79,8 +79,8 @@ final class ImportService {
         let filename = "\(id).\(targetExt)"
 
         // Get dimensions
-        let width: Int
-        let height: Int
+        var width: Int
+        var height: Int
         var duration: Double?
 
         if isVideo {
@@ -102,6 +102,12 @@ final class ImportService {
         // Generate thumbnail
         if isVideo {
             if let posterFrame = try? await VideoFrameExtractor.extractPosterFrame(from: storage.mediaURL(filename: filename)) {
+                // Use poster frame pixel dimensions as authoritative —
+                // they reflect the true display aspect ratio (handles PAR, rotation)
+                if let pixelSize = posterFrame.pixelSize, Int(pixelSize.width) > 0, Int(pixelSize.height) > 0 {
+                    width = Int(pixelSize.width)
+                    height = Int(pixelSize.height)
+                }
                 _ = try? ThumbnailService.generateThumbnail(from: posterFrame, id: id)
             }
         } else {
