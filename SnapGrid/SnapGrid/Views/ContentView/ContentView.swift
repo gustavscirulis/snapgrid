@@ -147,23 +147,41 @@ struct ContentView: View {
             handleDrop(providers)
             return true
         }
-        .onReceive(NotificationCenter.default.publisher(for: .importFiles)) { _ in
-            openImportPanel()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .importElectronLibrary)) { _ in
-            showElectronImport = true
-        }
+        .modifier(NotificationModifier(
+            onImportFiles: { openImportPanel() },
+            onImportElectron: { showElectronImport = true },
+            onUndoDelete: { undoLastDelete() },
+            onApiKeySaved: {
+                Task {
+                    await importService.analyzeUnanalyzedItems(from: Array(allItems), context: modelContext)
+                }
+            },
+            onCreateNewSpace: { createSpace() },
+            onFocusSearch: {
+                // Search from the theme frame (contentView's superview) to reach
+                // toolbar views — .searchable places NSSearchField in the toolbar,
+                // which is outside contentView's hierarchy
+                if let window = NSApp.keyWindow,
+                   let rootView = window.contentView?.superview,
+                   let searchField = findSearchField(in: rootView) {
+                    window.makeFirstResponder(searchField)
+                }
+            },
+            onSelectAll: { appState.selectAll(activeFilteredItems.map(\.id)) },
+            onSwitchToSpace: { digit in
+                if digit == 1 {
+                    switchToSpace(nil)
+                } else {
+                    let idx = digit - 2
+                    if idx < spaces.count {
+                        switchToSpace(spaces[idx].id)
+                    }
+                }
+            }
+        ))
         .sheet(isPresented: $showElectronImport) {
             ElectronImportView(isPresented: $showElectronImport)
                 .presentationBackground(Color.snapCard)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .undoDelete)) { _ in
-            undoLastDelete()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .apiKeySaved)) { _ in
-            Task {
-                await importService.analyzeUnanalyzedItems(from: Array(allItems), context: modelContext)
-            }
         }
         .task {
             MediaStorageService.shared.emptyOldTrash()
@@ -201,17 +219,6 @@ struct ContentView: View {
                 appState.clearSelection()
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .switchToSpaceByIndex)) { notification in
-            guard let digit = notification.userInfo?["digit"] as? Int else { return }
-            if digit == 1 {
-                switchToSpace(nil)
-            } else {
-                let idx = digit - 2
-                if idx < spaces.count {
-                    switchToSpace(spaces[idx].id)
-                }
-            }
-        }
         .onKeyPress(.init("="), phases: .down) { press in
             guard press.modifiers.contains(.command) else { return .ignored }
             appState.zoomIn()
@@ -220,11 +227,6 @@ struct ContentView: View {
         .onKeyPress(.init("-"), phases: .down) { press in
             guard press.modifiers.contains(.command) else { return .ignored }
             appState.zoomOut()
-            return .handled
-        }
-        .onKeyPress(.init("a"), phases: .down) { press in
-            guard press.modifiers.contains(.command) else { return .ignored }
-            appState.selectAll(activeFilteredItems.map(\.id))
             return .handled
         }
         .environment(appState)
@@ -466,4 +468,56 @@ struct ContentView: View {
         }
     }
 
+    private func findSearchField(in view: NSView?) -> NSSearchField? {
+        guard let view else { return nil }
+        if let searchField = view as? NSSearchField { return searchField }
+        for subview in view.subviews {
+            if let found = findSearchField(in: subview) { return found }
+        }
+        return nil
+    }
+
+}
+
+// MARK: - Notification Modifier
+// Extracted to reduce body complexity and avoid Swift type-checker timeouts.
+
+private struct NotificationModifier: ViewModifier {
+    let onImportFiles: () -> Void
+    let onImportElectron: () -> Void
+    let onUndoDelete: () -> Void
+    let onApiKeySaved: () -> Void
+    let onCreateNewSpace: () -> Void
+    let onFocusSearch: () -> Void
+    let onSelectAll: () -> Void
+    let onSwitchToSpace: (Int) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .importFiles)) { _ in
+                onImportFiles()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .importElectronLibrary)) { _ in
+                onImportElectron()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .undoDelete)) { _ in
+                onUndoDelete()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .apiKeySaved)) { _ in
+                onApiKeySaved()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .createNewSpace)) { _ in
+                onCreateNewSpace()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .focusSearch)) { _ in
+                onFocusSearch()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .selectAll)) { _ in
+                onSelectAll()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .switchToSpaceByIndex)) { notification in
+                guard let digit = notification.userInfo?["digit"] as? Int else { return }
+                onSwitchToSpace(digit)
+            }
+    }
 }
