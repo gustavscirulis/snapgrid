@@ -166,7 +166,7 @@ struct GridItemView: View {
 
                             HStack {
                                 FlowLayout(spacing: 5) {
-                                    ForEach(Array(patterns.prefix(4).enumerated()), id: \.element.name) { index, pattern in
+                                    ForEach(Array(patterns.prefix(5).enumerated()), id: \.element.name) { index, pattern in
                                         PatternPill(name: pattern.name)
                                             .opacity(effectiveHover ? 1 : 0)
                                             .offset(y: effectiveHover ? 0 : 8)
@@ -264,7 +264,7 @@ struct GridItemView: View {
                             itemId: item.id,
                             url: MediaStorageService.shared.mediaURL(filename: item.filename),
                             frame: globalFrame,
-                            patternNames: item.analysisResult?.patterns.prefix(4).map(\.name) ?? []
+                            patternNames: item.analysisResult?.patterns.prefix(5).map(\.name) ?? []
                         )
                     }
                 } else if videoPreview.activeItemId == item.id {
