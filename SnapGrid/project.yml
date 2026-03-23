@@ -7,6 +7,11 @@ options:
   generateEmptyDirectories: true
   groupSortPosition: top
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
+
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -24,19 +29,27 @@ targets:
       - path: SnapGrid
         excludes:
           - "**/.DS_Store"
+    dependencies:
+      - package: Sparkle
+        product: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.snapgrid.app
-        INFOPLIST_GENERATION_MODE: GeneratedByXcode
         MARKETING_VERSION: "2.0.0"
         CURRENT_PROJECT_VERSION: 1
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: SnapGrid
-        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.photography"
-        INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026 SnapGrid"
         CODE_SIGN_ENTITLEMENTS: SnapGrid/Resources/SnapGrid.entitlements
         SWIFT_STRICT_CONCURRENCY: complete
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_STANDALONE_ICON_BEHAVIOR: none
+    info:
+      path: SnapGrid/Info.plist
+      properties:
+        CFBundleDisplayName: SnapGrid
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSApplicationCategoryType: "public.app-category.photography"
+        NSHumanReadableCopyright: "Copyright © 2026 SnapGrid"
+        SUFeedURL: "https://raw.githubusercontent.com/gustavscirulis/snapgrid/main/appcast.xml"
+        SUPublicEDKey: "PLACEHOLDER"
     entitlements:
       path: SnapGrid/Resources/SnapGrid.entitlements

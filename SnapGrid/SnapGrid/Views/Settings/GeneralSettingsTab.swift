@@ -1,6 +1,8 @@
 import SwiftUI
+import Sparkle
 
 struct GeneralSettingsTab: View {
+    @EnvironmentObject private var updaterService: UpdaterService
     @AppStorage("aiProvider") private var selectedProvider: String = AIProvider.openai.rawValue
     @AppStorage("openaiModel") private var openaiModel: String = ModelDiscoveryService.autoModelValue
     @AppStorage("anthropicModel") private var anthropicModel: String = ModelDiscoveryService.autoModelValue
@@ -112,6 +114,14 @@ struct GeneralSettingsTab: View {
                 }
 
                 modelPicker
+            }
+
+            Section("Updates") {
+                Toggle("Automatically check for updates",
+                       isOn: Binding(
+                           get: { updaterService.updater.automaticallyChecksForUpdates },
+                           set: { updaterService.updater.automaticallyChecksForUpdates = $0 }
+                       ))
             }
 
             // Mobile Import section — SettingsPanel.tsx:627-697

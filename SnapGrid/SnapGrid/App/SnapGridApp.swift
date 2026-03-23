@@ -1,9 +1,11 @@
 import SwiftUI
 import SwiftData
+import Sparkle
 
 @main
 struct SnapGridApp: App {
     let container: ModelContainer
+    @StateObject private var updaterService = UpdaterService()
 
     init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -37,6 +39,13 @@ struct SnapGridApp: App {
         .windowResizability(.contentMinSize)
         .defaultPosition(.center)
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates...") {
+                    updaterService.checkForUpdates()
+                }
+                .disabled(!updaterService.canCheckForUpdates)
+            }
+
             CommandGroup(replacing: .newItem) {
                 Button("Import Images...") {
                     NotificationCenter.default.post(name: .importFiles, object: nil)
@@ -103,6 +112,7 @@ struct SnapGridApp: App {
 
         Settings {
             SettingsView()
+                .environmentObject(updaterService)
         }
         .modelContainer(container)
     }
