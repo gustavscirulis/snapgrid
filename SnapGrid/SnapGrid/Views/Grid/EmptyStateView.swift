@@ -8,7 +8,6 @@ struct EmptyStateView: View {
 
     var mode: Mode = .appLevel
     var isDragTargeted: Bool = false
-    var hasElectronLibrary: Bool = false
 
     // Random-looking heights for skeleton placeholders
     private let skeletonHeights: [CGFloat] = [
@@ -58,7 +57,7 @@ struct EmptyStateView: View {
                             .foregroundStyle(Color.snapMutedForeground)
                     }
 
-                    if mode == .appLevel, hasElectronLibrary {
+                    if mode == .appLevel {
                         Button {
                             NotificationCenter.default.post(name: .importElectronLibrary, object: nil)
                         } label: {

@@ -95,8 +95,10 @@ struct ElectronImportView: View {
             HStack(spacing: 12) {
                 Button("Cancel") { isPresented = false }
                     .keyboardShortcut(.cancelAction)
+                Button("Choose Folder...") { pickFolder() }
                 Button("Import") { startImport() }
                     .keyboardShortcut(.defaultAction)
+                    .disabled(itemCount == 0)
             }
         }
         .padding(32)
@@ -177,13 +179,12 @@ struct ElectronImportView: View {
         panel.allowsMultipleSelection = false
         panel.message = "Select your SnapGrid 1 library folder"
 
-        panel.begin { response in
-            if response == .OK, let url = panel.url {
-                if importService.validateLibraryFolder(url) {
-                    libraryURL = url
-                    itemCount = importService.countItems(in: url)
-                    phase = .ready
-                }
+        let response = panel.runModal()
+        if response == .OK, let url = panel.url {
+            if importService.validateLibraryFolder(url) {
+                libraryURL = url
+                itemCount = importService.countItems(in: url)
+                phase = .ready
             }
         }
     }

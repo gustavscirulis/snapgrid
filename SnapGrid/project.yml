@@ -11,8 +11,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "15.0"
-    DEVELOPMENT_TEAM: ""
-    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: "HJ4HYUU2Y6"
+    CODE_SIGN_IDENTITY: "Apple Development"
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
 
@@ -20,23 +20,37 @@ targets:
   SnapGrid:
     type: application
     platform: macOS
+    attributes:
+      DevelopmentTeam: HJ4HYUU2Y6
+      ProvisioningStyle: Automatic
     sources:
       - path: SnapGrid
         excludes:
           - "**/.DS_Store"
+    info:
+      path: SnapGrid/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: SnapGrid
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSApplicationCategoryType: public.app-category.photography
+        NSHumanReadableCopyright: "Copyright © 2026 SnapGrid"
+        NSUbiquitousContainers:
+          iCloud.com.SnapGrid:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerSupportedFolderLevels: Any
+            NSUbiquitousContainerName: SnapGrid
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.snapgrid.app
-        INFOPLIST_GENERATION_MODE: GeneratedByXcode
         MARKETING_VERSION: "2.0.0"
-        CURRENT_PROJECT_VERSION: 1
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: SnapGrid
-        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.photography"
-        INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026 SnapGrid"
+        CURRENT_PROJECT_VERSION: 2
         CODE_SIGN_ENTITLEMENTS: SnapGrid/Resources/SnapGrid.entitlements
         SWIFT_STRICT_CONCURRENCY: complete
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_STANDALONE_ICON_BEHAVIOR: none
     entitlements:
       path: SnapGrid/Resources/SnapGrid.entitlements
+      properties:
+        com.apple.developer.ubiquity-container-identifiers:
+          - iCloud.com.SnapGrid
