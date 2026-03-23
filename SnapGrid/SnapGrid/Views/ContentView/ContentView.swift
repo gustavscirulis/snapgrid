@@ -10,14 +10,11 @@ struct ContentView: View {
     @State private var videoPreview = VideoPreviewManager()
     @State private var importService = ImportService()
     @State private var queueWatcher = QueueWatcher(queueURL: MediaStorageService.shared.queueDir)
+    @State private var syncWatcher = SyncWatcher()
     @State private var isDragTargeted = false
     @State private var pendingEditSpaceId: String?
     @State private var showElectronImport = false
     @AppStorage("appTheme") private var themeSetting: String = AppTheme.system.rawValue
-
-    private var hasElectronLibrary: Bool {
-        ElectronImportService().detectElectronLibrary() != nil
-    }
 
     private func itemsForSpace(_ spaceId: String?) -> [MediaItem] {
         var items = allItems
@@ -77,7 +74,7 @@ struct ContentView: View {
 
                 // Main content — horizontal carousel of space pages
                 if allItems.isEmpty {
-                    EmptyStateView(isDragTargeted: isDragTargeted, hasElectronLibrary: hasElectronLibrary)
+                    EmptyStateView(isDragTargeted: isDragTargeted)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     GeometryReader { geo in
@@ -188,10 +185,21 @@ struct ContentView: View {
             ElectronImportView(isPresented: $showElectronImport)
                 .presentationBackground(Color.snapCard)
         }
+        .onChange(of: showElectronImport) { _, isPresented in
+            if !isPresented {
+                syncWatcher.beginLocalChange()
+                syncWatcher.endLocalChange()
+            }
+        }
         .task {
             MediaStorageService.shared.emptyOldTrash()
+            MigrationService.migrateIfNeeded(context: modelContext)
             DataCleanupService.cleanOrphanedRecords(context: modelContext)
             await DataCleanupService.migrateVideoDimensions(context: modelContext)
+
+            // Sync items that arrived via iCloud while app was closed
+            await syncWatcher.initialSync(context: modelContext)
+            syncWatcher.startWatching(context: modelContext)
 
             // Wire QueueWatcher — mirrors electron/main.js:1705-1738 chokidar watcher
             // and queueService.ts:107-144 (import, toast, remove source)
@@ -414,11 +422,13 @@ struct ContentView: View {
         }
         appState.pushDeleteBatch(batch)
 
+        syncWatcher.beginLocalChange()
         for item in items {
             try? MediaStorageService.shared.moveToTrash(filename: item.filename, id: item.id)
             modelContext.delete(item)
         }
         try? modelContext.save()
+        syncWatcher.endLocalChange()
         appState.clearSelection()
         appState.showToast("Moved \(items.count) item\(items.count == 1 ? "" : "s") to trash")
     }
@@ -431,6 +441,7 @@ struct ContentView: View {
     private func undoLastDelete() {
         guard let batch = appState.popDeleteBatch() else { return }
 
+        syncWatcher.beginLocalChange()
         for info in batch {
             try? MediaStorageService.shared.restoreFromTrash(filename: info.filename, id: info.id)
 
@@ -450,33 +461,57 @@ struct ContentView: View {
             }
 
             modelContext.insert(item)
+            MetadataSidecarService.shared.writeSidecar(for: item)
         }
         try? modelContext.save()
+        syncWatcher.endLocalChange()
         appState.showToast("Restored \(batch.count) item\(batch.count == 1 ? "" : "s")")
     }
 
     private func createSpace() {
+        syncWatcher.beginLocalChange()
         let space = Space(name: "New Space", order: spaces.count)
         modelContext.insert(space)
         try? modelContext.save()
+        MetadataSidecarService.shared.writeSpaces(Array(spaces))
+        syncWatcher.endLocalChange()
         switchToSpace(space.id)
         pendingEditSpaceId = space.id
     }
 
     private func deleteSpace(_ id: String) {
-        if let space = spaces.first(where: { $0.id == id }) {
-            modelContext.delete(space)
-            try? modelContext.save()
-            if appState.activeSpaceId == id {
-                switchToSpace(nil)
-            }
+        guard let space = spaces.first(where: { $0.id == id }) else { return }
+
+        // 1. Capture plain data before any SwiftData mutation
+        let remainingSidecars = spaces.filter { $0.id != id }.map { s in
+            SidecarSpace(id: s.id, name: s.name, order: s.order,
+                         createdAt: s.createdAt, customPrompt: s.customPrompt,
+                         useCustomPrompt: s.useCustomPrompt)
         }
+
+        // 2. Switch away before mutation
+        if appState.activeSpaceId == id {
+            appState.activeSpaceId = nil
+        }
+
+        // 3. Suppress sync, manually nullify relationships, delete, write sidecar
+        syncWatcher.beginLocalChange()
+        for item in space.items {
+            item.space = nil
+        }
+        modelContext.delete(space)
+        try? modelContext.save()
+        MetadataSidecarService.shared.writeSpaceSidecars(remainingSidecars)
+        syncWatcher.endLocalChange()
     }
 
     private func renameSpace(_ id: String, _ newName: String) {
         if let space = spaces.first(where: { $0.id == id }) {
+            syncWatcher.beginLocalChange()
             space.name = newName
             try? modelContext.save()
+            MetadataSidecarService.shared.writeSpaces(Array(spaces))
+            syncWatcher.endLocalChange()
         }
     }
 
@@ -485,7 +520,7 @@ struct ContentView: View {
               fromIndex >= 0, fromIndex < spaces.count,
               toIndex >= 0, toIndex < spaces.count else { return }
 
-        // Recompute order values
+        syncWatcher.beginLocalChange()
         var ordered = spaces.sorted(by: { $0.order < $1.order })
         let moved = ordered.remove(at: fromIndex)
         ordered.insert(moved, at: toIndex)
@@ -494,18 +529,25 @@ struct ContentView: View {
             space.order = i
         }
         try? modelContext.save()
+        MetadataSidecarService.shared.writeSpaces(Array(spaces))
+        syncWatcher.endLocalChange()
     }
 
     private func assignToSpace(itemIds: Set<String>, spaceId: String?) {
         let space = spaceId.flatMap { sid in spaces.first(where: { $0.id == sid }) }
         let itemsToUpdate = allItems.filter { itemIds.contains($0.id) }
 
+        syncWatcher.beginLocalChange()
         for item in itemsToUpdate {
             item.space = space
         }
         try? modelContext.save()
 
-        // Re-analyze items if target space has a custom prompt
+        for item in itemsToUpdate {
+            MetadataSidecarService.shared.writeSidecar(for: item)
+        }
+        syncWatcher.endLocalChange()
+
         if let space, space.useCustomPrompt, space.customPrompt != nil {
             for item in itemsToUpdate {
                 Task {

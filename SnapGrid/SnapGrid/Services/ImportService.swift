@@ -9,6 +9,7 @@ final class ImportService {
 
     private let storage = MediaStorageService.shared
     private let analysisService = AIAnalysisService.shared
+    private let sidecarService = MetadataSidecarService.shared
 
     private let imageTypes: Set<String> = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "heic"]
     private let videoTypes: Set<String> = ["mp4", "webm", "mov", "avi", "m4v"]
@@ -55,6 +56,7 @@ final class ImportService {
 
             context.insert(item)
             try context.save()
+            sidecarService.writeSidecar(for: item)
 
             Task { @MainActor [weak self] in
                 await self?.analyzeItem(item, context: context)
@@ -127,6 +129,7 @@ final class ImportService {
 
         context.insert(item)
         try context.save()
+        sidecarService.writeSidecar(for: item)
 
         // Queue AI analysis in background
         Task { @MainActor [weak self] in
@@ -184,6 +187,7 @@ final class ImportService {
             item.isAnalyzing = false
             item.analysisError = nil
             try? context.save()
+            sidecarService.writeSidecar(for: item)
         } catch {
             print("[Analysis] Failed for \(item.id): \(error)")
             item.isAnalyzing = false

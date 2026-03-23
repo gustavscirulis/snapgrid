@@ -56,6 +56,7 @@ final class ElectronImportService {
     var importResult: ElectronImportResult?
 
     private let storage = MediaStorageService.shared
+    private let sidecarService = MetadataSidecarService.shared
 
     // ISO 8601 date parsing (matches iOS app pattern)
     private static let isoFormatterFractional: ISO8601DateFormatter = {
@@ -75,10 +76,26 @@ final class ElectronImportService {
     // MARK: - Detection
 
     func detectElectronLibrary() -> URL? {
-        let documentsURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Documents/SnapGrid", isDirectory: true)
-        guard validateLibraryFolder(documentsURL) else { return nil }
-        return documentsURL
+        let fm = FileManager.default
+        let home = fm.homeDirectoryForCurrentUser
+
+        // Try standard ~/Documents/SnapGrid first
+        let documentsURL = home.appendingPathComponent("Documents/SnapGrid", isDirectory: true)
+        if validateLibraryFolder(documentsURL) && countItems(in: documentsURL) > 0 {
+            return documentsURL
+        }
+
+        // Try iCloud Documents path (when Desktop & Documents is synced to iCloud)
+        let iCloudDocsURL = home
+            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/Documents/SnapGrid", isDirectory: true)
+        if validateLibraryFolder(iCloudDocsURL) && countItems(in: iCloudDocsURL) > 0 {
+            return iCloudDocsURL
+        }
+
+        // Return whichever exists even with 0 items (user can still proceed)
+        if validateLibraryFolder(documentsURL) { return documentsURL }
+        if validateLibraryFolder(iCloudDocsURL) { return iCloudDocsURL }
+        return nil
     }
 
     func validateLibraryFolder(_ url: URL) -> Bool {
@@ -92,7 +109,61 @@ final class ElectronImportService {
     func countItems(in electronRoot: URL) -> Int {
         let metadataDir = electronRoot.appendingPathComponent("metadata")
         let files = (try? FileManager.default.contentsOfDirectory(at: metadataDir, includingPropertiesForKeys: nil)) ?? []
-        return files.filter { $0.pathExtension == "json" }.count
+        return files.filter { isJSONOrPlaceholder($0) }.count
+    }
+
+    /// Check if a URL is a .json file or an iCloud placeholder for a .json file (.abc.json.icloud)
+    private func isJSONOrPlaceholder(_ url: URL) -> Bool {
+        if url.pathExtension == "json" { return true }
+        // iCloud placeholders: .filename.json.icloud
+        let name = url.lastPathComponent
+        return name.hasPrefix(".") && name.hasSuffix(".json.icloud")
+    }
+
+    /// Resolve the actual file URL, downloading iCloud placeholders if needed.
+    /// Returns the downloaded URL when ready, or nil if download fails.
+    private func resolveICloudFile(at url: URL) async -> URL? {
+        let fm = FileManager.default
+
+        // Already a real file
+        if fm.fileExists(atPath: url.path) && url.pathExtension != "icloud" {
+            return url
+        }
+
+        // Check for iCloud placeholder version
+        let dir = url.deletingLastPathComponent()
+        let placeholderName = ".\(url.lastPathComponent).icloud"
+        let placeholderURL = dir.appendingPathComponent(placeholderName)
+
+        let targetURL: URL
+        if fm.fileExists(atPath: placeholderURL.path) {
+            targetURL = placeholderURL
+        } else if url.pathExtension == "icloud" {
+            targetURL = url
+        } else if fm.fileExists(atPath: url.path) {
+            return url
+        } else {
+            return nil
+        }
+
+        // Trigger download
+        do {
+            try fm.startDownloadingUbiquitousItem(at: targetURL)
+        } catch {
+            return nil
+        }
+
+        // Wait for download (up to 30 seconds)
+        let realName = targetURL.lastPathComponent
+            .replacingOccurrences(of: ".icloud", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        let realURL = dir.appendingPathComponent(realName)
+
+        for _ in 0..<60 {
+            if fm.fileExists(atPath: realURL.path) { return realURL }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        return nil
     }
 
     // MARK: - Import
@@ -107,17 +178,17 @@ final class ElectronImportService {
         var duplicatesSkipped = 0
         var errors = 0
 
-        // 1. Enumerate metadata files
+        // 1. Enumerate metadata files (including iCloud placeholders)
         let metadataDir = electronRoot.appendingPathComponent("metadata")
         let allFiles = ((try? FileManager.default.contentsOfDirectory(at: metadataDir, includingPropertiesForKeys: nil)) ?? [])
-            .filter { $0.pathExtension == "json" }
+            .filter { isJSONOrPlaceholder($0) }
         totalItems = allFiles.count
 
         // 2. Build duplicate skip-set from existing sourceIds
         let existingSourceIds = fetchExistingSourceIds(context: context)
 
         // 3. Import spaces
-        let (spaceMap, newSpaceCount) = importSpaces(from: electronRoot, into: context)
+        let (spaceMap, newSpaceCount) = await importSpaces(from: electronRoot, into: context)
         spacesImported = newSpaceCount
         try? context.save()
 
@@ -125,7 +196,8 @@ final class ElectronImportService {
         for fileURL in allFiles {
             if isCancelled { break }
 
-            let electronId = fileURL.deletingPathExtension().lastPathComponent
+            // Extract electronId: handle both "abc.json" and ".abc.json.icloud" placeholders
+            let electronId = Self.extractId(from: fileURL)
             currentFilename = electronId
 
             // Skip duplicates
@@ -136,17 +208,35 @@ final class ElectronImportService {
                 continue
             }
 
+            // Resolve iCloud placeholder to real file if needed
+            var resolvedURL = await resolveICloudFile(at: fileURL)
+            if resolvedURL == nil {
+                let jsonURL = fileURL.deletingLastPathComponent().appendingPathComponent("\(electronId).json")
+                resolvedURL = await resolveICloudFile(at: jsonURL)
+            }
+            guard let resolvedURL else {
+                print("[ElectronImport] Could not download \(electronId) from iCloud")
+                errors += 1
+                importedCount += 1
+                await Task.yield()
+                continue
+            }
+
             do {
                 try await importSingleItem(
-                    metadataURL: fileURL,
+                    metadataURL: resolvedURL,
                     electronId: electronId,
                     electronRoot: electronRoot,
                     spaceMap: spaceMap,
                     context: context
                 )
-                // Save immediately — each item is complete with its AnalysisResult,
-                // so the database is always in a consistent state
                 try? context.save()
+
+                // Write JSON sidecar so item syncs to other devices via iCloud
+                let itemDescriptor = FetchDescriptor<MediaItem>(predicate: #Predicate<MediaItem> { $0.sourceId == electronId })
+                if let imported = try? context.fetch(itemDescriptor).last {
+                    sidecarService.writeSidecar(for: imported)
+                }
             } catch {
                 print("[ElectronImport] Error importing \(electronId): \(error)")
                 errors += 1
@@ -156,6 +246,11 @@ final class ElectronImportService {
 
             // Yield to let SwiftUI update progress and process user events (e.g. Cancel)
             await Task.yield()
+        }
+
+        // Write spaces.json so spaces sync to other devices
+        if let allSpaces = try? context.fetch(FetchDescriptor<Space>()) {
+            sidecarService.writeSpaces(allSpaces)
         }
 
         currentFilename = ""
@@ -174,9 +269,10 @@ final class ElectronImportService {
 
     // MARK: - Private
 
-    private func importSpaces(from electronRoot: URL, into context: ModelContext) -> (map: [String: Space], created: Int) {
+    private func importSpaces(from electronRoot: URL, into context: ModelContext) async -> (map: [String: Space], created: Int) {
         let spacesURL = electronRoot.appendingPathComponent("spaces.json")
-        guard let data = try? Data(contentsOf: spacesURL),
+        let resolvedURL = await resolveICloudFile(at: spacesURL) ?? spacesURL
+        guard let data = try? Data(contentsOf: resolvedURL),
               let electronSpaces = try? JSONDecoder().decode([ElectronSpace].self, from: data) else {
             return ([:], 0)
         }
@@ -224,35 +320,38 @@ final class ElectronImportService {
         spaceMap: [String: Space],
         context: ModelContext
     ) async throws -> String {
-        // Perform heavy file I/O on a background thread
-        let result = try await Task.detached { [storage] in
-            let data = try Data(contentsOf: metadataURL)
-            let metadata = try JSONDecoder().decode(ElectronMetadata.self, from: data)
+        // Parse metadata first (file already resolved by caller)
+        let data = try Data(contentsOf: metadataURL)
+        let metadata = try JSONDecoder().decode(ElectronMetadata.self, from: data)
 
-            // Determine media type
-            let isVideo = metadata.type == "video" || electronId.hasPrefix("vid_")
-            let expectedExt = isVideo ? "mp4" : "png"
-            let imagesDir = electronRoot.appendingPathComponent("images")
-            var sourceURL = imagesDir.appendingPathComponent("\(electronId).\(expectedExt)")
-
-            if !FileManager.default.fileExists(atPath: sourceURL.path) {
-                let altExt = isVideo ? "mov" : "jpg"
-                sourceURL = imagesDir.appendingPathComponent("\(electronId).\(altExt)")
-                guard FileManager.default.fileExists(atPath: sourceURL.path) else {
-                    throw ImportError.mediaFileMissing(electronId)
-                }
+        // Resolve media file (may need iCloud download)
+        let isVideo = metadata.type == "video" || electronId.hasPrefix("vid_")
+        let imagesDir = electronRoot.appendingPathComponent("images")
+        let extensions = isVideo ? ["mp4", "mov"] : ["png", "jpg"]
+        var sourceURL: URL?
+        for ext in extensions {
+            let candidate = imagesDir.appendingPathComponent("\(electronId).\(ext)")
+            if let resolved = await resolveICloudFile(at: candidate) {
+                sourceURL = resolved
+                break
             }
+        }
+        guard let sourceURL else { throw ImportError.mediaFileMissing(electronId) }
 
-            // Generate new ID and copy media
-            let newId = UUID().uuidString
-            let targetExt = isVideo ? "mp4" : "png"
-            let filename = "\(newId).\(targetExt)"
+        // Resolve thumbnail
+        let thumbSource = electronRoot.appendingPathComponent("thumbnails/\(electronId).jpg")
+        let resolvedThumb = await resolveICloudFile(at: thumbSource)
+
+        // Perform heavy file I/O on a background thread
+        let newId = UUID().uuidString
+        let targetExt = isVideo ? "mp4" : "png"
+        let filename = "\(newId).\(targetExt)"
+
+        try await Task.detached { [storage] in
             _ = try storage.copyMedia(from: sourceURL, filename: filename)
 
             // Handle thumbnail
-            let thumbSource = electronRoot.appendingPathComponent("thumbnails/\(electronId).jpg")
-            if FileManager.default.fileExists(atPath: thumbSource.path),
-               let thumbData = try? Data(contentsOf: thumbSource) {
+            if let resolvedThumb, let thumbData = try? Data(contentsOf: resolvedThumb) {
                 _ = try? storage.saveThumbnail(data: thumbData, id: newId)
             } else if isVideo {
                 if let posterFrame = try? await VideoFrameExtractor.extractPosterFrame(from: storage.mediaURL(filename: filename)) {
@@ -261,11 +360,7 @@ final class ElectronImportService {
             } else {
                 _ = try? await ThumbnailService.generateThumbnail(from: storage.mediaURL(filename: filename), id: newId)
             }
-
-            return (metadata, isVideo, newId, filename)
         }.value
-
-        let (metadata, isVideo, newId, filename) = result
 
         // For videos, use poster frame dimensions as authoritative (handles PAR, rotation)
         var width = metadata.width ?? 0
@@ -296,12 +391,13 @@ final class ElectronImportService {
         }
 
         if let imageContext = metadata.imageContext, !imageContext.isEmpty {
-            let imageSummary = metadata.patterns?.first?.imageSummary
-                ?? metadata.title
-                ?? metadata.patterns?.first?.name
-                ?? ""
+            var imageSummary = ""
+            if let s = metadata.patterns?.first?.imageSummary { imageSummary = s }
+            else if let s = metadata.title { imageSummary = s }
+            else if let s = metadata.patterns?.first?.name { imageSummary = s }
 
-            let patterns = (metadata.patterns ?? []).map {
+            let electronPatterns = metadata.patterns ?? []
+            let patterns = electronPatterns.map {
                 PatternTag(name: $0.name, confidence: $0.confidence)
             }
 
@@ -318,6 +414,17 @@ final class ElectronImportService {
 
         context.insert(item)
         return filename
+    }
+
+    /// Extract the base ID from a filename like "abc.json" or ".abc.json.icloud"
+    private static func extractId(from url: URL) -> String {
+        let name = url.lastPathComponent
+        if name.hasPrefix(".") && name.hasSuffix(".json.icloud") {
+            // ".abc123.json.icloud" → "abc123"
+            let trimmed = String(name.dropFirst()) // remove leading "."
+            return String(trimmed.dropLast(".json.icloud".count))
+        }
+        return url.deletingPathExtension().lastPathComponent
     }
 
     enum ImportError: LocalizedError {
