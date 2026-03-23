@@ -12,6 +12,7 @@ final class AppState {
     var detailItem: String? = nil  // MediaItem id
     var detailSourceFrame: CGRect? = nil  // Global frame of tapped thumbnail for hero animation
     var isSettingsOpen: Bool = false
+    var isAssistantOpen: Bool = false
 
     // Undo stack — stores enough info to fully restore deleted items
     private(set) var deletedBatches: [[DeletedItemInfo]] = []

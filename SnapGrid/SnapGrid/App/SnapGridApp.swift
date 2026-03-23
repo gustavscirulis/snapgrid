@@ -66,6 +66,13 @@ struct SnapGridApp: App {
                 .keyboardShortcut("n")
             }
 
+            CommandGroup(after: .toolbar) {
+                Button("Toggle Assistant") {
+                    NotificationCenter.default.post(name: .toggleAssistant, object: nil)
+                }
+                .keyboardShortcut("l", modifiers: [.command, .shift])
+            }
+
             CommandGroup(replacing: .pasteboard) {
                 Button("Paste") {
                     if let firstResponder = NSApp.keyWindow?.firstResponder, firstResponder is NSText {
@@ -137,4 +144,5 @@ extension Notification.Name {
     static let focusSearch = Notification.Name("focusSearch")
     static let selectAll = Notification.Name("selectAll")
     static let pasteImages = Notification.Name("pasteImages")
+    static let toggleAssistant = Notification.Name("toggleAssistant")
 }
