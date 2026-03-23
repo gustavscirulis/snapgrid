@@ -70,7 +70,7 @@ final class AIAnalysisService: Sendable {
             throw AnalysisError.noAPIKey
         }
 
-        guard let base64 = imageToBase64(image) else {
+        guard let base64 = Self.imageToBase64(image) else {
             throw AnalysisError.imageConversionFailed
         }
 
@@ -307,9 +307,9 @@ final class AIAnalysisService: Sendable {
     }
 
     /// Max dimension recommended by Anthropic — larger images are resized server-side anyway.
-    private let maxImageDimension: CGFloat = 1568
+    static let maxImageDimension: CGFloat = 1568
 
-    private func imageToBase64(_ image: NSImage) -> String? {
+    static func imageToBase64(_ image: NSImage) -> String? {
         guard let tiffData = image.tiffRepresentation,
               let bitmapRep = NSBitmapImageRep(data: tiffData) else {
             return nil

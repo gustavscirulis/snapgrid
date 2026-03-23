@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var videoPreview = VideoPreviewManager()
     @State private var importService = ImportService()
     @State private var queueWatcher = QueueWatcher(queueURL: MediaStorageService.shared.queueDir)
+    @State private var chatService = ChatService()
     @State private var isDragTargeted = false
     @State private var pendingEditSpaceId: String?
     @State private var showElectronImport = false
@@ -56,95 +57,141 @@ struct ContentView: View {
         spaceIndex(for: appState.activeSpaceId)
     }
 
+    private var chatContext: ChatContext {
+        ChatContext(
+            modelContext: modelContext,
+            activeSpaceId: appState.activeSpaceId,
+            allItems: Array(allItems),
+            spaces: Array(spaces)
+        )
+    }
+
+    private var activeSpaceName: String? {
+        guard let id = appState.activeSpaceId else { return nil }
+        return spaces.first(where: { $0.id == id })?.name
+    }
+
     var body: some View {
-        ZStack {
-            Color.snapBackground.ignoresSafeArea()
+        HStack(spacing: 0) {
+            ZStack {
+                Color.snapBackground.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // Space tab bar
-                SpaceTabBar(
-                    spaces: spaces,
-                    activeSpaceId: appState.activeSpaceId,
-                    pendingEditSpaceId: $pendingEditSpaceId,
-                    onSelectSpace: switchToSpace,
-                    onCreateSpace: createSpace,
-                    onDeleteSpace: deleteSpace,
-                    onRenameSpace: renameSpace,
-                    onReorderSpaces: reorderSpaces,
-                    onAssignToSpace: assignToSpace
-                )
-                .padding(.top, 8)
+                VStack(spacing: 0) {
+                    // Space tab bar
+                    SpaceTabBar(
+                        spaces: spaces,
+                        activeSpaceId: appState.activeSpaceId,
+                        pendingEditSpaceId: $pendingEditSpaceId,
+                        onSelectSpace: switchToSpace,
+                        onCreateSpace: createSpace,
+                        onDeleteSpace: deleteSpace,
+                        onRenameSpace: renameSpace,
+                        onReorderSpaces: reorderSpaces,
+                        onAssignToSpace: assignToSpace
+                    )
+                    .padding(.top, 8)
 
-                // Main content — horizontal carousel of space pages
-                if allItems.isEmpty {
-                    EmptyStateView(isDragTargeted: isDragTargeted, hasElectronLibrary: hasElectronLibrary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    GeometryReader { geo in
-                        let pageWidth = geo.size.width
-                        let pageHeight = geo.size.height
+                    // Main content — horizontal carousel of space pages
+                    if allItems.isEmpty {
+                        EmptyStateView(isDragTargeted: isDragTargeted, hasElectronLibrary: hasElectronLibrary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        GeometryReader { geo in
+                            let pageWidth = geo.size.width
+                            let pageHeight = geo.size.height
 
-                        HStack(spacing: 0) {
-                            // "All" page (index 0)
-                            spacePageView(spaceId: nil, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: 0)
+                            HStack(spacing: 0) {
+                                // "All" page (index 0)
+                                spacePageView(spaceId: nil, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: 0)
 
-                            // Per-space pages (index 1+)
-                            ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
-                                spacePageView(spaceId: space.id, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: index + 1)
+                                // Per-space pages (index 1+)
+                                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                                    spacePageView(spaceId: space.id, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: index + 1)
+                                }
                             }
+                            .offset(x: -CGFloat(activeIndex) * pageWidth)
                         }
-                        .offset(x: -CGFloat(activeIndex) * pageWidth)
+                        .clipped()
                     }
-                    .clipped()
+                }
+
+                // Detail overlay — hero animation from thumbnail to centered view
+                if let detailId = appState.detailItem,
+                   let item = allItems.first(where: { $0.id == detailId }),
+                   let sourceFrame = appState.detailSourceFrame {
+                    HeroDetailOverlay(
+                        item: item,
+                        sourceFrame: sourceFrame,
+                        onAnimationComplete: {
+                            appState.detailItem = nil
+                            appState.detailSourceFrame = nil
+                        }
+                    )
+                }
+
+                // Floating video layer — ONE AVPlayerLayer that moves between grid and detail.
+                // Placed after HeroDetailOverlay so it renders above the backdrop.
+                FloatingVideoLayer()
+
+                // Selection badge
+                if !appState.selectedIds.isEmpty {
+                    VStack {
+                        Spacer()
+                        SelectionBadge(count: appState.selectedIds.count)
+                            .padding(.bottom, 24)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(SnapSpring.standard, value: appState.selectedIds.isEmpty)
+                }
+
+                // Toast notifications
+                ToastOverlay(toasts: appState.toasts)
+
+                // Drag overlay
+                if isDragTargeted {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.snapAccent, lineWidth: 3)
+                        .background(Color.snapAccent.opacity(0.1))
+                        .ignoresSafeArea()
+                        .transition(.opacity)
                 }
             }
 
-            // Detail overlay — hero animation from thumbnail to centered view
-            if let detailId = appState.detailItem,
-               let item = allItems.first(where: { $0.id == detailId }),
-               let sourceFrame = appState.detailSourceFrame {
-                HeroDetailOverlay(
-                    item: item,
-                    sourceFrame: sourceFrame,
-                    onAnimationComplete: {
-                        appState.detailItem = nil
-                        appState.detailSourceFrame = nil
+            // AI Assistant panel
+            if appState.isAssistantOpen {
+                Divider()
+                AssistantPanelView(
+                    chatService: chatService,
+                    context: chatContext,
+                    spaceName: activeSpaceName,
+                    onClose: {
+                        withAnimation(SnapSpring.standard) {
+                            appState.isAssistantOpen = false
+                        }
                     }
                 )
-            }
-
-            // Floating video layer — ONE AVPlayerLayer that moves between grid and detail.
-            // Placed after HeroDetailOverlay so it renders above the backdrop.
-            FloatingVideoLayer()
-
-            // Selection badge
-            if !appState.selectedIds.isEmpty {
-                VStack {
-                    Spacer()
-                    SelectionBadge(count: appState.selectedIds.count)
-                        .padding(.bottom, 24)
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(SnapSpring.standard, value: appState.selectedIds.isEmpty)
-            }
-
-            // Toast notifications
-            ToastOverlay(toasts: appState.toasts)
-
-            // Drag overlay
-            if isDragTargeted {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.snapAccent, lineWidth: 3)
-                    .background(Color.snapAccent.opacity(0.1))
-                    .ignoresSafeArea()
-                    .transition(.opacity)
+                .frame(width: 380)
+                .transition(.move(edge: .trailing))
             }
         }
+        .animation(SnapSpring.standard, value: appState.isAssistantOpen)
         .frame(minWidth: 540, minHeight: 400)
         .searchable(text: $appState.searchText, placement: .toolbar, prompt: "Search patterns, descriptions...")
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Spacer()
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    withAnimation(SnapSpring.standard) {
+                        appState.isAssistantOpen.toggle()
+                    }
+                } label: {
+                    Image(systemName: appState.isAssistantOpen
+                        ? "bubble.left.and.bubble.right.fill"
+                        : "bubble.left.and.bubble.right")
+                }
+                .help("Toggle Assistant (⇧⌘L)")
             }
         }
         .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
@@ -182,7 +229,12 @@ struct ContentView: View {
                     }
                 }
             },
-            onPasteImages: { handlePaste() }
+            onPasteImages: { handlePaste() },
+            onToggleAssistant: {
+                withAnimation(SnapSpring.standard) {
+                    appState.isAssistantOpen.toggle()
+                }
+            }
         ))
         .sheet(isPresented: $showElectronImport) {
             ElectronImportView(isPresented: $showElectronImport)
@@ -555,6 +607,7 @@ private struct NotificationModifier: ViewModifier {
     let onSelectAll: () -> Void
     let onSwitchToSpace: (Int) -> Void
     let onPasteImages: () -> Void
+    let onToggleAssistant: () -> Void
 
     func body(content: Content) -> some View {
         content
@@ -585,6 +638,9 @@ private struct NotificationModifier: ViewModifier {
             }
             .onReceive(NotificationCenter.default.publisher(for: .pasteImages)) { _ in
                 onPasteImages()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleAssistant)) { _ in
+                onToggleAssistant()
             }
     }
 }
