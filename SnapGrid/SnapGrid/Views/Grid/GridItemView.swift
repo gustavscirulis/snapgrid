@@ -369,19 +369,27 @@ struct GridItemView: View {
     }
 
     private func loadThumbnail() async {
-        // Check memory cache first
+        // Check memory cache first (fast, no I/O)
         if let cached = ImageCacheService.shared.image(forKey: item.id) {
             self.thumbnail = cached
             return
         }
 
-        let storage = MediaStorageService.shared
-        let url = storage.thumbnailExists(id: item.id)
-            ? storage.thumbnailURL(id: item.id)
-            : storage.mediaURL(filename: item.filename)
+        // Capture value types before crossing isolation boundary
+        let itemId = item.id
+        let filename = item.filename
 
-        if let image = NSImage(contentsOf: url) {
-            ImageCacheService.shared.setImage(image, forKey: item.id)
+        // Load image on background thread to avoid blocking the main actor
+        let image: NSImage? = await Task.detached(priority: .utility) {
+            let storage = MediaStorageService.shared
+            let url = storage.thumbnailExists(id: itemId)
+                ? storage.thumbnailURL(id: itemId)
+                : storage.mediaURL(filename: filename)
+            return NSImage(contentsOf: url)
+        }.value
+
+        if let image {
+            ImageCacheService.shared.setImage(image, forKey: itemId)
             self.thumbnail = image
         }
     }
