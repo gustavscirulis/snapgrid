@@ -201,6 +201,10 @@ struct ContentView: View {
             await syncWatcher.initialSync(context: modelContext)
             syncWatcher.startWatching(context: modelContext)
 
+            // Auto-download evicted iCloud files if user has opted in
+            if UserDefaults.standard.bool(forKey: "keepFilesLocal") {
+                iCloudDownloadManager.shared.downloadAll()
+            }
         }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .willResetAllData) {

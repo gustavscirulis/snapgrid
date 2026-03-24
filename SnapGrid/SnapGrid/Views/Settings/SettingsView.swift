@@ -13,10 +13,12 @@ struct SettingsView: View {
                     Label("Spaces", systemImage: "square.grid.2x2")
                 }
 
+            #if DEBUG
             DeveloperSettingsTab()
                 .tabItem {
                     Label("Developer", systemImage: "wrench.and.screwdriver")
                 }
+            #endif
         }
         .frame(width: 600, height: 450)
     }

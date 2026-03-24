@@ -29,6 +29,7 @@ struct HeroDetailOverlay: View {
     @State private var isClosing = false
     @State private var image: NSImage?
     @State private var scrollEnabled = false
+    @State private var isLoadingFullRes = false
     @FocusState private var isFocused: Bool
 
     private var isTallImage: Bool {
@@ -39,9 +40,7 @@ struct HeroDetailOverlay: View {
         self.item = item
         self.sourceFrame = sourceFrame
         self.onAnimationComplete = onAnimationComplete
-        if !item.isVideo {
-            _image = State(initialValue: ImageCacheService.shared.image(forKey: item.id))
-        }
+        _image = State(initialValue: ImageCacheService.shared.image(forKey: item.id))
     }
 
     var body: some View {
@@ -57,8 +56,8 @@ struct HeroDetailOverlay: View {
                     .ignoresSafeArea()
                     .onTapGesture { triggerClose() }
 
-                // Image — hero animation (non-video only)
-                if let image, !item.isVideo {
+                // Image — hero animation (also serves as video placeholder until AVPlayer renders)
+                if let image {
                     if isTallImage {
                         ScrollView(.vertical, showsIndicators: scrollEnabled) {
                             Image(nsImage: image)
@@ -69,6 +68,9 @@ struct HeroDetailOverlay: View {
                         }
                         .scrollDisabled(!scrollEnabled)
                         .frame(width: currentFrame.width, height: currentFrame.height)
+                        .overlay(alignment: .bottomTrailing) {
+                            loadingIndicator
+                        }
                         .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 12))
                         .position(x: currentFrame.midX, y: currentFrame.midY)
                         .id(item.id)
@@ -78,6 +80,9 @@ struct HeroDetailOverlay: View {
                             .aspectRatio(contentMode: .fill)
                             .frame(width: currentFrame.width, height: currentFrame.height)
                             .clipped()
+                            .overlay(alignment: .bottomTrailing) {
+                                loadingIndicator
+                            }
                             .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 12))
                             .onTapGesture { triggerClose() }
                             .position(x: currentFrame.midX, y: currentFrame.midY)
@@ -104,6 +109,11 @@ struct HeroDetailOverlay: View {
                 isFocused = true
 
                 if item.isVideo {
+                    if image == nil {
+                        await loadThumbnail()
+                    }
+                    isLoadingFullRes = true
+
                     let hasHoverPreview = videoPreview.player != nil
                         && videoPreview.activeItemId == item.id
 
@@ -126,10 +136,13 @@ struct HeroDetailOverlay: View {
                             isExpanded = true
                         }
                     }
+                    // Wait for the player to buffer its first frame, then hide indicator
+                    await waitForPlayerReady()
                 } else {
                     if image == nil {
-                        await loadImage()
+                        await loadThumbnail()
                     }
+                    isLoadingFullRes = true
                     withAnimation(SnapSpring.hero) {
                         isExpanded = true
                     }
@@ -138,6 +151,9 @@ struct HeroDetailOverlay: View {
                         scrollEnabled = true
                     }
                     await loadFullResImage()
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        isLoadingFullRes = false
+                    }
                 }
             }
         }
@@ -148,6 +164,22 @@ struct HeroDetailOverlay: View {
         .onKeyPress(.escape) {
             triggerClose()
             return .handled
+        }
+    }
+
+    // MARK: - Loading Indicator
+
+    @ViewBuilder
+    private var loadingIndicator: some View {
+        if isLoadingFullRes && isExpanded {
+            ProgressView()
+                .controlSize(.small)
+                .tint(.white)
+                .padding(6)
+                .background(.black.opacity(0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .padding(10)
+                .transition(.opacity)
         }
     }
 
@@ -198,22 +230,48 @@ struct HeroDetailOverlay: View {
 
     // MARK: - Image Loading
 
-    private func loadImage() async {
-        guard !item.isVideo else { return }
+    private func loadThumbnail() async {
         if let cached = ImageCacheService.shared.image(forKey: item.id) {
             self.image = cached
             return
         }
-        let url = MediaStorageService.shared.mediaURL(filename: item.filename)
-        if let loaded = NSImage(contentsOf: url) {
+        let itemId = item.id
+        let filename = item.filename
+        let loaded: NSImage? = await Task.detached(priority: .userInitiated) {
+            let storage = MediaStorageService.shared
+            if storage.thumbnailExists(id: itemId) {
+                return NSImage(contentsOf: storage.thumbnailURL(id: itemId))
+            }
+            return NSImage(contentsOf: storage.mediaURL(filename: filename))
+        }.value
+        if let loaded {
             self.image = loaded
         }
     }
 
     private func loadFullResImage() async {
-        let url = MediaStorageService.shared.mediaURL(filename: item.filename)
-        if let loaded = NSImage(contentsOf: url) {
+        guard !item.isVideo else { return }
+        let itemId = item.id
+        let filename = item.filename
+        let loaded: NSImage? = await Task.detached(priority: .utility) {
+            return NSImage(contentsOf: MediaStorageService.shared.mediaURL(filename: filename))
+        }.value
+        if let loaded {
             self.image = loaded
+            ImageCacheService.shared.setImage(loaded, forKey: itemId)
         }
+    }
+
+    private func waitForPlayerReady() async {
+        guard let player = videoPreview.player,
+              let item = player.currentItem else {
+            withAnimation(.easeOut(duration: 0.2)) { isLoadingFullRes = false }
+            return
+        }
+        // Poll until the player has buffered enough to render
+        while item.status == .unknown {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        withAnimation(.easeOut(duration: 0.2)) { isLoadingFullRes = false }
     }
 }
