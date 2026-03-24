@@ -142,6 +142,7 @@ struct GridItemView: View {
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3)
                                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                                    .environment(\.colorScheme, .dark)
                                 Spacer()
                             }
                             .padding(8)
