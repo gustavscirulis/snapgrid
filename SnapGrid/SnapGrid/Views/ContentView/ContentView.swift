@@ -9,7 +9,7 @@ struct ContentView: View {
     @State private var appState = AppState()
     @State private var videoPreview = VideoPreviewManager()
     @State private var importService = ImportService()
-    @State private var queueWatcher = QueueWatcher(queueURL: MediaStorageService.shared.queueDir)
+
     @State private var syncWatcher = SyncWatcher()
     @State private var isDragTargeted = false
     @State private var pendingEditSpaceId: String?
@@ -201,19 +201,6 @@ struct ContentView: View {
             await syncWatcher.initialSync(context: modelContext)
             syncWatcher.startWatching(context: modelContext)
 
-            // Wire QueueWatcher — mirrors electron/main.js:1705-1738 chokidar watcher
-            // and queueService.ts:107-144 (import, toast, remove source)
-            queueWatcher.onNewFiles = { urls in
-                Task {
-                    await importService.importFiles(urls, into: modelContext, spaceId: appState.activeSpaceId)
-                    // Remove processed files from queue (queueService.ts:135-144)
-                    for url in urls {
-                        try? FileManager.default.removeItem(at: url)
-                    }
-                    appState.showToast("Imported \(urls.count) item\(urls.count == 1 ? "" : "s") from queue")
-                }
-            }
-            queueWatcher.startWatching()
         }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .willResetAllData) {

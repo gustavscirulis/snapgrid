@@ -114,26 +114,7 @@ struct GeneralSettingsTab: View {
                 modelPicker
             }
 
-            // Mobile Import section — SettingsPanel.tsx:627-697
-            Section("Mobile Import") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Drop images into the queue folder from your phone or other devices. They'll be imported automatically.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
 
-                    HStack {
-                        Text(MediaStorageService.shared.queueDir.path)
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                        Spacer()
-                        Button("Show in Finder") {
-                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: MediaStorageService.shared.queueDir.path)
-                        }
-                        .controlSize(.small)
-                    }
-                }
-            }
         }
         .formStyle(.grouped)
         .onAppear {
