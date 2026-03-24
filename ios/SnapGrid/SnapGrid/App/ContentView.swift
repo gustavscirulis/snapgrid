@@ -7,6 +7,13 @@ struct ContentView: View {
         Group {
             if fileSystem.isAccessGranted {
                 MainView()
+            } else if fileSystem.isCheckingAccess {
+                ZStack {
+                    Color.snapDarkBackground
+                        .ignoresSafeArea()
+                    ProgressView()
+                        .tint(.white)
+                }
             } else {
                 OnboardingView()
             }
