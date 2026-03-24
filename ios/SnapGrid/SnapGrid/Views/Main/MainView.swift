@@ -209,10 +209,12 @@ struct MainView: View {
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Menu {
-                                Button(role: .destructive) {
-                                    fileSystem.disconnect()
-                                } label: {
-                                    Label("Disconnect Folder", systemImage: "folder.badge.minus")
+                                if !fileSystem.iCloudContainerActive {
+                                    Button(role: .destructive) {
+                                        fileSystem.disconnect()
+                                    } label: {
+                                        Label("Disconnect Folder", systemImage: "folder.badge.minus")
+                                    }
                                 }
                             } label: {
                                 Image(systemName: "ellipsis.circle")

@@ -6,33 +6,47 @@ import UniformTypeIdentifiers
 class FileSystemManager: ObservableObject {
     @Published var rootURL: URL?
     @Published var isAccessGranted = false
+    @Published var isCheckingAccess = false
+    @Published var iCloudContainerActive = false
     @Published var error: String?
 
     private let bookmarkKey = "snapgrid_folder_bookmark"
+    private let iCloudContainerID = "iCloud.com.SnapGrid"
 
     var imagesDir: URL? { rootURL?.appendingPathComponent("images") }
     var metadataDir: URL? { rootURL?.appendingPathComponent("metadata") }
     var thumbnailsDir: URL? { rootURL?.appendingPathComponent("thumbnails") }
 
-    // MARK: - Bookmark Persistence
+    // MARK: - Access Restoration
 
-    func saveBookmark(for url: URL) {
-        do {
-            let bookmarkData = try url.bookmarkData(
-                options: .minimalBookmark,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-            UserDefaults.standard.set(bookmarkData, forKey: bookmarkKey)
-            self.rootURL = url
-            self.isAccessGranted = true
-            self.error = nil
-        } catch {
-            self.error = "Failed to save folder access: \(error.localizedDescription)"
+    func restoreAccess() {
+        isCheckingAccess = true
+
+        // Try iCloud container on a background thread (can block)
+        Task.detached { [weak self] in
+            guard let self else { return }
+            let fm = FileManager.default
+            let containerURL = fm.url(forUbiquityContainerIdentifier: self.iCloudContainerID)
+
+            await MainActor.run {
+                if let containerURL {
+                    let docsURL = containerURL.appendingPathComponent("Documents", isDirectory: true)
+                    self.rootURL = docsURL
+                    self.isAccessGranted = true
+                    self.iCloudContainerActive = true
+                    self.error = nil
+                } else {
+                    // iCloud unavailable — fall back to bookmark
+                    self.restoreBookmark()
+                }
+                self.isCheckingAccess = false
+            }
         }
     }
 
-    func restoreAccess() {
+    // MARK: - Bookmark Persistence
+
+    private func restoreBookmark() {
         guard let bookmarkData = UserDefaults.standard.data(forKey: bookmarkKey) else {
             return
         }
@@ -50,7 +64,6 @@ class FileSystemManager: ObservableObject {
             }
 
             if isStale {
-                // Re-create the bookmark with the resolved URL
                 saveBookmark(for: url)
             }
 
@@ -60,6 +73,22 @@ class FileSystemManager: ObservableObject {
         } catch {
             self.error = "Folder access expired. Please re-select your SnapGrid folder."
             UserDefaults.standard.removeObject(forKey: bookmarkKey)
+        }
+    }
+
+    func saveBookmark(for url: URL) {
+        do {
+            let bookmarkData = try url.bookmarkData(
+                options: .minimalBookmark,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            UserDefaults.standard.set(bookmarkData, forKey: bookmarkKey)
+            self.rootURL = url
+            self.isAccessGranted = true
+            self.error = nil
+        } catch {
+            self.error = "Failed to save folder access: \(error.localizedDescription)"
         }
     }
 
@@ -84,7 +113,9 @@ class FileSystemManager: ObservableObject {
     }
 
     func disconnect() {
-        if let url = rootURL {
+        if iCloudContainerActive {
+            iCloudContainerActive = false
+        } else if let url = rootURL {
             url.stopAccessingSecurityScopedResource()
         }
         UserDefaults.standard.removeObject(forKey: bookmarkKey)
