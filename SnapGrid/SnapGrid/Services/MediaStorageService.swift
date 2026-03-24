@@ -9,7 +9,6 @@ final class MediaStorageService: Sendable {
     let mediaDir: URL       // images/ (named mediaDir to minimize call-site churn)
     let metadataDir: URL
     let thumbnailDir: URL
-    let queueDir: URL
     let trashMediaDir: URL
     let trashMetadataDir: URL
     let trashThumbnailDir: URL
@@ -31,13 +30,12 @@ final class MediaStorageService: Sendable {
         mediaDir = baseURL.appendingPathComponent("images", isDirectory: true)
         metadataDir = baseURL.appendingPathComponent("metadata", isDirectory: true)
         thumbnailDir = baseURL.appendingPathComponent("thumbnails", isDirectory: true)
-        queueDir = baseURL.appendingPathComponent("queue", isDirectory: true)
         trashMediaDir = baseURL.appendingPathComponent(".trash/images", isDirectory: true)
         trashMetadataDir = baseURL.appendingPathComponent(".trash/metadata", isDirectory: true)
         trashThumbnailDir = baseURL.appendingPathComponent(".trash/thumbnails", isDirectory: true)
 
         // Create directories on init
-        for dir in [baseURL, mediaDir, metadataDir, thumbnailDir, queueDir, trashMediaDir, trashMetadataDir, trashThumbnailDir] {
+        for dir in [baseURL, mediaDir, metadataDir, thumbnailDir, trashMediaDir, trashMetadataDir, trashThumbnailDir] {
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
     }
