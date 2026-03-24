@@ -7,6 +7,7 @@ struct GeneralSettingsTab: View {
     @AppStorage("geminiModel") private var geminiModel: String = ModelDiscoveryService.autoModelValue
     @AppStorage("openrouterModel") private var openrouterModel: String = "openai/gpt-4o"
     @AppStorage("appTheme") private var themeSetting: String = AppTheme.system.rawValue
+    @AppStorage("keepFilesLocal") private var keepFilesLocal: Bool = false
 
     @State private var apiKeyInput: String = ""
     @State private var hasKey: Bool = false
@@ -114,7 +115,9 @@ struct GeneralSettingsTab: View {
                 modelPicker
             }
 
-
+            if MediaStorageService.shared.isUsingiCloud {
+                iCloudSection
+            }
         }
         .formStyle(.grouped)
         .onAppear {
@@ -125,6 +128,60 @@ struct GeneralSettingsTab: View {
             checkForKey()
             discoveredModels = []
             Task { await loadModels() }
+        }
+    }
+
+    @ViewBuilder
+    private var iCloudSection: some View {
+        let manager = iCloudDownloadManager.shared
+
+        Section("iCloud") {
+            Toggle("Keep all files downloaded", isOn: $keepFilesLocal)
+                .onChange(of: keepFilesLocal) { _, enabled in
+                    if enabled {
+                        manager.downloadAll()
+                    } else {
+                        manager.stop()
+                    }
+                }
+
+            if manager.isDownloading {
+                VStack(alignment: .leading, spacing: 6) {
+                    ProgressView(
+                        value: Double(manager.downloadedFiles),
+                        total: Double(max(manager.totalFiles, 1))
+                    )
+                    Text("Downloading \(manager.downloadedFiles) of \(manager.totalFiles) files...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if keepFilesLocal {
+                let evicted = manager.countEvicted()
+                if evicted == 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                        Text("All files are stored locally")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    HStack(spacing: 4) {
+                        Text("\(evicted) files waiting to download")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Download Now") {
+                            manager.downloadAll()
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+
+            Text("When enabled, all images and thumbnails are downloaded from iCloud so they open instantly. Disable to let macOS manage storage automatically.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

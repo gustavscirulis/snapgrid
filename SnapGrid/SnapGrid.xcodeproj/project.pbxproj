@@ -27,6 +27,7 @@
 		58E281026420E8D7C519E0D6 /* ElectronImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6242DCFA059749F058CC6487 /* ElectronImportService.swift */; };
 		5C1E7DB8A91CE5B34721F868 /* PatternPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35770E61695F4882C7E976DF /* PatternPill.swift */; };
 		65160672513A59B8ED353208 /* SelectionBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFDD4D2B1F3CCB3ED261F5C /* SelectionBadge.swift */; };
+		6616D86A2EE273FDF8805951 /* iCloudDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23EE0E51D2D80BFD49716AA0 /* iCloudDownloadManager.swift */; };
 		67A2F4EA7A945C87AD04E886 /* SpacesSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1E6270DBFF25C7C3C0324E /* SpacesSettingsTab.swift */; };
 		76828B68E2CA3213D835B691 /* PatternTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 649D56F9B7920BF3924A8E4E /* PatternTagsView.swift */; };
 		8167D57BFF6AAEC5E1CF20E1 /* AnimationTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 468F744BF11C8965B74EF95F /* AnimationTokens.swift */; };
@@ -60,6 +61,7 @@
 		0A8B38057F541288379ABCA2 /* AIAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAnalysisService.swift; sourceTree = "<group>"; };
 		1A8584DB6A15E23CD509BC39 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1CE02953B123E7318BEBBA18 /* FloatingVideoLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingVideoLayer.swift; sourceTree = "<group>"; };
+		23EE0E51D2D80BFD49716AA0 /* iCloudDownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudDownloadManager.swift; sourceTree = "<group>"; };
 		2537EC9D8AD50664BBA121ED /* SyncWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncWatcher.swift; sourceTree = "<group>"; };
 		2E5C14CF112B283919BE0F7D /* VideoFrameExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFrameExtractor.swift; sourceTree = "<group>"; };
 		2EE366A7E490EA25CA0D6525 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
@@ -154,6 +156,7 @@
 				0A8B38057F541288379ABCA2 /* AIAnalysisService.swift */,
 				91A0CC2831F5CB94D1AF02D9 /* DataCleanupService.swift */,
 				6242DCFA059749F058CC6487 /* ElectronImportService.swift */,
+				23EE0E51D2D80BFD49716AA0 /* iCloudDownloadManager.swift */,
 				AB57D4AB7F12528E5ECD77DF /* ImageCacheService.swift */,
 				AAF0B485D040D2E5532516AE /* ImportService.swift */,
 				47A1525A6C63DFE52779E656 /* KeychainService.swift */,
@@ -312,7 +315,6 @@
 				};
 			};
 			buildConfigurationList = 00B33F9117438FAB18818194 /* Build configuration list for PBXProject "SnapGrid" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -322,6 +324,7 @@
 			mainGroup = FFD93DF4A621A23EC00FD90B;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			productRefGroup = 455AE9CECACB2D90B8221050 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -391,6 +394,7 @@
 				429D34E9222F716D0D0BE26C /* VideoPreviewManager.swift in Sources */,
 				3C8305A01967D9D664D9AA3D /* View+DoubleClick.swift in Sources */,
 				E287F102701B8A0ADF31921D /* ZoomableImageView.swift in Sources */,
+				6616D86A2EE273FDF8805951 /* iCloudDownloadManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
