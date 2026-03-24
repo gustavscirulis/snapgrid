@@ -15,7 +15,7 @@ final class SyncWatcher {
     private var spacesFD: Int32 = -1
     private var debounceTask: Task<Void, Never>?
     private var spacesDebounceTask: Task<Void, Never>?
-    private var knownSidecarIds: Set<String> = []
+    private var knownSidecarIds: [String: Date] = [:]
     private var context: ModelContext?
     /// When true, ignore file-system events (we caused them ourselves).
     private var suppressingLocalChanges = false
@@ -35,6 +35,12 @@ final class SyncWatcher {
         let needsThumbnail: Bool
     }
 
+    /// Lightweight update for existing items whose sidecar changed (e.g. space assignment).
+    private struct SidecarUpdateData: Sendable {
+        let id: String
+        let spaceId: String?
+    }
+
     // MARK: - Public API
 
     /// Call BEFORE local mutations that write sidecar/spaces files.
@@ -45,7 +51,7 @@ final class SyncWatcher {
     /// Call AFTER local mutations complete. Updates known state so the watcher
     /// won't react to our own file changes when suppression ends.
     func endLocalChange() {
-        knownSidecarIds = Set(Self.currentSidecarIdsFromDisk())
+        knownSidecarIds = Self.currentSidecarIdsWithDatesFromDisk()
         // Keep suppressed briefly to outlast any DispatchSource events
         // that are already queued from our write.
         Task { @MainActor [weak self] in
@@ -58,7 +64,7 @@ final class SyncWatcher {
         stopWatching()
         self.context = context
 
-        knownSidecarIds = Set(Self.currentSidecarIdsFromDisk())
+        knownSidecarIds = Self.currentSidecarIdsWithDatesFromDisk()
 
         // Watch metadata/ directory — use main queue so event handler is
         // already on the main thread, avoiding cross-isolation captures.
@@ -115,8 +121,8 @@ final class SyncWatcher {
     /// Perform an initial sync on launch — picks up items that arrived via iCloud while the app was closed.
     func initialSync(context: ModelContext) async {
         self.context = context
+        await syncSpaces()          // Spaces FIRST so items can resolve spaceId
         await syncMetadataAsync()
-        await syncSpaces()
     }
 
     // MARK: - Debouncing
@@ -148,16 +154,30 @@ final class SyncWatcher {
     private func syncMetadataAsync() async {
         guard context != nil else { return }
 
-        let knownIds = knownSidecarIds
+        let knownDates = knownSidecarIds
 
         // Phase 1: Gather all file data on a background thread
-        let (gathered, currentIds) = await Task.detached(priority: .userInitiated) {
-            let currentIds = Set(Self.currentSidecarIdsFromDisk())
+        let (gathered, updates, currentDates) = await Task.detached(priority: .userInitiated) {
+            let currentDates = Self.currentSidecarIdsWithDatesFromDisk()
+            let currentIds = Set(currentDates.keys)
+            let knownIds = Set(knownDates.keys)
             let newIds = currentIds.subtracting(knownIds)
 
-            if newIds.isEmpty { return ([SidecarImportData](), currentIds) }
+            // Detect modified sidecars (existing IDs whose mod date changed)
+            var modifiedIds: Set<String> = []
+            for id in currentIds.intersection(knownIds) {
+                if let currentDate = currentDates[id],
+                   let knownDate = knownDates[id],
+                   currentDate > knownDate {
+                    modifiedIds.insert(id)
+                }
+            }
 
-            print("[SyncWatcher] Initial sync: gathering \(newIds.count) items from iCloud...")
+            if newIds.isEmpty && modifiedIds.isEmpty {
+                return ([SidecarImportData](), [SidecarUpdateData](), currentDates)
+            }
+
+            print("[SyncWatcher] Initial sync: gathering \(newIds.count) new, \(modifiedIds.count) modified items...")
 
             var results: [SidecarImportData] = []
             results.reserveCapacity(newIds.count)
@@ -166,44 +186,78 @@ final class SyncWatcher {
                     results.append(data)
                 }
             }
-            return (results, currentIds)
+
+            var updates: [SidecarUpdateData] = []
+            for id in modifiedIds {
+                if let sidecar = MetadataSidecarService.shared.readSidecar(id: id) {
+                    updates.append(SidecarUpdateData(id: id, spaceId: sidecar.spaceId))
+                }
+            }
+
+            return (results, updates, currentDates)
         }.value
 
-        knownSidecarIds = currentIds
+        knownSidecarIds = currentDates
 
-        guard !gathered.isEmpty else { return }
+        guard !gathered.isEmpty || !updates.isEmpty else { return }
 
         // Phase 2: Apply to SwiftData on main actor, in batches
-        print("[SyncWatcher] Initial sync: importing \(gathered.count) items...")
-        var count = 0
-        for data in gathered {
-            applyImport(data)
-            count += 1
-            if count % 20 == 0 {
-                try? context?.save()
-                await Task.yield()
+        if !gathered.isEmpty {
+            print("[SyncWatcher] Initial sync: importing \(gathered.count) items...")
+            var count = 0
+            for data in gathered {
+                applyImport(data)
+                count += 1
+                if count % 20 == 0 {
+                    try? context?.save()
+                    await Task.yield()
+                }
             }
+            print("[SyncWatcher] Initial sync complete: imported \(count) items")
         }
+
+        for update in updates {
+            applySpaceUpdate(update)
+        }
+
         try? context?.save()
-        print("[SyncWatcher] Initial sync complete: imported \(count) items")
     }
 
     /// Ongoing sync — triggered by DispatchSource after debounce.
     private func syncMetadata() async {
         guard context != nil else { return }
 
-        let knownIds = knownSidecarIds
+        let knownDates = knownSidecarIds
 
         // Phase 1: Gather on background thread
-        let (gathered, deletedItemIds, currentIds) = await Task.detached(priority: .userInitiated) {
-            let currentIds = Set(Self.currentSidecarIdsFromDisk())
+        let (gathered, updates, deletedItemIds, currentDates) = await Task.detached(priority: .userInitiated) {
+            let currentDates = Self.currentSidecarIdsWithDatesFromDisk()
+            let currentIds = Set(currentDates.keys)
+            let knownIds = Set(knownDates.keys)
             let newIds = currentIds.subtracting(knownIds)
             let rawDeletedIds = knownIds.subtracting(currentIds)
+
+            // Detect modified sidecars
+            var modifiedIds: Set<String> = []
+            for id in currentIds.intersection(knownIds) {
+                if let currentDate = currentDates[id],
+                   let knownDate = knownDates[id],
+                   currentDate > knownDate {
+                    modifiedIds.insert(id)
+                }
+            }
 
             var gathered: [SidecarImportData] = []
             for id in newIds {
                 if let data = Self.gatherSidecarData(id: id) {
                     gathered.append(data)
+                }
+            }
+
+            var updates: [SidecarUpdateData] = []
+            for id in modifiedIds {
+                if let sidecar = MetadataSidecarService.shared.readSidecar(id: id) {
+                    updates.append(SidecarUpdateData(id: id, spaceId: sidecar.spaceId))
                 }
             }
 
@@ -215,21 +269,25 @@ final class SyncWatcher {
                 }
             }
 
-            return (gathered, deletedItemIds, currentIds)
+            return (gathered, updates, deletedItemIds, currentDates)
         }.value
 
         // Phase 2: Apply on main actor
-        knownSidecarIds = currentIds
+        knownSidecarIds = currentDates
 
         for data in gathered {
             applyImport(data)
+        }
+
+        for update in updates {
+            applySpaceUpdate(update)
         }
 
         for id in deletedItemIds {
             removeItemFromContext(id: id)
         }
 
-        if !gathered.isEmpty || !deletedItemIds.isEmpty {
+        if !gathered.isEmpty || !updates.isEmpty || !deletedItemIds.isEmpty {
             try? context?.save()
         }
     }
@@ -240,7 +298,16 @@ final class SyncWatcher {
 
         let dataId = data.id
         let descriptor = FetchDescriptor<MediaItem>(predicate: #Predicate { $0.id == dataId })
-        if let existing = try? context.fetch(descriptor), !existing.isEmpty { return }
+        if let existing = try? context.fetch(descriptor), let existingItem = existing.first {
+            // Item already imported — still reconcile space assignment
+            if let spaceId = data.sidecar.spaceId, existingItem.space?.id != spaceId {
+                let spaceDescriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
+                existingItem.space = try? context.fetch(spaceDescriptor).first
+            } else if data.sidecar.spaceId == nil && existingItem.space != nil {
+                existingItem.space = nil
+            }
+            return
+        }
 
         guard data.mediaFileFound else {
             print("[SyncWatcher] Media file not found for \(data.id), skipping")
@@ -300,6 +367,26 @@ final class SyncWatcher {
         guard let item = (try? context.fetch(descriptor))?.first else { return }
         context.delete(item)
         print("[SyncWatcher] Removed \(id) (sidecar deleted on other device)")
+    }
+
+    /// Update space assignment on an existing item. No file I/O.
+    private func applySpaceUpdate(_ update: SidecarUpdateData) {
+        guard let context else { return }
+
+        let updateId = update.id
+        let descriptor = FetchDescriptor<MediaItem>(predicate: #Predicate { $0.id == updateId })
+        guard let item = (try? context.fetch(descriptor))?.first else { return }
+
+        if let spaceId = update.spaceId {
+            if item.space?.id != spaceId {
+                let spaceDescriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
+                item.space = try? context.fetch(spaceDescriptor).first
+                print("[SyncWatcher] Updated space for \(update.id) -> \(spaceId)")
+            }
+        } else if item.space != nil {
+            item.space = nil
+            print("[SyncWatcher] Removed space assignment for \(update.id)")
+        }
     }
 
     // MARK: - Spaces Sync
@@ -389,13 +476,20 @@ final class SyncWatcher {
         )
     }
 
-    /// List sidecar IDs from disk. Safe to call from any thread.
-    private nonisolated static func currentSidecarIdsFromDisk() -> [String] {
+    /// List sidecar IDs with their modification dates from disk. Safe to call from any thread.
+    private nonisolated static func currentSidecarIdsWithDatesFromDisk() -> [String: Date] {
         let metadataDir = MediaStorageService.shared.metadataDir
-        let files = (try? FileManager.default.contentsOfDirectory(at: metadataDir, includingPropertiesForKeys: nil)) ?? []
-        return files
-            .filter { $0.pathExtension == "json" }
-            .map { $0.deletingPathExtension().lastPathComponent }
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: metadataDir,
+            includingPropertiesForKeys: [.contentModificationDateKey]
+        )) ?? []
+        var result: [String: Date] = [:]
+        for file in files where file.pathExtension == "json" {
+            let id = file.deletingPathExtension().lastPathComponent
+            let modDate = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            result[id] = modDate
+        }
+        return result
     }
 
     /// Check whether a sidecar was moved to trash (not deleted by remote). Safe to call from any thread.
