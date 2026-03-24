@@ -28,7 +28,12 @@ struct HeroDetailOverlay: View {
     @State private var isExpanded = false
     @State private var isClosing = false
     @State private var image: NSImage?
+    @State private var scrollEnabled = false
     @FocusState private var isFocused: Bool
+
+    private var isTallImage: Bool {
+        !item.isVideo && item.aspectRatio < 0.5
+    }
 
     init(item: MediaItem, sourceFrame: CGRect, onAnimationComplete: @escaping () -> Void) {
         self.item = item
@@ -54,15 +59,30 @@ struct HeroDetailOverlay: View {
 
                 // Image — hero animation (non-video only)
                 if let image, !item.isVideo {
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
+                    if isTallImage {
+                        ScrollView(.vertical, showsIndicators: scrollEnabled) {
+                            Image(nsImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: currentFrame.width)
+                                .onTapGesture { triggerClose() }
+                        }
+                        .scrollDisabled(!scrollEnabled)
                         .frame(width: currentFrame.width, height: currentFrame.height)
-                        .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 12))
-                        .onTapGesture { triggerClose() }
                         .position(x: currentFrame.midX, y: currentFrame.midY)
                         .id(item.id)
+                    } else {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: currentFrame.width, height: currentFrame.height)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 12))
+                            .onTapGesture { triggerClose() }
+                            .position(x: currentFrame.midX, y: currentFrame.midY)
+                            .id(item.id)
+                    }
                 }
 
                 // Video — tap target only. The FloatingVideoLayer renders the actual video.
@@ -113,6 +133,10 @@ struct HeroDetailOverlay: View {
                     withAnimation(SnapSpring.hero) {
                         isExpanded = true
                     }
+                    if isTallImage {
+                        try? await Task.sleep(for: .milliseconds(500))
+                        scrollEnabled = true
+                    }
                     await loadFullResImage()
                 }
             }
@@ -157,6 +181,7 @@ struct HeroDetailOverlay: View {
     private func triggerClose() {
         guard !isClosing else { return }
         isClosing = true
+        scrollEnabled = false
 
         withAnimation(SnapSpring.hero) {
             isExpanded = false
