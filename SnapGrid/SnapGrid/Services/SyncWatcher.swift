@@ -23,6 +23,9 @@ final class SyncWatcher {
     private let storage = MediaStorageService.shared
     private let sidecarService = MetadataSidecarService.shared
 
+    /// Called when new items without analysis are imported via sync.
+    var onNewUnanalyzedItems: (([String]) -> Void)?
+
     // MARK: - Background I/O Types
 
     /// Sendable bridge carrying file-derived data from background thread to main actor.
@@ -123,6 +126,14 @@ final class SyncWatcher {
         self.context = context
         await syncSpaces()          // Spaces FIRST so items can resolve spaceId
         await syncMetadataAsync()
+    }
+
+    /// Force a full re-sync by clearing cached state so every file on disk is re-evaluated.
+    /// Handles additions, modifications, and deletions. Use on app focus to catch iCloud changes
+    /// that DispatchSource may have missed.
+    func resyncFromDisk() async {
+        knownSidecarIds = [:]
+        await syncMetadata()
     }
 
     // MARK: - Debouncing
@@ -275,8 +286,13 @@ final class SyncWatcher {
         // Phase 2: Apply on main actor
         knownSidecarIds = currentDates
 
+        var unanalyzedIds: [String] = []
         for data in gathered {
             applyImport(data)
+            // Track items that arrived without AI analysis (e.g. from iOS share extension)
+            if data.sidecar.imageContext == nil || (data.sidecar.imageContext?.isEmpty ?? true) {
+                unanalyzedIds.append(data.id)
+            }
         }
 
         for update in updates {
@@ -289,6 +305,10 @@ final class SyncWatcher {
 
         if !gathered.isEmpty || !updates.isEmpty || !deletedItemIds.isEmpty {
             try? context?.save()
+        }
+
+        if !unanalyzedIds.isEmpty {
+            onNewUnanalyzedItems?(unanalyzedIds)
         }
     }
 

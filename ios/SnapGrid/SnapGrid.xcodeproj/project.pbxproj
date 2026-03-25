@@ -3,10 +3,11 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A0E9D3DA2F7328AC00E35403 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A0E9D3D02F7328AC00E35403 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A100000001 /* SnapGridApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000001 /* SnapGridApp.swift */; };
 		A100000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000002 /* ContentView.swift */; };
 		A100000003 /* SnapGridItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000003 /* SnapGridItem.swift */; };
@@ -15,7 +16,6 @@
 		A100000006 /* MetadataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000006 /* MetadataLoader.swift */; };
 		A100000007 /* SpacesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000007 /* SpacesManager.swift */; };
 		A100000008 /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000008 /* ThumbnailCache.swift */; };
-		A100000020 /* iCloudDownloadMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000020 /* iCloudDownloadMonitor.swift */; };
 		A100000009 /* Color+SnapGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000009 /* Color+SnapGrid.swift */; };
 		A100000010 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000010 /* OnboardingView.swift */; };
 		A100000011 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000011 /* MainView.swift */; };
@@ -27,11 +27,38 @@
 		A100000017 /* ZoomableImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000017 /* ZoomableImageView.swift */; };
 		A100000018 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000018 /* EmptyStateView.swift */; };
 		A100000019 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B100000019 /* Assets.xcassets */; };
+		A100000020 /* iCloudDownloadMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000020 /* iCloudDownloadMonitor.swift */; };
 		A100000021 /* FullScreenImageOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000021 /* FullScreenImageOverlay.swift */; };
 		A100000022 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B100000022 /* AppIcon.icon */; };
+		A100000023 /* ShareImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000025 /* ShareImportService.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		A0E9D3D82F7328AC00E35403 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = H100000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A0E9D3CF2F7328AC00E35403;
+			remoteInfo = ShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A0E9D3DB2F7328AC00E35403 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A0E9D3DA2F7328AC00E35403 /* ShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		A0E9D3D02F7328AC00E35403 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B100000001 /* SnapGridApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapGridApp.swift; sourceTree = "<group>"; };
 		B100000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B100000003 /* SnapGridItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapGridItem.swift; sourceTree = "<group>"; };
@@ -40,7 +67,6 @@
 		B100000006 /* MetadataLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataLoader.swift; sourceTree = "<group>"; };
 		B100000007 /* SpacesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacesManager.swift; sourceTree = "<group>"; };
 		B100000008 /* ThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCache.swift; sourceTree = "<group>"; };
-		B100000020 /* iCloudDownloadMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudDownloadMonitor.swift; sourceTree = "<group>"; };
 		B100000009 /* Color+SnapGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+SnapGrid.swift"; sourceTree = "<group>"; };
 		B100000010 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		B100000011 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -52,14 +78,37 @@
 		B100000017 /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
 		B100000018 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		B100000019 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B100000020 /* iCloudDownloadMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudDownloadMonitor.swift; sourceTree = "<group>"; };
 		B100000021 /* FullScreenImageOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenImageOverlay.swift; sourceTree = "<group>"; };
 		B100000022 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		B100000023 /* SnapGrid.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SnapGrid.entitlements; sourceTree = "<group>"; };
 		B100000024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B100000025 /* ShareImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareImportService.swift; sourceTree = "<group>"; };
 		C100000001 /* SnapGrid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapGrid.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A0E9D3DE2F7328AC00E35403 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A0E9D3CF2F7328AC00E35403 /* ShareExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A0E9D3D12F7328AC00E35403 /* ShareExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A0E9D3DE2F7328AC00E35403 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ShareExtension; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
+		A0E9D3CD2F7328AC00E35403 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D100000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -74,6 +123,7 @@
 			isa = PBXGroup;
 			children = (
 				E100000002 /* SnapGrid */,
+				A0E9D3D12F7328AC00E35403 /* ShareExtension */,
 				E100000099 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -127,6 +177,7 @@
 				B100000005 /* FileSystemManager.swift */,
 				B100000020 /* iCloudDownloadMonitor.swift */,
 				B100000006 /* MetadataLoader.swift */,
+				B100000025 /* ShareImportService.swift */,
 				B100000007 /* SpacesManager.swift */,
 				B100000008 /* ThumbnailCache.swift */,
 			);
@@ -201,6 +252,7 @@
 			isa = PBXGroup;
 			children = (
 				C100000001 /* SnapGrid.app */,
+				A0E9D3D02F7328AC00E35403 /* ShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -208,6 +260,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A0E9D3CF2F7328AC00E35403 /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A0E9D3DF2F7328AC00E35403 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				A0E9D3CC2F7328AC00E35403 /* Sources */,
+				A0E9D3CD2F7328AC00E35403 /* Frameworks */,
+				A0E9D3CE2F7328AC00E35403 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A0E9D3D12F7328AC00E35403 /* ShareExtension */,
+			);
+			name = ShareExtension;
+			packageProductDependencies = (
+			);
+			productName = ShareExtension;
+			productReference = A0E9D3D02F7328AC00E35403 /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		F100000001 /* SnapGrid */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = G100000003 /* Build configuration list for PBXNativeTarget "SnapGrid" */;
@@ -215,10 +289,12 @@
 				F100000002 /* Sources */,
 				D100000001 /* Frameworks */,
 				F100000003 /* Resources */,
+				A0E9D3DB2F7328AC00E35403 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A0E9D3D92F7328AC00E35403 /* PBXTargetDependency */,
 			);
 			name = SnapGrid;
 			productName = SnapGrid;
@@ -232,9 +308,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1540;
+				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 1540;
 				TargetAttributes = {
+					A0E9D3CF2F7328AC00E35403 = {
+						CreatedOnToolsVersion = 26.3;
+					};
 					F100000001 = {
 						CreatedOnToolsVersion = 15.4;
 					};
@@ -254,11 +333,19 @@
 			projectRoot = "";
 			targets = (
 				F100000001 /* SnapGrid */,
+				A0E9D3CF2F7328AC00E35403 /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A0E9D3CE2F7328AC00E35403 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F100000003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -271,6 +358,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		A0E9D3CC2F7328AC00E35403 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F100000002 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -295,12 +389,84 @@
 				A100000018 /* EmptyStateView.swift in Sources */,
 				A100000020 /* iCloudDownloadMonitor.swift in Sources */,
 				A100000021 /* FullScreenImageOverlay.swift in Sources */,
+				A100000023 /* ShareImportService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		A0E9D3D92F7328AC00E35403 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A0E9D3CF2F7328AC00E35403 /* ShareExtension */;
+			targetProxy = A0E9D3D82F7328AC00E35403 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		A0E9D3DC2F7328AC00E35403 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HJ4HYUU2Y6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapgrid.ios.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A0E9D3DD2F7328AC00E35403 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HJ4HYUU2Y6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapgrid.ios.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		G100000010 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -493,6 +659,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A0E9D3DF2F7328AC00E35403 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A0E9D3DC2F7328AC00E35403 /* Debug */,
+				A0E9D3DD2F7328AC00E35403 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		G100000001 /* Build configuration list for PBXProject "SnapGrid" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
