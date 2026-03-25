@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -21,6 +22,11 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: fileSystem.isAccessGranted)
         .onAppear {
             fileSystem.restoreAccess()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                fileSystem.restoreAccess()
+            }
         }
     }
 }

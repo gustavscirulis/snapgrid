@@ -33,6 +33,7 @@ private struct PageOffsetReporter: View {
 
 struct MainView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedIndex: Int?
     @State private var selectedItemId: String?
     @State private var sourceRect: CGRect = .zero
@@ -252,6 +253,15 @@ struct MainView: View {
         }
         .task {
             await loadContent()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                // Import any images saved by the share extension, then reload
+                if let rootURL = fileSystem.rootURL {
+                    ShareImportService.importPendingItems(to: rootURL)
+                }
+                Task { await loadContent() }
+            }
         }
     }
 

@@ -104,8 +104,16 @@ struct DeletedItemInfo {
     let width: Int
     let height: Int
     let duration: Double?
-    let analysisResult: AnalysisResult?
     let spaceId: String?
+
+    // Snapshot of analysis data — stored as plain values, NOT a reference to
+    // the SwiftData @Model object, which becomes invalid after deletion.
+    let imageContext: String?
+    let imageSummary: String?
+    let patterns: [PatternTag]?
+    let analyzedAt: Date?
+    let analysisProvider: String?
+    let analysisModel: String?
 }
 
 struct ToastMessage: Identifiable {

@@ -205,6 +205,32 @@ struct ContentView: View {
             if UserDefaults.standard.bool(forKey: "keepFilesLocal") {
                 iCloudDownloadManager.shared.downloadAll()
             }
+
+            // Auto-analyze any items that arrived without AI analysis (e.g. from iOS share extension)
+            await importService.analyzeUnanalyzedItems(from: allItems, context: modelContext)
+
+            // Wire SyncWatcher callback — analyze new items arriving via iCloud in real-time
+            syncWatcher.onNewUnanalyzedItems = { ids in
+                Task {
+                    let descriptor = FetchDescriptor<MediaItem>()
+                    guard let items = try? modelContext.fetch(descriptor) else { return }
+                    let newItems = items.filter { ids.contains($0.id) }
+                    for item in newItems {
+                        await importService.analyzeItem(item, context: modelContext)
+                    }
+                }
+            }
+
+        }
+        .task {
+            // Re-sync when app regains focus (picks up iCloud changes from other devices).
+            // Uses resyncFromDisk() which clears cached state and does a full disk comparison,
+            // because DispatchSource doesn't reliably fire for iCloud-synced file changes.
+            for await _ in NotificationCenter.default.notifications(named: NSApplication.didBecomeActiveNotification) {
+                await syncWatcher.resyncFromDisk()
+                // Analyze any new items that arrived without AI analysis
+                await importService.analyzeUnanalyzedItems(from: allItems, context: modelContext)
+            }
         }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .willResetAllData) {
@@ -400,15 +426,21 @@ struct ContentView: View {
     private func deleteItems(_ ids: Set<String>) {
         let items = allItems.filter { ids.contains($0.id) }
         let batch = items.map { item in
-            DeletedItemInfo(
+            let ar = item.analysisResult
+            return DeletedItemInfo(
                 id: item.id,
                 filename: item.filename,
                 mediaType: item.mediaType,
                 width: item.width,
                 height: item.height,
                 duration: item.duration,
-                analysisResult: item.analysisResult,
-                spaceId: item.space?.id
+                spaceId: item.space?.id,
+                imageContext: ar?.imageContext,
+                imageSummary: ar?.imageSummary,
+                patterns: ar?.patterns,
+                analyzedAt: ar?.analyzedAt,
+                analysisProvider: ar?.provider,
+                analysisModel: ar?.model
             )
         }
         appState.pushDeleteBatch(batch)
@@ -444,7 +476,18 @@ struct ContentView: View {
                 height: info.height,
                 duration: info.duration
             )
-            item.analysisResult = info.analysisResult
+            if let ctx = info.imageContext, let summary = info.imageSummary,
+               let patterns = info.patterns, let provider = info.analysisProvider,
+               let model = info.analysisModel {
+                item.analysisResult = AnalysisResult(
+                    imageContext: ctx,
+                    imageSummary: summary,
+                    patterns: patterns,
+                    analyzedAt: info.analyzedAt ?? .now,
+                    provider: provider,
+                    model: model
+                )
+            }
 
             if let spaceId = info.spaceId {
                 let descriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
