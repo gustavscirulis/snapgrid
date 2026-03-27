@@ -46,10 +46,10 @@ class iCloudDownloadMonitor {
 
     private func startPollingIfNeeded() {
         lock.lock()
-        let alreadyPolling = pollingTask != nil
-        lock.unlock()
-
-        guard !alreadyPolling else { return }
+        guard pollingTask == nil else {
+            lock.unlock()
+            return
+        }
 
         let task = Task.detached(priority: .utility) { [weak self] in
             while !Task.isCancelled {
@@ -58,10 +58,47 @@ class iCloudDownloadMonitor {
                 self.checkPendingDownloads()
             }
         }
-
-        lock.lock()
         pollingTask = task
         lock.unlock()
+    }
+
+    /// Wait for a specific file to finish downloading from iCloud.
+    /// Returns when the file is ready or the timeout expires.
+    func waitForDownload(of url: URL, timeout: TimeInterval = 120) async {
+        if isDownloaded(url) { return }
+        requestDownload(for: url)
+
+        let resumeLock = NSLock()
+        var resumed = false
+        var cancellable: AnyCancellable?
+        var timeoutTask: Task<Void, Never>?
+
+        func resumeOnce(_ continuation: CheckedContinuation<Void, Never>) {
+            resumeLock.lock()
+            guard !resumed else { resumeLock.unlock(); return }
+            resumed = true
+            resumeLock.unlock()
+            cancellable?.cancel()
+            timeoutTask?.cancel()
+            continuation.resume()
+        }
+
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            if Task.isCancelled {
+                continuation.resume()
+                return
+            }
+
+            cancellable = fileReady
+                .filter { $0.absoluteString == url.absoluteString }
+                .first()
+                .sink { _ in resumeOnce(continuation) }
+
+            timeoutTask = Task {
+                try? await Task.sleep(for: .seconds(timeout))
+                resumeOnce(continuation)
+            }
+        }
     }
 
     private func checkPendingDownloads() {

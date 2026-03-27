@@ -217,9 +217,9 @@ struct FullScreenImageOverlay: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
         } else if let thumbURL = adjacentItem.thumbnailURL,
-                  let data = try? Data(contentsOf: thumbURL),
-                  let uiImg = UIImage(data: data) {
-            Image(uiImage: uiImg)
+                  let cached = ThumbnailCache.shared.image(for: thumbURL) {
+            // Use cache-only lookup — no file I/O on the main thread
+            Image(uiImage: cached)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
         } else {
@@ -606,6 +606,14 @@ struct FullScreenImageOverlay: View {
     }
 
     private func preloadAdjacentImages() {
+        // Evict images we no longer need — keep at most current ± 1
+        var keepIds: Set<String> = [item.id]
+        if currentIndex > 0 { keepIds.insert(items[currentIndex - 1].id) }
+        if currentIndex < items.count - 1 { keepIds.insert(items[currentIndex + 1].id) }
+        for key in adjacentImages.keys where !keepIds.contains(key) {
+            adjacentImages.removeValue(forKey: key)
+        }
+
         // Preload previous
         if currentIndex > 0 {
             let prevItem = items[currentIndex - 1]

@@ -1,6 +1,5 @@
 import SwiftUI
 import AVKit
-import Combine
 
 struct ImageDetailView: View {
     let item: SnapGridItem
@@ -93,34 +92,7 @@ struct ImageDetailView: View {
 
         // Wait for iCloud download if needed
         if !monitor.isDownloaded(url) {
-            monitor.requestDownload(for: url)
-            // Wait for the monitor to signal this file is ready (up to 60s)
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                var cancellable: AnyCancellable?
-                var timeoutTask: Task<Void, Never>?
-                let lock = NSLock()
-                var resumed = false
-
-                func resumeOnce() {
-                    lock.lock()
-                    guard !resumed else { lock.unlock(); return }
-                    resumed = true
-                    lock.unlock()
-                    cancellable?.cancel()
-                    timeoutTask?.cancel()
-                    continuation.resume()
-                }
-
-                cancellable = monitor.fileReady
-                    .filter { $0.absoluteString == url.absoluteString }
-                    .first()
-                    .sink { _ in resumeOnce() }
-
-                timeoutTask = Task {
-                    try? await Task.sleep(for: .seconds(60))
-                    resumeOnce()
-                }
-            }
+            await monitor.waitForDownload(of: url, timeout: 60)
         }
 
         let newPlayer = AVPlayer(url: url)

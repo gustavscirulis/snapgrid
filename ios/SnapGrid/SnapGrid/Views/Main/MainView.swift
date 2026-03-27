@@ -48,6 +48,7 @@ struct MainView: View {
     @State private var error: String?
     @State private var hasAttemptedRescan = false
     @State private var tabScrollProgress: CGFloat = 0
+    @State private var prefetchTask: Task<Void, Never>?
 
     // MARK: - Index ↔ activeSpaceId bridging
 
@@ -321,10 +322,11 @@ struct MainView: View {
             if let final_ = lastUpdate {
                 self.items = final_.items
                 self.isLoading = false
-                // Prefetch all thumbnails in the background at grid size
+                // Cancel previous prefetch and start a new one
+                prefetchTask?.cancel()
                 let screenWidth = await MainActor.run { UIScreen.main.bounds.width }
                 let columnWidth = (screenWidth - 24 - 8) / 2 // 12pt padding each side, 8pt spacing
-                ThumbnailCache.shared.prefetchThumbnails(for: final_.items, targetPixelWidth: columnWidth * 2)
+                prefetchTask = ThumbnailCache.shared.prefetchThumbnails(for: final_.items, targetPixelWidth: columnWidth * 2)
             }
 
             #if DEBUG

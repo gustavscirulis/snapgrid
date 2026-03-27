@@ -9,27 +9,8 @@ struct MasonryGrid: View {
     private let columns = 2
     private let spacing: CGFloat = 8
 
-    var body: some View {
-        let columnWidth = (availableWidth - spacing * CGFloat(columns - 1)) / CGFloat(columns)
-
-        HStack(alignment: .top, spacing: spacing) {
-            ForEach(0..<columns, id: \.self) { column in
-                LazyVStack(spacing: spacing) {
-                    ForEach(itemsForColumn(column)) { item in
-                        GridItemView(
-                            item: item,
-                            width: columnWidth,
-                            isSelected: selectedItemId == item.id,
-                            onSelect: onItemSelected
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    /// Distribute items across columns using shortest-column-first algorithm
-    private func itemsForColumn(_ column: Int) -> [SnapGridItem] {
+    /// Distribute items across columns using shortest-column-first algorithm (computed once per body)
+    private var columnAssignments: [[SnapGridItem]] {
         var columnHeights = Array(repeating: CGFloat(0), count: columns)
         var columnItems = Array(repeating: [SnapGridItem](), count: columns)
 
@@ -40,6 +21,26 @@ struct MasonryGrid: View {
             columnHeights[shortest] += estimatedHeight + spacing
         }
 
-        return columnItems[column]
+        return columnItems
+    }
+
+    var body: some View {
+        let columnWidth = (availableWidth - spacing * CGFloat(columns - 1)) / CGFloat(columns)
+        let assignments = columnAssignments
+
+        HStack(alignment: .top, spacing: spacing) {
+            ForEach(0..<columns, id: \.self) { column in
+                LazyVStack(spacing: spacing) {
+                    ForEach(assignments[column]) { item in
+                        GridItemView(
+                            item: item,
+                            width: columnWidth,
+                            isSelected: selectedItemId == item.id,
+                            onSelect: onItemSelected
+                        )
+                    }
+                }
+            }
+        }
     }
 }
