@@ -32,11 +32,17 @@ class ThumbnailCache {
 
     private let cache = NSCache<NSString, UIImage>()
     private let limiter = ConcurrencyLimiter(maxConcurrent: 4)
+    private let diskWriteQueue = DispatchQueue(label: "com.snapgrid.thumbnailcache.diskwrite", qos: .utility)
+    private let diskCacheDir: URL
     private var memoryWarningObserver: NSObjectProtocol?
 
     private init() {
         cache.countLimit = 500
         cache.totalCostLimit = 100 * 1024 * 1024 // 100 MB
+
+        let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        diskCacheDir = cachesDir.appendingPathComponent("thumbnails", isDirectory: true)
+        try? FileManager.default.createDirectory(at: diskCacheDir, withIntermediateDirectories: true)
 
         memoryWarningObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
@@ -58,18 +64,27 @@ class ThumbnailCache {
     }
 
     /// Try to load image immediately, downsampled to targetPixelWidth.
-    /// Returns nil if file needs iCloud download.
-    func loadImage(for url: URL, targetPixelWidth: CGFloat = 0) async -> UIImage? {
+    /// Returns nil image if file needs iCloud download.
+    /// `wasCached` is true if the image came from memory or disk cache (no generation needed).
+    func loadImage(for url: URL, targetPixelWidth: CGFloat = 0) async -> (image: UIImage?, wasCached: Bool) {
         let key = cacheKey(for: url, targetPixelWidth: targetPixelWidth)
 
         if let cached = cache.object(forKey: key) {
-            return cached
+            return (cached, true)
+        }
+
+        // Check disk cache
+        let itemId = url.deletingPathExtension().lastPathComponent
+        if let diskImage = loadFromDisk(id: itemId, targetPixelWidth: targetPixelWidth) {
+            let cost = Int(diskImage.size.width * diskImage.size.height * 4)
+            cache.setObject(diskImage, forKey: key, cost: cost)
+            return (diskImage, true)
         }
 
         let monitor = iCloudDownloadMonitor.shared
         if !monitor.isDownloaded(url) {
             monitor.requestDownload(for: url)
-            return nil
+            return (nil, false)
         }
 
         // Throttle concurrent loads using structured concurrency
@@ -78,33 +93,37 @@ class ThumbnailCache {
 
         if url.pathExtension.lowercased() == "mp4" {
             guard let thumbnail = generateVideoThumbnail(for: url) else {
-                return nil
+                return (nil, false)
             }
             let cost = Int(thumbnail.size.width * thumbnail.size.height * 4)
             cache.setObject(thumbnail, forKey: key, cost: cost)
-            return thumbnail
+            saveToDisk(image: thumbnail, id: itemId, targetPixelWidth: targetPixelWidth)
+            return (thumbnail, false)
         }
 
         let image = downsampledImage(at: url, targetPixelWidth: targetPixelWidth)
 
         guard let image else {
-            return nil
+            return (nil, false)
         }
 
         let cost = Int(image.size.width * image.size.height * image.scale * image.scale * 4)
         cache.setObject(image, forKey: key, cost: cost)
-        return image
+        saveToDisk(image: image, id: itemId, targetPixelWidth: targetPixelWidth)
+        return (image, false)
     }
 
     /// Wait for a file to download from iCloud, then load it.
     /// Returns nil only if the timeout expires and the file still can't be loaded.
-    func loadImageWhenReady(for url: URL, timeout: TimeInterval = 120, targetPixelWidth: CGFloat = 0) async -> UIImage? {
-        if let image = await loadImage(for: url, targetPixelWidth: targetPixelWidth) {
-            return image
+    func loadImageWhenReady(for url: URL, timeout: TimeInterval = 120, targetPixelWidth: CGFloat = 0) async -> (image: UIImage?, wasCached: Bool) {
+        let result = await loadImage(for: url, targetPixelWidth: targetPixelWidth)
+        if result.image != nil {
+            return result
         }
 
         await iCloudDownloadMonitor.shared.waitForDownload(of: url, timeout: timeout)
-        return await loadImage(for: url, targetPixelWidth: targetPixelWidth)
+        let retryResult = await loadImage(for: url, targetPixelWidth: targetPixelWidth)
+        return retryResult
     }
 
     func clear() {
@@ -125,6 +144,27 @@ class ThumbnailCache {
                     _ = await self.loadImage(for: mediaURL, targetPixelWidth: targetPixelWidth)
                 }
             }
+        }
+    }
+
+    // MARK: - Disk Cache
+
+    private func diskCacheURL(id: String, targetPixelWidth: CGFloat) -> URL {
+        let filename = targetPixelWidth > 0 ? "\(id)@\(Int(targetPixelWidth))w.jpg" : "\(id).jpg"
+        return diskCacheDir.appendingPathComponent(filename)
+    }
+
+    private func loadFromDisk(id: String, targetPixelWidth: CGFloat) -> UIImage? {
+        let fileURL = diskCacheURL(id: id, targetPixelWidth: targetPixelWidth)
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
+        return UIImage(contentsOfFile: fileURL.path)
+    }
+
+    private func saveToDisk(image: UIImage, id: String, targetPixelWidth: CGFloat) {
+        let fileURL = diskCacheURL(id: id, targetPixelWidth: targetPixelWidth)
+        diskWriteQueue.async {
+            guard let data = image.jpegData(compressionQuality: 0.85) else { return }
+            try? data.write(to: fileURL, options: .atomic)
         }
     }
 

@@ -121,5 +121,6 @@ class FileSystemManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: bookmarkKey)
         self.rootURL = nil
         self.isAccessGranted = false
+        Task { await ItemsCache.shared.clear() }
     }
 }

@@ -298,30 +298,47 @@ struct MainView: View {
         print("[MainView] Loading content... rootURL=\(rootURL.path)")
         #endif
 
-        let loader = MetadataLoader(metadataDir: metadataDir, imagesDir: imagesDir, thumbnailsDir: thumbnailsDir)
         let spacesManager = SpacesManager(rootURL: rootURL)
-
-        // Load spaces early so tabs appear alongside the first items
         let loadedSpaces = (try? spacesManager.loadSpaces()) ?? []
         self.spaces = loadedSpaces
 
+        // Phase 1: Restore from cache for instant display
+        if isInitialLoad, let cached = await ItemsCache.shared.loadCached(imagesDir: imagesDir, thumbnailsDir: thumbnailsDir) {
+            self.items = cached
+            self.isLoading = false
+            #if DEBUG
+            print("[MainView] Restored \(cached.count) items from cache")
+            #endif
+        }
+
+        // Phase 2: Scan filesystem for changes
+        let loader = MetadataLoader(metadataDir: metadataDir, imagesDir: imagesDir, thumbnailsDir: thumbnailsDir)
+        let hadCache = !items.isEmpty
         var lastUpdate: LoadUpdate?
 
         do {
             for try await update in loader.loadItemsProgressively() {
                 lastUpdate = update
-                // On initial load, show items progressively as they're decoded.
-                // On refresh, keep existing items visible until fully loaded.
-                if isInitialLoad {
+                // Only show progressive updates if we have no cached items to display
+                if !hadCache && isInitialLoad {
                     self.items = update.items
                     self.isLoading = false
                 }
             }
 
-            // Apply final result (handles both initial load and refresh)
             if let final_ = lastUpdate {
-                self.items = final_.items
-                self.isLoading = false
+                // Compare with current items — only update UI if something changed
+                let currentIds = Set(items.map(\.id))
+                let freshIds = Set(final_.items.map(\.id))
+
+                if currentIds != freshIds || !hadCache {
+                    self.items = final_.items
+                    self.isLoading = false
+                }
+
+                // Save to cache for next launch
+                await ItemsCache.shared.save(items: final_.items)
+
                 // Cancel previous prefetch and start a new one
                 prefetchTask?.cancel()
                 let screenWidth = await MainActor.run { UIScreen.main.bounds.width }
@@ -348,7 +365,10 @@ struct MainView: View {
             #if DEBUG
             print("[MainView] Error loading: \(error)")
             #endif
-            self.error = error.localizedDescription
+            // Only show error if we have nothing cached to display
+            if items.isEmpty {
+                self.error = error.localizedDescription
+            }
             self.isLoading = false
         }
     }
