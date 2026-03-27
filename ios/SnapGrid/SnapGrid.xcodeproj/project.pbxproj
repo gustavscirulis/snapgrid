@@ -31,6 +31,7 @@
 		A100000021 /* FullScreenImageOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000021 /* FullScreenImageOverlay.swift */; };
 		A100000022 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B100000022 /* AppIcon.icon */; };
 		A100000023 /* ShareImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000025 /* ShareImportService.swift */; };
+		A100000025 /* ItemsCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000026 /* ItemsCache.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -84,6 +85,7 @@
 		B100000023 /* SnapGrid.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SnapGrid.entitlements; sourceTree = "<group>"; };
 		B100000024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B100000025 /* ShareImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareImportService.swift; sourceTree = "<group>"; };
+		B100000026 /* ItemsCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemsCache.swift; sourceTree = "<group>"; };
 		C100000001 /* SnapGrid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapGrid.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -177,6 +179,7 @@
 				B100000005 /* FileSystemManager.swift */,
 				B100000020 /* iCloudDownloadMonitor.swift */,
 				B100000006 /* MetadataLoader.swift */,
+				B100000026 /* ItemsCache.swift */,
 				B100000025 /* ShareImportService.swift */,
 				B100000007 /* SpacesManager.swift */,
 				B100000008 /* ThumbnailCache.swift */,
@@ -390,6 +393,7 @@
 				A100000020 /* iCloudDownloadMonitor.swift in Sources */,
 				A100000021 /* FullScreenImageOverlay.swift in Sources */,
 				A100000023 /* ShareImportService.swift in Sources */,
+				A100000025 /* ItemsCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

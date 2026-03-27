@@ -106,7 +106,7 @@ struct ImageDetailView: View {
             isLoading = false
             return
         }
-        let loaded = await ThumbnailCache.shared.loadImageWhenReady(for: url, timeout: 180)
+        let (loaded, _) = await ThumbnailCache.shared.loadImageWhenReady(for: url, timeout: 180)
         image = loaded
         loadFailed = loaded == nil
         isLoading = false

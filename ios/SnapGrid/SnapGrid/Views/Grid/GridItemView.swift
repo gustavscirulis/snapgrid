@@ -101,21 +101,33 @@ struct GridItemView: View {
         let cache = ThumbnailCache.shared
 
         // Try thumbnail first (fast, no wait)
-        if let thumbURL = item.thumbnailURL,
-           let loaded = await cache.loadImage(for: thumbURL, targetPixelWidth: targetPixelWidth) {
-            withAnimation(.easeIn(duration: 0.25)) {
-                thumbnail = loaded
+        if let thumbURL = item.thumbnailURL {
+            let (loaded, wasCached) = await cache.loadImage(for: thumbURL, targetPixelWidth: targetPixelWidth)
+            if let loaded {
+                if wasCached {
+                    thumbnail = loaded
+                } else {
+                    withAnimation(.easeIn(duration: 0.25)) {
+                        thumbnail = loaded
+                    }
+                }
+                return
             }
-            return
         }
 
         // Fall back to media file (wait for iCloud download if needed)
-        if let mediaURL = item.mediaURL,
-           let loaded = await cache.loadImageWhenReady(for: mediaURL, timeout: 180, targetPixelWidth: targetPixelWidth) {
-            withAnimation(.easeIn(duration: 0.25)) {
-                thumbnail = loaded
+        if let mediaURL = item.mediaURL {
+            let (loaded, wasCached) = await cache.loadImageWhenReady(for: mediaURL, timeout: 180, targetPixelWidth: targetPixelWidth)
+            if let loaded {
+                if wasCached {
+                    thumbnail = loaded
+                } else {
+                    withAnimation(.easeIn(duration: 0.25)) {
+                        thumbnail = loaded
+                    }
+                }
+                return
             }
-            return
         }
 
         loadFailed = true

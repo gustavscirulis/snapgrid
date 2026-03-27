@@ -593,7 +593,7 @@ struct FullScreenImageOverlay: View {
             return
         }
         Task {
-            image = await ThumbnailCache.shared.loadImage(for: url)
+            image = await ThumbnailCache.shared.loadImage(for: url).image
             isLoading = false
         }
     }
@@ -619,7 +619,7 @@ struct FullScreenImageOverlay: View {
             let prevItem = items[currentIndex - 1]
             if adjacentImages[prevItem.id] == nil, let url = prevItem.mediaURL ?? prevItem.thumbnailURL {
                 Task {
-                    if let img = await ThumbnailCache.shared.loadImage(for: url) {
+                    if let img = await ThumbnailCache.shared.loadImage(for: url).image {
                         adjacentImages[prevItem.id] = img
                     }
                 }
@@ -630,7 +630,7 @@ struct FullScreenImageOverlay: View {
             let nextItem = items[currentIndex + 1]
             if adjacentImages[nextItem.id] == nil, let url = nextItem.mediaURL ?? nextItem.thumbnailURL {
                 Task {
-                    if let img = await ThumbnailCache.shared.loadImage(for: url) {
+                    if let img = await ThumbnailCache.shared.loadImage(for: url).image {
                         adjacentImages[nextItem.id] = img
                     }
                 }
