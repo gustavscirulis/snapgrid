@@ -51,18 +51,23 @@ enum ShareImportService {
             let dstMetadata = metadataDir.appendingPathComponent(jsonURL.lastPathComponent)
 
             // Move image first (SyncWatcher checks for media when sidecar arrives)
-            if fm.fileExists(atPath: srcImage.path) {
-                do {
-                    if fm.fileExists(atPath: dstImage.path) {
-                        try fm.removeItem(at: dstImage)
-                    }
-                    try fm.moveItem(at: srcImage, to: dstImage)
-                } catch {
-                    #if DEBUG
-                    print("[ShareImport] Failed to move image \(id): \(error)")
-                    #endif
-                    continue
+            guard fm.fileExists(atPath: srcImage.path) else {
+                #if DEBUG
+                print("[ShareImport] Source image missing for \(id), skipping")
+                #endif
+                continue
+            }
+
+            do {
+                if fm.fileExists(atPath: dstImage.path) {
+                    try fm.removeItem(at: dstImage)
                 }
+                try fm.moveItem(at: srcImage, to: dstImage)
+            } catch {
+                #if DEBUG
+                print("[ShareImport] Failed to move image \(id): \(error)")
+                #endif
+                continue
             }
 
             // Then move metadata sidecar

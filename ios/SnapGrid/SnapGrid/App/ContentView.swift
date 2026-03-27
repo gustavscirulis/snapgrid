@@ -24,7 +24,7 @@ struct ContentView: View {
             fileSystem.restoreAccess()
         }
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
+            if newPhase == .active && !fileSystem.isAccessGranted {
                 fileSystem.restoreAccess()
             }
         }

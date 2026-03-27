@@ -1,14 +1,37 @@
 import UIKit
 import ImageIO
 import AVFoundation
-import Combine
+
+/// Actor-based concurrency limiter to replace DispatchSemaphore in async contexts.
+private actor ConcurrencyLimiter {
+    private let maxConcurrent: Int
+    private var running = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(maxConcurrent: Int) { self.maxConcurrent = maxConcurrent }
+
+    func acquire() async {
+        if running < maxConcurrent {
+            running += 1
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func release() {
+        running -= 1
+        if !waiters.isEmpty {
+            running += 1
+            waiters.removeFirst().resume()
+        }
+    }
+}
 
 class ThumbnailCache {
     static let shared = ThumbnailCache()
 
     private let cache = NSCache<NSString, UIImage>()
-    private let loadSemaphore = DispatchSemaphore(value: 4)
-    private let ioQueue = DispatchQueue(label: "com.snapgrid.thumbnailcache", qos: .userInitiated, attributes: .concurrent)
+    private let limiter = ConcurrencyLimiter(maxConcurrent: 4)
     private var memoryWarningObserver: NSObjectProtocol?
 
     private init() {
@@ -43,114 +66,45 @@ class ThumbnailCache {
             return cached
         }
 
-        return await withCheckedContinuation { continuation in
-            ioQueue.async { [weak self] in
-                guard let self else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                let monitor = iCloudDownloadMonitor.shared
-
-                if !monitor.isDownloaded(url) {
-                    monitor.requestDownload(for: url)
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                // Throttle concurrent loads
-                self.loadSemaphore.wait()
-                defer { self.loadSemaphore.signal() }
-
-                if url.pathExtension.lowercased() == "mp4" {
-                    guard let thumbnail = self.generateVideoThumbnail(for: url) else {
-                        continuation.resume(returning: nil)
-                        return
-                    }
-                    let cost = Int(thumbnail.size.width * thumbnail.size.height * 4)
-                    self.cache.setObject(thumbnail, forKey: key, cost: cost)
-                    continuation.resume(returning: thumbnail)
-                    return
-                }
-
-                let image: UIImage?
-                if targetPixelWidth > 0 {
-                    image = self.downsampledImage(at: url, targetPixelWidth: targetPixelWidth)
-                } else {
-                    image = self.downsampledImage(at: url, targetPixelWidth: 0)
-                }
-
-                guard let image else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                let cost = Int(image.size.width * image.size.height * image.scale * image.scale * 4)
-                self.cache.setObject(image, forKey: key, cost: cost)
-                continuation.resume(returning: image)
-            }
+        let monitor = iCloudDownloadMonitor.shared
+        if !monitor.isDownloaded(url) {
+            monitor.requestDownload(for: url)
+            return nil
         }
+
+        // Throttle concurrent loads using structured concurrency
+        await limiter.acquire()
+        defer { Task { await limiter.release() } }
+
+        if url.pathExtension.lowercased() == "mp4" {
+            guard let thumbnail = generateVideoThumbnail(for: url) else {
+                return nil
+            }
+            let cost = Int(thumbnail.size.width * thumbnail.size.height * 4)
+            cache.setObject(thumbnail, forKey: key, cost: cost)
+            return thumbnail
+        }
+
+        let image = downsampledImage(at: url, targetPixelWidth: targetPixelWidth)
+
+        guard let image else {
+            return nil
+        }
+
+        let cost = Int(image.size.width * image.size.height * image.scale * image.scale * 4)
+        cache.setObject(image, forKey: key, cost: cost)
+        return image
     }
 
     /// Wait for a file to download from iCloud, then load it.
-    /// Returns nil only if the timeout expires.
+    /// Returns nil only if the timeout expires and the file still can't be loaded.
     func loadImageWhenReady(for url: URL, timeout: TimeInterval = 120, targetPixelWidth: CGFloat = 0) async -> UIImage? {
         if let image = await loadImage(for: url, targetPixelWidth: targetPixelWidth) {
             return image
         }
 
-        let monitor = iCloudDownloadMonitor.shared
-        monitor.requestDownload(for: url)
-
-        let resumeLock = NSLock()
-        var resumed = false
-        var cancellable: AnyCancellable?
-        var timeoutTask: Task<Void, Never>?
-
-        func resumeOnce(with image: UIImage?, continuation: CheckedContinuation<UIImage?, Never>) {
-            resumeLock.lock()
-            guard !resumed else {
-                resumeLock.unlock()
-                return
-            }
-            resumed = true
-            resumeLock.unlock()
-            cancellable?.cancel()
-            timeoutTask?.cancel()
-            continuation.resume(returning: image)
-        }
-
-        return await withCheckedContinuation { continuation in
-            if Task.isCancelled {
-                continuation.resume(returning: nil)
-                return
-            }
-
-            cancellable = monitor.fileReady
-                .filter { $0.absoluteString == url.absoluteString }
-                .first()
-                .receive(on: DispatchQueue.global(qos: .userInitiated))
-                .sink { [weak self] readyURL in
-                    guard let self = self else {
-                        resumeOnce(with: nil, continuation: continuation)
-                        return
-                    }
-                    Task {
-                        let image = await self.loadImage(for: readyURL, targetPixelWidth: targetPixelWidth)
-                        resumeOnce(with: image, continuation: continuation)
-                    }
-                }
-
-            timeoutTask = Task {
-                try? await Task.sleep(for: .seconds(timeout))
-                if Task.isCancelled {
-                    resumeOnce(with: nil, continuation: continuation)
-                    return
-                }
-                let lastTry = await self.loadImage(for: url, targetPixelWidth: targetPixelWidth)
-                resumeOnce(with: lastTry, continuation: continuation)
-            }
-        }
+        await iCloudDownloadMonitor.shared.waitForDownload(of: url, timeout: timeout)
+        return await loadImage(for: url, targetPixelWidth: targetPixelWidth)
     }
 
     func clear() {
@@ -159,7 +113,8 @@ class ThumbnailCache {
 
     /// Prefetch thumbnails for a batch of items in the background.
     /// Loads at lower priority so it doesn't block on-screen cells.
-    func prefetchThumbnails(for items: [SnapGridItem], targetPixelWidth: CGFloat) {
+    @discardableResult
+    func prefetchThumbnails(for items: [SnapGridItem], targetPixelWidth: CGFloat) -> Task<Void, Never> {
         Task.detached(priority: .utility) {
             for item in items {
                 if Task.isCancelled { break }
