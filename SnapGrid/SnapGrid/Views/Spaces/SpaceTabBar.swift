@@ -24,6 +24,7 @@ struct SpaceTabBar: View {
     @State private var editingSpaceId: String?
     @State private var editName: String = ""
     @State private var dropTargetId: String?
+    @State private var spaceToDelete: Space?
     @FocusState private var isEditingFocused: Bool
     @Namespace private var tabNamespace
 
@@ -72,6 +73,24 @@ struct SpaceTabBar: View {
         .overlay(alignment: .bottom) {
             Divider().opacity(0.5)
         }
+        .alert("Delete Space?", isPresented: Binding(
+            get: { spaceToDelete != nil },
+            set: { if !$0 { spaceToDelete = nil } }
+        )) {
+            Button("Cancel", role: .cancel) {
+                spaceToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let space = spaceToDelete {
+                    onDeleteSpace(space.id)
+                    spaceToDelete = nil
+                }
+            }
+        } message: {
+            if let space = spaceToDelete {
+                Text("\"\(space.name)\" contains \(space.items.count) item\(space.items.count == 1 ? "" : "s"). They won't be deleted, but will be unassigned from this space.")
+            }
+        }
         .onChange(of: pendingEditSpaceId) { _, newValue in
             if let spaceId = newValue,
                let space = spaces.first(where: { $0.id == spaceId }) {
@@ -114,7 +133,11 @@ struct SpaceTabBar: View {
                     }
                     Divider()
                     Button("Delete", role: .destructive) {
-                        onDeleteSpace(space.id)
+                        if space.items.isEmpty {
+                            onDeleteSpace(space.id)
+                        } else {
+                            spaceToDelete = space
+                        }
                     }
                 }
                 .onDoubleClick {
