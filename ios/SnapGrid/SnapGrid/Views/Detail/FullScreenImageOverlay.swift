@@ -793,9 +793,15 @@ struct FullScreenImageOverlay: View {
 
     private func prepareVideoIfNeeded() {
         guard item.isVideo, let url = item.mediaURL else { return }
-        let newPlayer = AVPlayer(url: url)
-        self.player = newPlayer
-        newPlayer.play()
+        Task {
+            let monitor = iCloudDownloadMonitor.shared
+            if !monitor.isDownloaded(url) {
+                await monitor.waitForDownload(of: url, timeout: 60)
+            }
+            let newPlayer = AVPlayer(url: url)
+            self.player = newPlayer
+            newPlayer.play()
+        }
     }
 
     // MARK: - Adjacent Images
