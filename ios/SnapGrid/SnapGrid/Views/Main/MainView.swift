@@ -236,7 +236,7 @@ struct MainView: View {
                         sourceRect: sourceRect,
                         screenSize: geo.size,
                         thumbnailImage: thumbnailImage,
-                        gridItemRects: gridItemRects,
+                        gridItemRects: $gridItemRects,
                         onDismissing: { currentItemId in
                             selectedItemId = currentItemId
                         },
@@ -249,6 +249,9 @@ struct MainView: View {
                                 selectedItemId = nil
                                 thumbnailImage = nil
                             }
+                        },
+                        onSearchPattern: { pattern in
+                            searchText = pattern
                         }
                     )
                 }

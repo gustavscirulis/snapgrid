@@ -65,9 +65,10 @@ struct FullScreenImageOverlay: View {
     let sourceRect: CGRect
     let screenSize: CGSize
     let thumbnailImage: UIImage?
-    let gridItemRects: [String: CGRect]
+    @Binding var gridItemRects: [String: CGRect]
     var onDismissing: ((String) -> Void)?
     var onClose: () -> Void
+    var onSearchPattern: ((String) -> Void)?
 
     /// Captured at open time — stays stable even when parent re-filters.
     @State private var items: [MediaItem]
@@ -111,6 +112,8 @@ struct FullScreenImageOverlay: View {
     private enum GestureMode { case none, dismiss, scroll, swipe, zoomPan }
     @State private var gestureMode: GestureMode = .none
 
+    // Search-triggered close (skips rect correction since grid has re-laid out)
+    @State private var isSearchDismiss = false
 
     // Close target frame (updated reactively from grid rects)
     @State private var closeTargetFrame: CGRect
@@ -131,18 +134,20 @@ struct FullScreenImageOverlay: View {
         sourceRect: CGRect,
         screenSize: CGSize,
         thumbnailImage: UIImage?,
-        gridItemRects: [String: CGRect],
+        gridItemRects: Binding<[String: CGRect]>,
         onDismissing: ((String) -> Void)? = nil,
-        onClose: @escaping () -> Void
+        onClose: @escaping () -> Void,
+        onSearchPattern: ((String) -> Void)? = nil
     ) {
         _items = State(initialValue: items)
         self.startIndex = startIndex
         self.sourceRect = sourceRect
         self.screenSize = screenSize
         self.thumbnailImage = thumbnailImage
-        self.gridItemRects = gridItemRects
+        _gridItemRects = gridItemRects
         self.onDismissing = onDismissing
         self.onClose = onClose
+        self.onSearchPattern = onSearchPattern
         _currentIndex = State(initialValue: startIndex)
         _closeTargetFrame = State(initialValue: sourceRect)
     }
@@ -288,7 +293,9 @@ struct FullScreenImageOverlay: View {
 
             // Metadata — positioned so top starts near screen bottom (peek)
             GeometryReader { _ in
-                DetailMetadataSection(item: item, stage: metadataStage)
+                DetailMetadataSection(item: item, stage: metadataStage) { pattern in
+                    searchAndClose(pattern: pattern)
+                }
                     .id(item.id)
                     .frame(width: max(min(finalFrame.width, screen.width - 32), 300))
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -615,6 +622,19 @@ struct FullScreenImageOverlay: View {
         }
     }
 
+    // MARK: - Search & Close
+
+    private func searchAndClose(pattern: String) {
+        guard !isClosing else { return }
+        isSearchDismiss = true
+        onSearchPattern?(pattern)
+        // Wait for grid to re-filter and re-layout, then close to new position
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(200))
+            close()
+        }
+    }
+
     // MARK: - Close
 
     private func close() {
@@ -639,20 +659,24 @@ struct FullScreenImageOverlay: View {
 
         if let targetRect {
             // Grid cell is visible — hero animation back to it
-            // Apply correction: sourceRect is ground truth for the original item.
-            // Preference-based rects may have a systematic offset (e.g. from
-            // off-screen TabView pages), so anchor to sourceRect.
-            let originalItemId = items[startIndex].id
             var correctedRect = targetRect
-            if let originalGridRect = gridItemRects[originalItemId] {
-                let xCorrection = sourceRect.midX - originalGridRect.midX
-                let yCorrection = sourceRect.midY - originalGridRect.midY
-                correctedRect = CGRect(
-                    x: targetRect.origin.x + xCorrection,
-                    y: targetRect.origin.y + yCorrection,
-                    width: targetRect.width,
-                    height: targetRect.height
-                )
+            if !isSearchDismiss {
+                // Apply correction: sourceRect is ground truth for the original item.
+                // Preference-based rects may have a systematic offset (e.g. from
+                // off-screen TabView pages), so anchor to sourceRect.
+                // Skip this after search-triggered close — grid has re-laid out
+                // with new items, so the original correction is invalid.
+                let originalItemId = items[startIndex].id
+                if let originalGridRect = gridItemRects[originalItemId] {
+                    let xCorrection = sourceRect.midX - originalGridRect.midX
+                    let yCorrection = sourceRect.midY - originalGridRect.midY
+                    correctedRect = CGRect(
+                        x: targetRect.origin.x + xCorrection,
+                        y: targetRect.origin.y + yCorrection,
+                        width: targetRect.width,
+                        height: targetRect.height
+                    )
+                }
             }
 
             onDismissing?(currentItemId)
@@ -750,6 +774,7 @@ struct FullScreenImageOverlay: View {
 private struct DetailMetadataSection: View {
     let item: MediaItem
     let stage: Int
+    var onSearchPattern: ((String) -> Void)?
     @State private var isDescriptionExpanded = false
 
     var body: some View {
@@ -793,6 +818,11 @@ private struct DetailMetadataSection: View {
                                 .padding(.vertical, 5)
                                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                                 .environment(\.colorScheme, .dark)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    onSearchPattern?(pattern.name)
+                                }
                                 .opacity(stage >= 2 ? 1 : 0)
                                 .offset(y: stage >= 2 ? 0 : MetadataReveal.slideDistance)
                                 .animation(
