@@ -9,11 +9,16 @@ struct ContentView: View {
     @State private var appState = AppState()
     @State private var videoPreview = VideoPreviewManager()
     @State private var importService = ImportService()
+    @State private var searchService = SearchIndexService()
 
     @State private var syncWatcher = SyncWatcher()
     @State private var isDragTargeted = false
     @State private var pendingEditSpaceId: String?
     @State private var showElectronImport = false
+    @State private var debounceTask: Task<Void, Never>?
+    /// Pre-computed search scores keyed by item ID. Empty = no active search.
+    @State private var searchScores: [String: Double] = [:]
+    @State private var isSearchActive = false
     @AppStorage("appTheme") private var themeSetting: String = AppTheme.system.rawValue
 
     private func itemsForSpace(_ spaceId: String?) -> [MediaItem] {
@@ -23,26 +28,24 @@ struct ContentView: View {
             items = items.filter { $0.space?.id == spaceId }
         }
 
-        if !appState.searchText.isEmpty {
-            let query = appState.searchText.lowercased()
-            items = items.filter { item in
-                if let patterns = item.analysisResult?.patterns,
-                   patterns.contains(where: { $0.name.lowercased().contains(query) }) {
-                    return true
-                }
-                if let context = item.analysisResult?.imageContext.lowercased(), context.contains(query) {
-                    return true
-                }
-                if let summary = item.analysisResult?.imageSummary.lowercased(), summary.contains(query) {
-                    return true
-                }
-                if query == "video" && item.isVideo { return true }
-                if query == "image" && !item.isVideo { return true }
-                return false
-            }
+        guard isSearchActive else { return items }
+
+        let scores = searchScores
+        guard !scores.isEmpty else {
+            // Search is active but no results yet — check for special keywords
+            let query = appState.searchText.lowercased().trimmingCharacters(in: .whitespaces)
+            if query == "video" { return items.filter { $0.isVideo } }
+            if query == "image" { return items.filter { !$0.isVideo } }
+            return []
         }
 
         return items
+            .filter { scores[$0.id] != nil }
+            .sorted { a, b in
+                let scoreA = scores[a.id] ?? 0
+                let scoreB = scores[b.id] ?? 0
+                return scoreA > scoreB
+            }
     }
 
     private var activeFilteredItems: [MediaItem] {
@@ -203,6 +206,31 @@ struct ContentView: View {
                 syncWatcher.endLocalChange()
             }
         }
+        .onChange(of: appState.searchText) { _, newValue in
+            debounceTask?.cancel()
+            let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty {
+                isSearchActive = false
+                searchScores = [:]
+            } else {
+                isSearchActive = true
+                debounceTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(100))
+                    guard !Task.isCancelled else { return }
+
+                    let lowered = trimmed.lowercased()
+                    if lowered == "video" || lowered == "image" {
+                        searchScores = [:]
+                        return
+                    }
+
+                    // BM25 search: <1ms, pure dictionary lookups + arithmetic
+                    let results = searchService.search(query: trimmed)
+                    guard !Task.isCancelled else { return }
+                    searchScores = Dictionary(uniqueKeysWithValues: results.map { ($0.itemId, $0.score) })
+                }
+            }
+        }
         .task {
             MediaStorageService.shared.emptyOldTrash()
             MigrationService.migrateIfNeeded(context: modelContext)
@@ -220,6 +248,11 @@ struct ContentView: View {
 
             // Auto-analyze any items that arrived without AI analysis (e.g. from iOS share extension)
             await importService.analyzeUnanalyzedItems(from: allItems, context: modelContext)
+
+            // Build search index from metadata (instant — pure tokenization + dictionary building)
+            searchService.buildIndex(items: allItems)
+            // Build word-vector embeddings in background for synonym matching (non-blocking)
+            searchService.buildEmbeddingsInBackground(items: allItems)
 
             // Wire SyncWatcher callback — analyze new items arriving via iCloud in real-time
             syncWatcher.onNewUnanalyzedItems = { ids in
@@ -242,6 +275,17 @@ struct ContentView: View {
                 await syncWatcher.resyncFromDisk()
                 // Analyze any new items that arrived without AI analysis
                 await importService.analyzeUnanalyzedItems(from: allItems, context: modelContext)
+            }
+        }
+        .onChange(of: allItems.count) { _, _ in
+            // Rebuild index when items are added/removed (covers imports, syncs, deletions)
+            searchService.buildIndex(items: allItems)
+        }
+        .task {
+            for await notification in NotificationCenter.default.notifications(named: .analysisCompleted) {
+                guard let itemId = notification.userInfo?["itemId"] as? String,
+                      let item = allItems.first(where: { $0.id == itemId }) else { continue }
+                searchService.addToIndex(item: item)
             }
         }
         .task {

@@ -188,6 +188,7 @@ final class ImportService {
             item.analysisError = nil
             try? context.save()
             sidecarService.writeSidecar(for: item)
+            NotificationCenter.default.post(name: .analysisCompleted, object: nil, userInfo: ["itemId": item.id])
         } catch {
             print("[Analysis] Failed for \(item.id): \(error)")
             item.isAnalyzing = false

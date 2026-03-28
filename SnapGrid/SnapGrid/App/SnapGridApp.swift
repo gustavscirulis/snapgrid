@@ -143,4 +143,5 @@ extension Notification.Name {
     static let selectAll = Notification.Name("selectAll")
     static let pasteImages = Notification.Name("pasteImages")
     static let deleteSelected = Notification.Name("deleteSelected")
+    static let analysisCompleted = Notification.Name("analysisCompleted")
 }
