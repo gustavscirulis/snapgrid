@@ -12,7 +12,7 @@ struct SpaceTabBar: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 2) {
+            HStack(spacing: 4) {
                 TabButton(title: "All", index: 0, isActive: activeSpaceId == nil) {
                     activeSpaceId = nil
                 }
@@ -23,7 +23,7 @@ struct SpaceTabBar: View {
                     }
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 16)
             .overlayPreferenceValue(TabAnchorPreferenceKey.self) { anchors in
                 GeometryReader { proxy in
                     let frames = anchors.mapValues { proxy[$0] }
@@ -33,14 +33,14 @@ struct SpaceTabBar: View {
         }
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.white.opacity(0.08))
+                .fill(Color.white.opacity(0.15))
                 .frame(height: 1)
         }
     }
 
     @ViewBuilder
     private func tabUnderline(frames: [Int: CGRect], containerHeight: CGFloat) -> some View {
-        let inset: CGFloat = 12
+        let inset: CGFloat = 8
         let floorIndex = max(0, Int(scrollProgress))
         let ceilIndex = floorIndex + 1
         let fraction = scrollProgress - CGFloat(floorIndex)
@@ -86,10 +86,16 @@ private struct TabButton: View {
             action()
         } label: {
             Text(title)
-                .font(.system(size: 16, weight: isActive ? .medium : .regular))
-                .foregroundStyle(isActive ? .white : .white.opacity(0.5))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 12)
+                .font(.system(size: 15, weight: .medium))
+                .hidden()
+                .overlay {
+                    Text(title)
+                        .font(.system(size: 15, weight: isActive ? .medium : .regular))
+                        .foregroundStyle(isActive ? .white : .white.opacity(0.5))
+                }
+                .padding(.horizontal, 10)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isActive ? .isSelected : [])
