@@ -289,6 +289,7 @@ struct FullScreenImageOverlay: View {
             // Metadata — positioned so top starts near screen bottom (peek)
             GeometryReader { _ in
                 DetailMetadataSection(item: item, stage: metadataStage)
+                    .id(item.id)
                     .frame(width: max(min(finalFrame.width, screen.width - 32), 300))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .offset(y: metadataTopY - contentOffset)
@@ -591,7 +592,7 @@ struct FullScreenImageOverlay: View {
                 currentIndex = newIndex
                 hasNavigated = true
                 swipeOffset = 0
-                metadataStage = 0
+                metadataStage = 4
                 contentOffset = 0
                 isZoomed = false
                 zoomScale = minZoomScale
@@ -603,13 +604,14 @@ struct FullScreenImageOverlay: View {
 
             onDismissing?(items[newIndex].id)
 
+            revealTask?.cancel()
+
             loadTask?.cancel()
             loadTask = Task {
                 await loadCurrentItem()
             }
             preloadAdjacentImages()
             isNavigating = false
-            startMetadataReveal()
         }
     }
 
