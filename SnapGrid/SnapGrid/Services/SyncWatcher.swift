@@ -114,8 +114,10 @@ final class SyncWatcher {
     func stopWatching() {
         metadataSource?.cancel()
         metadataSource = nil
+        metadataFD = -1
         spacesSource?.cancel()
         spacesSource = nil
+        spacesFD = -1
         debounceTask?.cancel()
         spacesDebounceTask?.cancel()
         context = nil
@@ -160,15 +162,20 @@ final class SyncWatcher {
 
     // MARK: - Metadata Sync
 
-    /// Async version for initial sync — gathers file data on background thread,
-    /// then applies to SwiftData on main actor in batches.
-    private func syncMetadataAsync() async {
-        guard context != nil else { return }
+    /// Result of gathering file changes on a background thread.
+    private struct GatheredChanges: Sendable {
+        let newItems: [SidecarImportData]
+        let updates: [SidecarUpdateData]
+        let deletedIds: Set<String>
+        let currentDates: [String: Date]
+    }
 
+    /// Shared Phase 1: Gather all file-derived changes on a background thread.
+    /// When `detectDeletions` is true (ongoing sync), also reports IDs that disappeared from disk.
+    private func gatherChangesFromDisk(detectDeletions: Bool) async -> GatheredChanges {
         let knownDates = knownSidecarIds
 
-        // Phase 1: Gather all file data on a background thread
-        let (gathered, updates, currentDates) = await Task.detached(priority: .userInitiated) {
+        return await Task.detached(priority: .userInitiated) {
             let currentDates = Self.currentSidecarIdsWithDatesFromDisk()
             let currentIds = Set(currentDates.keys)
             let knownIds = Set(knownDates.keys)
@@ -184,17 +191,11 @@ final class SyncWatcher {
                 }
             }
 
-            if newIds.isEmpty && modifiedIds.isEmpty {
-                return ([SidecarImportData](), [SidecarUpdateData](), currentDates)
-            }
-
-            print("[SyncWatcher] Initial sync: gathering \(newIds.count) new, \(modifiedIds.count) modified items...")
-
-            var results: [SidecarImportData] = []
-            results.reserveCapacity(newIds.count)
+            var newItems: [SidecarImportData] = []
+            newItems.reserveCapacity(newIds.count)
             for id in newIds {
                 if let data = Self.gatherSidecarData(id: id) {
-                    results.append(data)
+                    newItems.append(data)
                 }
             }
 
@@ -205,18 +206,38 @@ final class SyncWatcher {
                 }
             }
 
-            return (results, updates, currentDates)
+            // Filter out items moved to local trash (not truly deleted by remote)
+            var deletedIds: Set<String> = []
+            if detectDeletions {
+                let rawDeletedIds = knownIds.subtracting(currentIds)
+                for id in rawDeletedIds {
+                    if !Self.isInTrash(id: id) {
+                        deletedIds.insert(id)
+                    }
+                }
+            }
+
+            return GatheredChanges(
+                newItems: newItems, updates: updates,
+                deletedIds: deletedIds, currentDates: currentDates
+            )
         }.value
+    }
 
-        knownSidecarIds = currentDates
+    /// Initial sync on launch — gathers then applies in batches with yielding.
+    private func syncMetadataAsync() async {
+        guard context != nil else { return }
 
-        guard !gathered.isEmpty || !updates.isEmpty else { return }
+        let changes = await gatherChangesFromDisk(detectDeletions: false)
+        knownSidecarIds = changes.currentDates
 
-        // Phase 2: Apply to SwiftData on main actor, in batches
-        if !gathered.isEmpty {
-            print("[SyncWatcher] Initial sync: importing \(gathered.count) items...")
+        guard !changes.newItems.isEmpty || !changes.updates.isEmpty else { return }
+
+        // Apply to SwiftData on main actor, in batches
+        if !changes.newItems.isEmpty {
+            print("[SyncWatcher] Initial sync: importing \(changes.newItems.count) items...")
             var count = 0
-            for data in gathered {
+            for data in changes.newItems {
                 applyImport(data)
                 count += 1
                 if count % 20 == 0 {
@@ -227,7 +248,7 @@ final class SyncWatcher {
             print("[SyncWatcher] Initial sync complete: imported \(count) items")
         }
 
-        for update in updates {
+        for update in changes.updates {
             applySpaceUpdate(update)
         }
 
@@ -238,72 +259,26 @@ final class SyncWatcher {
     private func syncMetadata() async {
         guard context != nil else { return }
 
-        let knownDates = knownSidecarIds
-
-        // Phase 1: Gather on background thread
-        let (gathered, updates, deletedItemIds, currentDates) = await Task.detached(priority: .userInitiated) {
-            let currentDates = Self.currentSidecarIdsWithDatesFromDisk()
-            let currentIds = Set(currentDates.keys)
-            let knownIds = Set(knownDates.keys)
-            let newIds = currentIds.subtracting(knownIds)
-            let rawDeletedIds = knownIds.subtracting(currentIds)
-
-            // Detect modified sidecars
-            var modifiedIds: Set<String> = []
-            for id in currentIds.intersection(knownIds) {
-                if let currentDate = currentDates[id],
-                   let knownDate = knownDates[id],
-                   currentDate > knownDate {
-                    modifiedIds.insert(id)
-                }
-            }
-
-            var gathered: [SidecarImportData] = []
-            for id in newIds {
-                if let data = Self.gatherSidecarData(id: id) {
-                    gathered.append(data)
-                }
-            }
-
-            var updates: [SidecarUpdateData] = []
-            for id in modifiedIds {
-                if let sidecar = MetadataSidecarService.shared.readSidecar(id: id) {
-                    updates.append(SidecarUpdateData(id: id, spaceId: sidecar.spaceId))
-                }
-            }
-
-            // Filter out items that were moved to trash (not truly deleted by remote)
-            var deletedItemIds: Set<String> = []
-            for id in rawDeletedIds {
-                if !Self.isInTrash(id: id) {
-                    deletedItemIds.insert(id)
-                }
-            }
-
-            return (gathered, updates, deletedItemIds, currentDates)
-        }.value
-
-        // Phase 2: Apply on main actor
-        knownSidecarIds = currentDates
+        let changes = await gatherChangesFromDisk(detectDeletions: true)
+        knownSidecarIds = changes.currentDates
 
         var unanalyzedIds: [String] = []
-        for data in gathered {
+        for data in changes.newItems {
             applyImport(data)
-            // Track items that arrived without AI analysis (e.g. from iOS share extension)
             if data.sidecar.imageContext == nil || (data.sidecar.imageContext?.isEmpty ?? true) {
                 unanalyzedIds.append(data.id)
             }
         }
 
-        for update in updates {
+        for update in changes.updates {
             applySpaceUpdate(update)
         }
 
-        for id in deletedItemIds {
+        for id in changes.deletedIds {
             removeItemFromContext(id: id)
         }
 
-        if !gathered.isEmpty || !updates.isEmpty || !deletedItemIds.isEmpty {
+        if !changes.newItems.isEmpty || !changes.updates.isEmpty || !changes.deletedIds.isEmpty {
             try? context?.save()
         }
 

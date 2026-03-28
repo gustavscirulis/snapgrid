@@ -73,26 +73,34 @@ struct ContentView: View {
                 .padding(.top, 8)
 
                 // Main content — horizontal carousel of space pages
-                if allItems.isEmpty {
-                    EmptyStateView(isDragTargeted: isDragTargeted)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    GeometryReader { geo in
-                        let pageWidth = geo.size.width
-                        let pageHeight = geo.size.height
+                // File-import .onDrop is scoped here (not the whole window) so it
+                // doesn't steal drags from SpaceTabBar's .onDrop for space assignment.
+                Group {
+                    if allItems.isEmpty {
+                        EmptyStateView(isDragTargeted: isDragTargeted)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        GeometryReader { geo in
+                            let pageWidth = geo.size.width
+                            let pageHeight = geo.size.height
 
-                        HStack(spacing: 0) {
-                            // "All" page (index 0)
-                            spacePageView(spaceId: nil, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: 0)
+                            HStack(spacing: 0) {
+                                // "All" page (index 0)
+                                spacePageView(spaceId: nil, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: 0)
 
-                            // Per-space pages (index 1+)
-                            ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
-                                spacePageView(spaceId: space.id, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: index + 1)
+                                // Per-space pages (index 1+)
+                                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                                    spacePageView(spaceId: space.id, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: index + 1)
+                                }
                             }
+                            .offset(x: -CGFloat(activeIndex) * pageWidth)
                         }
-                        .offset(x: -CGFloat(activeIndex) * pageWidth)
+                        .clipped()
                     }
-                    .clipped()
+                }
+                .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
+                    handleDrop(providers)
+                    return true
                 }
             }
 
@@ -134,6 +142,7 @@ struct ContentView: View {
                     .stroke(Color.snapAccent, lineWidth: 3)
                     .background(Color.snapAccent.opacity(0.1))
                     .ignoresSafeArea()
+                    .allowsHitTesting(false)
                     .transition(.opacity)
             }
         }
@@ -144,11 +153,8 @@ struct ContentView: View {
                 Spacer()
             }
         }
-        .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
-            guard !appState.isDraggingFromApp else { return false }
-            handleDrop(providers)
-            return true
-        }
+        // Note: .onDrop for file imports is on the content area Group above,
+        // NOT here on the outer ZStack — so it doesn't steal drags from SpaceTabBar.
         .onChange(of: isDragTargeted) { _, targeted in
             if !targeted {
                 appState.isDraggingFromApp = false
@@ -345,6 +351,7 @@ struct ContentView: View {
         Task {
             var urls: [URL] = []
             var images: [NSImage] = []
+            let storagePath = MediaStorageService.shared.mediaDir.path
 
             for provider in providers {
                 // Try file URL first (local file drags from Finder)
@@ -353,6 +360,8 @@ struct ContentView: View {
                    let data = item as? Data,
                    let url = URL(dataRepresentation: data, relativeTo: nil),
                    url.isFileURL {
+                    // Skip internal drags (grid items already in our storage)
+                    if url.path.hasPrefix(storagePath) { continue }
                     urls.append(url)
                 }
                 // Fall back to image data (browser drags) — uses NSItemProviderReading
@@ -488,14 +497,25 @@ struct ContentView: View {
         appState.pushDeleteBatch(batch)
 
         syncWatcher.beginLocalChange()
+        var trashedCount = 0
         for item in items {
-            try? MediaStorageService.shared.moveToTrash(filename: item.filename, id: item.id)
-            modelContext.delete(item)
+            do {
+                try MediaStorageService.shared.moveToTrash(filename: item.filename, id: item.id)
+                modelContext.delete(item)
+                trashedCount += 1
+            } catch {
+                print("[Delete] Failed to trash \(item.id): \(error)")
+            }
         }
         try? modelContext.save()
         syncWatcher.endLocalChange()
         appState.clearSelection()
-        appState.showToast("Moved \(items.count) item\(items.count == 1 ? "" : "s") to trash")
+        if trashedCount > 0 {
+            appState.showToast("Moved \(trashedCount) item\(trashedCount == 1 ? "" : "s") to trash")
+        }
+        if trashedCount < items.count {
+            appState.showToast("Failed to trash \(items.count - trashedCount) item\(items.count - trashedCount == 1 ? "" : "s")")
+        }
     }
 
     private func deleteSelectedItems() {
@@ -549,7 +569,16 @@ struct ContentView: View {
         let space = Space(name: "New Space", order: spaces.count)
         modelContext.insert(space)
         try? modelContext.save()
-        MetadataSidecarService.shared.writeSpaces(Array(spaces))
+        // Build sidecar array manually — @Query hasn't updated yet with the new space
+        var allSpaceSidecars = spaces.map { s in
+            SidecarSpace(id: s.id, name: s.name, order: s.order,
+                         createdAt: s.createdAt, customPrompt: s.customPrompt,
+                         useCustomPrompt: s.useCustomPrompt)
+        }
+        allSpaceSidecars.append(SidecarSpace(id: space.id, name: space.name, order: space.order,
+                                              createdAt: space.createdAt, customPrompt: space.customPrompt,
+                                              useCustomPrompt: space.useCustomPrompt))
+        MetadataSidecarService.shared.writeSpaceSidecars(allSpaceSidecars)
         syncWatcher.endLocalChange()
         switchToSpace(space.id)
         pendingEditSpaceId = space.id

@@ -89,8 +89,13 @@ final class AppState {
 
     // MARK: - Undo Stack
 
+    private let maxUndoBatches = 20
+
     func pushDeleteBatch(_ items: [DeletedItemInfo]) {
         deletedBatches.append(items)
+        if deletedBatches.count > maxUndoBatches {
+            deletedBatches.removeFirst(deletedBatches.count - maxUndoBatches)
+        }
     }
 
     func popDeleteBatch() -> [DeletedItemInfo]? {

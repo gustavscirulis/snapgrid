@@ -140,7 +140,7 @@ struct MasonryGridView: View {
                             .allowsHitTesting(false)
                     }
                 }
-                .coordinateSpace(name: "gridContent")
+                .coordinateSpace(name: coordinateSpaceName)
                 .onPreferenceChange(ItemFramePreferenceKey.self) { frames in
                     itemFrames = frames
                 }

@@ -236,20 +236,7 @@ struct HeroDetailOverlay: View {
     // MARK: - Image Loading
 
     private func loadThumbnail() async {
-        if let cached = ImageCacheService.shared.image(forKey: item.id) {
-            self.image = cached
-            return
-        }
-        let itemId = item.id
-        let filename = item.filename
-        let loaded: NSImage? = await Task.detached(priority: .userInitiated) {
-            let storage = MediaStorageService.shared
-            if storage.thumbnailExists(id: itemId) {
-                return NSImage(contentsOf: storage.thumbnailURL(id: itemId))
-            }
-            return NSImage(contentsOf: storage.mediaURL(filename: filename))
-        }.value
-        if let loaded {
+        if let loaded = await ImageCacheService.shared.loadThumbnail(id: item.id, filename: item.filename) {
             self.image = loaded
         }
     }
@@ -263,7 +250,8 @@ struct HeroDetailOverlay: View {
         }.value
         if let loaded {
             self.image = loaded
-            ImageCacheService.shared.setImage(loaded, forKey: itemId)
+            // Don't cache full-res images in the thumbnail cache —
+            // they're much larger and would displace useful thumbnails
         }
     }
 

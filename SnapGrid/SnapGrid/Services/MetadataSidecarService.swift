@@ -68,8 +68,11 @@ final class MetadataSidecarService: Sendable {
         )
 
         let url = storage.metadataDir.appendingPathComponent("\(item.id).json")
-        if let data = try? Self.encoder.encode(sidecar) {
-            try? data.write(to: url, options: .atomic)
+        do {
+            let data = try Self.encoder.encode(sidecar)
+            try data.write(to: url, options: .atomic)
+        } catch {
+            print("[MetadataSidecar] Failed to write sidecar for \(item.id): \(error)")
         }
     }
 
@@ -102,8 +105,11 @@ final class MetadataSidecarService: Sendable {
 
     func writeSpaceSidecars(_ sidecars: [SidecarSpace]) {
         let url = MediaStorageService.shared.baseURL.appendingPathComponent("spaces.json")
-        if let data = try? Self.encoder.encode(sidecars) {
-            try? data.write(to: url, options: .atomic)
+        do {
+            let data = try Self.encoder.encode(sidecars)
+            try data.write(to: url, options: .atomic)
+        } catch {
+            print("[MetadataSidecar] Failed to write spaces.json: \(error)")
         }
     }
 

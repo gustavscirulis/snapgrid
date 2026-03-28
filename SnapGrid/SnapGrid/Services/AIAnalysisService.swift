@@ -84,17 +84,11 @@ final class AIAnalysisService: Sendable {
                 print("[Analysis] Retry attempt \(attempt)")
             }
             do {
-                let responseText: String
-                switch provider {
-                case .openai:
-                    responseText = try await callOpenAI(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
-                case .anthropic:
-                    responseText = try await callAnthropic(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
-                case .gemini:
-                    responseText = try await callGemini(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
-                case .openrouter:
-                    responseText = try await callOpenRouter(apiKey: apiKey, model: model, base64Image: base64, prompt: prompt)
-                }
+                let req = buildProviderRequest(
+                    provider: provider, apiKey: apiKey, model: model,
+                    base64Image: base64, prompt: prompt
+                )
+                let responseText = try await sendProviderRequest(req)
                 return try parseResponse(responseText, provider: provider.rawValue, model: model)
             } catch {
                 lastError = error
@@ -151,34 +145,115 @@ final class AIAnalysisService: Sendable {
         )
     }
 
-    // MARK: - Provider Implementations
+    // MARK: - Provider Request Infrastructure
 
-    private func callOpenAI(apiKey: String, model: String, base64Image: String, prompt: String) async throws -> String {
-        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 120
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    private struct ProviderRequest {
+        let url: URL
+        let headers: [String: String]
+        let body: [String: Any]
+        let extractText: ([String: Any]) throws -> String
+    }
 
-        let body: [String: Any] = [
-            "model": model,
-            "messages": [
-                ["role": "system", "content": prompt],
-                ["role": "user", "content": [
-                    ["type": "text", "text": userText],
-                    ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(base64Image)"]]
-                ]]
-            ],
-            "max_completion_tokens": 800
-        ]
+    private func buildProviderRequest(
+        provider: AIProvider, apiKey: String, model: String,
+        base64Image: String, prompt: String
+    ) -> ProviderRequest {
+        switch provider {
+        case .openai:
+            return ProviderRequest(
+                url: URL(string: "https://api.openai.com/v1/chat/completions")!,
+                headers: ["Authorization": "Bearer \(apiKey)"],
+                body: [
+                    "model": model,
+                    "messages": [
+                        ["role": "system", "content": prompt],
+                        ["role": "user", "content": [
+                            ["type": "text", "text": userText],
+                            ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(base64Image)"]]
+                        ]]
+                    ],
+                    "max_completion_tokens": 800
+                ],
+                extractText: Self.extractOpenAIText
+            )
+        case .anthropic:
+            return ProviderRequest(
+                url: URL(string: "https://api.anthropic.com/v1/messages")!,
+                headers: ["x-api-key": apiKey, "anthropic-version": "2023-06-01"],
+                body: [
+                    "model": model,
+                    "max_tokens": 800,
+                    "system": prompt,
+                    "messages": [
+                        ["role": "user", "content": [
+                            ["type": "image", "source": [
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": base64Image
+                            ]],
+                            ["type": "text", "text": userText]
+                        ]]
+                    ]
+                ],
+                extractText: { json in
+                    let content = json["content"] as? [[String: Any]]
+                    guard let text = content?.first?["text"] as? String else {
+                        throw AnalysisError.invalidResponse
+                    }
+                    return text
+                }
+            )
+        case .gemini:
+            return ProviderRequest(
+                url: URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)")!,
+                headers: [:],
+                body: [
+                    "contents": [
+                        ["parts": [
+                            ["text": userText],
+                            ["inlineData": ["mimeType": "image/jpeg", "data": base64Image]]
+                        ]]
+                    ],
+                    "systemInstruction": ["parts": [["text": prompt]]],
+                    "generationConfig": ["maxOutputTokens": 800]
+                ],
+                extractText: { json in
+                    let candidates = json["candidates"] as? [[String: Any]]
+                    let content = candidates?.first?["content"] as? [String: Any]
+                    let parts = content?["parts"] as? [[String: Any]]
+                    guard let text = parts?.first?["text"] as? String else {
+                        throw AnalysisError.invalidResponse
+                    }
+                    return text
+                }
+            )
+        case .openrouter:
+            return ProviderRequest(
+                url: URL(string: "https://openrouter.ai/api/v1/chat/completions")!,
+                headers: [
+                    "Authorization": "Bearer \(apiKey)",
+                    "HTTP-Referer": "https://snapgrid.app",
+                    "X-Title": "SnapGrid"
+                ],
+                body: [
+                    "model": model,
+                    "messages": [
+                        ["role": "system", "content": prompt],
+                        ["role": "user", "content": [
+                            ["type": "text", "text": userText],
+                            ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(base64Image)"]]
+                        ]]
+                    ],
+                    "max_tokens": 1200
+                ],
+                extractText: Self.extractOpenAIText
+            )
+        }
+    }
 
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try validateHTTPResponse(response, data: data)
-
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let choices = json?["choices"] as? [[String: Any]]
+    /// Shared text extractor for OpenAI-compatible response formats (OpenAI, OpenRouter)
+    private static func extractOpenAIText(_ json: [String: Any]) throws -> String {
+        let choices = json["choices"] as? [[String: Any]]
         let message = choices?.first?["message"] as? [String: Any]
         guard let content = message?["content"] as? String else {
             throw AnalysisError.invalidResponse
@@ -186,115 +261,23 @@ final class AIAnalysisService: Sendable {
         return content
     }
 
-    private func callAnthropic(apiKey: String, model: String, base64Image: String, prompt: String) async throws -> String {
-        let url = URL(string: "https://api.anthropic.com/v1/messages")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 120
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body: [String: Any] = [
-            "model": model,
-            "max_tokens": 800,
-            "system": prompt,
-            "messages": [
-                ["role": "user", "content": [
-                    ["type": "image", "source": [
-                        "type": "base64",
-                        "media_type": "image/jpeg",
-                        "data": base64Image
-                    ]],
-                    ["type": "text", "text": userText]
-                ]]
-            ]
-        ]
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try validateHTTPResponse(response, data: data)
-
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let content = json?["content"] as? [[String: Any]]
-        guard let text = content?.first?["text"] as? String else {
-            throw AnalysisError.invalidResponse
-        }
-        return text
-    }
-
-    private func callGemini(apiKey: String, model: String, base64Image: String, prompt: String) async throws -> String {
-        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)")!
-        var request = URLRequest(url: url)
+    private func sendProviderRequest(_ req: ProviderRequest) async throws -> String {
+        var request = URLRequest(url: req.url)
         request.httpMethod = "POST"
         request.timeoutInterval = 120
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        for (key, value) in req.headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: req.body)
 
-        let body: [String: Any] = [
-            "contents": [
-                ["parts": [
-                    ["text": userText],
-                    ["inlineData": [
-                        "mimeType": "image/jpeg",
-                        "data": base64Image
-                    ]]
-                ]]
-            ],
-            "systemInstruction": [
-                "parts": [["text": prompt]]
-            ],
-            "generationConfig": [
-                "maxOutputTokens": 800
-            ]
-        ]
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         try validateHTTPResponse(response, data: data)
 
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let candidates = json?["candidates"] as? [[String: Any]]
-        let content = candidates?.first?["content"] as? [String: Any]
-        let parts = content?["parts"] as? [[String: Any]]
-        guard let text = parts?.first?["text"] as? String else {
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AnalysisError.invalidResponse
         }
-        return text
-    }
-
-    private func callOpenRouter(apiKey: String, model: String, base64Image: String, prompt: String) async throws -> String {
-        let url = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 120
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("https://snapgrid.app", forHTTPHeaderField: "HTTP-Referer")
-        request.setValue("SnapGrid", forHTTPHeaderField: "X-Title")
-
-        let body: [String: Any] = [
-            "model": model,
-            "messages": [
-                ["role": "system", "content": prompt],
-                ["role": "user", "content": [
-                    ["type": "text", "text": userText],
-                    ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(base64Image)"]]
-                ]]
-            ],
-            "max_tokens": 1200
-        ]
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try validateHTTPResponse(response, data: data)
-
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let choices = json?["choices"] as? [[String: Any]]
-        let message = choices?.first?["message"] as? [String: Any]
-        guard let content = message?["content"] as? String else {
-            throw AnalysisError.invalidResponse
-        }
-        return content
+        return try req.extractText(json)
     }
 
     // MARK: - Helpers
