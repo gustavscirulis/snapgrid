@@ -207,14 +207,63 @@ final class ImportService {
         }
     }
 
+    /// Import media from a remote HTTP/HTTPS URL — downloads the file, determines its type,
+    /// and runs it through the standard import pipeline.
+    func importFromURL(_ url: URL, into context: ModelContext, spaceId: String? = nil) async throws {
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw ImportError.downloadFailed(code)
+        }
+
+        let ext = Self.fileExtension(
+            from: httpResponse.value(forHTTPHeaderField: "Content-Type"),
+            urlPathExtension: url.pathExtension.lowercased()
+        )
+
+        guard let ext, (imageTypes.contains(ext) || videoTypes.contains(ext)) else {
+            throw ImportError.unsupportedFileType(ext ?? "unknown")
+        }
+
+        let tempFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + "." + ext)
+        try data.write(to: tempFile)
+        defer { try? FileManager.default.removeItem(at: tempFile) }
+
+        try await importSingleFile(tempFile, into: context, spaceId: spaceId)
+    }
+
+    /// Map a Content-Type MIME string to a file extension. Falls back to URL path extension.
+    private static func fileExtension(from contentType: String?, urlPathExtension: String?) -> String? {
+        if let mime = contentType?.lowercased().split(separator: ";").first?.trimmingCharacters(in: .whitespaces) {
+            let mimeMap: [String: String] = [
+                "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg",
+                "image/gif": "gif", "image/webp": "webp", "image/bmp": "bmp",
+                "image/tiff": "tiff", "image/heic": "heic",
+                "video/mp4": "mp4", "video/webm": "webm",
+                "video/quicktime": "mov", "video/x-msvideo": "avi", "video/x-m4v": "m4v",
+            ]
+            if let ext = mimeMap[mime] { return ext }
+        }
+
+        let allKnown: Set<String> = ["png","jpg","jpeg","gif","bmp","tiff","webp","heic",
+                                      "mp4","webm","mov","avi","m4v"]
+        if let ext = urlPathExtension, allKnown.contains(ext) { return ext }
+        return nil
+    }
+
     enum ImportError: LocalizedError {
         case unsupportedFileType(String)
         case cannotReadDimensions
+        case downloadFailed(Int)
 
         var errorDescription: String? {
             switch self {
             case .unsupportedFileType(let ext): return "Unsupported file type: .\(ext)"
             case .cannotReadDimensions: return "Cannot read image dimensions"
+            case .downloadFailed(let code): return "Download failed (HTTP \(code))"
             }
         }
     }

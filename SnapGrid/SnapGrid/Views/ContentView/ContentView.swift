@@ -405,6 +405,37 @@ struct ContentView: View {
                 }
                 appState.showToast("Pasted \(images.count) image\(images.count == 1 ? "" : "s")")
             }
+            return
+        }
+
+        // Fall back to text URL (e.g. copied URL from browser address bar)
+        if let strings = pasteboard.readObjects(forClasses: [NSString.self]) as? [String] {
+            let urls = strings.compactMap { str -> URL? in
+                let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let url = URL(string: trimmed),
+                      let scheme = url.scheme?.lowercased(),
+                      scheme == "http" || scheme == "https" else { return nil }
+                return url
+            }
+            if !urls.isEmpty {
+                Task {
+                    appState.showToast("Downloading\(urls.count == 1 ? "" : " \(urls.count) items")...")
+                    var successCount = 0
+                    for url in urls {
+                        do {
+                            try await importService.importFromURL(url, into: modelContext, spaceId: appState.activeSpaceId)
+                            successCount += 1
+                        } catch {
+                            print("[Paste] Failed to import URL \(url): \(error)")
+                        }
+                    }
+                    if successCount > 0 {
+                        appState.showToast("Imported \(successCount) item\(successCount == 1 ? "" : "s")")
+                    } else {
+                        appState.showToast("URL doesn't point to a supported image or video")
+                    }
+                }
+            }
         }
     }
 
