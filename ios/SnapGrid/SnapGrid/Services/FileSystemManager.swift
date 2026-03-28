@@ -3,6 +3,9 @@ import SwiftUI
 
 @MainActor
 class FileSystemManager: ObservableObject {
+    /// Shared instance for use by SwiftData computed properties (set on app launch).
+    static var shared: FileSystemManager?
+
     @Published var rootURL: URL?
     @Published var isAccessGranted = false
     @Published var isCheckingAccess = false

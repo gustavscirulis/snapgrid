@@ -132,15 +132,17 @@ class ThumbnailCache {
 
     /// Prefetch thumbnails for a batch of items in the background.
     /// Loads at lower priority so it doesn't block on-screen cells.
+    @MainActor
     @discardableResult
-    func prefetchThumbnails(for items: [SnapGridItem], targetPixelWidth: CGFloat) -> Task<Void, Never> {
-        Task.detached(priority: .utility) {
-            for item in items {
+    func prefetchThumbnails(for items: [MediaItem], targetPixelWidth: CGFloat) -> Task<Void, Never> {
+        // Extract URLs on main actor (MediaItem computed properties are @MainActor)
+        let urls: [(thumb: URL?, media: URL?)] = items.map { (thumb: $0.thumbnailURL, media: $0.mediaURL) }
+        return Task.detached(priority: .utility) {
+            for pair in urls {
                 if Task.isCancelled { break }
-                // Try thumbnail file first, then media file
-                if let thumbURL = item.thumbnailURL {
+                if let thumbURL = pair.thumb {
                     _ = await self.loadImage(for: thumbURL, targetPixelWidth: targetPixelWidth)
-                } else if let mediaURL = item.mediaURL {
+                } else if let mediaURL = pair.media {
                     _ = await self.loadImage(for: mediaURL, targetPixelWidth: targetPixelWidth)
                 }
             }

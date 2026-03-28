@@ -2,7 +2,7 @@ import SwiftUI
 import AVKit
 
 struct ImageDetailView: View {
-    let item: SnapGridItem
+    let item: MediaItem
     @State private var image: UIImage?
     @State private var player: AVPlayer?
     @State private var isLoading = true
@@ -114,12 +114,12 @@ struct ImageDetailView: View {
 }
 
 struct MetadataPanel: View {
-    let item: SnapGridItem
+    let item: MediaItem
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Pattern tags
-            if let patterns = item.patterns, !patterns.isEmpty {
+            if let patterns = item.analysisResult?.patterns, !patterns.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Patterns")
                         .font(.system(size: 12, weight: .semibold))
@@ -146,7 +146,7 @@ struct MetadataPanel: View {
             }
 
             // AI Context
-            if let context = item.imageContext, !context.isEmpty {
+            if let context = item.analysisResult?.imageContext, !context.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("AI Analysis")
                         .font(.system(size: 12, weight: .semibold))
@@ -175,12 +175,10 @@ struct MetadataPanel: View {
                     }
                 }
 
-                if let date = item.createdDate {
-                    DetailChip(
-                        label: "Added",
-                        value: date.formatted(date: .abbreviated, time: .shortened)
-                    )
-                }
+                DetailChip(
+                    label: "Added",
+                    value: item.createdAt.formatted(date: .abbreviated, time: .shortened)
+                )
             }
 
             Spacer(minLength: 40)
