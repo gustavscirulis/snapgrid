@@ -108,11 +108,15 @@ struct ContentView: View {
             }
 
             // Detail overlay — hero animation from thumbnail to centered view
+            // Existence check uses allItems so search changes can't remove the overlay.
+            // Navigation uses activeFilteredItems when the item is in the set, else allItems.
             if let detailId = appState.detailItem,
-               let startIndex = activeFilteredItems.firstIndex(where: { $0.id == detailId }),
                let sourceFrame = appState.detailSourceFrame {
+                let overlayItems = activeFilteredItems.contains(where: { $0.id == detailId })
+                    ? activeFilteredItems : allItems
+                if let startIndex = overlayItems.firstIndex(where: { $0.id == detailId }) {
                 HeroDetailOverlay(
-                    items: activeFilteredItems,
+                    items: overlayItems,
                     startIndex: startIndex,
                     sourceFrame: sourceFrame,
                     onAnimationComplete: {
@@ -123,6 +127,7 @@ struct ContentView: View {
                         appState.detailItem = newId
                     }
                 )
+                }
             }
 
             // Floating video layer — ONE AVPlayerLayer that moves between grid and detail.

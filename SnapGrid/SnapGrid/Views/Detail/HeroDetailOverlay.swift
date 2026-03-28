@@ -24,12 +24,26 @@ import AVFoundation
  *    next/previous image slides in from the opposite edge.
  *    Uses NSEvent scroll wheel monitoring for trackpad two-finger swipe.
  *
+ * METADATA REVEAL
+ *    After hero animation completes, metadata section fades in
+ *    with staggered timing: title → pills → description → file info.
+ *    Scrolling down reveals metadata with a fade mask.
+ *
  * The floating video layer is a SEPARATE view in ContentView's ZStack.
  * This overlay only manages the backdrop, image hero, and close triggers.
  * ───────────────────────────────────────────────────────── */
 
+private enum MetadataReveal {
+    static let titleDelay:       Duration = .milliseconds(100)
+    static let pillsDelay:       Duration = .milliseconds(300)
+    static let tagStagger:       Double   = 0.05
+    static let descriptionDelay: Duration = .milliseconds(450)
+    static let fileInfoDelay:    Duration = .milliseconds(600)
+    static let slideDistance:    CGFloat  = 8
+    static let spring = SnapSpring.metadata
+}
+
 struct HeroDetailOverlay: View {
-    let items: [MediaItem]
     let startIndex: Int
     let sourceFrame: CGRect
     let onAnimationComplete: () -> Void
@@ -37,6 +51,8 @@ struct HeroDetailOverlay: View {
 
     @Environment(VideoPreviewManager.self) private var videoPreview
     @Environment(AppState.self) private var appState
+    /// Captured at open time — stays stable even when parent re-filters.
+    @State private var items: [MediaItem]
     @State private var currentIndex: Int
     @State private var isExpanded = false
     @State private var isClosing = false
@@ -52,6 +68,9 @@ struct HeroDetailOverlay: View {
     @State private var closeTargetFrame: CGRect
     @State private var lastWindowWidth: CGFloat = 800
     @State private var trackpadScroll = TrackpadScrollState()
+    @State private var scrollOffset: CGFloat = 0
+    @State private var metadataStage: Int = 0
+    @State private var revealTask: Task<Void, Never>?
     @FocusState private var isFocused: Bool
 
     private var currentItem: MediaItem { items[currentIndex] }
@@ -67,7 +86,7 @@ struct HeroDetailOverlay: View {
         onAnimationComplete: @escaping () -> Void,
         onCurrentItemChanged: ((String) -> Void)? = nil
     ) {
-        self.items = items
+        _items = State(initialValue: items)
         self.startIndex = startIndex
         self.sourceFrame = sourceFrame
         self.onAnimationComplete = onAnimationComplete
@@ -85,10 +104,13 @@ struct HeroDetailOverlay: View {
 
             ZStack {
                 // Backdrop
-                Color.black
-                    .opacity(isExpanded ? 0.80 : 0.0)
-                    .ignoresSafeArea()
-                    .onTapGesture { triggerClose() }
+                ZStack {
+                    Rectangle().fill(.ultraThinMaterial)
+                    Color.black.opacity(0.55)
+                }
+                .opacity(isExpanded ? 1.0 : 0.0)
+                .ignoresSafeArea()
+                .onTapGesture { triggerClose() }
 
                 // Adjacent images — only after hero animation completes, never during open/close
                 if heroComplete && !isClosing {
@@ -104,48 +126,49 @@ struct HeroDetailOverlay: View {
                     }
                 }
 
-                // Current image — hero animation (also serves as video placeholder)
-                if let image {
-                    if isTallImage {
-                        ScrollView(.vertical, showsIndicators: scrollEnabled) {
-                            Image(nsImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: currentFrame.width)
-                                .onTapGesture { triggerClose() }
-                        }
-                        .scrollDisabled(!scrollEnabled)
+                // Current content — settled ScrollView (stays visible during swipe) or position-based hero
+                if heroComplete && !isClosing {
+                    // SETTLED: scrollable image + metadata, slides with swipe
+                    settledScrollView(image: image, finalFrame: finalFrame)
+                        .offset(x: swipeOffset)
+                } else if let image, isTallImage {
+                    // HERO/SWIPE: tall image
+                    ScrollView(.vertical, showsIndicators: scrollEnabled) {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: currentFrame.width)
+                            .onTapGesture { triggerClose() }
+                    }
+                    .scrollDisabled(!scrollEnabled)
+                    .frame(width: currentFrame.width, height: currentFrame.height)
+                    .overlay(alignment: .bottomTrailing) {
+                        loadingIndicator
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 12))
+                    .onDrag { makeDragProvider() } preview: { dragPreview }
+                    .position(x: currentFrame.midX, y: currentFrame.midY)
+                    .offset(x: heroComplete ? swipeOffset : 0)
+                } else if let image {
+                    // HERO/SWIPE: regular image
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
                         .frame(width: currentFrame.width, height: currentFrame.height)
+                        .clipped()
                         .overlay(alignment: .bottomTrailing) {
                             loadingIndicator
                         }
                         .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 12))
                         .onDrag { makeDragProvider() } preview: { dragPreview }
+                        .onTapGesture { triggerClose() }
                         .position(x: currentFrame.midX, y: currentFrame.midY)
                         .offset(x: heroComplete ? swipeOffset : 0)
-
-
-                    } else {
-                        Image(nsImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: currentFrame.width, height: currentFrame.height)
-                            .clipped()
-                            .overlay(alignment: .bottomTrailing) {
-                                loadingIndicator
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 12))
-                            .onDrag { makeDragProvider() } preview: { dragPreview }
-                            .onTapGesture { triggerClose() }
-                            .position(x: currentFrame.midX, y: currentFrame.midY)
-                            .offset(x: heroComplete ? swipeOffset : 0)
-    
-
-                    }
                 }
 
                 // Video — tap target only. The FloatingVideoLayer renders the actual video.
-                if currentItem.isVideo {
+                // Disable when settled (scroll view handles taps).
+                if currentItem.isVideo && !(heroComplete && !isClosing) {
                     Color.clear
                         .contentShape(Rectangle())
                         .frame(width: finalFrame.width, height: finalFrame.height)
@@ -172,7 +195,7 @@ struct HeroDetailOverlay: View {
             }
             // Track the current item's grid frame for close animation
             .onChange(of: appState.detailSourceFrame) { _, newFrame in
-                if let newFrame, hasNavigated {
+                if let newFrame {
                     closeTargetFrame = newFrame
                 }
             }
@@ -282,6 +305,8 @@ struct HeroDetailOverlay: View {
                 hasNavigated = true
                 swipeOffset = 0
                 scrollEnabled = false
+                metadataStage = 0
+                scrollOffset = 0
 
                 // Load new image from cache or preloaded adjacents
                 let newItem = items[newIndex]
@@ -304,6 +329,7 @@ struct HeroDetailOverlay: View {
 
             preloadAdjacentImages()
             isNavigating = false
+            startMetadataReveal()
         }
     }
 
@@ -332,6 +358,7 @@ struct HeroDetailOverlay: View {
                     )
                 } completion: {
                     heroComplete = true
+                    startMetadataReveal()
                 }
             } else {
                 videoPreview.transitionToDetail(
@@ -341,6 +368,7 @@ struct HeroDetailOverlay: View {
                     isExpanded = true
                 } completion: {
                     heroComplete = true
+                    startMetadataReveal()
                 }
             }
             await waitForPlayerReady()
@@ -353,6 +381,7 @@ struct HeroDetailOverlay: View {
                 isExpanded = true
             } completion: {
                 heroComplete = true
+                startMetadataReveal()
             }
             if isTallImage {
                 try? await Task.sleep(for: .milliseconds(500))
@@ -459,6 +488,112 @@ struct HeroDetailOverlay: View {
         }
     }
 
+    // MARK: - Metadata Reveal
+
+    private func startMetadataReveal() {
+        revealTask?.cancel()
+        revealTask = Task { @MainActor in
+            try? await Task.sleep(for: MetadataReveal.titleDelay)
+            guard !Task.isCancelled, heroComplete else { return }
+            withAnimation(MetadataReveal.spring) { metadataStage = 1 }
+
+            try? await Task.sleep(for: MetadataReveal.pillsDelay - MetadataReveal.titleDelay)
+            guard !Task.isCancelled, heroComplete else { return }
+            withAnimation(MetadataReveal.spring) { metadataStage = 2 }
+
+            try? await Task.sleep(for: MetadataReveal.descriptionDelay - MetadataReveal.pillsDelay)
+            guard !Task.isCancelled, heroComplete else { return }
+            withAnimation(MetadataReveal.spring) { metadataStage = 3 }
+
+            try? await Task.sleep(for: MetadataReveal.fileInfoDelay - MetadataReveal.descriptionDelay)
+            guard !Task.isCancelled, heroComplete else { return }
+            withAnimation(MetadataReveal.spring) { metadataStage = 4 }
+        }
+    }
+
+    // MARK: - Settled Scroll View
+
+    @ViewBuilder
+    private func settledScrollView(image: NSImage?, finalFrame: CGRect) -> some View {
+        ScrollView(.vertical) {
+            VStack(spacing: 0) {
+                Color.clear
+                    .frame(height: finalFrame.minY)
+                    .contentShape(Rectangle())
+                    .onTapGesture { triggerClose() }
+
+                Group {
+                    if currentItem.isVideo {
+                        Color.clear
+                            .frame(width: finalFrame.width, height: finalFrame.height)
+                    } else if let image, isTallImage {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: finalFrame.width)
+                    } else if let image {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: finalFrame.width, height: finalFrame.height)
+                            .clipped()
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if !currentItem.isVideo { loadingIndicator }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .onDrag { makeDragProvider() } preview: { dragPreview }
+                .onTapGesture { triggerClose() }
+
+                DetailMetadataSection(item: currentItem, stage: metadataStage) { pattern in
+                    // Set search so grid re-layouts and reports new frame position
+                    appState.searchText = pattern
+                    // Wait for grid to re-layout and report new frame, then close to it
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(150))
+                        triggerClose {
+                            NotificationCenter.default.post(name: .focusSearch, object: nil)
+                        }
+                    }
+                }
+                .frame(width: max(min(finalFrame.width, 500), 300))
+                .padding(.top, 20)
+                .padding(.bottom, 60)
+                .mask(metadataFadeMask)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.automatic)
+        .defaultScrollAnchor(.top)
+        .id(currentItem.id)  // Force new ScrollView per item, resetting scroll position
+        .onScrollGeometryChange(for: CGFloat.self) { geo in
+            geo.contentOffset.y
+        } action: { _, newOffset in
+            scrollOffset = newOffset
+            if currentItem.isVideo && heroComplete && !isClosing {
+                videoPreview.updateDetailFrame(CGRect(
+                    x: finalFrame.origin.x,
+                    y: finalFrame.origin.y - newOffset,
+                    width: finalFrame.width,
+                    height: finalFrame.height
+                ))
+            }
+        }
+    }
+
+    private var metadataFadeMask: some View {
+        let fade = max(0, 1 - scrollOffset / 60)
+        return LinearGradient(
+            colors: [
+                .white.opacity(1 - 0.8 * fade),
+                .white.opacity(1 - 0.4 * fade)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
     // MARK: - Final Frame Computation
 
     private func computeFinalFrame(windowSize: CGSize, item: MediaItem) -> CGRect {
@@ -486,11 +621,14 @@ struct HeroDetailOverlay: View {
 
     // MARK: - Close
 
-    private func triggerClose() {
+    private func triggerClose(then afterClose: (() -> Void)? = nil) {
         guard !isClosing else { return }
         isClosing = true
         heroComplete = false
         scrollEnabled = false
+        scrollOffset = 0
+        metadataStage = 0
+        revealTask?.cancel()
         appState.detailSwipeProgress = 0
         appState.detailSwipeTargetId = nil
 
@@ -512,6 +650,7 @@ struct HeroDetailOverlay: View {
                 videoPreview.completeTransitionToGrid()
             }
             onAnimationComplete()
+            afterClose?()
         }
     }
 
@@ -574,6 +713,130 @@ struct HeroDetailOverlay: View {
             try? await Task.sleep(for: .milliseconds(100))
         }
         withAnimation(.easeOut(duration: 0.2)) { isLoadingFullRes = false }
+    }
+}
+
+// MARK: - Detail Metadata Section
+
+private struct DetailMetadataSection: View {
+    let item: MediaItem
+    let stage: Int
+    var onSearchPattern: ((String) -> Void)?
+    @State private var isDescriptionExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if item.isAnalyzing {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.white)
+                    Text("Analyzing...")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                .stageReveal(stage: stage, threshold: 1)
+            } else if item.analysisError != nil {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.red.opacity(0.8))
+                    Text("Analysis failed")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                .stageReveal(stage: stage, threshold: 1)
+            } else if let result = item.analysisResult {
+                if !result.imageSummary.isEmpty {
+                    Text(result.imageSummary)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(2)
+                        .stageReveal(stage: stage, threshold: 1)
+                        .padding(.bottom, 10)
+                }
+
+                if !result.patterns.isEmpty {
+                    FlowLayout(spacing: 6) {
+                        ForEach(Array(result.patterns.enumerated()), id: \.element.name) { index, pattern in
+                            PatternPill(name: pattern.name, size: 12)
+                                .onTapGesture { onSearchPattern?(pattern.name) }
+                                .opacity(stage >= 2 ? 1 : 0)
+                                .offset(y: stage >= 2 ? 0 : MetadataReveal.slideDistance)
+                                .animation(
+                                    MetadataReveal.spring.delay(Double(index) * MetadataReveal.tagStagger),
+                                    value: stage
+                                )
+                        }
+                    }
+                    .padding(.leading, -6)
+                    .padding(.bottom, 12)
+                }
+
+                if hasDescription(result) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(result.imageContext)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .lineSpacing(2)
+                            .lineLimit(isDescriptionExpanded ? nil : 2)
+
+                        if !isDescriptionExpanded {
+                            Text("more")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.25))
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .opacity(stage >= 3 ? 1 : 0)
+                    .animation(MetadataReveal.spring, value: stage)
+                    .onTapGesture {
+                        withAnimation(MetadataReveal.spring) {
+                            isDescriptionExpanded.toggle()
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 0) {
+                Text("\(item.width) \u{00D7} \(item.height)")
+                Text("  \u{00B7}  ")
+                    .foregroundStyle(.white.opacity(0.15))
+                Text(item.createdAt, style: .date)
+                if let duration = item.duration {
+                    Text("  \u{00B7}  ")
+                        .foregroundStyle(.white.opacity(0.15))
+                    Text(formatDuration(duration))
+                }
+            }
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(.white.opacity(0.25))
+            .stageReveal(stage: stage, threshold: 4)
+            .padding(.top, 12)
+        }
+        .padding(.horizontal, 16)
+        .animation(MetadataReveal.spring, value: isDescriptionExpanded)
+    }
+
+    private func hasDescription(_ result: AnalysisResult) -> Bool {
+        !result.imageContext.isEmpty && result.imageContext != result.imageSummary
+    }
+
+    private func formatDuration(_ seconds: Double) -> String {
+        guard seconds.isFinite else { return "0:00" }
+        let total = Int(seconds)
+        return "\(total / 60):\(String(format: "%02d", total % 60))"
+    }
+}
+
+// MARK: - Stage Reveal Modifier
+
+private extension View {
+    func stageReveal(stage: Int, threshold: Int) -> some View {
+        self
+            .opacity(stage >= threshold ? 1 : 0)
+            .offset(y: stage >= threshold ? 0 : 4)
+            .animation(MetadataReveal.spring, value: stage)
     }
 }
 

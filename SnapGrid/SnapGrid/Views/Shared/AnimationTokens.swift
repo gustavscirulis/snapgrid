@@ -10,4 +10,5 @@ enum SnapSpring {
     static let fast     = Animation.spring(response: 0.2, dampingFraction: 0.85)
     static let standard = Animation.spring(response: 0.3, dampingFraction: 0.8)
     static let hero     = Animation.spring(response: 0.36, dampingFraction: 0.87)
+    static let metadata = Animation.spring(response: 0.4, dampingFraction: 0.85)
 }
