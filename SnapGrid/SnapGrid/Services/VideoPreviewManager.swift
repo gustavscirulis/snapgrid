@@ -153,6 +153,14 @@ final class VideoPreviewManager {
         }
     }
 
+    /// Stop detail video without transitioning back to grid.
+    /// Used when swiping from a video to a non-video item.
+    func stopDetailPlayer() {
+        cleanup()
+        displayState = .hidden
+        isHandedOffToDetail = false
+    }
+
     /// Create a fresh player for arrow key navigation in detail
     func switchDetailPlayer(itemId: String, url: URL, frame: CGRect, suggestedName: String? = nil) {
         cleanup()

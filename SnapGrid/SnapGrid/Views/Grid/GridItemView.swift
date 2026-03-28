@@ -47,6 +47,18 @@ struct GridItemView: View {
         width / item.aspectRatio
     }
 
+    /// Continuous opacity driven by fullscreen swipe progress.
+    /// Current detail item fades in as it's swiped away; target item fades out as it approaches.
+    private var gridItemOpacity: Double {
+        if item.id == appState.detailItem {
+            return Double(appState.detailSwipeProgress)
+        }
+        if item.id == appState.detailSwipeTargetId {
+            return Double(1 - appState.detailSwipeProgress)
+        }
+        return item.id == hiddenItemId ? 0 : 1
+    }
+
     /// Whether this item is part of a multi-selection context menu
     private var isBulk: Bool {
         isSelected && selectedCount > 1
@@ -323,7 +335,7 @@ struct GridItemView: View {
             }
             .opacity(0.85)
         }
-        .opacity(item.id == hiddenItemId ? 0 : 1)
+        .opacity(gridItemOpacity)
         .onGeometryChange(for: CGRect.self) { proxy in
             proxy.frame(in: .global)
         } action: { newValue in
@@ -331,6 +343,15 @@ struct GridItemView: View {
             // Keep the floating video layer in sync with scroll/resize
             if item.isVideo && videoPreview.activeItemId == item.id {
                 videoPreview.updateGridFrame(newValue)
+            }
+            // Keep detail source frame in sync when this item is the active detail
+            if appState.detailItem == item.id {
+                appState.detailSourceFrame = newValue
+            }
+        }
+        .onChange(of: appState.detailItem) { _, newId in
+            if newId == item.id {
+                appState.detailSourceFrame = globalFrame
             }
         }
         .contextMenu {
