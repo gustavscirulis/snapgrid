@@ -56,6 +56,9 @@ struct MainView: View {
     @State private var debounceTask: Task<Void, Never>?
     @State private var searchScores: [String: Double] = [:]
     @State private var isSearchActive = false
+    @State private var showPhotosPicker = false
+    @State private var showFilesPicker = false
+    @State private var isImporting = false
 
     // MARK: - Index ↔ activeSpaceId bridging
 
@@ -222,6 +225,19 @@ struct MainView: View {
                 .ignoresSafeArea(edges: .bottom)
                 .navigationTitle("SnapGrid")
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    if #available(iOS 26.0, *) {
+                        DefaultToolbarItem(kind: .search, placement: .bottomBar)
+                        ToolbarSpacer(.flexible, placement: .bottomBar)
+                        ToolbarItem(placement: .bottomBar) {
+                            addImagesMenu
+                        }
+                    } else {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            addImagesMenu
+                        }
+                    }
+                }
                 .toolbarColorScheme(.dark, for: .navigationBar)
                 .searchable(text: $searchText, prompt: "Search patterns, context...")
                 .onPreferenceChange(GridItemRectsPreferenceKey.self) { rects in
@@ -292,6 +308,36 @@ struct MainView: View {
                 Task { await loadContent() }
             }
         }
+        .sheet(isPresented: $showPhotosPicker) {
+            PhotosPickerWrapper { images in
+                handlePickedImages(images)
+            }
+        }
+        .sheet(isPresented: $showFilesPicker) {
+            DocumentPickerWrapper { images in
+                handlePickedImages(images)
+            }
+        }
+    }
+
+    // MARK: - Add Images Menu
+
+    private var addImagesMenu: some View {
+        Menu {
+            Button {
+                showPhotosPicker = true
+            } label: {
+                Label("Choose from Photos", systemImage: "photo.on.rectangle")
+            }
+            Button {
+                showFilesPicker = true
+            } label: {
+                Label("Choose from Files", systemImage: "folder")
+            }
+        } label: {
+            Label("Add", systemImage: "plus")
+        }
+        .disabled(isImporting || fileSystem.rootURL == nil)
     }
 
     // MARK: - Item Selection
@@ -304,6 +350,27 @@ struct MainView: View {
         sourceRect = rect
         thumbnailImage = thumb
         showOverlay = true
+    }
+
+    // MARK: - Image Import
+
+    private func handlePickedImages(_ images: [UIImage]) {
+        guard !images.isEmpty, let rootURL = fileSystem.rootURL else { return }
+
+        isImporting = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
+        Task {
+            let result = await ImageImportService.importImages(images, to: rootURL)
+            isImporting = false
+
+            if result.successCount > 0 {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                await loadContent()
+            } else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        }
     }
 
     // MARK: - Data Loading
