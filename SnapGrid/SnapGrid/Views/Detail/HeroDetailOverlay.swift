@@ -25,6 +25,7 @@ struct HeroDetailOverlay: View {
     let onAnimationComplete: () -> Void
 
     @Environment(VideoPreviewManager.self) private var videoPreview
+    @Environment(AppState.self) private var appState
     @State private var isExpanded = false
     @State private var isClosing = false
     @State private var image: NSImage?
@@ -72,6 +73,7 @@ struct HeroDetailOverlay: View {
                             loadingIndicator
                         }
                         .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 12))
+                        .onDrag { makeDragProvider() } preview: { dragPreview }
                         .position(x: currentFrame.midX, y: currentFrame.midY)
                         .id(item.id)
                     } else {
@@ -84,6 +86,7 @@ struct HeroDetailOverlay: View {
                                 loadingIndicator
                             }
                             .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 12))
+                            .onDrag { makeDragProvider() } preview: { dragPreview }
                             .onTapGesture { triggerClose() }
                             .position(x: currentFrame.midX, y: currentFrame.midY)
                             .id(item.id)
@@ -119,18 +122,20 @@ struct HeroDetailOverlay: View {
 
                     let url = MediaStorageService.shared.mediaURL(filename: item.filename)
 
+                    let suggestedName = item.analysisResult?.patterns.first?.name
+
                     if hasHoverPreview {
                         // Hover preview exists — animate both backdrop and video together
                         withAnimation(SnapSpring.hero) {
                             isExpanded = true
                             videoPreview.transitionToDetail(
-                                itemId: item.id, url: url, finalFrame: finalFrame
+                                itemId: item.id, url: url, finalFrame: finalFrame, suggestedName: suggestedName
                             )
                         }
                     } else {
                         // No hover (keyboard open) — place video at detail frame instantly
                         videoPreview.transitionToDetail(
-                            itemId: item.id, url: url, finalFrame: finalFrame
+                            itemId: item.id, url: url, finalFrame: finalFrame, suggestedName: suggestedName
                         )
                         withAnimation(SnapSpring.hero) {
                             isExpanded = true
@@ -259,6 +264,36 @@ struct HeroDetailOverlay: View {
         if let loaded {
             self.image = loaded
             ImageCacheService.shared.setImage(loaded, forKey: itemId)
+        }
+    }
+
+    // MARK: - Drag to Export
+
+    private func makeDragProvider() -> NSItemProvider {
+        appState.isDraggingFromApp = true
+        let url = MediaStorageService.shared.mediaURL(filename: item.filename)
+        let provider = NSItemProvider(contentsOf: url) ?? NSItemProvider()
+        if let name = item.analysisResult?.patterns.first?.name {
+            let ext = url.pathExtension
+            provider.suggestedName = ext.isEmpty ? name : "\(name).\(ext)"
+        }
+        return provider
+    }
+
+    @ViewBuilder
+    private var dragPreview: some View {
+        if let image {
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 96, height: 96 / item.aspectRatio)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .opacity(0.85)
+        } else {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.gray.opacity(0.3))
+                .frame(width: 96, height: 64)
+                .opacity(0.85)
         }
     }
 

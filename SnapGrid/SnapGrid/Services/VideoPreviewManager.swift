@@ -38,6 +38,12 @@ final class VideoPreviewManager {
     /// Pattern names to display on the floating layer during grid hover
     private(set) var gridPatternNames: [String] = []
 
+    /// File URL of the active video (set during detail mode for drag-to-export)
+    private(set) var activeItemURL: URL?
+
+    /// Suggested export name for the active video (from AI analysis)
+    private(set) var activeItemSuggestedName: String?
+
     private var isHandedOffToDetail = false
     private var loopObserver: NSObjectProtocol?
 
@@ -97,7 +103,7 @@ final class VideoPreviewManager {
 
     /// Transition to detail mode. Sets properties — caller wraps in withAnimation.
     /// If no hover preview exists, creates a fresh player at finalFrame (no animation needed).
-    func transitionToDetail(itemId: String, url: URL, finalFrame: CGRect) {
+    func transitionToDetail(itemId: String, url: URL, finalFrame: CGRect, suggestedName: String? = nil) {
         if player == nil || activeItemId != itemId {
             // No hover preview — create fresh player directly at detail position
             cleanup()
@@ -116,6 +122,9 @@ final class VideoPreviewManager {
             currentFrame = finalFrame
             cornerRadius = 16
         }
+
+        activeItemURL = url
+        activeItemSuggestedName = suggestedName
     }
 
     /// Update the detail frame on window resize
@@ -145,8 +154,10 @@ final class VideoPreviewManager {
     }
 
     /// Create a fresh player for arrow key navigation in detail
-    func switchDetailPlayer(itemId: String, url: URL, frame: CGRect) {
+    func switchDetailPlayer(itemId: String, url: URL, frame: CGRect, suggestedName: String? = nil) {
         cleanup()
+        activeItemURL = url
+        activeItemSuggestedName = suggestedName
         let newPlayer = AVPlayer(url: url)
         newPlayer.isMuted = false
         player = newPlayer
@@ -165,6 +176,8 @@ final class VideoPreviewManager {
         player?.pause()
         player = nil
         activeItemId = nil
+        activeItemURL = nil
+        activeItemSuggestedName = nil
         gridPatternNames = []
     }
 

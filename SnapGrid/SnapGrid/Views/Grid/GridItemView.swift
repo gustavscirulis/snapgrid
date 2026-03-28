@@ -19,6 +19,7 @@ struct GridItemView: View {
     let onRetryAnalysis: () -> Void
 
     @Environment(VideoPreviewManager.self) private var videoPreview
+    @Environment(AppState.self) private var appState
     @State private var isHovered = false
     @State private var thumbnail: NSImage?
     @State private var globalFrame: CGRect = .zero
@@ -283,6 +284,7 @@ struct GridItemView: View {
             }
         }
         .onDrag {
+            appState.isDraggingFromApp = true
             let url = MediaStorageService.shared.mediaURL(filename: item.filename)
             let provider = NSItemProvider(contentsOf: url) ?? NSItemProvider()
             if let name = item.analysisResult?.patterns.first?.name {
