@@ -8,10 +8,10 @@ struct GridItemRectsPreferenceKey: PreferenceKey {
 }
 
 struct GridItemView: View {
-    let item: SnapGridItem
+    let item: MediaItem
     let width: CGFloat
     var isSelected: Bool = false
-    var onSelect: ((SnapGridItem, CGRect, UIImage?) -> Void)?
+    var onSelect: ((MediaItem, CGRect, UIImage?) -> Void)?
     @State private var thumbnail: UIImage?
     @State private var loadFailed = false
 
@@ -75,7 +75,7 @@ struct GridItemView: View {
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityLabel(item.title ?? (item.isVideo ? "Video" : "Image"))
+        .accessibilityLabel(item.isVideo ? "Video" : "Image")
         .accessibilityHint("Double tap to view full screen")
         .opacity(isSelected ? 0 : 1)
         .overlay(

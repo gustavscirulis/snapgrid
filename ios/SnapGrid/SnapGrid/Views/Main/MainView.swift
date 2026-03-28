@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Preference key for continuous TabView scroll tracking
 
@@ -33,14 +34,15 @@ private struct PageOffsetReporter: View {
 
 struct MainView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Query(sort: \MediaItem.createdAt, order: .reverse) private var allItems: [MediaItem]
+    @Query(sort: \Space.order) private var spaces: [Space]
     @State private var selectedIndex: Int?
     @State private var selectedItemId: String?
     @State private var sourceRect: CGRect = .zero
     @State private var thumbnailImage: UIImage?
     @State private var showOverlay = false
-    @State private var items: [SnapGridItem] = []
-    @State private var spaces: [Space] = []
     @State private var activeSpaceId: String? = nil
     @State private var searchText = ""
     @State private var gridItemRects: [String: CGRect] = [:]
@@ -49,6 +51,11 @@ struct MainView: View {
     @State private var hasAttemptedRescan = false
     @State private var tabScrollProgress: CGFloat = 0
     @State private var prefetchTask: Task<Void, Never>?
+    @State private var syncService = SyncService()
+    @State private var searchService = SearchIndexService()
+    @State private var debounceTask: Task<Void, Never>?
+    @State private var searchScores: [String: Double] = [:]
+    @State private var isSearchActive = false
 
     // MARK: - Index ↔ activeSpaceId bridging
 
@@ -57,8 +64,6 @@ struct MainView: View {
         return (spaces.firstIndex { $0.id == id } ?? -1) + 1
     }
 
-    /// Binding that syncs TabView page selection with activeSpaceId.
-    /// The `set` wraps in withAnimation so the underline slides on swipe completion.
     private var activeIndexBinding: Binding<Int> {
         Binding(
             get: { activeIndex },
@@ -76,50 +81,42 @@ struct MainView: View {
 
     // MARK: - Filtering
 
-    private var searchFilteredItems: [SnapGridItem] {
-        guard !searchText.isEmpty else { return items }
-        let query = searchText.lowercased()
-        return items.filter { matchesSearch($0, query: query) }
+    private func itemsForSpace(_ spaceId: String?) -> [MediaItem] {
+        var items: [MediaItem]
+        if let spaceId {
+            items = allItems.filter { $0.space?.id == spaceId }
+        } else {
+            items = Array(allItems)
+        }
+
+        guard isSearchActive else { return items }
+
+        let scores = searchScores
+        guard !scores.isEmpty else {
+            let query = searchText.lowercased().trimmingCharacters(in: .whitespaces)
+            if query == "vid" { return items.filter { $0.isVideo } }
+            if query == "img" { return items.filter { !$0.isVideo } }
+            return []
+        }
+
+        return items
+            .filter { scores[$0.id] != nil }
+            .sorted { a, b in
+                let scoreA = scores[a.id] ?? 0
+                let scoreB = scores[b.id] ?? 0
+                return scoreA > scoreB
+            }
     }
 
-    private func itemsForSpace(_ space: Space) -> [SnapGridItem] {
-        var result = items.filter { $0.spaceId == space.id }
-        if !searchText.isEmpty {
-            let query = searchText.lowercased()
-            result = result.filter { matchesSearch($0, query: query) }
-        }
-        return result
-    }
-
-    private func matchesSearch(_ item: SnapGridItem, query: String) -> Bool {
-        if let patterns = item.patterns,
-           patterns.contains(where: { $0.name.lowercased().contains(query) }) {
-            return true
-        }
-        if let context = item.imageContext?.lowercased(), context.contains(query) {
-            return true
-        }
-        if let title = item.title?.lowercased(), title.contains(query) {
-            return true
-        }
-        if query == "vid" && item.isVideo { return true }
-        if query == "img" && !item.isVideo { return true }
-        return false
-    }
-
-    /// Items visible in the currently active space/tab (used for full-screen swipe navigation)
-    private var currentVisibleItems: [SnapGridItem] {
-        if let activeSpaceId, let space = spaces.first(where: { $0.id == activeSpaceId }) {
-            return itemsForSpace(space)
-        }
-        return searchFilteredItems
+    private var currentVisibleItems: [MediaItem] {
+        itemsForSpace(activeSpaceId)
     }
 
     // MARK: - Body
 
     var body: some View {
         GeometryReader { geo in
-            let gridWidth = geo.size.width - 24 // 12pt padding on each side
+            let gridWidth = geo.size.width - 24
 
             NavigationStack {
                 ZStack {
@@ -133,12 +130,12 @@ struct MainView: View {
                         ErrorStateView(message: error) {
                             await loadContent()
                         }
-                    } else if items.isEmpty {
+                    } else if allItems.isEmpty {
                         EmptyStateView()
                     } else if spaces.isEmpty {
                         ScrollView {
                             MasonryGrid(
-                                items: searchFilteredItems,
+                                items: itemsForSpace(nil),
                                 availableWidth: gridWidth,
                                 selectedItemId: showOverlay ? selectedItemId : nil,
                                 onItemSelected: handleItemSelected
@@ -161,7 +158,7 @@ struct MainView: View {
                             TabView(selection: activeIndexBinding) {
                                 ScrollView {
                                     MasonryGrid(
-                                        items: searchFilteredItems,
+                                        items: itemsForSpace(nil),
                                         availableWidth: gridWidth,
                                         selectedItemId: showOverlay ? selectedItemId : nil,
                                         onItemSelected: handleItemSelected
@@ -177,7 +174,7 @@ struct MainView: View {
                                 ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
                                     ScrollView {
                                         MasonryGrid(
-                                            items: itemsForSpace(space),
+                                            items: itemsForSpace(space.id),
                                             availableWidth: gridWidth,
                                             selectedItemId: showOverlay ? selectedItemId : nil,
                                             onItemSelected: handleItemSelected
@@ -213,8 +210,6 @@ struct MainView: View {
                 }
             }
             .overlay {
-                // Full-screen overlay — layered above NavigationStack without
-                // participating in layout, so dismissal cannot resize the grid.
                 if showOverlay, let startIndex = selectedIndex {
                     FullScreenImageOverlay(
                         items: currentVisibleItems,
@@ -227,10 +222,14 @@ struct MainView: View {
                             selectedItemId = currentItemId
                         },
                         onClose: {
-                            showOverlay = false
-                            selectedIndex = nil
-                            selectedItemId = nil
-                            thumbnailImage = nil
+                            var t = Transaction()
+                            t.disablesAnimations = true
+                            withTransaction(t) {
+                                showOverlay = false
+                                selectedIndex = nil
+                                selectedItemId = nil
+                                thumbnailImage = nil
+                            }
                         }
                     )
                 }
@@ -239,9 +238,35 @@ struct MainView: View {
         .task {
             await loadContent()
         }
+        .onChange(of: searchText) { _, newValue in
+            debounceTask?.cancel()
+            let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty {
+                isSearchActive = false
+                searchScores = [:]
+            } else {
+                isSearchActive = true
+                debounceTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(100))
+                    guard !Task.isCancelled else { return }
+
+                    let lowered = trimmed.lowercased()
+                    if lowered == "vid" || lowered == "img" {
+                        searchScores = [:]
+                        return
+                    }
+
+                    let results = searchService.search(query: trimmed)
+                    guard !Task.isCancelled else { return }
+                    searchScores = Dictionary(uniqueKeysWithValues: results.map { ($0.itemId, $0.score) })
+                }
+            }
+        }
+        .onChange(of: allItems.count) { _, _ in
+            searchService.buildIndex(items: allItems)
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
-                // Import any images saved by the share extension, then reload
                 if let rootURL = fileSystem.rootURL {
                     ShareImportService.importPendingItems(to: rootURL)
                 }
@@ -252,7 +277,7 @@ struct MainView: View {
 
     // MARK: - Item Selection
 
-    private func handleItemSelected(_ item: SnapGridItem, _ rect: CGRect, _ thumb: UIImage?) {
+    private func handleItemSelected(_ item: MediaItem, _ rect: CGRect, _ thumb: UIImage?) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let visibleItems = currentVisibleItems
         selectedIndex = visibleItems.firstIndex(where: { $0.id == item.id }) ?? 0
@@ -265,95 +290,36 @@ struct MainView: View {
     // MARK: - Data Loading
 
     private func loadContent() async {
-        let isInitialLoad = items.isEmpty
-        isLoading = isInitialLoad
+        let isInitialLoad = isLoading
         error = nil
 
-        guard let metadataDir = fileSystem.metadataDir,
-              let imagesDir = fileSystem.imagesDir,
-              let thumbnailsDir = fileSystem.thumbnailsDir,
-              let rootURL = fileSystem.rootURL else {
+        guard let rootURL = fileSystem.rootURL else {
             self.error = "No access to SnapGrid folder"
             self.isLoading = false
             return
         }
 
-        #if DEBUG
-        print("[MainView] Loading content... rootURL=\(rootURL.path)")
-        #endif
+        let skipped = await syncService.sync(rootURL: rootURL, context: modelContext)
+        isLoading = false
 
-        let spacesManager = SpacesManager(rootURL: rootURL)
-        let loadedSpaces = (try? spacesManager.loadSpaces()) ?? []
-        self.spaces = loadedSpaces
+        // Build search index
+        searchService.buildIndex(items: allItems)
 
-        // Phase 1: Restore from cache for instant display
-        if isInitialLoad, let cached = await ItemsCache.shared.loadCached(imagesDir: imagesDir, thumbnailsDir: thumbnailsDir) {
-            self.items = cached
-            self.isLoading = false
-            #if DEBUG
-            print("[MainView] Restored \(cached.count) items from cache")
-            #endif
-        }
+        // Prefetch thumbnails
+        prefetchTask?.cancel()
+        let screenWidth = UIScreen.main.bounds.width
+        let columnWidth = (screenWidth - 24 - 8) / 2
+        prefetchTask = ThumbnailCache.shared.prefetchThumbnails(for: allItems, targetPixelWidth: columnWidth * 2)
 
-        // Phase 2: Scan filesystem for changes
-        let loader = MetadataLoader(metadataDir: metadataDir, imagesDir: imagesDir, thumbnailsDir: thumbnailsDir)
-        let hadCache = !items.isEmpty
-        var lastUpdate: LoadUpdate?
-
-        do {
-            for try await update in loader.loadItemsProgressively() {
-                lastUpdate = update
-                // Only show progressive updates if we have no cached items to display
-                if !hadCache && isInitialLoad {
-                    self.items = update.items
-                    self.isLoading = false
-                }
+        // Re-scan if some iCloud files were still downloading
+        if skipped > 0 && !hasAttemptedRescan {
+            hasAttemptedRescan = true
+            print("[MainView] \(skipped) files pending iCloud download, will re-scan in 15s")
+            Task {
+                try? await Task.sleep(for: .seconds(15))
+                hasAttemptedRescan = false
+                await loadContent()
             }
-
-            if let final_ = lastUpdate {
-                // Compare with current items — only update UI if something changed
-                let currentIds = Set(items.map(\.id))
-                let freshIds = Set(final_.items.map(\.id))
-
-                if currentIds != freshIds || !hadCache {
-                    self.items = final_.items
-                    self.isLoading = false
-                }
-
-                // Save to cache for next launch
-                await ItemsCache.shared.save(items: final_.items)
-
-                // Cancel previous prefetch and start a new one
-                prefetchTask?.cancel()
-                let screenWidth = await MainActor.run { UIScreen.main.bounds.width }
-                let columnWidth = (screenWidth - 24 - 8) / 2 // 12pt padding each side, 8pt spacing
-                prefetchTask = ThumbnailCache.shared.prefetchThumbnails(for: final_.items, targetPixelWidth: columnWidth * 2)
-            }
-
-            #if DEBUG
-            print("[MainView] Loaded \(items.count) items, \(loadedSpaces.count) spaces")
-            #endif
-
-            // If some metadata files were still downloading from iCloud, re-scan once after a delay
-            if let skipped = lastUpdate?.skippedCount, skipped > 0, !hasAttemptedRescan {
-                hasAttemptedRescan = true
-                #if DEBUG
-                print("[MainView] \(skipped) metadata files pending iCloud download, will re-scan in 15s")
-                #endif
-                Task {
-                    try? await Task.sleep(for: .seconds(15))
-                    await loadContent()
-                }
-            }
-        } catch {
-            #if DEBUG
-            print("[MainView] Error loading: \(error)")
-            #endif
-            // Only show error if we have nothing cached to display
-            if items.isEmpty {
-                self.error = error.localizedDescription
-            }
-            self.isLoading = false
         }
     }
 }

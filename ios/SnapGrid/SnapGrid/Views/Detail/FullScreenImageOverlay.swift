@@ -2,7 +2,7 @@ import SwiftUI
 import AVKit
 
 struct FullScreenImageOverlay: View {
-    let items: [SnapGridItem]
+    let items: [MediaItem]
     let startIndex: Int
     let sourceRect: CGRect
     let screenSize: CGSize
@@ -53,7 +53,7 @@ struct FullScreenImageOverlay: View {
     private let doubleTapZoomScale: CGFloat = 2.5
 
     /// Current item derived from index
-    private var item: SnapGridItem {
+    private var item: MediaItem {
         items[currentIndex]
     }
 
@@ -211,7 +211,7 @@ struct FullScreenImageOverlay: View {
     // MARK: - Adjacent page content (simple image, no zoom/scroll)
 
     @ViewBuilder
-    private func adjacentPageContent(for adjacentItem: SnapGridItem) -> some View {
+    private func adjacentPageContent(for adjacentItem: MediaItem) -> some View {
         if let img = adjacentImages[adjacentItem.id] {
             Image(uiImage: img)
                 .resizable()
@@ -238,7 +238,7 @@ struct FullScreenImageOverlay: View {
         VStack {
             Spacer()
             VStack(spacing: 8) {
-                if let patterns = item.patterns, !patterns.isEmpty {
+                if let patterns = item.analysisResult?.patterns, !patterns.isEmpty {
                     Image(systemName: "chevron.compact.up")
                         .font(.system(size: 20))
                         .foregroundStyle(.white.opacity(0.3))

@@ -1,18 +1,18 @@
 import SwiftUI
 
 struct MasonryGrid: View {
-    let items: [SnapGridItem]
+    let items: [MediaItem]
     let availableWidth: CGFloat
     var selectedItemId: String?
-    var onItemSelected: ((SnapGridItem, CGRect, UIImage?) -> Void)?
+    var onItemSelected: ((MediaItem, CGRect, UIImage?) -> Void)?
 
     private let columns = 2
     private let spacing: CGFloat = 8
 
     /// Distribute items across columns using shortest-column-first algorithm (computed once per body)
-    private var columnAssignments: [[SnapGridItem]] {
+    private var columnAssignments: [[MediaItem]] {
         var columnHeights = Array(repeating: CGFloat(0), count: columns)
-        var columnItems = Array(repeating: [SnapGridItem](), count: columns)
+        var columnItems = Array(repeating: [MediaItem](), count: columns)
 
         for item in items {
             let shortest = columnHeights.enumerated().min(by: { $0.element < $1.element })?.offset ?? 0
