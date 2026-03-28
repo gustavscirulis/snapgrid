@@ -237,6 +237,11 @@ struct ContentView: View {
                 handleResetAllData()
             }
         }
+        .task {
+            for await _ in NotificationCenter.default.notifications(named: .deleteSelected) {
+                deleteSelectedItems()
+            }
+        }
         .onDeleteCommand {
             deleteSelectedItems()
         }

@@ -98,6 +98,11 @@ struct SnapGridApp: App {
                     NotificationCenter.default.post(name: .undoDelete, object: nil)
                 }
                 .keyboardShortcut("z")
+
+                Button("Delete") {
+                    NotificationCenter.default.post(name: .deleteSelected, object: nil)
+                }
+                .keyboardShortcut(.delete)
             }
         }
 
@@ -137,4 +142,5 @@ extension Notification.Name {
     static let focusSearch = Notification.Name("focusSearch")
     static let selectAll = Notification.Name("selectAll")
     static let pasteImages = Notification.Name("pasteImages")
+    static let deleteSelected = Notification.Name("deleteSelected")
 }
