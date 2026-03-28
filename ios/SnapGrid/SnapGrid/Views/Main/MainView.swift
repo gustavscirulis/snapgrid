@@ -121,48 +121,63 @@ struct MainView: View {
         GeometryReader { geo in
             let gridWidth = geo.size.width - 24 // 12pt padding on each side
 
-            ZStack {
-                NavigationStack {
-                    ZStack {
-                        Color.snapDarkBackground
-                            .ignoresSafeArea()
+            NavigationStack {
+                ZStack {
+                    Color.snapDarkBackground
+                        .ignoresSafeArea()
 
-                        if isLoading {
-                            ProgressView()
-                                .tint(.white.opacity(0.6))
-                        } else if let error {
-                            ErrorStateView(message: error) {
-                                await loadContent()
-                            }
-                        } else if items.isEmpty {
-                            EmptyStateView()
-                        } else if spaces.isEmpty {
-                            ScrollView {
-                                MasonryGrid(
-                                    items: searchFilteredItems,
-                                    availableWidth: gridWidth,
-                                    selectedItemId: showOverlay ? selectedItemId : nil,
-                                    onItemSelected: handleItemSelected
-                                )
-                                .padding(.horizontal, 12)
-                                .padding(.bottom, 70)
-                            }
-                            .refreshable {
-                                hasAttemptedRescan = false
-                                await loadContent()
-                            }
-                        } else {
-                            VStack(spacing: 0) {
-                                SpaceTabBar(
-                                    spaces: spaces,
-                                    activeSpaceId: $activeSpaceId,
-                                    scrollProgress: tabScrollProgress
-                                )
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white.opacity(0.6))
+                    } else if let error {
+                        ErrorStateView(message: error) {
+                            await loadContent()
+                        }
+                    } else if items.isEmpty {
+                        EmptyStateView()
+                    } else if spaces.isEmpty {
+                        ScrollView {
+                            MasonryGrid(
+                                items: searchFilteredItems,
+                                availableWidth: gridWidth,
+                                selectedItemId: showOverlay ? selectedItemId : nil,
+                                onItemSelected: handleItemSelected
+                            )
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 70)
+                        }
+                        .refreshable {
+                            hasAttemptedRescan = false
+                            await loadContent()
+                        }
+                    } else {
+                        VStack(spacing: 0) {
+                            SpaceTabBar(
+                                spaces: spaces,
+                                activeSpaceId: $activeSpaceId,
+                                scrollProgress: tabScrollProgress
+                            )
 
-                                TabView(selection: activeIndexBinding) {
+                            TabView(selection: activeIndexBinding) {
+                                ScrollView {
+                                    MasonryGrid(
+                                        items: searchFilteredItems,
+                                        availableWidth: gridWidth,
+                                        selectedItemId: showOverlay ? selectedItemId : nil,
+                                        onItemSelected: handleItemSelected
+                                    )
+                                    .padding(.horizontal, 12)
+                                    .padding(.top, 12)
+                                    .padding(.bottom, 70)
+                                }
+                                .refreshable { await loadContent() }
+                                .tag(0)
+                                .background(PageOffsetReporter(pageIndex: 0))
+
+                                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
                                     ScrollView {
                                         MasonryGrid(
-                                            items: searchFilteredItems,
+                                            items: itemsForSpace(space),
                                             availableWidth: gridWidth,
                                             selectedItemId: showOverlay ? selectedItemId : nil,
                                             onItemSelected: handleItemSelected
@@ -172,65 +187,50 @@ struct MainView: View {
                                         .padding(.bottom, 70)
                                     }
                                     .refreshable { await loadContent() }
-                                    .tag(0)
-                                    .background(PageOffsetReporter(pageIndex: 0))
-
-                                    ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
-                                        ScrollView {
-                                            MasonryGrid(
-                                                items: itemsForSpace(space),
-                                                availableWidth: gridWidth,
-                                                selectedItemId: showOverlay ? selectedItemId : nil,
-                                                onItemSelected: handleItemSelected
-                                            )
-                                            .padding(.horizontal, 12)
-                                            .padding(.top, 12)
-                                            .padding(.bottom, 70)
-                                        }
-                                        .refreshable { await loadContent() }
-                                        .tag(index + 1)
-                                        .background(PageOffsetReporter(pageIndex: index + 1))
-                                    }
-                                }
-                                .tabViewStyle(.page(indexDisplayMode: .never))
-                                .coordinateSpace(name: "pagerContainer")
-                                .onPreferenceChange(PageOffsetPreferenceKey.self) { data in
-                                    guard let data = data else { return }
-                                    let containerWidth = geo.size.width
-                                    guard containerWidth > 0 else { return }
-                                    let progress = CGFloat(data.pageIndex) - data.minX / containerWidth
-                                    tabScrollProgress = min(max(progress, 0), CGFloat(spaces.count))
+                                    .tag(index + 1)
+                                    .background(PageOffsetReporter(pageIndex: index + 1))
                                 }
                             }
-                        }
-                    }
-                    .ignoresSafeArea(edges: .bottom)
-                    .navigationTitle("SnapGrid")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbarColorScheme(.dark, for: .navigationBar)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Menu {
-                                if !fileSystem.iCloudContainerActive {
-                                    Button(role: .destructive) {
-                                        fileSystem.disconnect()
-                                    } label: {
-                                        Label("Disconnect Folder", systemImage: "folder.badge.minus")
-                                    }
-                                }
-                            } label: {
-                                Image(systemName: "ellipsis.circle")
-                                    .foregroundStyle(.white.opacity(0.6))
+                            .tabViewStyle(.page(indexDisplayMode: .never))
+                            .coordinateSpace(name: "pagerContainer")
+                            .onPreferenceChange(PageOffsetPreferenceKey.self) { data in
+                                guard let data = data else { return }
+                                let containerWidth = geo.size.width
+                                guard containerWidth > 0 else { return }
+                                let progress = CGFloat(data.pageIndex) - data.minX / containerWidth
+                                tabScrollProgress = min(max(progress, 0), CGFloat(spaces.count))
                             }
                         }
-                    }
-                    .searchable(text: $searchText, prompt: "Search patterns, context...")
-                    .onPreferenceChange(GridItemRectsPreferenceKey.self) { rects in
-                        gridItemRects = rects
                     }
                 }
-
-                // Full-screen overlay — above NavigationStack
+                .ignoresSafeArea(edges: .bottom)
+                .navigationTitle("SnapGrid")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarColorScheme(.dark, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            if !fileSystem.iCloudContainerActive {
+                                Button(role: .destructive) {
+                                    fileSystem.disconnect()
+                                } label: {
+                                    Label("Disconnect Folder", systemImage: "folder.badge.minus")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundStyle(.white.opacity(0.6))
+                        }
+                    }
+                }
+                .searchable(text: $searchText, prompt: "Search patterns, context...")
+                .onPreferenceChange(GridItemRectsPreferenceKey.self) { rects in
+                    gridItemRects = rects
+                }
+            }
+            .overlay {
+                // Full-screen overlay — layered above NavigationStack without
+                // participating in layout, so dismissal cannot resize the grid.
                 if showOverlay, let startIndex = selectedIndex {
                     FullScreenImageOverlay(
                         items: currentVisibleItems,
