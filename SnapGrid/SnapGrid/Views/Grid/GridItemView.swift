@@ -349,9 +349,13 @@ struct GridItemView: View {
                 appState.detailSourceFrame = newValue
             }
         }
-        .onChange(of: appState.detailItem) { _, newId in
+        .onChange(of: appState.detailItem) { oldId, newId in
             if newId == item.id {
                 appState.detailSourceFrame = globalFrame
+            } else if oldId == item.id {
+                // Fullscreen dismissed — mouse may have moved, so clear stale hover state.
+                // If the cursor is still over this item, .onHover will re-fire true immediately.
+                isHovered = false
             }
         }
         .contextMenu {
