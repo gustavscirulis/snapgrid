@@ -133,19 +133,24 @@ struct MainView: View {
                     } else if allItems.isEmpty {
                         EmptyStateView()
                     } else if spaces.isEmpty {
-                        ScrollView {
-                            MasonryGrid(
-                                items: itemsForSpace(nil),
-                                availableWidth: gridWidth,
-                                selectedItemId: showOverlay ? selectedItemId : nil,
-                                onItemSelected: handleItemSelected
-                            )
-                            .padding(.horizontal, 12)
-                            .padding(.bottom, 70)
-                        }
-                        .refreshable {
-                            hasAttemptedRescan = false
-                            await loadContent()
+                        let items = itemsForSpace(nil)
+                        if items.isEmpty && isSearchActive {
+                            SearchEmptyStateView()
+                        } else {
+                            ScrollView {
+                                MasonryGrid(
+                                    items: items,
+                                    availableWidth: gridWidth,
+                                    selectedItemId: showOverlay ? selectedItemId : nil,
+                                    onItemSelected: handleItemSelected
+                                )
+                                .padding(.horizontal, 12)
+                                .padding(.bottom, 70)
+                            }
+                            .refreshable {
+                                hasAttemptedRescan = false
+                                await loadContent()
+                            }
                         }
                     } else {
                         VStack(spacing: 0) {
@@ -156,25 +161,15 @@ struct MainView: View {
                             )
 
                             TabView(selection: activeIndexBinding) {
-                                ScrollView {
-                                    MasonryGrid(
-                                        items: itemsForSpace(nil),
-                                        availableWidth: gridWidth,
-                                        selectedItemId: showOverlay ? selectedItemId : nil,
-                                        onItemSelected: handleItemSelected
-                                    )
-                                    .padding(.horizontal, 12)
-                                    .padding(.top, 12)
-                                    .padding(.bottom, 70)
-                                }
-                                .refreshable { await loadContent() }
-                                .tag(0)
-                                .background(PageOffsetReporter(pageIndex: 0))
-
-                                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                                let allItems = itemsForSpace(nil)
+                                if allItems.isEmpty && isSearchActive {
+                                    SearchEmptyStateView()
+                                        .tag(0)
+                                        .background(PageOffsetReporter(pageIndex: 0))
+                                } else {
                                     ScrollView {
                                         MasonryGrid(
-                                            items: itemsForSpace(space.id),
+                                            items: allItems,
                                             availableWidth: gridWidth,
                                             selectedItemId: showOverlay ? selectedItemId : nil,
                                             onItemSelected: handleItemSelected
@@ -184,8 +179,32 @@ struct MainView: View {
                                         .padding(.bottom, 70)
                                     }
                                     .refreshable { await loadContent() }
-                                    .tag(index + 1)
-                                    .background(PageOffsetReporter(pageIndex: index + 1))
+                                    .tag(0)
+                                    .background(PageOffsetReporter(pageIndex: 0))
+                                }
+
+                                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                                    let spaceItems = itemsForSpace(space.id)
+                                    if spaceItems.isEmpty && isSearchActive {
+                                        SearchEmptyStateView()
+                                            .tag(index + 1)
+                                            .background(PageOffsetReporter(pageIndex: index + 1))
+                                    } else {
+                                        ScrollView {
+                                            MasonryGrid(
+                                                items: spaceItems,
+                                                availableWidth: gridWidth,
+                                                selectedItemId: showOverlay ? selectedItemId : nil,
+                                                onItemSelected: handleItemSelected
+                                            )
+                                            .padding(.horizontal, 12)
+                                            .padding(.top, 12)
+                                            .padding(.bottom, 70)
+                                        }
+                                        .refreshable { await loadContent() }
+                                        .tag(index + 1)
+                                        .background(PageOffsetReporter(pageIndex: index + 1))
+                                    }
                                 }
                             }
                             .tabViewStyle(.page(indexDisplayMode: .never))

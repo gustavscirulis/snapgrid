@@ -19,6 +19,21 @@ struct EmptyStateView: View {
     }
 }
 
+struct SearchEmptyStateView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 32, weight: .light))
+                .foregroundStyle(.white.opacity(0.3))
+
+            Text("No results found")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 struct ErrorStateView: View {
     let message: String
     let retry: () async -> Void

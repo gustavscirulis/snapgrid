@@ -356,9 +356,7 @@ struct ContentView: View {
         Color.clear
             .frame(width: pageWidth, height: pageHeight)
             .overlay {
-                if items.isEmpty && spaceId != nil {
-                    EmptyStateView(mode: .spaceLevel, isDragTargeted: isDragTargeted)
-                } else if items.isEmpty {
+                if items.isEmpty && isSearchActive {
                     VStack(spacing: 12) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 32, weight: .light))
@@ -367,6 +365,8 @@ struct ContentView: View {
                             .font(.headline)
                             .foregroundStyle(.secondary)
                     }
+                } else if items.isEmpty && spaceId != nil {
+                    EmptyStateView(mode: .spaceLevel, isDragTargeted: isDragTargeted)
                 } else {
                     MasonryGridView(
                         items: items,
