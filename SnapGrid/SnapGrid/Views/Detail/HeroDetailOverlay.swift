@@ -557,7 +557,7 @@ struct HeroDetailOverlay: View {
                         }
                     }
                 }
-                .frame(width: max(min(finalFrame.width, 500), 300))
+                .frame(width: max(min(finalFrame.width, 500), 400))
                 .padding(.top, 20)
                 .padding(.bottom, 60)
                 .mask(metadataFadeMask)
@@ -774,27 +774,21 @@ private struct DetailMetadataSection: View {
                 }
 
                 if hasDescription(result) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(result.imageContext)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.4))
-                            .lineSpacing(2)
-                            .lineLimit(isDescriptionExpanded ? nil : 2)
-
-                        if !isDescriptionExpanded {
-                            Text("more")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.25))
+                    Text(result.imageContext)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .lineSpacing(2)
+                        .lineLimit(isDescriptionExpanded ? nil : 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .animation(nil, value: isDescriptionExpanded)
+                        .contentShape(Rectangle())
+                        .opacity(stage >= 3 ? 1 : 0)
+                        .animation(MetadataReveal.spring, value: stage)
+                        .onTapGesture {
+                            withAnimation(MetadataReveal.spring) {
+                                isDescriptionExpanded.toggle()
+                            }
                         }
-                    }
-                    .contentShape(Rectangle())
-                    .opacity(stage >= 3 ? 1 : 0)
-                    .animation(MetadataReveal.spring, value: stage)
-                    .onTapGesture {
-                        withAnimation(MetadataReveal.spring) {
-                            isDescriptionExpanded.toggle()
-                        }
-                    }
                 }
             }
 
