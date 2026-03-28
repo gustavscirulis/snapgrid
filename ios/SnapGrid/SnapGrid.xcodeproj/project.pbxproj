@@ -33,6 +33,8 @@
 		787BBD33FD14A7CC420B8C71 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC24EBA6AD6068C4ADA26030 /* SyncService.swift */; };
 		F2AD76603369201957F4E1FD /* SearchIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFAB07291230EAED58390B4 /* SearchIndexService.swift */; };
 		A100000030 /* AnimationTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000030 /* AnimationTokens.swift */; };
+		A100000031 /* ImageImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000031 /* ImageImportService.swift */; };
+		A100000032 /* PhotoPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000032 /* PhotoPickerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -89,6 +91,8 @@
 		71A78C6996F3AEB37B949CCE /* AnalysisResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisResult.swift; sourceTree = "<group>"; };
 		FC24EBA6AD6068C4ADA26030 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
 		5CFAB07291230EAED58390B4 /* SearchIndexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchIndexService.swift; sourceTree = "<group>"; };
+		B100000031 /* ImageImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageImportService.swift; sourceTree = "<group>"; };
+		B100000032 /* PhotoPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -185,6 +189,7 @@
 				FC24EBA6AD6068C4ADA26030 /* SyncService.swift */,
 				5CFAB07291230EAED58390B4 /* SearchIndexService.swift */,
 				B100000008 /* ThumbnailCache.swift */,
+				B100000031 /* ImageImportService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -221,6 +226,7 @@
 			children = (
 				B100000011 /* MainView.swift */,
 				B100000012 /* SpaceTabBar.swift */,
+				B100000032 /* PhotoPickerView.swift */,
 			);
 			path = Main;
 			sourceTree = "<group>";
@@ -398,6 +404,8 @@
 				787BBD33FD14A7CC420B8C71 /* SyncService.swift in Sources */,
 				F2AD76603369201957F4E1FD /* SearchIndexService.swift in Sources */,
 				A100000030 /* AnimationTokens.swift in Sources */,
+				A100000031 /* ImageImportService.swift in Sources */,
+				A100000032 /* PhotoPickerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
