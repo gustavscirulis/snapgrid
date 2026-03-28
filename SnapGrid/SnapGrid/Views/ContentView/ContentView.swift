@@ -109,14 +109,18 @@ struct ContentView: View {
 
             // Detail overlay — hero animation from thumbnail to centered view
             if let detailId = appState.detailItem,
-               let item = allItems.first(where: { $0.id == detailId }),
+               let startIndex = activeFilteredItems.firstIndex(where: { $0.id == detailId }),
                let sourceFrame = appState.detailSourceFrame {
                 HeroDetailOverlay(
-                    item: item,
+                    items: activeFilteredItems,
+                    startIndex: startIndex,
                     sourceFrame: sourceFrame,
                     onAnimationComplete: {
                         appState.detailItem = nil
                         appState.detailSourceFrame = nil
+                    },
+                    onCurrentItemChanged: { newId in
+                        appState.detailItem = newId
                     }
                 )
             }
