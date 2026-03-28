@@ -142,15 +142,14 @@ final class VideoPreviewManager {
         cornerRadius = 12
     }
 
-    /// Called when close animation completes and overlay is removed
+    /// Called when close animation completes and overlay is removed.
+    /// Stops the preview entirely — the hero spring already animated the layer
+    /// back to the grid cell, so hiding it now is seamless. If the cursor is
+    /// still over the thumbnail, normal hover will restart the preview.
     func completeTransitionToGrid() {
-        displayState = .grid
-        // Delay clearing handoff — the overlay removal triggers a transient
-        // onHover(false) on the grid item; keep the flag true so stopPreview() is a no-op
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(200))
-            isHandedOffToDetail = false
-        }
+        isHandedOffToDetail = false
+        displayState = .hidden
+        cleanup()
     }
 
     /// Stop detail video without transitioning back to grid.
