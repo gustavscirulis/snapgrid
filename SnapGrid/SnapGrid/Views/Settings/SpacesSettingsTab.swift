@@ -6,6 +6,7 @@ struct SpacesSettingsTab: View {
     @Environment(\.modelContext) private var modelContext
     @State private var newSpaceName: String = ""
     @State private var selectedSpaceId: String? = nil
+    @State private var showDeleteConfirm = false
 
     // Global "All" space prompt
     @AppStorage("allSpacePrompt") private var allSpacePrompt: String = ""
@@ -137,9 +138,23 @@ struct SpacesSettingsTab: View {
 
                     Section {
                         Button("Delete Space", role: .destructive) {
-                            modelContext.delete(space)
-                            try? modelContext.save()
-                            selectedSpaceId = nil
+                            if space.items.isEmpty {
+                                modelContext.delete(space)
+                                try? modelContext.save()
+                                selectedSpaceId = nil
+                            } else {
+                                showDeleteConfirm = true
+                            }
+                        }
+                        .alert("Delete Space?", isPresented: $showDeleteConfirm) {
+                            Button("Cancel", role: .cancel) {}
+                            Button("Delete", role: .destructive) {
+                                modelContext.delete(space)
+                                try? modelContext.save()
+                                selectedSpaceId = nil
+                            }
+                        } message: {
+                            Text("\"\(space.name)\" contains \(space.items.count) item\(space.items.count == 1 ? "" : "s"). They won't be deleted, but will be unassigned from this space.")
                         }
                     }
                 } else {
