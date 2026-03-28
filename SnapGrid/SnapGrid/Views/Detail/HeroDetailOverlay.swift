@@ -376,7 +376,10 @@ struct HeroDetailOverlay: View {
             if image == nil {
                 await loadThumbnailFor(item)
             }
-            isLoadingFullRes = true
+            let mediaURL = MediaStorageService.shared.mediaURL(filename: item.filename)
+            if !FileManager.default.fileExists(atPath: mediaURL.path) {
+                isLoadingFullRes = true
+            }
             withAnimation(SnapSpring.hero) {
                 isExpanded = true
             } completion: {
@@ -411,7 +414,10 @@ struct HeroDetailOverlay: View {
             if image == nil {
                 await loadThumbnailFor(item)
             }
-            isLoadingFullRes = true
+            let mediaURL = MediaStorageService.shared.mediaURL(filename: item.filename)
+            if !FileManager.default.fileExists(atPath: mediaURL.path) {
+                isLoadingFullRes = true
+            }
             if isTallImage {
                 try? await Task.sleep(for: .milliseconds(300))
                 scrollEnabled = true
