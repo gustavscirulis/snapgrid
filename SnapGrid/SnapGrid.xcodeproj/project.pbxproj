@@ -11,6 +11,7 @@
 		071B2A3BF29E5D8C82A0F4DB /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA0DBF4BD46715A129146550 /* AppState.swift */; };
 		0BD6F0F6397C8D6CC98DDFFF /* SyncWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2537EC9D8AD50664BBA121ED /* SyncWatcher.swift */; };
 		0FB79B182FF2453212D42811 /* SpaceTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4091FEF7AEC687AE2DA55B3D /* SpaceTabBar.swift */; };
+		19DF74D39041BCACC5B21A10 /* SemanticSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689AEED4D4344D4F358EC9C1 /* SemanticSearchService.swift */; };
 		20978B2B412744B389E3D316 /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BA6AB7DC0A84E670681EB6C /* MediaItem.swift */; };
 		210A13790BE0E2F8D5123662 /* NSImage+Thumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE5033083DAF80AD07ABC32 /* NSImage+Thumbnail.swift */; };
 		22B3C67B9FEA9300A6D969AE /* ToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EE366A7E490EA25CA0D6525 /* ToastView.swift */; };
@@ -49,7 +50,6 @@
 		DD17973EEB4B2AC6A97B2E5C /* ElectronImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DB5BFB2BC5A94B434803361 /* ElectronImportView.swift */; };
 		E287F102701B8A0ADF31921D /* ZoomableImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A7AD2552C0E5EF0A3708956 /* ZoomableImageView.swift */; };
 		E317897879AD400BF3F5A524 /* GridItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4945D23305D50B9C7D0873C9 /* GridItemView.swift */; };
-
 		ED7E6EF1043AE2A69F053E6C /* ImageCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB57D4AB7F12528E5ECD77DF /* ImageCacheService.swift */; };
 		EED812B5100CAE8E3D506AEE /* FloatingVideoLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CE02953B123E7318BEBBA18 /* FloatingVideoLayer.swift */; };
 		F84D4B0142262DA02D0EF60D /* MetadataSidecarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB5003E05FB3CAF53FEDBCA5 /* MetadataSidecarService.swift */; };
@@ -80,6 +80,7 @@
 		6477AAD40C3308F596D68729 /* Space.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Space.swift; sourceTree = "<group>"; };
 		649D56F9B7920BF3924A8E4E /* PatternTagsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternTagsView.swift; sourceTree = "<group>"; };
 		68305A61078FFD8F1E7C722F /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
+		689AEED4D4344D4F358EC9C1 /* SemanticSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticSearchService.swift; sourceTree = "<group>"; };
 		6B6205D7E807323F142415FE /* View+DoubleClick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+DoubleClick.swift"; sourceTree = "<group>"; };
 		79AADB26603B741C1AC17342 /* SnapGrid.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SnapGrid.entitlements; sourceTree = "<group>"; };
 		7B91561419FB6DD4EEB954BE /* GeneralSettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsTab.swift; sourceTree = "<group>"; };
@@ -97,7 +98,6 @@
 		AB57D4AB7F12528E5ECD77DF /* ImageCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheService.swift; sourceTree = "<group>"; };
 		ADAA221ED457C361084B34E7 /* HeroDetailOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroDetailOverlay.swift; sourceTree = "<group>"; };
 		BBFDD4D2B1F3CCB3ED261F5C /* SelectionBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionBadge.swift; sourceTree = "<group>"; };
-
 		CF20E3B5FA0802105388A2AC /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		D12368B01B4DD3634830B038 /* RubberBandOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RubberBandOverlay.swift; sourceTree = "<group>"; };
 		D5AD67C6232580C3B0D9E982 /* MasonryGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MasonryGridView.swift; sourceTree = "<group>"; };
@@ -164,7 +164,7 @@
 				EB5003E05FB3CAF53FEDBCA5 /* MetadataSidecarService.swift */,
 				9B1BF47348836CDB70325FEE /* MigrationService.swift */,
 				9391B9A3F7CE5C394F263B9C /* ModelDiscoveryService.swift */,
-
+				689AEED4D4344D4F358EC9C1 /* SemanticSearchService.swift */,
 				2537EC9D8AD50664BBA121ED /* SyncWatcher.swift */,
 				2F7E099305244B612B096B86 /* ThumbnailService.swift */,
 				2E5C14CF112B283919BE0F7D /* VideoFrameExtractor.swift */,
@@ -378,9 +378,9 @@
 				210A13790BE0E2F8D5123662 /* NSImage+Thumbnail.swift in Sources */,
 				5C1E7DB8A91CE5B34721F868 /* PatternPill.swift in Sources */,
 				76828B68E2CA3213D835B691 /* PatternTagsView.swift in Sources */,
-
 				F882C50D1073D1CF18EDC49A /* RubberBandOverlay.swift in Sources */,
 				65160672513A59B8ED353208 /* SelectionBadge.swift in Sources */,
+				19DF74D39041BCACC5B21A10 /* SemanticSearchService.swift in Sources */,
 				D016DE668FB1A40FFB11BD0D /* SettingsView.swift in Sources */,
 				52559E4B91F49A6CEDD07719 /* SnapGridApp.swift in Sources */,
 				8350DC604AC401431E9CD255 /* Space.swift in Sources */,
