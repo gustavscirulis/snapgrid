@@ -222,10 +222,14 @@ struct MainView: View {
                             selectedItemId = currentItemId
                         },
                         onClose: {
-                            showOverlay = false
-                            selectedIndex = nil
-                            selectedItemId = nil
-                            thumbnailImage = nil
+                            var t = Transaction()
+                            t.disablesAnimations = true
+                            withTransaction(t) {
+                                showOverlay = false
+                                selectedIndex = nil
+                                selectedItemId = nil
+                                thumbnailImage = nil
+                            }
                         }
                     )
                 }
