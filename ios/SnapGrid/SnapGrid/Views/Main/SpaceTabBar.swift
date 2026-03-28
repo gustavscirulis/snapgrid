@@ -14,12 +14,16 @@ struct SpaceTabBar: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 4) {
                 TabButton(title: "All", index: 0, isActive: activeSpaceId == nil) {
-                    activeSpaceId = nil
+                    withAnimation(SnapSpring.standard) {
+                        activeSpaceId = nil
+                    }
                 }
 
                 ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
                     TabButton(title: space.name, index: index + 1, isActive: activeSpaceId == space.id) {
-                        activeSpaceId = space.id
+                        withAnimation(SnapSpring.standard) {
+                            activeSpaceId = space.id
+                        }
                     }
                 }
             }

@@ -56,27 +56,13 @@ struct MainView: View {
     @State private var debounceTask: Task<Void, Never>?
     @State private var searchScores: [String: Double] = [:]
     @State private var isSearchActive = false
+    @State private var currentPage: Int? = 0
 
     // MARK: - Index ↔ activeSpaceId bridging
 
     private var activeIndex: Int {
         guard let id = activeSpaceId else { return 0 }
         return (spaces.firstIndex { $0.id == id } ?? -1) + 1
-    }
-
-    private var activeIndexBinding: Binding<Int> {
-        Binding(
-            get: { activeIndex },
-            set: { newIndex in
-                withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
-                    if newIndex == 0 {
-                        activeSpaceId = nil
-                    } else if newIndex > 0 && newIndex <= spaces.count {
-                        activeSpaceId = spaces[newIndex - 1].id
-                    }
-                }
-            }
-        )
     }
 
     // MARK: - Filtering
@@ -160,39 +146,18 @@ struct MainView: View {
                                 scrollProgress: tabScrollProgress
                             )
 
-                            TabView(selection: activeIndexBinding) {
-                                let allItems = itemsForSpace(nil)
-                                if allItems.isEmpty && isSearchActive {
-                                    SearchEmptyStateView()
-                                        .tag(0)
-                                        .background(PageOffsetReporter(pageIndex: 0))
-                                } else {
-                                    ScrollView {
-                                        MasonryGrid(
-                                            items: allItems,
-                                            availableWidth: gridWidth,
-                                            selectedItemId: showOverlay ? selectedItemId : nil,
-                                            onItemSelected: handleItemSelected
-                                        )
-                                        .padding(.horizontal, 12)
-                                        .padding(.top, 12)
-                                        .padding(.bottom, 70)
-                                    }
-                                    .refreshable { await loadContent() }
-                                    .tag(0)
-                                    .background(PageOffsetReporter(pageIndex: 0))
-                                }
-
-                                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
-                                    let spaceItems = itemsForSpace(space.id)
-                                    if spaceItems.isEmpty && isSearchActive {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 0) {
+                                    let allPageItems = itemsForSpace(nil)
+                                    if allPageItems.isEmpty && isSearchActive {
                                         SearchEmptyStateView()
-                                            .tag(index + 1)
-                                            .background(PageOffsetReporter(pageIndex: index + 1))
+                                            .containerRelativeFrame(.horizontal)
+                                            .id(0)
+                                            .background(PageOffsetReporter(pageIndex: 0))
                                     } else {
                                         ScrollView {
                                             MasonryGrid(
-                                                items: spaceItems,
+                                                items: allPageItems,
                                                 availableWidth: gridWidth,
                                                 selectedItemId: showOverlay ? selectedItemId : nil,
                                                 onItemSelected: handleItemSelected
@@ -202,12 +167,41 @@ struct MainView: View {
                                             .padding(.bottom, 70)
                                         }
                                         .refreshable { await loadContent() }
-                                        .tag(index + 1)
-                                        .background(PageOffsetReporter(pageIndex: index + 1))
+                                        .containerRelativeFrame(.horizontal)
+                                        .id(0)
+                                        .background(PageOffsetReporter(pageIndex: 0))
+                                    }
+
+                                    ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                                        let spaceItems = itemsForSpace(space.id)
+                                        if spaceItems.isEmpty && isSearchActive {
+                                            SearchEmptyStateView()
+                                                .containerRelativeFrame(.horizontal)
+                                                .id(index + 1)
+                                                .background(PageOffsetReporter(pageIndex: index + 1))
+                                        } else {
+                                            ScrollView {
+                                                MasonryGrid(
+                                                    items: spaceItems,
+                                                    availableWidth: gridWidth,
+                                                    selectedItemId: showOverlay ? selectedItemId : nil,
+                                                    onItemSelected: handleItemSelected
+                                                )
+                                                .padding(.horizontal, 12)
+                                                .padding(.top, 12)
+                                                .padding(.bottom, 70)
+                                            }
+                                            .refreshable { await loadContent() }
+                                            .containerRelativeFrame(.horizontal)
+                                            .id(index + 1)
+                                            .background(PageOffsetReporter(pageIndex: index + 1))
+                                        }
                                     }
                                 }
+                                .scrollTargetLayout()
                             }
-                            .tabViewStyle(.page(indexDisplayMode: .never))
+                            .scrollTargetBehavior(.paging)
+                            .scrollPosition(id: $currentPage)
                             .coordinateSpace(name: "pagerContainer")
                             .onPreferenceChange(PageOffsetPreferenceKey.self) { data in
                                 guard let data = data else { return }
@@ -293,6 +287,22 @@ struct MainView: View {
                     ShareImportService.importPendingItems(to: rootURL)
                 }
                 Task { await loadContent() }
+            }
+        }
+        .onChange(of: currentPage) { _, newPage in
+            let page = newPage ?? 0
+            if page == 0 {
+                activeSpaceId = nil
+            } else if page > 0 && page <= spaces.count {
+                activeSpaceId = spaces[page - 1].id
+            }
+        }
+        .onChange(of: activeSpaceId) { _, _ in
+            let target = activeIndex
+            if currentPage != target {
+                withAnimation(SnapSpring.standard) {
+                    currentPage = target
+                }
             }
         }
     }
