@@ -1,9 +1,7 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct OnboardingView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
-    @State private var showPicker = false
 
     var body: some View {
         ZStack {
@@ -14,7 +12,7 @@ struct OnboardingView: View {
                 Spacer()
 
                 VStack(spacing: 16) {
-                    Image(systemName: "square.grid.2x2")
+                    Image(systemName: "icloud")
                         .font(.system(size: 56, weight: .light))
                         .foregroundStyle(.white.opacity(0.9))
 
@@ -22,7 +20,7 @@ struct OnboardingView: View {
                         .font(.system(size: 34, weight: .bold, design: .default))
                         .foregroundStyle(.white)
 
-                    Text("Browse your SnapGrid library\non this device")
+                    Text("Sign in to iCloud to sync\nyour SnapGrid library")
                         .font(.system(size: 17, weight: .regular))
                         .foregroundStyle(.white.opacity(0.6))
                         .multilineTextAlignment(.center)
@@ -30,14 +28,16 @@ struct OnboardingView: View {
 
                 Spacer()
 
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     Button {
-                        showPicker = true
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
                     } label: {
                         HStack(spacing: 10) {
-                            Image(systemName: "folder")
+                            Image(systemName: "gear")
                                 .font(.system(size: 17, weight: .medium))
-                            Text("Select SnapGrid Folder")
+                            Text("Open Settings")
                                 .font(.system(size: 17, weight: .semibold))
                         }
                         .foregroundStyle(.black)
@@ -48,10 +48,16 @@ struct OnboardingView: View {
                     }
                     .padding(.horizontal, 24)
 
-                    Text("Open the Files app location:\niCloud Drive → Documents → SnapGrid")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.4))
-                        .multilineTextAlignment(.center)
+                    Button {
+                        fileSystem.restoreAccess()
+                    } label: {
+                        Text("Try Again")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                    }
+                    .padding(.horizontal, 24)
 
                     if let error = fileSystem.error {
                         Text(error)
@@ -65,46 +71,6 @@ struct OnboardingView: View {
                 Spacer()
                     .frame(height: 40)
             }
-        }
-        .sheet(isPresented: $showPicker) {
-            FolderPicker { url in
-                if let url {
-                    fileSystem.grantAccess(to: url)
-                }
-            }
-        }
-    }
-}
-
-struct FolderPicker: UIViewControllerRepresentable {
-    let onPick: (URL?) -> Void
-
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
-        picker.allowsMultipleSelection = false
-        picker.delegate = context.coordinator
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onPick: onPick)
-    }
-
-    class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let onPick: (URL?) -> Void
-
-        init(onPick: @escaping (URL?) -> Void) {
-            self.onPick = onPick
-        }
-
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            onPick(urls.first)
-        }
-
-        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-            onPick(nil)
         }
     }
 }

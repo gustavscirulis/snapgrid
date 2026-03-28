@@ -207,22 +207,6 @@ struct MainView: View {
                 .navigationTitle("SnapGrid")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarColorScheme(.dark, for: .navigationBar)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            if !fileSystem.iCloudContainerActive {
-                                Button(role: .destructive) {
-                                    fileSystem.disconnect()
-                                } label: {
-                                    Label("Disconnect Folder", systemImage: "folder.badge.minus")
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .foregroundStyle(.white.opacity(0.6))
-                        }
-                    }
-                }
                 .searchable(text: $searchText, prompt: "Search patterns, context...")
                 .onPreferenceChange(GridItemRectsPreferenceKey.self) { rects in
                     gridItemRects = rects
