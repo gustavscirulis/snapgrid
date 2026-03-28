@@ -115,6 +115,13 @@ struct FullScreenImageOverlay: View {
     // Search-triggered close (skips rect correction since grid has re-laid out)
     @State private var isSearchDismiss = false
 
+    // Real-time gesture translation (synchronous updates, no frame delay)
+    private struct GestureDrag: Equatable {
+        var active: Bool = false
+        var translation: CGSize = .zero
+    }
+    @GestureState private var gestureDrag = GestureDrag()
+
     // Close target frame (updated reactively from grid rects)
     @State private var closeTargetFrame: CGRect
 
@@ -154,14 +161,63 @@ struct FullScreenImageOverlay: View {
 
     // MARK: - Computed Properties
 
+    // Effective offsets: prefer @GestureState (synchronous) during active gesture,
+    // fall back to @State (for animations) when gesture is inactive.
+
+    private var effectiveSwipeOffset: CGFloat {
+        if gestureDrag.active && gestureMode == .swipe {
+            var proposed = gestureDrag.translation.width
+            if (currentIndex == 0 && proposed > 0) ||
+               (currentIndex == items.count - 1 && proposed < 0) {
+                proposed *= 0.3
+            }
+            return proposed
+        }
+        return swipeOffset
+    }
+
+    private var effectiveDismissOffset: CGFloat {
+        if gestureDrag.active && gestureMode == .dismiss {
+            return max(0, gestureDrag.translation.height)
+        }
+        return dismissOffset
+    }
+
+    private var effectiveContentOffset: CGFloat {
+        if gestureDrag.active && gestureMode == .scroll {
+            let proposed = contentOffsetAtGestureStart - gestureDrag.translation.height
+            if proposed < 0 {
+                // Rubber band past top — allows bouncy feel when scrolling back to image
+                let overshoot = -proposed
+                return -(log2(1 + overshoot) * 8)
+            }
+            if proposed > maxContentOffset {
+                let overshoot = proposed - maxContentOffset
+                return maxContentOffset + log2(1 + overshoot) * 8
+            }
+            return proposed
+        }
+        return contentOffset
+    }
+
+    private var effectiveZoomPanOffset: CGSize {
+        if gestureDrag.active && gestureMode == .zoomPan {
+            return CGSize(
+                width: zoomPanLastOffset.width + gestureDrag.translation.width,
+                height: zoomPanLastOffset.height + gestureDrag.translation.height
+            )
+        }
+        return zoomPanOffset
+    }
+
     private var backdropOpacity: Double {
         if !isExpanded { return 0 }
-        let dragProgress = min(abs(dismissOffset) / 300.0, 1.0)
+        let dragProgress = min(abs(effectiveDismissOffset) / 300.0, 1.0)
         return 1.0 - dragProgress * 0.5
     }
 
     private var dismissScale: CGFloat {
-        let progress = min(abs(dismissOffset) / 400.0, 1.0)
+        let progress = min(abs(effectiveDismissOffset) / 400.0, 1.0)
         return 1.0 - progress * 0.1
     }
 
@@ -190,27 +246,30 @@ struct FullScreenImageOverlay: View {
         let finalFrame = computeFinalFrame(for: item)
 
         ZStack {
-            // 1. Backdrop
-            Color.black
-                .opacity(backdropOpacity)
-                .ignoresSafeArea()
+            // 1. Backdrop — material blur + tint (matches Mac app)
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                Color.black.opacity(0.55)
+            }
+            .opacity(backdropOpacity)
+            .ignoresSafeArea()
 
             // 2. Adjacent images — only after hero, hidden during close
             if heroComplete && !isClosing {
                 if currentIndex > 0 {
                     adjacentItemView(for: items[currentIndex - 1])
-                        .offset(x: -screenSize.width + swipeOffset)
+                        .offset(x: -screenSize.width + effectiveSwipeOffset)
                 }
                 if currentIndex < items.count - 1 {
                     adjacentItemView(for: items[currentIndex + 1])
-                        .offset(x: screenSize.width + swipeOffset)
+                        .offset(x: screenSize.width + effectiveSwipeOffset)
                 }
             }
 
             // 3. Current content — hero image OR settled ScrollView
             if heroComplete && !isClosing {
                 settledContentView(finalFrame: finalFrame)
-                    .offset(x: swipeOffset)
+                    .offset(x: effectiveSwipeOffset)
             } else {
                 heroImage(finalFrame: finalFrame)
             }
@@ -276,7 +335,7 @@ struct FullScreenImageOverlay: View {
                         .frame(width: finalFrame.width, height: finalFrame.height)
                         .clipped()
                         .scaleEffect(zoomScale)
-                        .offset(zoomPanOffset)
+                        .offset(effectiveZoomPanOffset)
                 } else {
                     Rectangle()
                         .fill(Color.snapDarkMuted)
@@ -289,21 +348,23 @@ struct FullScreenImageOverlay: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .position(x: finalFrame.midX, y: finalFrame.midY)
-            .offset(y: -contentOffset)
+            .offset(y: -effectiveContentOffset)
 
             // Metadata — positioned so top starts near screen bottom (peek)
-            GeometryReader { _ in
-                DetailMetadataSection(item: item, stage: metadataStage) { pattern in
-                    searchAndClose(pattern: pattern)
-                }
-                    .id(item.id)
-                    .frame(width: max(min(finalFrame.width, screen.width - 32), 300))
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .offset(y: metadataTopY - contentOffset)
+            DetailMetadataSection(item: item, stage: metadataStage) { pattern in
+                searchAndClose(pattern: pattern)
             }
-            .opacity(metadataOpacity)
+                .id(item.id)
+                .frame(width: max(min(finalFrame.width, screen.width - 32), 300))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .offset(y: metadataTopY - effectiveContentOffset)
+                .opacity(metadataOpacity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Rasterize content so swipe/dismiss transforms are pure GPU operations.
+        // During swipe/dismiss the inner content is static (only outer offset changes),
+        // so the texture is reused — no per-frame blur recomputation.
+        .drawingGroup()
         .contentShape(Rectangle())
         .gesture(settledDragGesture)
         .simultaneousGesture(pinchGesture)
@@ -314,8 +375,8 @@ struct FullScreenImageOverlay: View {
                 }
         )
         // Dismiss visual effects
-        .offset(y: dismissOffset)
-        .scaleEffect(dismissOffset > 0 ? dismissScale : 1.0)
+        .offset(y: effectiveDismissOffset)
+        .scaleEffect(effectiveDismissOffset > 0 ? dismissScale : 1.0)
     }
 
     // MARK: - Adjacent Item View
@@ -360,7 +421,7 @@ struct FullScreenImageOverlay: View {
     /// Metadata starts faded (0.3), reaches full opacity over 60pt of scroll
     private var metadataOpacity: Double {
         let base = 0.3
-        let progress = min(contentOffset / 60, 1.0)
+        let progress = min(effectiveContentOffset / 60, 1.0)
         return base + (1.0 - base) * progress
     }
 
@@ -390,32 +451,45 @@ struct FullScreenImageOverlay: View {
     // MARK: - Settled Drag Gesture
 
     private var settledDragGesture: some Gesture {
-        DragGesture(minimumDistance: 8)
+        DragGesture(minimumDistance: 8, coordinateSpace: .global)
+            .updating($gestureDrag) { value, state, _ in
+                state = GestureDrag(active: true, translation: value.translation)
+            }
             .onChanged { value in
+                // Only lock gesture mode on first event. No @State offset
+                // mutations here — the view reads @GestureState via effective*
+                // computed properties. Mutating @State would schedule a second
+                // (redundant) render that fights with the synchronous one.
+                guard !gestureActive else { return }
+                gestureActive = true
+
                 let tx = value.translation.width
                 let ty = value.translation.height
 
-                // Determine gesture mode on first call
-                if !gestureActive {
-                    gestureActive = true
-                    if isZoomed {
-                        gestureMode = .zoomPan
-                        zoomPanLastOffset = zoomPanOffset
-                    } else if contentOffset > 0 {
-                        // Metadata visible — only allow scroll
-                        gestureMode = .scroll
-                        contentOffsetAtGestureStart = contentOffset
-                    } else if abs(tx) > abs(ty) + 4 {
-                        gestureMode = .swipe
-                    } else if ty > 0 {
-                        gestureMode = .dismiss
-                    } else {
-                        gestureMode = .scroll
-                        contentOffsetAtGestureStart = contentOffset
-                    }
+                if isZoomed {
+                    gestureMode = .zoomPan
+                    zoomPanLastOffset = zoomPanOffset
+                } else if contentOffset > 0 {
+                    gestureMode = .scroll
+                    contentOffsetAtGestureStart = contentOffset
+                } else if abs(tx) > abs(ty) + 4 {
+                    gestureMode = .swipe
+                } else if ty > 0 {
+                    gestureMode = .dismiss
+                } else {
+                    gestureMode = .scroll
+                    contentOffsetAtGestureStart = contentOffset
                 }
+            }
+            .onEnded { value in
+                let mode = gestureMode
+                let tx = value.translation.width
+                let ty = value.translation.height
 
-                switch gestureMode {
+                // Sync @State to final gesture position. This provides
+                // the starting point for end-of-gesture animations and
+                // the fallback value when @GestureState resets.
+                switch mode {
                 case .zoomPan:
                     zoomPanOffset = CGSize(
                         width: zoomPanLastOffset.width + tx,
@@ -433,32 +507,27 @@ struct FullScreenImageOverlay: View {
                 case .scroll:
                     let proposed = contentOffsetAtGestureStart - ty
                     if proposed < 0 {
-                        // Dragged past top → transition to dismiss
-                        contentOffset = 0
-                        dismissOffset = -proposed
+                        let overshoot = -proposed
+                        contentOffset = -(log2(1 + overshoot) * 8)
                     } else if proposed > maxContentOffset {
                         let overshoot = proposed - maxContentOffset
                         contentOffset = maxContentOffset + log2(1 + overshoot) * 8
-                        dismissOffset = 0
                     } else {
                         contentOffset = proposed
-                        dismissOffset = 0
                     }
-                case .none:
-                    break
+                case .none: break
                 }
-            }
-            .onEnded { value in
-                let mode = gestureMode
+
                 gestureActive = false
                 gestureMode = .none
 
+                // Now handle end-of-gesture animations / navigation
                 switch mode {
                 case .zoomPan:
                     zoomPanLastOffset = zoomPanOffset
 
                 case .swipe:
-                    let velocity = value.predictedEndTranslation.width - value.translation.width
+                    let velocity = value.predictedEndTranslation.width - tx
                     let threshold = screenSize.width * 0.3
                     let velocityThreshold: CGFloat = 200
 
@@ -487,31 +556,18 @@ struct FullScreenImageOverlay: View {
                     }
 
                 case .scroll:
-                    if dismissOffset > 0 {
-                        // Was scrolling but dragged past top → treat as dismiss
-                        if dismissOffset > 100 || value.predictedEndTranslation.height > 300 {
-                            close()
-                        } else {
-                            withAnimation(SnapSpring.standard) {
-                                dismissOffset = 0
-                            }
-                        }
-                        contentOffset = 0
+                    let velocity = -(value.predictedEndTranslation.height - ty)
+                    let projected = contentOffset + velocity * 0.3
+                    let snapTarget: CGFloat
+                    if projected > maxContentOffset * 0.35 {
+                        snapTarget = maxContentOffset
                     } else {
-                        // Snap to nearest target
-                        let velocity = -(value.predictedEndTranslation.height - value.translation.height)
-                        let projected = contentOffset + velocity * 0.3
-                        let snapTarget: CGFloat
-                        if projected > maxContentOffset * 0.35 {
-                            snapTarget = maxContentOffset
-                        } else {
-                            snapTarget = 0
-                        }
-                        withAnimation(SnapSpring.standard) {
-                            contentOffset = snapTarget
-                        }
-                        contentOffsetAtGestureStart = snapTarget
+                        snapTarget = 0
                     }
+                    withAnimation(SnapSpring.standard) {
+                        contentOffset = snapTarget
+                    }
+                    contentOffsetAtGestureStart = snapTarget
 
                 case .none:
                     break
