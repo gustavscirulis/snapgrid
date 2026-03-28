@@ -93,50 +93,62 @@ final class MediaStorageService: Sendable {
     func moveToTrash(filename: String, id: String) throws {
         let fm = FileManager.default
 
-        // Move media file
-        let mediaSrc = mediaDir.appendingPathComponent(filename)
-        let mediaDst = trashMediaDir.appendingPathComponent(filename)
-        if fm.fileExists(atPath: mediaSrc.path) {
-            if fm.fileExists(atPath: mediaDst.path) { try fm.removeItem(at: mediaDst) }
-            try fm.moveItem(at: mediaSrc, to: mediaDst)
+        // Track which files we've moved so we can roll back on failure
+        var movedPairs: [(src: URL, dst: URL)] = []
+
+        func moveFile(from src: URL, to dst: URL) throws {
+            guard fm.fileExists(atPath: src.path) else { return }
+            if fm.fileExists(atPath: dst.path) { try fm.removeItem(at: dst) }
+            try fm.moveItem(at: src, to: dst)
+            movedPairs.append((src: src, dst: dst))
         }
 
-        // Move metadata sidecar
-        let metaSrc = metadataDir.appendingPathComponent("\(id).json")
-        let metaDst = trashMetadataDir.appendingPathComponent("\(id).json")
-        if fm.fileExists(atPath: metaSrc.path) {
-            if fm.fileExists(atPath: metaDst.path) { try fm.removeItem(at: metaDst) }
-            try fm.moveItem(at: metaSrc, to: metaDst)
+        func rollback() {
+            for pair in movedPairs.reversed() {
+                try? fm.moveItem(at: pair.dst, to: pair.src)
+            }
         }
 
-        // Move thumbnail
-        let thumbSrc = thumbnailDir.appendingPathComponent("\(id).jpg")
-        let thumbDst = trashThumbnailDir.appendingPathComponent("\(id).jpg")
-        if fm.fileExists(atPath: thumbSrc.path) {
-            if fm.fileExists(atPath: thumbDst.path) { try fm.removeItem(at: thumbDst) }
-            try fm.moveItem(at: thumbSrc, to: thumbDst)
+        do {
+            try moveFile(from: mediaDir.appendingPathComponent(filename),
+                         to: trashMediaDir.appendingPathComponent(filename))
+            try moveFile(from: metadataDir.appendingPathComponent("\(id).json"),
+                         to: trashMetadataDir.appendingPathComponent("\(id).json"))
+            try moveFile(from: thumbnailDir.appendingPathComponent("\(id).jpg"),
+                         to: trashThumbnailDir.appendingPathComponent("\(id).jpg"))
+        } catch {
+            rollback()
+            throw error
         }
     }
 
     func restoreFromTrash(filename: String, id: String) throws {
         let fm = FileManager.default
 
-        let mediaSrc = trashMediaDir.appendingPathComponent(filename)
-        let mediaDst = mediaDir.appendingPathComponent(filename)
-        if fm.fileExists(atPath: mediaSrc.path) {
-            try fm.moveItem(at: mediaSrc, to: mediaDst)
+        var movedPairs: [(src: URL, dst: URL)] = []
+
+        func moveFile(from src: URL, to dst: URL) throws {
+            guard fm.fileExists(atPath: src.path) else { return }
+            try fm.moveItem(at: src, to: dst)
+            movedPairs.append((src: src, dst: dst))
         }
 
-        let metaSrc = trashMetadataDir.appendingPathComponent("\(id).json")
-        let metaDst = metadataDir.appendingPathComponent("\(id).json")
-        if fm.fileExists(atPath: metaSrc.path) {
-            try fm.moveItem(at: metaSrc, to: metaDst)
+        func rollback() {
+            for pair in movedPairs.reversed() {
+                try? fm.moveItem(at: pair.dst, to: pair.src)
+            }
         }
 
-        let thumbSrc = trashThumbnailDir.appendingPathComponent("\(id).jpg")
-        let thumbDst = thumbnailDir.appendingPathComponent("\(id).jpg")
-        if fm.fileExists(atPath: thumbSrc.path) {
-            try fm.moveItem(at: thumbSrc, to: thumbDst)
+        do {
+            try moveFile(from: trashMediaDir.appendingPathComponent(filename),
+                         to: mediaDir.appendingPathComponent(filename))
+            try moveFile(from: trashMetadataDir.appendingPathComponent("\(id).json"),
+                         to: metadataDir.appendingPathComponent("\(id).json"))
+            try moveFile(from: trashThumbnailDir.appendingPathComponent("\(id).jpg"),
+                         to: thumbnailDir.appendingPathComponent("\(id).jpg"))
+        } catch {
+            rollback()
+            throw error
         }
     }
 

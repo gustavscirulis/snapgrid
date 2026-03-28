@@ -26,4 +26,25 @@ final class ImageCacheService: @unchecked Sendable {
     func clearAll() {
         cache.removeAllObjects()
     }
+
+    /// Load a thumbnail for an item, checking cache first, then disk.
+    /// Caches the result for future reads. Runs disk I/O on a background thread.
+    func loadThumbnail(id: String, filename: String) async -> NSImage? {
+        if let cached = image(forKey: id) {
+            return cached
+        }
+
+        let loaded: NSImage? = await Task.detached(priority: .utility) {
+            let storage = MediaStorageService.shared
+            let url = storage.thumbnailExists(id: id)
+                ? storage.thumbnailURL(id: id)
+                : storage.mediaURL(filename: filename)
+            return NSImage(contentsOf: url)
+        }.value
+
+        if let loaded {
+            setImage(loaded, forKey: id)
+        }
+        return loaded
+    }
 }

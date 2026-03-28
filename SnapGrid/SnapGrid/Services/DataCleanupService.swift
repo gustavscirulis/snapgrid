@@ -59,8 +59,16 @@ enum DataCleanupService {
 
         var removed = 0
         for item in items {
-            let mediaPath = storage.mediaURL(filename: item.filename).path
+            let mediaURL = storage.mediaURL(filename: item.filename)
+            let mediaPath = mediaURL.path
             if !fm.fileExists(atPath: mediaPath) {
+                // Check for iCloud placeholder before considering orphaned —
+                // evicted files exist as .filename.icloud in the same directory
+                let placeholderName = ".\(item.filename).icloud"
+                let placeholderURL = mediaURL.deletingLastPathComponent().appendingPathComponent(placeholderName)
+                if fm.fileExists(atPath: placeholderURL.path) {
+                    continue  // File is evicted by iCloud, not truly missing
+                }
                 context.delete(item)
                 removed += 1
             }

@@ -44,8 +44,10 @@ struct SpaceTabBar: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 // "All" tab
                 tabView(id: nil, title: "All", isActive: activeSpaceId == nil)
-                    .onDrop(of: [.plainText], isTargeted: allTabTargeted) { providers in
-                        handleDrop(providers, spaceId: nil)
+                    .dropDestination(for: String.self) { strings, _ in
+                        handleDropStrings(strings, spaceId: nil)
+                    } isTargeted: { targeted in
+                        dropTargetId = targeted ? "ALL" : nil
                     }
 
                 ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
@@ -119,11 +121,10 @@ struct SpaceTabBar: View {
                     editName = space.name
                     editingSpaceId = space.id
                 }
-                .onDrop(of: [.plainText], isTargeted: Binding(
-                    get: { dropTargetId == space.id },
-                    set: { dropTargetId = $0 ? space.id : nil }
-                )) { providers in
-                    handleDrop(providers, spaceId: space.id)
+                .dropDestination(for: String.self) { strings, _ in
+                    handleDropStrings(strings, spaceId: space.id)
+                } isTargeted: { targeted in
+                    dropTargetId = targeted ? space.id : nil
                 }
                 .background(
                     GeometryReader { geo in
@@ -258,28 +259,17 @@ struct SpaceTabBar: View {
 
     // MARK: - Drop Helpers
 
-    private var allTabTargeted: Binding<Bool> {
-        Binding(
-            get: { dropTargetId == nil && false },
-            set: { dropTargetId = $0 ? "ALL" : nil }
-        )
-    }
-
-    private func handleDrop(_ providers: [NSItemProvider], spaceId: String?) -> Bool {
-        for provider in providers {
-            _ = provider.loadObject(ofClass: NSString.self) { string, _ in
-                guard let text = string as? String else { return }
-                Task { @MainActor in
-                    if text.hasPrefix("snapgrid:") {
-                        let idsString = String(text.dropFirst("snapgrid:".count))
-                        let itemIds = Set(idsString.split(separator: ",").map(String.init))
-                        if !itemIds.isEmpty {
-                            onAssignToSpace(itemIds, spaceId)
-                        }
-                    }
+    private func handleDropStrings(_ strings: [String], spaceId: String?) -> Bool {
+        for text in strings {
+            if text.hasPrefix("snapgrid:") {
+                let idsString = String(text.dropFirst("snapgrid:".count))
+                let itemIds = Set(idsString.split(separator: ",").map(String.init))
+                if !itemIds.isEmpty {
+                    onAssignToSpace(itemIds, spaceId)
+                    return true
                 }
             }
         }
-        return true
+        return false
     }
 }

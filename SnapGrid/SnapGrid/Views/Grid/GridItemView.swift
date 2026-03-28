@@ -286,14 +286,17 @@ struct GridItemView: View {
         .onDrag {
             appState.isDraggingFromApp = true
             let url = MediaStorageService.shared.mediaURL(filename: item.filename)
-            let provider = NSItemProvider(contentsOf: url) ?? NSItemProvider()
+            // Build provider from scratch — NSItemProvider(contentsOf:) creates a sealed
+            // provider where additional registerObject() calls are not loadable by the
+            // drop system (the types appear in registeredTypeIdentifiers but data loading fails).
+            let provider = NSItemProvider()
+            provider.registerObject(url as NSURL, visibility: .all)
+            let idString = "snapgrid:" + effectiveIds.joined(separator: ",")
+            provider.registerObject(idString as NSString, visibility: .all)
             if let name = item.analysisResult?.patterns.first?.name {
                 let ext = url.pathExtension
                 provider.suggestedName = ext.isEmpty ? name : "\(name).\(ext)"
             }
-            // Register item IDs as plain text for space tab drops
-            let idString = "snapgrid:" + effectiveIds.joined(separator: ",")
-            provider.registerObject(idString as NSString, visibility: .all)
             return provider
         } preview: {
             ZStack(alignment: .topTrailing) {
@@ -372,28 +375,8 @@ struct GridItemView: View {
     }
 
     private func loadThumbnail() async {
-        // Check memory cache first (fast, no I/O)
-        if let cached = ImageCacheService.shared.image(forKey: item.id) {
-            self.thumbnail = cached
-            return
-        }
-
-        // Capture value types before crossing isolation boundary
-        let itemId = item.id
-        let filename = item.filename
-
-        // Load image on background thread to avoid blocking the main actor
-        let image: NSImage? = await Task.detached(priority: .utility) {
-            let storage = MediaStorageService.shared
-            let url = storage.thumbnailExists(id: itemId)
-                ? storage.thumbnailURL(id: itemId)
-                : storage.mediaURL(filename: filename)
-            return NSImage(contentsOf: url)
-        }.value
-
-        if let image {
-            ImageCacheService.shared.setImage(image, forKey: itemId)
-            self.thumbnail = image
+        if let loaded = await ImageCacheService.shared.loadThumbnail(id: item.id, filename: item.filename) {
+            self.thumbnail = loaded
         }
     }
 }
