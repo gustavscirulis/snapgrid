@@ -85,6 +85,7 @@ private struct VideoPlayerNSView: NSViewRepresentable {
 /// No view swap ever occurs — one AVPlayerLayer, animated between frames.
 struct FloatingVideoLayer: View {
     @Environment(VideoPreviewManager.self) private var videoPreview
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         if videoPreview.displayState != .hidden, let player = videoPreview.player {
@@ -115,6 +116,28 @@ struct FloatingVideoLayer: View {
                     if videoPreview.displayState == .detail {
                         VideoControlsOverlay(player: player)
                     }
+                }
+                // Drag-to-export — only in detail mode
+                .onDrag {
+                    appState.isDraggingFromApp = true
+                    guard videoPreview.displayState == .detail,
+                          let url = videoPreview.activeItemURL else {
+                        return NSItemProvider()
+                    }
+                    let provider = NSItemProvider(contentsOf: url) ?? NSItemProvider()
+                    if let name = videoPreview.activeItemSuggestedName {
+                        let ext = url.pathExtension
+                        provider.suggestedName = ext.isEmpty ? name : "\(name).\(ext)"
+                    }
+                    return provider
+                } preview: {
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white)
+                        .frame(width: 96, height: 64)
+                        .background(Color.gray.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .opacity(0.85)
                 }
             .frame(width: videoPreview.currentFrame.width, height: videoPreview.currentFrame.height)
             .clipShape(RoundedRectangle(cornerRadius: videoPreview.cornerRadius))

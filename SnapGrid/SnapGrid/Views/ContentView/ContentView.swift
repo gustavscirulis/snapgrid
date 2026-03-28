@@ -128,8 +128,8 @@ struct ContentView: View {
             // Toast notifications
             ToastOverlay(toasts: appState.toasts)
 
-            // Drag overlay
-            if isDragTargeted {
+            // Drag overlay — only for external drags (Finder, browser, etc.)
+            if isDragTargeted && !appState.isDraggingFromApp {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(Color.snapAccent, lineWidth: 3)
                     .background(Color.snapAccent.opacity(0.1))
@@ -145,8 +145,14 @@ struct ContentView: View {
             }
         }
         .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
+            guard !appState.isDraggingFromApp else { return false }
             handleDrop(providers)
             return true
+        }
+        .onChange(of: isDragTargeted) { _, targeted in
+            if !targeted {
+                appState.isDraggingFromApp = false
+            }
         }
         .modifier(NotificationModifier(
             onImportFiles: { openImportPanel() },
