@@ -1,8 +1,66 @@
 import SwiftUI
 import AVKit
 
+/* ─────────────────────────────────────────────────────────
+ * ANIMATION STORYBOARD — Thumbnail → Detail Hero (iOS)
+ *
+ * OPEN
+ *    0ms   thumbnail hidden, backdrop 0 → 1.0
+ *          hero image springs from sourceRect → finalFrame
+ *
+ * SETTLED (after hero completes)
+ *          ScrollView with image + staggered metadata reveal
+ *          Swipe horizontal to navigate, drag down to dismiss
+ *          Pinch/double-tap to zoom
+ *
+ * CLOSE (hero back to grid)
+ *    0ms   switch to hero image, backdrop 1.0 → 0
+ *          hero springs back to closeTargetFrame
+ *  ~360ms  overlay removed
+ *
+ * CLOSE (slide down, when grid cell not visible)
+ *    0ms   slide down + fade
+ *  ~250ms  overlay removed
+ *
+ * METADATA REVEAL
+ *    After hero animation completes, metadata section fades in
+ *    with staggered timing: title → pills → description → file info.
+ *    Scrolling down reveals metadata with a fade mask.
+ * ───────────────────────────────────────────────────────── */
+
+private enum MetadataReveal {
+    static let titleDelay:       Duration = .milliseconds(100)
+    static let pillsDelay:       Duration = .milliseconds(300)
+    static let tagStagger:       Double   = 0.05
+    static let descriptionDelay: Duration = .milliseconds(450)
+    static let fileInfoDelay:    Duration = .milliseconds(600)
+    static let slideDistance:    CGFloat  = 8
+    static let spring = SnapSpring.metadata
+}
+
+// MARK: - Scroll Offset Tracking (iOS 17)
+
+private struct ScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+// MARK: - Stage Reveal Modifier
+
+private extension View {
+    func stageReveal(stage: Int, threshold: Int) -> some View {
+        self
+            .opacity(stage >= threshold ? 1 : 0)
+            .offset(y: stage >= threshold ? 0 : 4)
+            .animation(MetadataReveal.spring, value: stage)
+    }
+}
+
+// MARK: - Full Screen Image Overlay
+
 struct FullScreenImageOverlay: View {
-    let items: [MediaItem]
     let startIndex: Int
     let sourceRect: CGRect
     let screenSize: CGSize
@@ -11,84 +69,88 @@ struct FullScreenImageOverlay: View {
     var onDismissing: ((String) -> Void)?
     var onClose: () -> Void
 
-    @State private var currentIndex: Int = 0
-    @State private var isPresented = false
-    @State private var animationComplete = false
-    @State private var image: UIImage?
-    @State private var isLoading = true
-    @State private var isZoomed = false
-    @State private var player: AVPlayer?
+    /// Captured at open time — stays stable even when parent re-filters.
+    @State private var items: [MediaItem]
+    @State private var currentIndex: Int
 
-    // Dismiss gesture state (drag down from top)
+    // Phase control
+    @State private var isExpanded = false
+    @State private var isClosing = false
+    @State private var heroComplete = false
+    @State private var hasNavigated = false
+
+    // Content
+    @State private var image: UIImage?
+    @State private var isLoadingFullRes = false
+    @State private var player: AVPlayer?
+    @State private var loadTask: Task<Void, Never>?
+
+    // Swipe navigation
+    @State private var swipeOffset: CGFloat = 0
+    @State private var isNavigating = false
+    @State private var adjacentImages: [String: UIImage] = [:]
+
+    // Dismiss gesture
     @State private var dismissOffset: CGFloat = 0
 
-    // Content scroll state (drag up to reveal metadata)
+    // Metadata reveal (manual scroll)
     @State private var contentOffset: CGFloat = 0
     @State private var contentOffsetAtGestureStart: CGFloat = 0
+    @State private var metadataStage: Int = 0
+    @State private var revealTask: Task<Void, Never>?
 
-    // Zoom state (owned here — NOT on a child view, to avoid gesture conflicts)
+    // Zoom state (owned here to avoid gesture conflicts with child views)
+    @State private var isZoomed = false
     @State private var zoomScale: CGFloat = 1.0
     @State private var zoomLastScale: CGFloat = 1.0
     @State private var zoomPanOffset: CGSize = .zero
     @State private var zoomPanLastOffset: CGSize = .zero
 
-    // Hero animation target (resolved at dismiss time)
-    @State private var heroTargetRect: CGRect?
-
-    // Horizontal swipe state
-    @State private var swipeOffset: CGFloat = 0
-    @State private var adjacentImages: [String: UIImage] = [:]  // keyed by item id
-
     // Gesture mode tracking — locked per gesture
     @State private var gestureActive = false
-    private enum GestureMode { case none, dismiss, scroll, zoomPan, swipe }
+    private enum GestureMode { case none, dismiss, scroll, swipe, zoomPan }
     @State private var gestureMode: GestureMode = .none
 
-    private let spring = Animation.spring(response: 0.35, dampingFraction: 0.86)
-    private let impactFeedback = UIImpactFeedbackGenerator(style: .light)
 
-    // Zoom constants
+    // Close target frame (updated reactively from grid rects)
+    @State private var closeTargetFrame: CGRect
+
+    private let impactFeedback = UIImpactFeedbackGenerator(style: .light)
     private let minZoomScale: CGFloat = 1.0
     private let maxZoomScale: CGFloat = 4.0
     private let doubleTapZoomScale: CGFloat = 2.5
 
     /// Current item derived from index
-    private var item: MediaItem {
-        items[currentIndex]
+    private var item: MediaItem { items[currentIndex] }
+
+    private var displayImage: UIImage? { image ?? thumbnailImage }
+
+    init(
+        items: [MediaItem],
+        startIndex: Int,
+        sourceRect: CGRect,
+        screenSize: CGSize,
+        thumbnailImage: UIImage?,
+        gridItemRects: [String: CGRect],
+        onDismissing: ((String) -> Void)? = nil,
+        onClose: @escaping () -> Void
+    ) {
+        _items = State(initialValue: items)
+        self.startIndex = startIndex
+        self.sourceRect = sourceRect
+        self.screenSize = screenSize
+        self.thumbnailImage = thumbnailImage
+        self.gridItemRects = gridItemRects
+        self.onDismissing = onDismissing
+        self.onClose = onClose
+        _currentIndex = State(initialValue: startIndex)
+        _closeTargetFrame = State(initialValue: sourceRect)
     }
 
-    /// How far to scroll up to fully reveal metadata
-    private var metadataSnapOffset: CGFloat {
-        screenSize.height * 0.45
-    }
-
-    // MARK: - Computed layout properties
-
-    private var fullScreenFrame: CGRect {
-        let aspect = item.aspectRatio
-        let w = screenSize.width
-        let h = w / aspect
-        let y = (screenSize.height - h) / 2
-        return CGRect(x: 0, y: max(y, 0), width: w, height: min(h, screenSize.height))
-    }
-
-    private var currentRect: CGRect {
-        if isPresented {
-            return fullScreenFrame
-        }
-        return heroTargetRect ?? sourceRect
-    }
-
-    private var currentCornerRadius: CGFloat {
-        isPresented ? 0 : 12
-    }
-
-    private var displayImage: UIImage? {
-        image ?? thumbnailImage
-    }
+    // MARK: - Computed Properties
 
     private var backdropOpacity: Double {
-        if !isPresented { return 0 }
+        if !isExpanded { return 0 }
         let dragProgress = min(abs(dismissOffset) / 300.0, 1.0)
         return 1.0 - dragProgress * 0.5
     }
@@ -98,219 +160,229 @@ struct FullScreenImageOverlay: View {
         return 1.0 - progress * 0.1
     }
 
+    private func computeFinalFrame(for mediaItem: MediaItem) -> CGRect {
+        // Use actual screen bounds for true centering (screenSize from GeometryReader
+        // excludes safe area, but the overlay ignores safe area)
+        let screen = UIScreen.main.bounds.size
+        let maxW = screen.width - 24  // 12pt padding on each side
+        let maxH = screen.height * 0.85
+        let widthScale = maxW / CGFloat(mediaItem.width)
+        let heightScale = maxH / CGFloat(mediaItem.height)
+        let scale = min(widthScale, heightScale)
+        let w = CGFloat(mediaItem.width) * scale
+        let h = CGFloat(mediaItem.height) * scale
+        return CGRect(
+            x: (screen.width - w) / 2,
+            y: (screen.height - h) / 2,
+            width: w,
+            height: h
+        )
+    }
+
     // MARK: - Body
 
     var body: some View {
+        let finalFrame = computeFinalFrame(for: item)
+
         ZStack {
-            // Backdrop
+            // 1. Backdrop
             Color.black
                 .opacity(backdropOpacity)
                 .ignoresSafeArea()
 
-            if animationComplete {
-                // Visual content (non-interactive — gestures are on the layer above)
-                ZStack(alignment: .top) {
-                    // Previous image (visible during swipe)
-                    if currentIndex > 0 {
-                        adjacentPageContent(for: items[currentIndex - 1])
-                            .frame(width: screenSize.width, height: screenSize.height)
-                            .offset(x: -screenSize.width + swipeOffset)
-                    }
-
-                    // Current item content
-                    VStack(spacing: 0) {
-                        mediaContent
-                            .frame(width: screenSize.width, height: screenSize.height)
-                            .clipped()
-
-                        MetadataPanel(item: item)
-                            .padding(.top, 16)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 60)
-                            .frame(width: screenSize.width)
-                    }
-                    .offset(x: swipeOffset, y: -contentOffset + dismissOffset)
-                    .scaleEffect(dismissOffset > 0 ? dismissScale : 1.0)
-
-                    // Next image (visible during swipe)
-                    if currentIndex < items.count - 1 {
-                        adjacentPageContent(for: items[currentIndex + 1])
-                            .frame(width: screenSize.width, height: screenSize.height)
-                            .offset(x: screenSize.width + swipeOffset)
-                    }
+            // 2. Adjacent images — only after hero, hidden during close
+            if heroComplete && !isClosing {
+                if currentIndex > 0 {
+                    adjacentItemView(for: items[currentIndex - 1])
+                        .offset(x: -screenSize.width + swipeOffset)
                 }
-                .allowsHitTesting(false)
-                .transition(.opacity)
-
-                // Pattern pills (non-interactive)
-                if !isZoomed && contentOffset < 10 && dismissOffset == 0 && swipeOffset == 0 {
-                    patternOverlay
-                        .allowsHitTesting(false)
-                        .transition(.opacity)
+                if currentIndex < items.count - 1 {
+                    adjacentItemView(for: items[currentIndex + 1])
+                        .offset(x: screenSize.width + swipeOffset)
                 }
-
-                // Page counter
-                if items.count > 1 && !isZoomed && contentOffset < 10 && dismissOffset == 0 {
-                    VStack {
-                        Text("\(currentIndex + 1) / \(items.count)")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
-                            .padding(.top, 60)
-                        Spacer()
-                    }
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
-                }
-
-                // Full-screen gesture layer — covers everything so drags work anywhere
-                Color.clear
-                    .contentShape(Rectangle())
-                    .gesture(interactionGesture)
-                    .simultaneousGesture(pinchGesture)
-                    .simultaneousGesture(
-                        SpatialTapGesture(count: 2)
-                            .onEnded { value in
-                                handleDoubleTap(at: value.location)
-                            }
-                    )
-                    .overlay(alignment: .topTrailing) {
-                        // Close button as overlay child — tap gets priority over drag
-                        if !isZoomed && contentOffset < 50 {
-                            Button(action: close) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(.white.opacity(0.9))
-                                    .frame(width: 36, height: 36)
-                                    .background(.ultraThinMaterial, in: Circle())
-                            }
-                            .accessibilityLabel("Close")
-                            .padding(.top, 54)
-                            .padding(.trailing, 16)
-                            .transition(.opacity)
-                        }
-                    }
-            } else {
-                animatingImage
             }
+
+            // 3. Current content — hero image OR settled ScrollView
+            if heroComplete && !isClosing {
+                settledContentView(finalFrame: finalFrame)
+                    .offset(x: swipeOffset)
+            } else {
+                heroImage(finalFrame: finalFrame)
+            }
+
         }
         .ignoresSafeArea()
         .onAppear {
-            currentIndex = startIndex
             impactFeedback.prepare()
             loadFullImage()
             prepareVideoIfNeeded()
             preloadAdjacentImages()
-            withAnimation(spring) {
-                isPresented = true
+            withAnimation(SnapSpring.hero) {
+                isExpanded = true
             } completion: {
-                animationComplete = true
+                heroComplete = true
+                startMetadataReveal()
             }
         }
     }
 
-    // MARK: - Adjacent page content (simple image, no zoom/scroll)
+    // MARK: - Hero Image (Phase A/C)
 
     @ViewBuilder
-    private func adjacentPageContent(for adjacentItem: MediaItem) -> some View {
-        if let img = adjacentImages[adjacentItem.id] {
-            Image(uiImage: img)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-        } else if let thumbURL = adjacentItem.thumbnailURL,
-                  let cached = ThumbnailCache.shared.image(for: thumbURL) {
-            // Use cache-only lookup — no file I/O on the main thread
-            Image(uiImage: cached)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-        } else {
-            Rectangle()
-                .fill(Color.snapDarkMuted)
-                .overlay {
-                    ProgressView()
-                        .tint(.white.opacity(0.3))
-                }
-        }
-    }
+    private func heroImage(finalFrame: CGRect) -> some View {
+        let currentFrame = isExpanded ? finalFrame : closeTargetFrame
+        let cornerRadius: CGFloat = isExpanded ? 16 : 12
 
-    // MARK: - Pattern pills overlay
-
-    private var patternOverlay: some View {
-        VStack {
-            Spacer()
-            VStack(spacing: 8) {
-                if let patterns = item.analysisResult?.patterns, !patterns.isEmpty {
-                    Image(systemName: "chevron.compact.up")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white.opacity(0.3))
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(patterns.prefix(6), id: \.name) { pattern in
-                                Text(pattern.name)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.9))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(.ultraThinMaterial, in: Capsule())
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                    }
-                }
-            }
-            .padding(.bottom, 50)
-        }
-    }
-
-    // MARK: - Phase A/C: Animating image
-
-    private var animatingImage: some View {
         Group {
             if let displayImage {
                 Image(uiImage: displayImage)
                     .resizable()
-                    .aspectRatio(contentMode: isPresented ? .fit : .fill)
-                    .frame(width: currentRect.width, height: currentRect.height, alignment: .top)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: currentFrame.width, height: currentFrame.height)
                     .clipped()
             } else {
                 Rectangle()
                     .fill(Color.snapDarkMuted)
-                    .frame(width: currentRect.width, height: currentRect.height)
+                    .frame(width: currentFrame.width, height: currentFrame.height)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: currentCornerRadius))
-        .position(x: currentRect.midX, y: currentRect.midY + dismissOffset)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        .position(x: currentFrame.midX, y: currentFrame.midY + dismissOffset)
     }
 
-    // MARK: - Media content (rendered directly — no child gestures)
+    // MARK: - Settled Content View (Phase B)
 
     @ViewBuilder
-    private var mediaContent: some View {
-        if item.isVideo, let player {
-            VideoPlayer(player: player)
-        } else if let displayImage {
-            GeometryReader { geo in
-                Image(uiImage: displayImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .scaleEffect(zoomScale)
-                    .offset(zoomPanOffset)
-                    .frame(width: geo.size.width, height: geo.size.height)
-            }
-        } else {
-            Rectangle()
-                .fill(Color.snapDarkMuted)
-                .overlay {
-                    ProgressView()
-                        .tint(.white.opacity(0.3))
+    private func settledContentView(finalFrame: CGRect) -> some View {
+        let screen = UIScreen.main.bounds
+        // Metadata top starts near screen bottom — ~50pt peeks initially
+        let metadataTopY = screen.height - 50
+
+        ZStack {
+            // Image — centered at finalFrame, scrolls up with content
+            Group {
+                if item.isVideo, let player {
+                    VideoPlayer(player: player)
+                        .frame(width: finalFrame.width, height: finalFrame.height)
+                } else if let displayImage {
+                    Image(uiImage: displayImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: finalFrame.width, height: finalFrame.height)
+                        .clipped()
+                        .scaleEffect(zoomScale)
+                        .offset(zoomPanOffset)
+                } else {
+                    Rectangle()
+                        .fill(Color.snapDarkMuted)
+                        .frame(width: finalFrame.width, height: finalFrame.height)
+                        .overlay {
+                            ProgressView()
+                                .tint(.white.opacity(0.3))
+                        }
                 }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .position(x: finalFrame.midX, y: finalFrame.midY)
+            .offset(y: -contentOffset)
+
+            // Metadata — positioned so top starts near screen bottom (peek)
+            GeometryReader { _ in
+                DetailMetadataSection(item: item, stage: metadataStage)
+                    .frame(width: max(min(finalFrame.width, screen.width - 32), 300))
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .offset(y: metadataTopY - contentOffset)
+            }
+            .opacity(metadataOpacity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .gesture(settledDragGesture)
+        .simultaneousGesture(pinchGesture)
+        .simultaneousGesture(
+            SpatialTapGesture(count: 2)
+                .onEnded { value in
+                    handleDoubleTap(at: value.location)
+                }
+        )
+        // Dismiss visual effects
+        .offset(y: dismissOffset)
+        .scaleEffect(dismissOffset > 0 ? dismissScale : 1.0)
+    }
+
+    // MARK: - Adjacent Item View
+
+    @ViewBuilder
+    private func adjacentItemView(for adjacentItem: MediaItem) -> some View {
+        let frame = computeFinalFrame(for: adjacentItem)
+        let adjImage = adjacentImages[adjacentItem.id]
+
+        if let adjImage {
+            Image(uiImage: adjImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: frame.width, height: frame.height)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .position(x: frame.midX, y: frame.midY)
+        } else if let thumbURL = adjacentItem.thumbnailURL,
+                  let cached = ThumbnailCache.shared.image(for: thumbURL) {
+            Image(uiImage: cached)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: frame.width, height: frame.height)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .position(x: frame.midX, y: frame.midY)
+        } else {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.snapDarkMuted)
+                .frame(width: frame.width, height: frame.height)
+                .position(x: frame.midX, y: frame.midY)
         }
     }
 
-    // MARK: - Unified interaction gesture (handles dismiss, scroll, zoom pan, and swipe)
+    // MARK: - Metadata Fade Mask
 
-    private var interactionGesture: some Gesture {
-        DragGesture()
+    /// How far the user can scroll up to reveal metadata
+    private var maxContentOffset: CGFloat {
+        UIScreen.main.bounds.height * 0.25
+    }
+
+    /// Metadata starts faded (0.3), reaches full opacity over 60pt of scroll
+    private var metadataOpacity: Double {
+        let base = 0.3
+        let progress = min(contentOffset / 60, 1.0)
+        return base + (1.0 - base) * progress
+    }
+
+    // MARK: - Metadata Reveal
+
+    private func startMetadataReveal() {
+        revealTask?.cancel()
+        revealTask = Task { @MainActor in
+            try? await Task.sleep(for: MetadataReveal.titleDelay)
+            guard !Task.isCancelled, heroComplete else { return }
+            withAnimation(MetadataReveal.spring) { metadataStage = 1 }
+
+            try? await Task.sleep(for: MetadataReveal.pillsDelay - MetadataReveal.titleDelay)
+            guard !Task.isCancelled, heroComplete else { return }
+            withAnimation(MetadataReveal.spring) { metadataStage = 2 }
+
+            try? await Task.sleep(for: MetadataReveal.descriptionDelay - MetadataReveal.pillsDelay)
+            guard !Task.isCancelled, heroComplete else { return }
+            withAnimation(MetadataReveal.spring) { metadataStage = 3 }
+
+            try? await Task.sleep(for: MetadataReveal.fileInfoDelay - MetadataReveal.descriptionDelay)
+            guard !Task.isCancelled, heroComplete else { return }
+            withAnimation(MetadataReveal.spring) { metadataStage = 4 }
+        }
+    }
+
+    // MARK: - Settled Drag Gesture
+
+    private var settledDragGesture: some Gesture {
+        DragGesture(minimumDistance: 8)
             .onChanged { value in
                 let tx = value.translation.width
                 let ty = value.translation.height
@@ -322,11 +394,10 @@ struct FullScreenImageOverlay: View {
                         gestureMode = .zoomPan
                         zoomPanLastOffset = zoomPanOffset
                     } else if contentOffset > 0 {
-                        // Metadata is visible — only allow vertical scroll
+                        // Metadata visible — only allow scroll
                         gestureMode = .scroll
                         contentOffsetAtGestureStart = contentOffset
-                    } else if abs(tx) > abs(ty) {
-                        // Horizontal movement dominates — swipe between images
+                    } else if abs(tx) > abs(ty) + 4 {
                         gestureMode = .swipe
                     } else if ty > 0 {
                         gestureMode = .dismiss
@@ -339,15 +410,14 @@ struct FullScreenImageOverlay: View {
                 switch gestureMode {
                 case .zoomPan:
                     zoomPanOffset = CGSize(
-                        width: zoomPanLastOffset.width + value.translation.width,
-                        height: zoomPanLastOffset.height + value.translation.height
+                        width: zoomPanLastOffset.width + tx,
+                        height: zoomPanLastOffset.height + ty
                     )
                 case .swipe:
                     var proposed = tx
-                    // Rubber-band at edges
                     if (currentIndex == 0 && proposed > 0) ||
                        (currentIndex == items.count - 1 && proposed < 0) {
-                        proposed = proposed * 0.3
+                        proposed *= 0.3
                     }
                     swipeOffset = proposed
                 case .dismiss:
@@ -355,12 +425,12 @@ struct FullScreenImageOverlay: View {
                 case .scroll:
                     let proposed = contentOffsetAtGestureStart - ty
                     if proposed < 0 {
-                        // Dragged past the top → transition into dismiss behavior
+                        // Dragged past top → transition to dismiss
                         contentOffset = 0
                         dismissOffset = -proposed
-                    } else if proposed > metadataSnapOffset {
-                        let overshoot = proposed - metadataSnapOffset
-                        contentOffset = metadataSnapOffset + log2(1 + overshoot) * 8
+                    } else if proposed > maxContentOffset {
+                        let overshoot = proposed - maxContentOffset
+                        contentOffset = maxContentOffset + log2(1 + overshoot) * 8
                         dismissOffset = 0
                     } else {
                         contentOffset = proposed
@@ -386,30 +456,15 @@ struct FullScreenImageOverlay: View {
 
                     var newIndex = currentIndex
                     if swipeOffset < -threshold || velocity < -velocityThreshold {
-                        // Swiped left → next image
                         newIndex = min(currentIndex + 1, items.count - 1)
                     } else if swipeOffset > threshold || velocity > velocityThreshold {
-                        // Swiped right → previous image
                         newIndex = max(currentIndex - 1, 0)
                     }
 
                     if newIndex != currentIndex {
-                        // Navigate to new image
-                        let targetOffset: CGFloat = newIndex > currentIndex ? -screenSize.width : screenSize.width
-                        impactFeedback.impactOccurred()
-                        onDismissing?(items[newIndex].id)
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
-                            swipeOffset = targetOffset
-                        } completion: {
-                            withAnimation(nil) {
-                                currentIndex = newIndex
-                                swipeOffset = 0
-                            }
-                            resetImageState()
-                        }
+                        navigateTo(newIndex)
                     } else {
-                        // Snap back
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) {
+                        withAnimation(SnapSpring.standard) {
                             swipeOffset = 0
                         }
                     }
@@ -418,7 +473,7 @@ struct FullScreenImageOverlay: View {
                     if dismissOffset > 100 || value.predictedEndTranslation.height > 300 {
                         close()
                     } else {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) {
+                        withAnimation(SnapSpring.standard) {
                             dismissOffset = 0
                         }
                     }
@@ -429,22 +484,22 @@ struct FullScreenImageOverlay: View {
                         if dismissOffset > 100 || value.predictedEndTranslation.height > 300 {
                             close()
                         } else {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) {
+                            withAnimation(SnapSpring.standard) {
                                 dismissOffset = 0
                             }
                         }
                         contentOffset = 0
-                        contentOffsetAtGestureStart = 0
                     } else {
+                        // Snap to nearest target
                         let velocity = -(value.predictedEndTranslation.height - value.translation.height)
-                        let projectedOffset = contentOffset + velocity * 0.3
+                        let projected = contentOffset + velocity * 0.3
                         let snapTarget: CGFloat
-                        if projectedOffset > metadataSnapOffset * 0.35 {
-                            snapTarget = metadataSnapOffset
+                        if projected > maxContentOffset * 0.35 {
+                            snapTarget = maxContentOffset
                         } else {
                             snapTarget = 0
                         }
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+                        withAnimation(SnapSpring.standard) {
                             contentOffset = snapTarget
                         }
                         contentOffsetAtGestureStart = snapTarget
@@ -456,7 +511,7 @@ struct FullScreenImageOverlay: View {
             }
     }
 
-    // MARK: - Pinch-to-zoom gesture
+    // MARK: - Pinch-to-Zoom Gesture
 
     private var pinchGesture: some Gesture {
         MagnifyGesture()
@@ -467,7 +522,7 @@ struct FullScreenImageOverlay: View {
             }
             .onEnded { _ in
                 let clamped = min(max(zoomScale, minZoomScale), maxZoomScale)
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(SnapSpring.standard) {
                     zoomScale = clamped
                     if clamped <= minZoomScale {
                         zoomPanOffset = .zero
@@ -478,12 +533,11 @@ struct FullScreenImageOverlay: View {
             }
     }
 
-    // MARK: - Double-tap to zoom
+    // MARK: - Double-Tap to Zoom
 
     private func handleDoubleTap(at location: CGPoint) {
-        guard contentOffset < 10 else { return }
         let viewCenter = CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(SnapSpring.standard) {
             if zoomScale > minZoomScale {
                 zoomScale = minZoomScale
                 zoomLastScale = minZoomScale
@@ -513,11 +567,70 @@ struct FullScreenImageOverlay: View {
         return value
     }
 
-    // MARK: - Actions
+    // MARK: - Navigation
+
+    private func navigateTo(_ newIndex: Int) {
+        guard newIndex >= 0, newIndex < items.count,
+              newIndex != currentIndex, !isNavigating, !isClosing else {
+            withAnimation(SnapSpring.standard) { swipeOffset = 0 }
+            return
+        }
+        isNavigating = true
+        let direction: CGFloat = newIndex > currentIndex ? -1 : 1
+
+        player?.pause()
+        player = nil
+        impactFeedback.impactOccurred()
+
+        withAnimation(SnapSpring.standard) {
+            swipeOffset = direction * screenSize.width
+        } completion: {
+            // Swap without animation
+            let t = Transaction(animation: nil)
+            withTransaction(t) {
+                currentIndex = newIndex
+                hasNavigated = true
+                swipeOffset = 0
+                metadataStage = 0
+                contentOffset = 0
+                isZoomed = false
+                zoomScale = minZoomScale
+                zoomLastScale = minZoomScale
+                zoomPanOffset = .zero
+                zoomPanLastOffset = .zero
+                image = adjacentImages[items[newIndex].id]
+            }
+
+            onDismissing?(items[newIndex].id)
+
+            loadTask?.cancel()
+            loadTask = Task {
+                await loadCurrentItem()
+            }
+            preloadAdjacentImages()
+            isNavigating = false
+            startMetadataReveal()
+        }
+    }
+
+    // MARK: - Close
 
     private func close() {
+        guard !isClosing else { return }
+        isClosing = true
+        heroComplete = false
+        metadataStage = 0
+        revealTask?.cancel()
+        contentOffset = 0
         player?.pause()
         impactFeedback.impactOccurred()
+
+        // Reset zoom instantly
+        zoomScale = minZoomScale
+        zoomLastScale = minZoomScale
+        zoomPanOffset = .zero
+        zoomPanLastOffset = .zero
+        isZoomed = false
 
         let currentItemId = items[currentIndex].id
         let targetRect = gridItemRects[currentItemId]
@@ -541,18 +654,10 @@ struct FullScreenImageOverlay: View {
             }
 
             onDismissing?(currentItemId)
-            heroTargetRect = correctedRect
+            closeTargetFrame = correctedRect
 
-            withAnimation(nil) {
-                animationComplete = false
-                contentOffset = 0
-                zoomScale = minZoomScale
-                zoomLastScale = minZoomScale
-                zoomPanOffset = .zero
-                isZoomed = false
-            }
-            withAnimation(spring) {
-                isPresented = false
+            withAnimation(SnapSpring.hero) {
+                isExpanded = false
                 dismissOffset = 0
             } completion: {
                 onClose()
@@ -561,40 +666,46 @@ struct FullScreenImageOverlay: View {
             // Grid cell not visible — slide down and fade
             withAnimation(.easeOut(duration: 0.25)) {
                 dismissOffset = screenSize.height
-                isPresented = false
+                isExpanded = false
             } completion: {
                 onClose()
             }
         }
     }
 
-    private func resetImageState() {
-        image = nil
-        isLoading = true
-        isZoomed = false
-        zoomScale = minZoomScale
-        zoomLastScale = minZoomScale
-        zoomPanOffset = .zero
-        zoomPanLastOffset = .zero
-        contentOffset = 0
-        contentOffsetAtGestureStart = 0
-        dismissOffset = 0
-        player?.pause()
-        player = nil
-
-        loadFullImage()
-        prepareVideoIfNeeded()
-        preloadAdjacentImages()
-    }
+    // MARK: - Image Loading
 
     private func loadFullImage() {
         guard let url = item.mediaURL, !item.isVideo else {
-            isLoading = false
+            isLoadingFullRes = false
             return
         }
-        Task {
-            image = await ThumbnailCache.shared.loadImage(for: url).image
-            isLoading = false
+        isLoadingFullRes = true
+        loadTask = Task {
+            let loaded = await ThumbnailCache.shared.loadImage(for: url).image
+            if !Task.isCancelled {
+                image = loaded
+                isLoadingFullRes = false
+            }
+        }
+    }
+
+    private func loadCurrentItem() async {
+        let currentItem = item
+
+        if currentItem.isVideo {
+            prepareVideoIfNeeded()
+        } else {
+            guard let url = currentItem.mediaURL else {
+                isLoadingFullRes = false
+                return
+            }
+            isLoadingFullRes = true
+            let loaded = await ThumbnailCache.shared.loadImage(for: url).image
+            if !Task.isCancelled {
+                image = loaded
+                isLoadingFullRes = false
+            }
         }
     }
 
@@ -605,8 +716,9 @@ struct FullScreenImageOverlay: View {
         newPlayer.play()
     }
 
+    // MARK: - Adjacent Images
+
     private func preloadAdjacentImages() {
-        // Evict images we no longer need — keep at most current ± 1
         var keepIds: Set<String> = [item.id]
         if currentIndex > 0 { keepIds.insert(items[currentIndex - 1].id) }
         if currentIndex < items.count - 1 { keepIds.insert(items[currentIndex + 1].id) }
@@ -614,27 +726,136 @@ struct FullScreenImageOverlay: View {
             adjacentImages.removeValue(forKey: key)
         }
 
-        // Preload previous
-        if currentIndex > 0 {
-            let prevItem = items[currentIndex - 1]
-            if adjacentImages[prevItem.id] == nil, let url = prevItem.mediaURL ?? prevItem.thumbnailURL {
+        for offset in [-1, 1] {
+            let idx = currentIndex + offset
+            guard idx >= 0, idx < items.count else { continue }
+            let adjItem = items[idx]
+            if adjacentImages[adjItem.id] != nil { continue }
+
+            if let url = adjItem.mediaURL ?? adjItem.thumbnailURL {
                 Task {
                     if let img = await ThumbnailCache.shared.loadImage(for: url).image {
-                        adjacentImages[prevItem.id] = img
+                        adjacentImages[adjItem.id] = img
                     }
                 }
             }
         }
-        // Preload next
-        if currentIndex < items.count - 1 {
-            let nextItem = items[currentIndex + 1]
-            if adjacentImages[nextItem.id] == nil, let url = nextItem.mediaURL ?? nextItem.thumbnailURL {
-                Task {
-                    if let img = await ThumbnailCache.shared.loadImage(for: url).image {
-                        adjacentImages[nextItem.id] = img
+    }
+}
+
+// MARK: - Detail Metadata Section
+
+private struct DetailMetadataSection: View {
+    let item: MediaItem
+    let stage: Int
+    @State private var isDescriptionExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if item.isAnalyzing {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .tint(.white)
+                    Text("Analyzing...")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                .stageReveal(stage: stage, threshold: 1)
+            } else if item.analysisError != nil {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.red.opacity(0.8))
+                    Text("Analysis failed")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                .stageReveal(stage: stage, threshold: 1)
+            } else if let result = item.analysisResult {
+                if !result.imageSummary.isEmpty {
+                    Text(result.imageSummary)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(2)
+                        .stageReveal(stage: stage, threshold: 1)
+                        .padding(.bottom, 12)
+                }
+
+                if !result.patterns.isEmpty {
+                    FlowLayout(spacing: 6) {
+                        ForEach(Array(result.patterns.enumerated()), id: \.element.name) { index, pattern in
+                            Text(pattern.name)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                                .environment(\.colorScheme, .dark)
+                                .opacity(stage >= 2 ? 1 : 0)
+                                .offset(y: stage >= 2 ? 0 : MetadataReveal.slideDistance)
+                                .animation(
+                                    MetadataReveal.spring.delay(Double(index) * MetadataReveal.tagStagger),
+                                    value: stage
+                                )
+                        }
                     }
+                    .padding(.bottom, 14)
+                }
+
+                if hasDescription(result) {
+                    let needsTruncation = result.imageContext.count > 60
+                    Text(isDescriptionExpanded || !needsTruncation ? result.imageContext : truncateAtWord(result.imageContext, maxChars: 60))
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .contentShape(Rectangle())
+                        .opacity(stage >= 3 ? 1 : 0)
+                        .animation(MetadataReveal.spring, value: stage)
+                        .onTapGesture {
+                            withAnimation(MetadataReveal.spring) {
+                                isDescriptionExpanded.toggle()
+                            }
+                        }
                 }
             }
+
+            HStack(spacing: 0) {
+                Text("\(item.width) \u{00D7} \(item.height)")
+                Text("  \u{00B7}  ")
+                    .foregroundStyle(.white.opacity(0.15))
+                Text(item.createdAt, style: .date)
+                if let duration = item.duration {
+                    Text("  \u{00B7}  ")
+                        .foregroundStyle(.white.opacity(0.15))
+                    Text(formatDuration(duration))
+                }
+            }
+            .font(.system(size: 12, design: .monospaced))
+            .foregroundStyle(.white.opacity(0.3))
+            .stageReveal(stage: stage, threshold: 4)
+            .padding(.top, 14)
         }
+        .padding(.horizontal, 16)
+        .animation(MetadataReveal.spring, value: isDescriptionExpanded)
+    }
+
+    private func hasDescription(_ result: AnalysisResult) -> Bool {
+        !result.imageContext.isEmpty && result.imageContext != result.imageSummary
+    }
+
+    private func truncateAtWord(_ text: String, maxChars: Int) -> String {
+        guard text.count > maxChars else { return text }
+        let prefix = text.prefix(maxChars)
+        if let lastSpace = prefix.lastIndex(of: " ") {
+            return String(prefix[prefix.startIndex..<lastSpace]) + "…"
+        }
+        return String(prefix) + "…"
+    }
+
+    private func formatDuration(_ seconds: Double) -> String {
+        guard seconds.isFinite else { return "0:00" }
+        let total = Int(seconds)
+        return "\(total / 60):\(String(format: "%02d", total % 60))"
     }
 }

@@ -32,6 +32,7 @@
 		810E66F164E96C78F5095B7B /* AnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A78C6996F3AEB37B949CCE /* AnalysisResult.swift */; };
 		787BBD33FD14A7CC420B8C71 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC24EBA6AD6068C4ADA26030 /* SyncService.swift */; };
 		F2AD76603369201957F4E1FD /* SearchIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFAB07291230EAED58390B4 /* SearchIndexService.swift */; };
+		A100000030 /* AnimationTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000030 /* AnimationTokens.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +76,7 @@
 		B100000016 /* ImageDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageDetailView.swift; sourceTree = "<group>"; };
 		B100000017 /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
 		B100000018 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		B100000030 /* AnimationTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationTokens.swift; sourceTree = "<group>"; };
 		B100000019 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B100000020 /* iCloudDownloadMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudDownloadMonitor.swift; sourceTree = "<group>"; };
 		B100000021 /* FullScreenImageOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenImageOverlay.swift; sourceTree = "<group>"; };
@@ -246,6 +248,7 @@
 		E100000014 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				B100000030 /* AnimationTokens.swift */,
 				B100000018 /* EmptyStateView.swift */,
 			);
 			path = Shared;
@@ -394,6 +397,7 @@
 				810E66F164E96C78F5095B7B /* AnalysisResult.swift in Sources */,
 				787BBD33FD14A7CC420B8C71 /* SyncService.swift in Sources */,
 				F2AD76603369201957F4E1FD /* SearchIndexService.swift in Sources */,
+				A100000030 /* AnimationTokens.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
