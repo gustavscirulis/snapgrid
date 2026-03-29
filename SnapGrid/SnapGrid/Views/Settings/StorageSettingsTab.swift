@@ -15,7 +15,7 @@ struct StorageSettingsTab: View {
                 LabeledContent("Path") {
                     HStack {
                         Text(MediaStorageService.shared.baseURL.path)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.caption.monospaced())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)

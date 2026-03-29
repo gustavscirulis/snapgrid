@@ -6,9 +6,22 @@ import SwiftUI
 final class AppState {
     var selectedIds: Set<String> = []
     var anchorId: String?
-    var activeSpaceId: String?
+
+    init() {
+        // Restore persisted state
+        if let saved = UserDefaults.standard.string(forKey: "thumbnailSize"),
+           let size = ThumbnailSize(rawValue: saved) {
+            thumbnailSize = size
+        }
+        activeSpaceId = UserDefaults.standard.string(forKey: "lastActiveSpaceId")
+    }
+    var activeSpaceId: String? {
+        didSet { UserDefaults.standard.set(activeSpaceId, forKey: "lastActiveSpaceId") }
+    }
     var searchText: String = ""
-    var thumbnailSize: ThumbnailSize = .medium
+    var thumbnailSize: ThumbnailSize = .medium {
+        didSet { UserDefaults.standard.set(thumbnailSize.rawValue, forKey: "thumbnailSize") }
+    }
     var detailItem: String? = nil  // MediaItem id
     var detailSourceFrame: CGRect? = nil  // Global frame of tapped thumbnail for hero animation
     var detailSwipeProgress: CGFloat = 0  // 0 = viewing current item, 1 = fully swiped to next

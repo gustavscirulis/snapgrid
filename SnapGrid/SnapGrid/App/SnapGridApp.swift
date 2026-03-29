@@ -28,7 +28,7 @@ struct SnapGridApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup("SnapGrid") {
             ContentView()
                 .task { KeySyncService.syncToiCloud() }
         }
@@ -99,6 +99,12 @@ struct SnapGridApp: App {
                     NotificationCenter.default.post(name: .undoDelete, object: nil)
                 }
                 .keyboardShortcut("z")
+
+                Button("Redo") {}
+                    .keyboardShortcut("z", modifiers: [.command, .shift])
+                    .disabled(true)
+
+                Divider()
 
                 Button("Delete") {
                     NotificationCenter.default.post(name: .deleteSelected, object: nil)

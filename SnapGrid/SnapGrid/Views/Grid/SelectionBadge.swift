@@ -5,12 +5,14 @@ struct SelectionBadge: View {
 
     var body: some View {
         Text("\(count) selected")
-            .font(.system(size: 13, weight: .medium))
+            .font(.callout.weight(.medium))
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Color.blue)  // ImageGrid.tsx:728 — bg-blue-500 (always blue, not adaptive accent)
+            .background(Color.accentColor)
             .clipShape(Capsule())
             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+            .accessibilityLabel("\(count) items selected")
+            .accessibilityAddTraits(.updatesFrequently)
     }
 }

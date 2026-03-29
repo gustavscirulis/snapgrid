@@ -127,13 +127,13 @@ struct MasonryGridView: View {
                     .padding(.top, 24)
                     .padding(.bottom, 24)
 
-                    // Rubber band visual — ImageGrid.tsx:715: border-blue-400 bg-blue-400/10
+                    // Rubber band visual
                     if let rect = rubberBandRect {
                         Rectangle()
-                            .fill(Color.blue.opacity(0.10))
+                            .fill(Color.accentColor.opacity(0.10))
                             .overlay(
                                 Rectangle()
-                                    .stroke(Color.blue.opacity(0.6), lineWidth: 1)
+                                    .stroke(Color.accentColor.opacity(0.6), lineWidth: 1)
                             )
                             .frame(width: rect.width, height: rect.height)
                             .offset(x: rect.minX, y: rect.minY)

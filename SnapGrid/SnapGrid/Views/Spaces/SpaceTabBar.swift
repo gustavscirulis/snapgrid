@@ -58,12 +58,13 @@ struct SpaceTabBar: View {
                 // Add button
                 Button(action: onCreateSpace) {
                     Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.caption.weight(.medium))
                         .foregroundStyle(Color.snapMutedForeground)
                         .padding(12)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Add space")
             }
             .padding(.horizontal, 24)
             .padding(.top, 6)
@@ -113,7 +114,7 @@ struct SpaceTabBar: View {
             })
             .focused($isEditingFocused)
             .textFieldStyle(.plain)
-            .font(.system(size: 13, weight: .medium))
+            .font(.body.weight(.medium))
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(Color.snapMuted)
@@ -233,6 +234,8 @@ struct SpaceTabBar: View {
 
     // MARK: - Tab View
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @ViewBuilder
     private func tabView(id: String?, title: String, isActive: Bool) -> some View {
         let isDropTarget = (id == nil && dropTargetId == "ALL") || (id != nil && dropTargetId == id)
@@ -243,7 +246,7 @@ struct SpaceTabBar: View {
         } label: {
             VStack(spacing: 0) {
                 Text(title)
-                    .font(.system(size: 13, weight: isActive ? .medium : .regular))
+                    .font(.body.weight(isActive ? .medium : .regular))
                     .foregroundStyle(
                         isActive ? Color.snapForeground :
                         isDropTarget ? Color.snapForeground.opacity(0.7) :
@@ -277,7 +280,9 @@ struct SpaceTabBar: View {
             }
         }
         .buttonStyle(.plain)
-        .animation(SnapSpring.standard, value: activeSpaceId)
+        .accessibilityLabel("\(title)\(isActive ? ", selected" : "")")
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+        .animation(SnapSpring.standard(reduced: reduceMotion), value: activeSpaceId)
     }
 
     // MARK: - Drop Helpers

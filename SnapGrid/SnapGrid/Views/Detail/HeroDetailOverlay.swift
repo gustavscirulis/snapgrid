@@ -51,6 +51,7 @@ struct HeroDetailOverlay: View {
 
     @Environment(VideoPreviewManager.self) private var videoPreview
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Captured at open time — stays stable even when parent re-filters.
     @State private var items: [MediaItem]
     @State private var currentIndex: Int
@@ -243,7 +244,7 @@ struct HeroDetailOverlay: View {
             guard heroComplete && !isClosing && !isNavigating && items.count > 1 else {
                 if phase == .ended {
                     trackpadScroll.reset()
-                    withAnimation(SnapSpring.standard) { swipeOffset = 0 }
+                    withAnimation(SnapSpring.standard(reduced: reduceMotion)) { swipeOffset = 0 }
                 }
                 return
             }
@@ -272,7 +273,7 @@ struct HeroDetailOverlay: View {
         } else if offset > threshold && currentIndex > 0 {
             navigateTo(currentIndex - 1)
         } else {
-            withAnimation(SnapSpring.standard) {
+            withAnimation(SnapSpring.standard(reduced: reduceMotion)) {
                 swipeOffset = 0
             }
         }
@@ -282,7 +283,7 @@ struct HeroDetailOverlay: View {
 
     private func navigateTo(_ newIndex: Int) {
         guard newIndex >= 0, newIndex < items.count, newIndex != currentIndex else {
-            withAnimation(SnapSpring.standard) { swipeOffset = 0 }
+            withAnimation(SnapSpring.standard(reduced: reduceMotion)) { swipeOffset = 0 }
             return
         }
         isNavigating = true
@@ -295,7 +296,7 @@ struct HeroDetailOverlay: View {
         }
 
         // Slide current image out, adjacent image slides in
-        withAnimation(SnapSpring.standard) {
+        withAnimation(SnapSpring.standard(reduced: reduceMotion)) {
             swipeOffset = direction * lastWindowWidth
         } completion: {
             // Swap to new item without animation
@@ -351,7 +352,7 @@ struct HeroDetailOverlay: View {
             let suggestedName = item.analysisResult?.patterns.first?.name
 
             if hasHoverPreview {
-                withAnimation(SnapSpring.hero) {
+                withAnimation(SnapSpring.hero(reduced: reduceMotion)) {
                     isExpanded = true
                     videoPreview.transitionToDetail(
                         itemId: item.id, url: url, finalFrame: finalFrame, suggestedName: suggestedName
@@ -364,7 +365,7 @@ struct HeroDetailOverlay: View {
                 videoPreview.transitionToDetail(
                     itemId: item.id, url: url, finalFrame: finalFrame, suggestedName: suggestedName
                 )
-                withAnimation(SnapSpring.hero) {
+                withAnimation(SnapSpring.hero(reduced: reduceMotion)) {
                     isExpanded = true
                 } completion: {
                     heroComplete = true
@@ -380,7 +381,7 @@ struct HeroDetailOverlay: View {
             if !FileManager.default.fileExists(atPath: mediaURL.path) {
                 isLoadingFullRes = true
             }
-            withAnimation(SnapSpring.hero) {
+            withAnimation(SnapSpring.hero(reduced: reduceMotion)) {
                 isExpanded = true
             } completion: {
                 heroComplete = true
@@ -498,6 +499,13 @@ struct HeroDetailOverlay: View {
 
     private func startMetadataReveal() {
         revealTask?.cancel()
+
+        // Skip staggered reveal when reduce motion is enabled — show everything at once
+        if reduceMotion {
+            withAnimation(.easeInOut(duration: 0.15)) { metadataStage = 4 }
+            return
+        }
+
         revealTask = Task { @MainActor in
             try? await Task.sleep(for: MetadataReveal.titleDelay)
             guard !Task.isCancelled, heroComplete else { return }
@@ -646,7 +654,7 @@ struct HeroDetailOverlay: View {
             }
         }
 
-        withAnimation(SnapSpring.hero) {
+        withAnimation(SnapSpring.hero(reduced: reduceMotion)) {
             isExpanded = false
             if currentItem.isVideo && !hasNavigated {
                 videoPreview.transitionToGrid()
@@ -738,24 +746,24 @@ private struct DetailMetadataSection: View {
                         .controlSize(.small)
                         .tint(.white)
                     Text("Analyzing...")
-                        .font(.system(size: 13))
+                        .font(.callout)
                         .foregroundStyle(.white.opacity(0.6))
                 }
                 .stageReveal(stage: stage, threshold: 1)
             } else if item.analysisError != nil {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(.red.opacity(0.8))
                     Text("Analysis failed")
-                        .font(.system(size: 13))
+                        .font(.callout)
                         .foregroundStyle(.white.opacity(0.6))
                 }
                 .stageReveal(stage: stage, threshold: 1)
             } else if let result = item.analysisResult {
                 if !result.imageSummary.isEmpty {
                     Text(result.imageSummary)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.85))
                         .lineLimit(2)
                         .stageReveal(stage: stage, threshold: 1)
@@ -765,7 +773,7 @@ private struct DetailMetadataSection: View {
                 if !result.patterns.isEmpty {
                     FlowLayout(spacing: 6) {
                         ForEach(Array(result.patterns.enumerated()), id: \.element.name) { index, pattern in
-                            PatternPill(name: pattern.name, size: 12)
+                            PatternPill(name: pattern.name, large: true)
                                 .onTapGesture { onSearchPattern?(pattern.name) }
                                 .opacity(stage >= 2 ? 1 : 0)
                                 .offset(y: stage >= 2 ? 0 : MetadataReveal.slideDistance)
@@ -783,8 +791,8 @@ private struct DetailMetadataSection: View {
                     ExpandableText(
                         text: result.imageContext,
                         lineLimit: 3,
-                        font: .system(size: 12),
-                        platformFont: .systemFont(ofSize: 12),
+                        font: .caption,
+                        platformFont: .systemFont(ofSize: NSFont.systemFontSize(for: .small)),
                         lineSpacing: 2,
                         textColor: .white.opacity(0.4),
                         animation: MetadataReveal.spring,
@@ -806,7 +814,7 @@ private struct DetailMetadataSection: View {
                     Text(formatDuration(duration))
                 }
             }
-            .font(.system(size: 11, design: .monospaced))
+            .font(.caption.monospaced())
             .foregroundStyle(.white.opacity(0.25))
             .stageReveal(stage: stage, threshold: 4)
             .padding(.top, 12)

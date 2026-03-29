@@ -132,7 +132,7 @@ struct FloatingVideoLayer: View {
                     return provider
                 } preview: {
                     Image(systemName: "video.fill")
-                        .font(.system(size: 24))
+                        .font(.title2)
                         .foregroundStyle(.white)
                         .frame(width: 96, height: 64)
                         .background(Color.gray.opacity(0.5))
@@ -191,20 +191,21 @@ struct VideoControlsOverlay: View {
         // Center play/pause button
         Button(action: togglePlayback) {
             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
                 .background(.black.opacity(0.5))
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(isPlaying ? "Pause" : "Play")
 
         // Bottom time bar
         VStack {
             Spacer()
             HStack {
                 Text("\(formatTime(currentTime)) / \(formatTime(duration))")
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .font(.caption.weight(.medium).monospacedDigit())
                     .foregroundStyle(.white.opacity(0.8))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
