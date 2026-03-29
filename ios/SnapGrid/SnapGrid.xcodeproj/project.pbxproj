@@ -35,6 +35,7 @@
 		A100000030 /* AnimationTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000030 /* AnimationTokens.swift */; };
 		A100000031 /* ImageImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000031 /* ImageImportService.swift */; };
 		A100000032 /* PhotoPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000032 /* PhotoPickerView.swift */; };
+		A100000033 /* MediaDeleteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000033 /* MediaDeleteService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,6 +94,7 @@
 		5CFAB07291230EAED58390B4 /* SearchIndexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchIndexService.swift; sourceTree = "<group>"; };
 		B100000031 /* ImageImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageImportService.swift; sourceTree = "<group>"; };
 		B100000032 /* PhotoPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerView.swift; sourceTree = "<group>"; };
+		B100000033 /* MediaDeleteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDeleteService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -190,6 +192,7 @@
 				5CFAB07291230EAED58390B4 /* SearchIndexService.swift */,
 				B100000008 /* ThumbnailCache.swift */,
 				B100000031 /* ImageImportService.swift */,
+				B100000033 /* MediaDeleteService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -406,6 +409,7 @@
 				A100000030 /* AnimationTokens.swift in Sources */,
 				A100000031 /* ImageImportService.swift in Sources */,
 				A100000032 /* PhotoPickerView.swift in Sources */,
+				A100000033 /* MediaDeleteService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

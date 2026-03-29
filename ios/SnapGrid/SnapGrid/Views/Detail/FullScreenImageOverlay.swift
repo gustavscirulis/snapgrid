@@ -38,6 +38,23 @@ private enum MetadataReveal {
     static let spring = SnapSpring.metadata
 }
 
+/* ─────────────────────────────────────────────────────────
+ * ANIMATION STORYBOARD — Delete (Wallet Card Crush)
+ *
+ *    0ms   height clips inward (top + bottom) → 5%, width stays 100%
+ *  280ms   width shrinks → 0%, opacity fades → 0
+ *  500ms   animation complete, item removed, next image loads
+ * ───────────────────────────────────────────────────────── */
+
+private enum DeleteAnimation {
+    static let heightCrush = Animation.spring(response: 0.32, dampingFraction: 0.82)
+    static let widthCrush  = Animation.spring(response: 0.25, dampingFraction: 0.9)
+    static let widthDelay: Duration = .milliseconds(280)
+    static let completeDelay: Duration = .milliseconds(500)
+    static let crushedScaleY: CGFloat = 0.05   // near-zero height slit
+    static let crushedScaleX: CGFloat = 0.0     // fully collapsed
+}
+
 // MARK: - Scroll Offset Tracking (iOS 17)
 
 private struct ScrollOffsetKey: PreferenceKey {
@@ -69,6 +86,7 @@ struct FullScreenImageOverlay: View {
     var onDismissing: ((String) -> Void)?
     var onClose: () -> Void
     var onSearchPattern: ((String) -> Void)?
+    var onDelete: ((MediaItem) -> Void)?
 
     /// Captured at open time — stays stable even when parent re-filters.
     @State private var items: [MediaItem]
@@ -114,6 +132,16 @@ struct FullScreenImageOverlay: View {
     private enum GestureMode { case none, dismiss, scroll, swipe, zoomPan }
     @State private var gestureMode: GestureMode = .none
 
+    // Delete confirmation
+    @State private var showDeleteConfirmation = false
+
+    // Delete animation — wallet-style card crush
+    // Stage 0: normal, 1: height clips inward, 2: width shrinks + fade, 3: complete
+    @State private var deleteStage: Int = 0
+
+    // Share sheet
+    @State private var shareItem: URL?
+
     // Search-triggered close (skips rect correction since grid has re-laid out)
     @State private var isSearchDismiss = false
 
@@ -146,7 +174,8 @@ struct FullScreenImageOverlay: View {
         gridItemRects: Binding<[String: CGRect]>,
         onDismissing: ((String) -> Void)? = nil,
         onClose: @escaping () -> Void,
-        onSearchPattern: ((String) -> Void)? = nil
+        onSearchPattern: ((String) -> Void)? = nil,
+        onDelete: ((MediaItem) -> Void)? = nil
     ) {
         _items = State(initialValue: items)
         self.startIndex = startIndex
@@ -157,6 +186,7 @@ struct FullScreenImageOverlay: View {
         self.onDismissing = onDismissing
         self.onClose = onClose
         self.onSearchPattern = onSearchPattern
+        self.onDelete = onDelete
         _currentIndex = State(initialValue: startIndex)
         _closeTargetFrame = State(initialValue: sourceRect)
     }
@@ -349,6 +379,18 @@ struct FullScreenImageOverlay: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 16))
+            // Delete animation — wallet card crush (mask approach)
+            .mask {
+                let maskH = deleteStage >= 1
+                    ? finalFrame.height * DeleteAnimation.crushedScaleY
+                    : finalFrame.height
+                let maskW = deleteStage >= 2
+                    ? finalFrame.width * DeleteAnimation.crushedScaleX
+                    : finalFrame.width
+                RoundedRectangle(cornerRadius: 16)
+                    .frame(width: maskW, height: maskH)
+            }
+            .opacity(deleteStage >= 2 ? 0 : 1)
             .position(x: finalFrame.midX, y: finalFrame.midY)
             .offset(y: -effectiveContentOffset)
 
@@ -365,7 +407,21 @@ struct FullScreenImageOverlay: View {
                     }
                 )
                 .offset(y: metadataTopY - effectiveContentOffset)
-                .opacity(metadataOpacity)
+                .opacity(deleteStage >= 1 ? 0 : metadataOpacity)
+
+            // Action toolbar — share + delete (Glass split button)
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    actionToolbar
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 16)
+                .opacity(!isZoomed && contentOffset < 80 && deleteStage == 0 ? 1 : 0)
+                .animation(SnapSpring.fast, value: isZoomed)
+                .animation(SnapSpring.fast, value: contentOffset < 80)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Rasterize content so swipe/dismiss transforms are pure GPU operations.
@@ -390,9 +446,96 @@ struct FullScreenImageOverlay: View {
                 }
             }
         }
+        .confirmationDialog("Delete this item?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                handleDelete()
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { shareItem != nil },
+            set: { if !$0 { shareItem = nil } }
+        )) {
+            if let url = shareItem {
+                ActivityView(activityItems: [url])
+                    .presentationDetents([.medium, .large])
+            }
+        }
         // Dismiss visual effects
         .offset(y: effectiveDismissOffset)
         .scaleEffect(effectiveDismissOffset > 0 ? dismissScale : 1.0)
+    }
+
+    // MARK: - Action Toolbar (Glass split button)
+
+    @ViewBuilder
+    private var actionToolbar: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 0) {
+                HStack(spacing: 0) {
+                    Button {
+                        prepareShareItem()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 18, weight: .medium))
+                            .frame(width: 56, height: 50)
+                    }
+
+                    Divider()
+                        .frame(height: 24)
+                        .opacity(0.3)
+
+                    Button {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 18, weight: .medium))
+                            .frame(width: 56, height: 50)
+                    }
+                }
+                .glassEffect(.regular.interactive())
+            }
+        } else {
+            HStack(spacing: 0) {
+                Button {
+                    prepareShareItem()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(width: 56, height: 50)
+                }
+
+                Divider()
+                    .frame(height: 24)
+                    .opacity(0.3)
+
+                Button {
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(width: 56, height: 50)
+                }
+            }
+            .background(.ultraThinMaterial, in: Capsule())
+            .environment(\.colorScheme, .dark)
+        }
+    }
+
+    /// Copy file to temp directory so share sheet shows "Send a Copy" only (no iCloud collaboration).
+    private func prepareShareItem() {
+        guard let url = item.mediaURL else { return }
+        let tempDir = FileManager.default.temporaryDirectory
+        let tempURL = tempDir.appendingPathComponent(url.lastPathComponent)
+        try? FileManager.default.removeItem(at: tempURL)
+        do {
+            try FileManager.default.copyItem(at: url, to: tempURL)
+            shareItem = tempURL
+        } catch {
+            // Fallback to original URL if copy fails
+            shareItem = url
+        }
     }
 
     // MARK: - Adjacent Item View
@@ -708,6 +851,73 @@ struct FullScreenImageOverlay: View {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(200))
             close()
+        }
+    }
+
+    // MARK: - Delete
+
+    private func handleDelete() {
+        let deletedIndex = currentIndex
+        let deletedItem = items[deletedIndex]
+        let isLastItem = deletedIndex == items.count - 1
+
+        // Stage 1 — height crushes inward
+        withAnimation(DeleteAnimation.heightCrush) {
+            deleteStage = 1
+        }
+
+        Task { @MainActor in
+            // Stage 2 — width collapses + fade out
+            try? await Task.sleep(for: DeleteAnimation.widthDelay)
+            withAnimation(DeleteAnimation.widthCrush) {
+                deleteStage = 2
+            }
+
+            // Stage 3 — crush complete, commit deletion + slide in replacement
+            try? await Task.sleep(for: DeleteAnimation.completeDelay)
+
+            // Notify parent to handle file move + SwiftData deletion
+            onDelete?(deletedItem)
+
+            // Update local items array
+            items.remove(at: deletedIndex)
+
+            if items.isEmpty {
+                close()
+                return
+            }
+
+            // Adjust index
+            if deletedIndex >= items.count {
+                currentIndex = items.count - 1
+            }
+
+            // Prepare new image before resetting delete state
+            player?.pause()
+            player = nil
+            image = adjacentImages[items[currentIndex].id]
+            contentOffset = 0
+
+            // Position replacement off-screen: from right normally, from left if last
+            let slideFrom = isLastItem ? -screenSize.width : screenSize.width
+            swipeOffset = slideFrom
+            deleteStage = 0
+            metadataStage = 0
+
+            // Animate the slide-in
+            withAnimation(SnapSpring.standard) {
+                swipeOffset = 0
+            }
+
+            // Stagger metadata reveal after slide settles
+            try? await Task.sleep(for: .milliseconds(200))
+            startMetadataReveal()
+
+            loadTask?.cancel()
+            loadTask = Task { await loadCurrentItem() }
+            preloadAdjacentImages()
+
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }
 
@@ -1072,4 +1282,18 @@ private extension String {
     var trimmingTrailingWhitespace: String {
         replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
     }
+}
+
+// MARK: - UIActivityViewController Wrapper
+
+/// Wraps UIActivityViewController for SwiftUI. Uses a temp file URL
+/// (outside iCloud) so iOS shows "Send a Copy" instead of "Collaborate".
+private struct ActivityView: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
