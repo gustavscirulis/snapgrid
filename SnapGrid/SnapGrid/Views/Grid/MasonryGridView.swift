@@ -12,7 +12,7 @@ struct MasonryGridView: View {
     let onShiftSelect: (String) -> Void
     let onDelete: (Set<String>) -> Void
     let onAssignToSpace: (Set<String>, String?) -> Void
-    let onRetryAnalysis: (MediaItem) -> Void
+    let onRetryAnalysis: (Set<String>) -> Void
     let onSetSelection: (Set<String>) -> Void
     var coordinateSpaceName: String = "gridContent"
 
@@ -109,7 +109,7 @@ struct MasonryGridView: View {
                                         onShiftSelect: { onShiftSelect(item.id) },
                                         onDelete: { onDelete(effectiveIds) },
                                         onAssignToSpace: { spaceId in onAssignToSpace(effectiveIds, spaceId) },
-                                        onRetryAnalysis: { onRetryAnalysis(item) }
+                                        onRetryAnalysis: { onRetryAnalysis(effectiveIds) }
                                     )
                                     .background(
                                         GeometryReader { geo in

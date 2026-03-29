@@ -404,7 +404,7 @@ struct GridItemView: View {
 
             Divider()
 
-            Button("Retry Analysis") {
+            Button(isBulk ? "Retry Analysis for \(selectedCount) Items" : "Retry Analysis") {
                 onRetryAnalysis()
             }
 
