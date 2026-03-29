@@ -8,11 +8,11 @@ struct EmptyStateView: View {
                 .foregroundStyle(.white.opacity(0.3))
 
             Text("No images yet")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.7))
 
-            Text("Add images to your SnapGrid library\non your Mac to see them here")
-                .font(.system(size: 15))
+            Text("Tap + to add images, or add them\nfrom your Mac to see them here")
+                .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.4))
                 .multilineTextAlignment(.center)
         }
@@ -27,7 +27,7 @@ struct SearchEmptyStateView: View {
                 .foregroundStyle(.white.opacity(0.3))
 
             Text("No results found")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.headline)
                 .foregroundStyle(.white.opacity(0.7))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -45,18 +45,18 @@ struct ErrorStateView: View {
                 .foregroundStyle(.white.opacity(0.3))
 
             Text("Something went wrong")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.headline)
                 .foregroundStyle(.white.opacity(0.7))
 
             Text(message)
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.4))
                 .multilineTextAlignment(.center)
 
             Button("Try Again") {
                 Task { await retry() }
             }
-            .font(.system(size: 15, weight: .medium))
+            .font(.subheadline.weight(.medium))
             .foregroundStyle(.white)
             .padding(.horizontal, 20)
             .padding(.vertical, 10)

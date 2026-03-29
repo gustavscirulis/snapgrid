@@ -48,10 +48,10 @@ struct GridItemView: View {
                     .overlay {
                         VStack(spacing: 6) {
                             Image(systemName: "icloud.and.arrow.down")
-                                .font(.system(size: 20))
+                                .font(.body)
                                 .foregroundStyle(.white.opacity(0.3))
                             Text("Tap to retry")
-                                .font(.system(size: 11))
+                                .font(.caption2)
                                 .foregroundStyle(.white.opacity(0.3))
                         }
                     }
@@ -70,7 +70,7 @@ struct GridItemView: View {
                 HStack {
                     Spacer()
                     Image(systemName: "play.fill")
-                        .font(.system(size: 10))
+                        .font(.caption2)
                         .foregroundStyle(.white)
                         .padding(6)
                         .background(.black.opacity(0.5))
@@ -78,6 +78,7 @@ struct GridItemView: View {
                         .padding(8)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .accessibilityHidden(true)
             }
 
             // Analysis state overlay
@@ -112,15 +113,17 @@ struct GridItemView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 10))
+                            .font(.caption2)
                         Text("Retry")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.caption2.weight(.medium))
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(.red.opacity(0.7))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .padding(8)
                 .frame(width: width, height: height, alignment: .bottomLeading)
@@ -128,7 +131,7 @@ struct GridItemView: View {
             }
         }
         .frame(width: width, height: height)
-        .animation(SnapSpring.standard, value: item.isAnalyzing)
+        .animation(SnapSpring.resolvedStandard, value: item.isAnalyzing)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityLabel(item.isVideo ? "Video" : "Image")
         .accessibilityHint("Double tap to view full screen")
@@ -210,26 +213,32 @@ struct ShimmerText: View {
     }
 
     var body: some View {
-        TimelineView(.animation) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
-                .truncatingRemainder(dividingBy: ShimmerConfig.cycle)
-                / ShimmerConfig.cycle
-            let phase = t * (ShimmerConfig.rangeEnd - ShimmerConfig.rangeStart)
-                + ShimmerConfig.rangeStart
-
+        if UIAccessibility.isReduceMotionEnabled {
             Text(text)
-                .font(.system(size: 11))
-                .foregroundStyle(
-                    .linearGradient(
-                        colors: [
-                            .white.opacity(ShimmerConfig.baseBrightness),
-                            .white.opacity(ShimmerConfig.peakBrightness),
-                            .white.opacity(ShimmerConfig.baseBrightness),
-                        ],
-                        startPoint: .init(x: phase - ShimmerConfig.bandHalf, y: 0.5),
-                        endPoint: .init(x: phase + ShimmerConfig.bandHalf, y: 0.5)
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.7))
+        } else {
+            TimelineView(.animation) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: ShimmerConfig.cycle)
+                    / ShimmerConfig.cycle
+                let phase = t * (ShimmerConfig.rangeEnd - ShimmerConfig.rangeStart)
+                    + ShimmerConfig.rangeStart
+
+                Text(text)
+                    .font(.caption2)
+                    .foregroundStyle(
+                        .linearGradient(
+                            colors: [
+                                .white.opacity(ShimmerConfig.baseBrightness),
+                                .white.opacity(ShimmerConfig.peakBrightness),
+                                .white.opacity(ShimmerConfig.baseBrightness),
+                            ],
+                            startPoint: .init(x: phase - ShimmerConfig.bandHalf, y: 0.5),
+                            endPoint: .init(x: phase + ShimmerConfig.bandHalf, y: 0.5)
+                        )
                     )
-                )
+            }
         }
     }
 }

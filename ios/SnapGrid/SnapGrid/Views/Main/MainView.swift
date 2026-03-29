@@ -342,7 +342,7 @@ struct MainView: View {
         .onChange(of: activeSpaceId) { _, _ in
             let target = activeIndex
             if currentPage != target {
-                withAnimation(SnapSpring.standard) {
+                withAnimation(SnapSpring.resolvedStandard) {
                     currentPage = target
                 }
             }

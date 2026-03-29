@@ -7,7 +7,7 @@ struct PatternPills: View {
         FlowLayout(spacing: 4) {
             ForEach(patterns, id: \.name) { pattern in
                 Text(pattern.name)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.caption2.weight(.medium))
                     .foregroundStyle(.white.opacity(0.9))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
