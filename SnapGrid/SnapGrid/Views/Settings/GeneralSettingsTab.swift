@@ -70,6 +70,7 @@ struct GeneralSettingsTab: View {
                             hasKey = false
                             apiKeyInput = ""
                             discoveredModels = []
+                            KeySyncService.syncToiCloud()
                         }
                     }
 
@@ -87,6 +88,7 @@ struct GeneralSettingsTab: View {
                             ModelDiscoveryService.shared.clearCache(for: provider)
                             Task { await loadModels() }
                             NotificationCenter.default.post(name: .apiKeySaved, object: nil)
+                            KeySyncService.syncToiCloud()
                         } catch {
                             saveError = error.localizedDescription
                         }
@@ -128,7 +130,12 @@ struct GeneralSettingsTab: View {
             checkForKey()
             discoveredModels = []
             Task { await loadModels() }
+            KeySyncService.syncToiCloud()
         }
+        .onChange(of: openaiModel) { KeySyncService.syncToiCloud() }
+        .onChange(of: anthropicModel) { KeySyncService.syncToiCloud() }
+        .onChange(of: geminiModel) { KeySyncService.syncToiCloud() }
+        .onChange(of: openrouterModel) { KeySyncService.syncToiCloud() }
     }
 
     @ViewBuilder

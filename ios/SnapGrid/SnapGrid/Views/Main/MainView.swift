@@ -34,6 +34,7 @@ private struct PageOffsetReporter: View {
 
 struct MainView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
+    @EnvironmentObject var keySyncService: KeySyncService
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \MediaItem.createdAt, order: .reverse) private var allItems: [MediaItem]
@@ -51,6 +52,7 @@ struct MainView: View {
     @State private var hasAttemptedRescan = false
     @State private var tabScrollProgress: CGFloat = 0
     @State private var prefetchTask: Task<Void, Never>?
+    @State private var analysisTask: Task<Void, Never>?
     @State private var syncService = SyncService()
     @State private var searchService = SearchIndexService()
     @State private var debounceTask: Task<Void, Never>?
@@ -131,7 +133,8 @@ struct MainView: View {
                                     items: items,
                                     availableWidth: gridWidth,
                                     selectedItemId: showOverlay ? selectedItemId : nil,
-                                    onItemSelected: handleItemSelected
+                                    onItemSelected: handleItemSelected,
+                                    onRetryAnalysis: handleRetryAnalysis
                                 )
                                 .padding(.horizontal, 12)
                                 .padding(.bottom, 70)
@@ -423,6 +426,9 @@ struct MainView: View {
         let columnWidth = (screenWidth - 24 - 8) / 2
         prefetchTask = ThumbnailCache.shared.prefetchThumbnails(for: allItems, targetPixelWidth: columnWidth * 2)
 
+        // Analyze unanalyzed items if API keys are available
+        analyzeUnanalyzedItems()
+
         // Re-scan if some iCloud files were still downloading
         if skipped > 0 && !hasAttemptedRescan {
             hasAttemptedRescan = true
@@ -432,6 +438,115 @@ struct MainView: View {
                 hasAttemptedRescan = false
                 await loadContent()
             }
+        }
+    }
+
+    private func handleRetryAnalysis(_ item: MediaItem) {
+        item.analysisError = nil
+        analyzeUnanalyzedItems()
+    }
+
+    // MARK: - AI Analysis
+
+    private func analyzeUnanalyzedItems() {
+        guard keySyncService.isUnlocked else {
+            print("[Analysis] Skipped — keySyncService not unlocked")
+            return
+        }
+        guard let providerStr = keySyncService.activeProvider,
+              let provider = AIProvider(rawValue: providerStr) else {
+            print("[Analysis] Skipped — no active provider")
+            return
+        }
+        guard let apiKey = keySyncService.activeAPIKey() else {
+            print("[Analysis] Skipped — no API key for provider \(providerStr)")
+            return
+        }
+        guard let rootURL = fileSystem.rootURL else {
+            print("[Analysis] Skipped — no rootURL")
+            return
+        }
+
+        let model = keySyncService.activeModel ?? provider.defaultModel
+        let resolvedModel = (model == "auto") ? provider.defaultModel : model
+
+        // Query model context directly — @Query may not have refreshed yet after sync
+        let descriptor = FetchDescriptor<MediaItem>()
+        let allCurrentItems = (try? modelContext.fetch(descriptor)) ?? []
+        let unanalyzed = allCurrentItems.filter { $0.analysisResult == nil && !$0.isAnalyzing && $0.analysisError == nil && !$0.isVideo }
+        guard !unanalyzed.isEmpty else {
+            print("[Analysis] No unanalyzed items found (total: \(allCurrentItems.count))")
+            return
+        }
+
+        print("[Analysis] Found \(unanalyzed.count) unanalyzed items, starting analysis")
+
+        analysisTask?.cancel()
+        analysisTask = Task {
+            for item in unanalyzed {
+                guard !Task.isCancelled else { break }
+
+                item.isAnalyzing = true
+                do {
+                    let image = try loadImage(for: item, rootURL: rootURL)
+                    let result = try await AIAnalysisService.shared.analyze(
+                        image: image,
+                        provider: provider,
+                        model: resolvedModel,
+                        apiKey: apiKey
+                    )
+                    item.analysisResult = result
+                    item.isAnalyzing = false
+
+                    // Write back to sidecar JSON so Mac picks up the analysis
+                    writeSidecar(for: item, rootURL: rootURL)
+
+                    // Rebuild search index to include new analysis
+                    searchService.buildIndex(items: allItems)
+
+                    try? modelContext.save()
+                    print("[Analysis] Completed: \(item.id)")
+                } catch {
+                    item.isAnalyzing = false
+                    item.analysisError = error.localizedDescription
+                    print("[Analysis] Failed for \(item.id): \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    private func loadImage(for item: MediaItem, rootURL: URL) throws -> UIImage {
+        let imageURL = rootURL.appendingPathComponent("images/\(item.filename)")
+        guard let data = try? Data(contentsOf: imageURL),
+              let image = UIImage(data: data) else {
+            throw AIAnalysisService.AnalysisError.imageConversionFailed
+        }
+        return image
+    }
+
+    private func writeSidecar(for item: MediaItem, rootURL: URL) {
+        let metadataDir = rootURL.appendingPathComponent("metadata")
+        let sidecarURL = metadataDir.appendingPathComponent("\(item.id).json")
+
+        // Read existing sidecar to preserve all fields
+        guard let existingData = try? Data(contentsOf: sidecarURL) else { return }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard var json = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any] else { return }
+
+        // Add analysis fields
+        if let result = item.analysisResult {
+            json["imageContext"] = result.imageContext
+            json["imageSummary"] = result.imageSummary
+            json["patterns"] = result.patterns.map { ["name": $0.name, "confidence": $0.confidence] }
+        }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+        if let updatedData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) {
+            try? updatedData.write(to: sidecarURL, options: .atomic)
         }
     }
 }

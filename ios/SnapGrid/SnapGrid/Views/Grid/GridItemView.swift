@@ -12,6 +12,7 @@ struct GridItemView: View {
     let width: CGFloat
     var isSelected: Bool = false
     var onSelect: ((MediaItem, CGRect, UIImage?) -> Void)?
+    var onRetryAnalysis: (() -> Void)?
     @State private var thumbnail: UIImage?
     @State private var loadFailed = false
 
@@ -72,8 +73,56 @@ struct GridItemView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
+
+            // Analysis state overlay
+            if item.isAnalyzing {
+                ZStack(alignment: .bottomLeading) {
+                    LinearGradient(
+                        colors: [.black.opacity(0.5), .black.opacity(0.15), .clear],
+                        startPoint: .bottom,
+                        endPoint: .init(x: 0.5, y: 0.3)
+                    )
+
+                    HStack {
+                        ShimmerText("Analyzing...")
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                            .environment(\.colorScheme, .dark)
+                        Spacer()
+                    }
+                    .padding(8)
+                }
+                .frame(width: width, height: height)
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity.combined(with: .offset(y: 6)),
+                        removal: .opacity
+                    )
+                )
+            } else if !item.isAnalyzing && item.analysisError != nil {
+                Button {
+                    onRetryAnalysis?()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 10))
+                        Text("Retry")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.red.opacity(0.7))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .padding(8)
+                .frame(width: width, height: height, alignment: .bottomLeading)
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+            }
         }
         .frame(width: width, height: height)
+        .animation(SnapSpring.standard, value: item.isAnalyzing)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityLabel(item.isVideo ? "Video" : "Image")
         .accessibilityHint("Double tap to view full screen")
@@ -96,6 +145,8 @@ struct GridItemView: View {
             await loadThumbnail()
         }
     }
+
+    // MARK: - Thumbnail Loading
 
     private func loadThumbnail() async {
         let cache = ThumbnailCache.shared
@@ -131,5 +182,48 @@ struct GridItemView: View {
         }
 
         loadFailed = true
+    }
+}
+
+// MARK: - Shimmer Text
+
+private enum ShimmerConfig {
+    static let cycle: Double = 1.5     // seconds per sweep
+    static let bandHalf: CGFloat = 0.4 // half-width of bright band
+    static let rangeStart: CGFloat = -0.6
+    static let rangeEnd: CGFloat = 1.6
+    static let baseBrightness: CGFloat = 0.5
+    static let peakBrightness: CGFloat = 1.0
+}
+
+struct ShimmerText: View {
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+                .truncatingRemainder(dividingBy: ShimmerConfig.cycle)
+                / ShimmerConfig.cycle
+            let phase = t * (ShimmerConfig.rangeEnd - ShimmerConfig.rangeStart)
+                + ShimmerConfig.rangeStart
+
+            Text(text)
+                .font(.system(size: 11))
+                .foregroundStyle(
+                    .linearGradient(
+                        colors: [
+                            .white.opacity(ShimmerConfig.baseBrightness),
+                            .white.opacity(ShimmerConfig.peakBrightness),
+                            .white.opacity(ShimmerConfig.baseBrightness),
+                        ],
+                        startPoint: .init(x: phase - ShimmerConfig.bandHalf, y: 0.5),
+                        endPoint: .init(x: phase + ShimmerConfig.bandHalf, y: 0.5)
+                    )
+                )
+        }
     }
 }
