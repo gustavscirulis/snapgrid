@@ -32,6 +32,20 @@ private struct PageOffsetReporter: View {
     }
 }
 
+private struct CloseSearchButton: View {
+    @Environment(\.dismissSearch) private var dismissSearch
+    @Binding var searchText: String
+
+    var body: some View {
+        Button {
+            searchText = ""
+            dismissSearch()
+        } label: {
+            Label("Close Search", systemImage: "xmark")
+        }
+    }
+}
+
 struct MainView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
     @EnvironmentObject var keySyncService: KeySyncService
@@ -227,11 +241,19 @@ struct MainView: View {
                         DefaultToolbarItem(kind: .search, placement: .bottomBar)
                         ToolbarSpacer(.flexible, placement: .bottomBar)
                         ToolbarItem(placement: .bottomBar) {
-                            addImagesMenu
+                            if isSearchActive {
+                                CloseSearchButton(searchText: $searchText)
+                            } else {
+                                addImagesMenu
+                            }
                         }
                     } else {
                         ToolbarItem(placement: .topBarTrailing) {
-                            addImagesMenu
+                            if isSearchActive {
+                                CloseSearchButton(searchText: $searchText)
+                            } else {
+                                addImagesMenu
+                            }
                         }
                     }
                 }
