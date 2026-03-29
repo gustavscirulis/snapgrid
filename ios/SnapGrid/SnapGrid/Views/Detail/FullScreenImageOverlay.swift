@@ -418,16 +418,11 @@ struct FullScreenImageOverlay: View {
                 }
                 .padding(.trailing, 20)
                 .padding(.bottom, 16)
-                .opacity(!isZoomed && contentOffset < 80 && deleteStage == 0 ? 1 : 0)
+                .opacity(!isZoomed && deleteStage == 0 ? 1 : 0)
                 .animation(SnapSpring.fast, value: isZoomed)
-                .animation(SnapSpring.fast, value: contentOffset < 80)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Rasterize content so swipe/dismiss transforms are pure GPU operations.
-        // During swipe/dismiss the inner content is static (only outer offset changes),
-        // so the texture is reused — no per-frame blur recomputation.
-        .drawingGroup()
         .contentShape(Rectangle())
         .gesture(settledDragGesture)
         .simultaneousGesture(pinchGesture)
@@ -847,9 +842,22 @@ struct FullScreenImageOverlay: View {
         guard !isClosing else { return }
         isSearchDismiss = true
         onSearchPattern?(pattern)
-        // Wait for grid to re-filter and re-layout, then close to new position
+
+        // Wait for the grid to re-filter and report the current item's
+        // updated rect on the visible screen.  The search debounce is 100ms,
+        // then SwiftUI needs 1-2 render cycles for layout + preference
+        // propagation.  Poll at short intervals instead of a fixed delay
+        // so we close as soon as the rect is ready.
+        let targetId = items[currentIndex].id
+        let screen = UIScreen.main.bounds
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(200))
+            for _ in 0..<20 { // 20 × 30ms = 600ms max
+                try? await Task.sleep(for: .milliseconds(30))
+                if let rect = gridItemRects[targetId],
+                   screen.intersects(rect) {
+                    break
+                }
+            }
             close()
         }
     }
@@ -941,7 +949,16 @@ struct FullScreenImageOverlay: View {
         isZoomed = false
 
         let currentItemId = items[currentIndex].id
-        let targetRect = gridItemRects[currentItemId]
+        let rawRect = gridItemRects[currentItemId]
+
+        // For search dismiss, only accept rects on the visible screen.
+        // Preference rects from non-visible space pages can have off-screen
+        // coordinates that would send the hero animation out of view.
+        let targetRect: CGRect? = if isSearchDismiss {
+            rawRect.flatMap { UIScreen.main.bounds.intersects($0) ? $0 : nil }
+        } else {
+            rawRect
+        }
 
         if let targetRect {
             // Grid cell is visible — hero animation back to it

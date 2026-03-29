@@ -3,7 +3,13 @@ import SwiftUI
 struct GridItemRectsPreferenceKey: PreferenceKey {
     static var defaultValue: [String: CGRect] = [:]
     static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
-        value.merge(nextValue(), uniquingKeysWith: { $1 })
+        // When multiple grids exist (space pages in a horizontal pager),
+        // prefer rects that are on the visible screen over off-screen ones.
+        let screen = UIScreen.main.bounds
+        value.merge(nextValue()) { existing, new in
+            if screen.intersects(new) { return new }
+            return existing
+        }
     }
 }
 
