@@ -511,11 +511,24 @@ struct MainView: View {
                 item.isAnalyzing = true
                 do {
                     let image = try loadImage(for: item, rootURL: rootURL)
+
+                    // Resolve guidance and space context
+                    var guidance: String?
+                    var spaceContext: String?
+                    if let space = item.space {
+                        spaceContext = "This image belongs to a collection called \"\(space.name)\". Use this as context to inform your analysis."
+                        if space.useCustomPrompt, let custom = space.customPrompt, !custom.isEmpty {
+                            guidance = custom
+                        }
+                    }
+
                     let result = try await AIAnalysisService.shared.analyze(
                         image: image,
                         provider: provider,
                         model: resolvedModel,
-                        apiKey: apiKey
+                        apiKey: apiKey,
+                        guidance: guidance,
+                        spaceContext: spaceContext
                     )
                     item.analysisResult = result
                     item.isAnalyzing = false

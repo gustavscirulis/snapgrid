@@ -50,8 +50,8 @@ interface SettingsPanelProps {
   onCreateSpace: (name: string) => Promise<Space>;
   onRenameSpace: (id: string, name: string) => Promise<void>;
   onDeleteSpace: (id: string) => Promise<void>;
-  onUpdateSpacePrompt: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
-  onUpdateAllSpacePrompt: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  onUpdateSpaceGuidance: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  onUpdateAllSpaceGuidance: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
   onReorderSpaces?: (fromIndex: number, toIndex: number) => void;
   onShuffleImages?: () => void;
 }
@@ -65,8 +65,8 @@ export function SettingsPanel({
   onCreateSpace,
   onRenameSpace,
   onDeleteSpace,
-  onUpdateSpacePrompt,
-  onUpdateAllSpacePrompt,
+  onUpdateSpaceGuidance,
+  onUpdateAllSpaceGuidance,
   onReorderSpaces,
   onShuffleImages,
 }: SettingsPanelProps) {
@@ -174,8 +174,8 @@ export function SettingsPanel({
                     onCreateSpace={onCreateSpace}
                     onRenameSpace={onRenameSpace}
                     onDeleteSpace={onDeleteSpace}
-                    onUpdateSpacePrompt={onUpdateSpacePrompt}
-                    onUpdateAllSpacePrompt={onUpdateAllSpacePrompt}
+                    onUpdateSpaceGuidance={onUpdateSpaceGuidance}
+                    onUpdateAllSpaceGuidance={onUpdateAllSpaceGuidance}
                     onReorderSpaces={onReorderSpaces}
                   />
                 </motion.div>
@@ -845,8 +845,8 @@ interface SpacesTabProps {
   onCreateSpace: (name: string) => Promise<Space>;
   onRenameSpace: (id: string, name: string) => Promise<void>;
   onDeleteSpace: (id: string) => Promise<void>;
-  onUpdateSpacePrompt: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
-  onUpdateAllSpacePrompt: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  onUpdateSpaceGuidance: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  onUpdateAllSpaceGuidance: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
   onReorderSpaces?: (fromIndex: number, toIndex: number) => void;
 }
 
@@ -857,8 +857,8 @@ const SpacesTab = ({
   onCreateSpace,
   onRenameSpace,
   onDeleteSpace,
-  onUpdateSpacePrompt,
-  onUpdateAllSpacePrompt,
+  onUpdateSpaceGuidance,
+  onUpdateAllSpaceGuidance,
   onReorderSpaces,
 }: SpacesTabProps) => {
   // Which space is selected for editing (null = "All")
@@ -897,9 +897,9 @@ const SpacesTab = ({
 
   const handleToggleCustomPrompt = (checked: boolean) => {
     if (selectedSpaceId === null) {
-      onUpdateAllSpacePrompt(currentPromptText || undefined, checked);
+      onUpdateAllSpaceGuidance(currentPromptText || undefined, checked);
     } else {
-      onUpdateSpacePrompt(selectedSpaceId, currentPromptText || undefined, checked);
+      onUpdateSpaceGuidance(selectedSpaceId, currentPromptText || undefined, checked);
     }
   };
 
@@ -909,12 +909,12 @@ const SpacesTab = ({
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       if (selectedSpaceId === null) {
-        onUpdateAllSpacePrompt(text, true);
+        onUpdateAllSpaceGuidance(text, true);
       } else {
-        onUpdateSpacePrompt(selectedSpaceId, text, true);
+        onUpdateSpaceGuidance(selectedSpaceId, text, true);
       }
     }, 500);
-  }, [selectedSpaceId, onUpdateAllSpacePrompt, onUpdateSpacePrompt]);
+  }, [selectedSpaceId, onUpdateAllSpaceGuidance, onUpdateSpaceGuidance]);
 
   // Clean up debounce on unmount
   useEffect(() => {
@@ -1117,7 +1117,7 @@ const SpacesTab = ({
                 )}
                 {item.hasCustomPrompt && (
                   <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-zinc-700 text-gray-500 dark:text-gray-400 select-none">
-                    custom instructions
+                    custom guidance
                   </span>
                 )}
               </div>
@@ -1193,15 +1193,15 @@ const SpacesTab = ({
         </button>
       </div>
 
-      {/* Prompt section */}
+      {/* Guidance section */}
       <div className="pt-4 border-t border-gray-100 dark:border-zinc-800/50 space-y-3">
         <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 select-none">
-          Analysis Instructions
+          Analysis Guidance
           {selectedSpaceId === null ? " — All" : ` — ${selectedSpace?.name ?? ""}`}
         </h3>
 
         <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Custom instructions</span>
+          <span className="text-sm text-gray-700 dark:text-gray-300 select-none">Custom guidance</span>
           <Switch
             checked={isCustom}
             onCheckedChange={handleToggleCustomPrompt}
@@ -1220,7 +1220,7 @@ const SpacesTab = ({
           </div>
         ) : (
           <p className="text-xs text-gray-500 dark:text-gray-500 select-none">
-            Using the built-in prompt. App updates will automatically improve analysis.
+            Using default guidance. App updates will automatically improve analysis.
           </p>
         )}
       </div>

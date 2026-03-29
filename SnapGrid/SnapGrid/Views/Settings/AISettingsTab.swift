@@ -9,7 +9,6 @@ struct AISettingsTab: View {
 
     @State private var apiKeyInput: String = ""
     @State private var hasKey: Bool = false
-@State private var showSaved: Bool = false
     @State private var saveError: String?
     @State private var keyWarning: String?
     @State private var discoveredModels: [DiscoveredModel] = []
@@ -19,51 +18,35 @@ struct AISettingsTab: View {
         AIProvider(rawValue: selectedProvider) ?? .openai
     }
 
+    private var keyPlaceholder: String {
+        switch provider {
+        case .openai: return "sk-..."
+        case .anthropic: return "sk-ant-..."
+        case .gemini: return "AIza..."
+        case .openrouter: return "sk-or-..."
+        }
+    }
+
+    private var keyGenerationURL: URL {
+        switch provider {
+        case .openai: return URL(string: "https://platform.openai.com/api-keys")!
+        case .anthropic: return URL(string: "https://console.anthropic.com/settings/keys")!
+        case .gemini: return URL(string: "https://aistudio.google.com/apikey")!
+        case .openrouter: return URL(string: "https://openrouter.ai/keys")!
+        }
+    }
+
     var body: some View {
         Form {
-            Section("AI Provider For Image Analysis") {
+            Section {
                 Picker("Provider", selection: $selectedProvider) {
                     ForEach(AIProvider.allCases, id: \.rawValue) { p in
                         Text(p.displayName).tag(p.rawValue)
                     }
                 }
-            }
-
-            Section("API Key") {
-                HStack {
-                    SecureField("Enter your \(provider.displayName) API key", text: $apiKeyInput)
-                        .textFieldStyle(.roundedBorder)
-                    Button("Save") {
-                        saveApiKey()
-                    }
-                    .disabled(apiKeyInput.isEmpty)
-                }
-
-                if let keyWarning {
-                    Text(keyWarning)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-
-                if showSaved {
-                    Text("API key saved")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                }
-
-                if let saveError {
-                    Text(saveError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
 
                 if hasKey {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text("Key configured")
-                            .foregroundStyle(.secondary)
-                        Spacer()
+                    LabeledContent("API Key") {
                         Button("Remove", role: .destructive) {
                             try? KeychainService.delete(service: provider.keychainService)
                             hasKey = false
@@ -72,6 +55,30 @@ struct AISettingsTab: View {
                             KeySyncService.syncToiCloud()
                         }
                     }
+                } else {
+                    HStack {
+                        SecureField("API Key", text: $apiKeyInput, prompt: Text(keyPlaceholder))
+                            .textFieldStyle(.roundedBorder)
+                        Button("Save") {
+                            saveApiKey()
+                        }
+                        .disabled(apiKeyInput.isEmpty)
+                    }
+
+                    Link("Get \(provider.displayName) API key", destination: keyGenerationURL)
+                        .font(.caption)
+                }
+
+                if let keyWarning {
+                    Text(keyWarning)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                if let saveError {
+                    Text(saveError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             }
 
@@ -103,13 +110,13 @@ struct AISettingsTab: View {
         let binding = modelBinding(for: provider)
 
         if !hasKey {
-            Text("Configure an API key above to select a model.")
+            Text("Add an API key to choose a model.")
                 .foregroundStyle(.secondary)
         } else if isLoadingModels {
             HStack {
                 ProgressView()
                     .controlSize(.small)
-                Text("Discovering available models…")
+                Text("Loading models…")
                     .foregroundStyle(.secondary)
             }
         } else if !discoveredModels.isEmpty {
@@ -148,8 +155,6 @@ struct AISettingsTab: View {
             hasKey = true
             apiKeyInput = ""
             saveError = nil
-            showSaved = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { showSaved = false }
             ModelDiscoveryService.shared.clearCache(for: provider)
             Task { await loadModels() }
             NotificationCenter.default.post(name: .apiKeySaved, object: nil)

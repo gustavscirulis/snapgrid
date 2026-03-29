@@ -47,7 +47,7 @@ struct StorageSettingsTab: View {
         let manager = iCloudDownloadManager.shared
 
         Section("iCloud") {
-            Toggle("Keep all files downloaded locally", isOn: $keepFilesLocal)
+            Toggle("Keep files downloaded", isOn: $keepFilesLocal)
                 .onChange(of: keepFilesLocal) { _, enabled in
                     if enabled {
                         manager.downloadAll()
@@ -79,7 +79,7 @@ struct StorageSettingsTab: View {
                     }
                 } else {
                     HStack(spacing: 4) {
-                        Text("\(evicted) files waiting to download")
+                        Text("\(evicted) files in iCloud only")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Button("Download Now") {

@@ -135,7 +135,8 @@ export async function deleteApiKey(provider?: AIProvider): Promise<boolean> {
 
 // ── Shared prompt ──────────────────────────────────────────────────
 
-export const DEFAULT_SYSTEM_PROMPT = `You are an expert AI in analyzing images. Your task is to analyze the content of images and provide appropriate descriptions.
+// System prompt: structural instructions for response format (not user-visible)
+const SYSTEM_PROMPT = `You are an expert AI in analyzing images. Your task is to analyze the content of images and provide appropriate descriptions.
 
     Provide your response in the following JSON format:
     {
@@ -158,9 +159,20 @@ export const DEFAULT_SYSTEM_PROMPT = `You are an expert AI in analyzing images. 
       6. Include confidence scores between 0.8 and 1.0
       7. List patterns in order of confidence/importance
       8. Ensure that the patterns are unique and not duplicates of each other and imageSummary
-      9. Provide exactly 6 patterns, ordered by confidence`;
+      9. Provide exactly 6 patterns, ordered by confidence
+      10. Respond with a strict, valid JSON object — do not include markdown formatting, explanations, or code block symbols
+      11. Use title case for pattern/object names
+      12. Provide up to 6 patterns, ordered by confidence`;
 
-const USER_TEXT = "Analyze this image and provide a detailed breakdown of its content. If it's a UI screenshot, focus on UI patterns and components. If it's a general scene, focus on objects and subjects. Respond with a strict, valid JSON object in the format specified in the system prompt. Do not include markdown formatting, explanations, or code block symbols. Use title case for pattern/object names. Provide up to 6 patterns/objects, ordered by confidence.";
+// Master instructions in the user message (not user-visible)
+const MASTER_USER_TEXT = "Analyze this image.";
+
+// Default guidance: user-visible, tells the AI what to focus on
+export const DEFAULT_GUIDANCE = "If it's a UI screenshot, focus on UI patterns and components. If it's a general scene, focus on objects and subjects.";
+
+function buildUserText(guidance?: string): string {
+  return `${MASTER_USER_TEXT} ${guidance ?? DEFAULT_GUIDANCE}`;
+}
 
 // ── Response parsing (shared by both providers) ────────────────────
 
@@ -231,7 +243,7 @@ function extractBase64(dataUrl: string): { data: string; mediaType: string } {
 
 // ── OpenAI analysis ────────────────────────────────────────────────
 
-async function analyzeImageWithOpenAI(imageUrl: string, modelId: string, systemPrompt: string): Promise<PatternMatch[]> {
+async function analyzeImageWithOpenAI(imageUrl: string, modelId: string, systemPrompt: string, userText: string): Promise<PatternMatch[]> {
   const payload = {
     model: modelId,
     messages: [
@@ -242,7 +254,7 @@ async function analyzeImageWithOpenAI(imageUrl: string, modelId: string, systemP
       {
         role: "user",
         content: [
-          { type: "text", text: USER_TEXT },
+          { type: "text", text: userText },
           { type: "image_url", image_url: { url: imageUrl } }
         ]
       }
@@ -281,7 +293,7 @@ async function analyzeImageWithOpenAI(imageUrl: string, modelId: string, systemP
 
 // ── Claude analysis ────────────────────────────────────────────────
 
-async function analyzeImageWithClaude(imageUrl: string, modelId: string, systemPrompt: string): Promise<PatternMatch[]> {
+async function analyzeImageWithClaude(imageUrl: string, modelId: string, systemPrompt: string, userText: string): Promise<PatternMatch[]> {
   const { data: base64Data, mediaType } = extractBase64(imageUrl);
 
   const payload = {
@@ -300,7 +312,7 @@ async function analyzeImageWithClaude(imageUrl: string, modelId: string, systemP
               data: base64Data
             }
           },
-          { type: "text", text: USER_TEXT }
+          { type: "text", text: userText }
         ]
       }
     ]
@@ -338,7 +350,7 @@ async function analyzeImageWithClaude(imageUrl: string, modelId: string, systemP
 
 // ── Gemini analysis ───────────────────────────────────────────────
 
-async function analyzeImageWithGemini(imageUrl: string, modelId: string, systemPrompt: string): Promise<PatternMatch[]> {
+async function analyzeImageWithGemini(imageUrl: string, modelId: string, systemPrompt: string, userText: string): Promise<PatternMatch[]> {
   const { data: base64Data, mediaType } = extractBase64(imageUrl);
 
   const payload = {
@@ -346,7 +358,7 @@ async function analyzeImageWithGemini(imageUrl: string, modelId: string, systemP
     contents: [
       {
         parts: [
-          { text: USER_TEXT },
+          { text: userText },
           {
             inlineData: {
               mimeType: mediaType,
@@ -395,7 +407,7 @@ async function analyzeImageWithGemini(imageUrl: string, modelId: string, systemP
 
 // ── OpenRouter analysis ──────────────────────────────────────────
 
-async function analyzeImageWithOpenRouter(imageUrl: string, modelId: string, systemPrompt: string): Promise<PatternMatch[]> {
+async function analyzeImageWithOpenRouter(imageUrl: string, modelId: string, systemPrompt: string, userText: string): Promise<PatternMatch[]> {
   const payload = {
     model: modelId,
     messages: [
@@ -406,7 +418,7 @@ async function analyzeImageWithOpenRouter(imageUrl: string, modelId: string, sys
       {
         role: "user",
         content: [
-          { type: "text", text: USER_TEXT },
+          { type: "text", text: userText },
           { type: "image_url", image_url: { url: imageUrl } }
         ]
       }
@@ -466,28 +478,28 @@ const PROVIDER_NAMES: Record<string, string> = {
   openrouter: "OpenRouter",
 };
 
-export async function analyzeImage(imageUrl: string, systemPrompt?: string): Promise<PatternMatch[]> {
+export async function analyzeImage(imageUrl: string, guidance?: string): Promise<PatternMatch[]> {
   const provider = await getActiveProvider();
   const hasKey = await hasApiKey(provider);
   if (!hasKey) {
     throw new Error(`${PROVIDER_NAMES[provider] || provider} API key not set. Please set an API key to use image analysis.`);
   }
 
-  const prompt = systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+  const userText = buildUserText(guidance);
 
   try {
     const modelId = await resolveModel();
 
     if (provider === 'anthropic') {
-      return await analyzeImageWithClaude(imageUrl, modelId, prompt);
+      return await analyzeImageWithClaude(imageUrl, modelId, SYSTEM_PROMPT, userText);
     }
     if (provider === 'gemini') {
-      return await analyzeImageWithGemini(imageUrl, modelId, prompt);
+      return await analyzeImageWithGemini(imageUrl, modelId, SYSTEM_PROMPT, userText);
     }
     if (provider === 'openrouter') {
-      return await analyzeImageWithOpenRouter(imageUrl, modelId, prompt);
+      return await analyzeImageWithOpenRouter(imageUrl, modelId, SYSTEM_PROMPT, userText);
     }
-    return await analyzeImageWithOpenAI(imageUrl, modelId, prompt);
+    return await analyzeImageWithOpenAI(imageUrl, modelId, SYSTEM_PROMPT, userText);
   } catch (error) {
     console.error(`Error analyzing image with ${provider}:`, error);
     throw error;
@@ -497,7 +509,7 @@ export async function analyzeImage(imageUrl: string, systemPrompt?: string): Pro
 /**
  * Analyzes multiple frames from a video and combines the results
  */
-export async function analyzeVideoFrames(frameUrls: string[], systemPrompt?: string): Promise<PatternMatch[]> {
+export async function analyzeVideoFrames(frameUrls: string[], guidance?: string): Promise<PatternMatch[]> {
   if (!frameUrls || frameUrls.length === 0) {
     throw new Error("No frames provided for analysis");
   }
@@ -508,7 +520,7 @@ export async function analyzeVideoFrames(frameUrls: string[], systemPrompt?: str
   }
 
   try {
-    const frameAnalysisPromises = frameUrls.map(frameUrl => analyzeImage(frameUrl, systemPrompt));
+    const frameAnalysisPromises = frameUrls.map(frameUrl => analyzeImage(frameUrl, guidance));
     const frameResults = await Promise.all(frameAnalysisPromises);
 
     const allPatterns: PatternMatch[] = [];

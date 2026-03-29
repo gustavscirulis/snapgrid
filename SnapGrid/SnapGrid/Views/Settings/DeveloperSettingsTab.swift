@@ -45,7 +45,7 @@ struct DeveloperSettingsTab: View {
                         resetAllData()
                     }
                 } message: {
-                    Text("This will delete all imported media, analysis results, and spaces. The app will restart. This cannot be undone.")
+                    Text("This will delete all media, analysis results, and spaces. This cannot be undone. The app will restart.")
                 }
             }
         }

@@ -1,14 +1,14 @@
 import SwiftUI
 import SwiftData
 
-struct PromptsSettingsTab: View {
+struct GuidanceSettingsTab: View {
     @Query(sort: \Space.order) private var spaces: [Space]
     @Environment(\.modelContext) private var modelContext
 
-    @AppStorage("allSpacePrompt") private var allSpacePrompt: String = ""
-    @AppStorage("useAllSpacePrompt") private var useAllSpacePrompt: Bool = false
+    @AppStorage("allSpacePrompt") private var allSpaceGuidance: String = ""
+    @AppStorage("useAllSpacePrompt") private var useAllSpaceGuidance: Bool = false
 
-    @State private var editingPrompt: PromptEditTarget?
+    @State private var editingTarget: GuidanceEditTarget?
     @State private var selectedOverrideId: String?
 
     private var spacesWithOverrides: [Space] {
@@ -26,27 +26,27 @@ struct PromptsSettingsTab: View {
 
     var body: some View {
         Form {
-            // MARK: - Default Prompt
+            // MARK: - Default Guidance
 
-            Section("Default Prompt") {
-                Toggle("Override default prompt", isOn: $useAllSpacePrompt)
-                    .onChange(of: useAllSpacePrompt) { _, isOn in
-                        if isOn && allSpacePrompt.isEmpty {
-                            allSpacePrompt = AIAnalysisService.defaultPromptDescription
+            Section("Analysis Guidance") {
+                Toggle("Use custom guidance", isOn: $useAllSpaceGuidance)
+                    .onChange(of: useAllSpaceGuidance) { _, isOn in
+                        if isOn && allSpaceGuidance.isEmpty {
+                            allSpaceGuidance = AIAnalysisService.defaultGuidance
                         }
                         if !isOn {
-                            allSpacePrompt = ""
+                            allSpaceGuidance = ""
                         }
                     }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(useAllSpacePrompt ? allSpacePrompt : AIAnalysisService.defaultPromptDescription)
+                    Text(useAllSpaceGuidance ? allSpaceGuidance : AIAnalysisService.defaultGuidance)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    if useAllSpacePrompt {
+                    if useAllSpaceGuidance {
                         Button("Edit") {
-                            editingPrompt = .defaultPrompt(allSpacePrompt)
+                            editingTarget = .defaultGuidance(allSpaceGuidance)
                         }
                     }
                 }
@@ -55,8 +55,8 @@ struct PromptsSettingsTab: View {
             // MARK: - Space Overrides
 
             if !spaces.isEmpty {
-                Section("Space Overrides") {
-                    Text("Additional instructions appended to the default prompt for specific spaces.")
+                Section("Per-Space Guidance") {
+                    Text("When set, replaces the default for that space.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -64,8 +64,8 @@ struct PromptsSettingsTab: View {
                         ForEach(spacesWithOverrides) { space in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(space.name)
-                                if let prompt = space.customPrompt, !prompt.isEmpty {
-                                    Text(prompt)
+                                if let guidance = space.customPrompt, !guidance.isEmpty {
+                                    Text(guidance)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(1)
@@ -76,6 +76,10 @@ struct PromptsSettingsTab: View {
                     }
                     .listStyle(.bordered)
                     .frame(height: max(72, CGFloat(spacesWithOverrides.count) * 40))
+                    .onDoubleClick(handler: {
+                        guard let space = selectedSpace else { return }
+                        editingTarget = .spaceGuidance(space.id, space.name, space.customPrompt ?? "")
+                    })
 
                     HStack(spacing: 8) {
                         Menu("Add...") {
@@ -85,7 +89,7 @@ struct PromptsSettingsTab: View {
                                     if space.customPrompt == nil { space.customPrompt = "" }
                                     try? modelContext.save()
                                     selectedOverrideId = space.id
-                                    editingPrompt = .spacePrompt(space.id, space.name, "")
+                                    editingTarget = .spaceGuidance(space.id, space.name, "")
                                 }
                             }
                         }
@@ -103,7 +107,7 @@ struct PromptsSettingsTab: View {
 
                         Button("Edit") {
                             guard let space = selectedSpace else { return }
-                            editingPrompt = .spacePrompt(space.id, space.name, space.customPrompt ?? "")
+                            editingTarget = .spaceGuidance(space.id, space.name, space.customPrompt ?? "")
                         }
                         .disabled(selectedSpace == nil)
 
@@ -115,8 +119,8 @@ struct PromptsSettingsTab: View {
         }
         .formStyle(.grouped)
         .textSelection(.enabled)
-        .sheet(item: $editingPrompt) { target in
-            PromptEditorSheet(target: target) { newText in
+        .sheet(item: $editingTarget) { target in
+            GuidanceEditorSheet(target: target) { newText in
                 applyEdit(target: target, text: newText)
             }
         }
@@ -124,12 +128,12 @@ struct PromptsSettingsTab: View {
 
     // MARK: - Apply Edit
 
-    private func applyEdit(target: PromptEditTarget, text: String) {
+    private func applyEdit(target: GuidanceEditTarget, text: String) {
         switch target {
-        case .defaultPrompt:
-            allSpacePrompt = text
-            useAllSpacePrompt = !text.isEmpty
-        case .spacePrompt(let spaceId, _, _):
+        case .defaultGuidance:
+            allSpaceGuidance = text
+            useAllSpaceGuidance = !text.isEmpty
+        case .spaceGuidance(let spaceId, _, _):
             guard let space = spaces.first(where: { $0.id == spaceId }) else { return }
             space.customPrompt = text
             space.useCustomPrompt = !text.isEmpty
@@ -140,42 +144,107 @@ struct PromptsSettingsTab: View {
 
 // MARK: - Edit Target
 
-private enum PromptEditTarget: Identifiable {
-    case defaultPrompt(String)
-    case spacePrompt(String, String, String) // id, name, text
+private enum GuidanceEditTarget: Identifiable {
+    case defaultGuidance(String)
+    case spaceGuidance(String, String, String) // id, name, text
 
     var id: String {
         switch self {
-        case .defaultPrompt: return "default"
-        case .spacePrompt(let spaceId, _, _): return spaceId
+        case .defaultGuidance: return "default"
+        case .spaceGuidance(let spaceId, _, _): return spaceId
         }
     }
 
     var title: String {
         switch self {
-        case .defaultPrompt: return "Default Prompt"
-        case .spacePrompt(_, let name, _): return name
+        case .defaultGuidance: return "Default Guidance"
+        case .spaceGuidance(_, let name, _): return name
         }
     }
 
     var text: String {
         switch self {
-        case .defaultPrompt(let text): return text
-        case .spacePrompt(_, _, let text): return text
+        case .defaultGuidance(let text): return text
+        case .spaceGuidance(_, _, let text): return text
         }
     }
 }
 
-// MARK: - Prompt Editor Sheet
+// MARK: - NSTextView wrapper (TextEditor in sheets breaks Cmd+C/V)
 
-private struct PromptEditorSheet: View {
-    let target: PromptEditTarget
+private struct NativeTextEditor: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    var font: NSFont
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSTextView.scrollableTextView()
+        let textView = scrollView.documentView as! NSTextView
+        textView.font = font
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.backgroundColor = .clear
+        textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.delegate = context.coordinator
+        textView.string = text
+        scrollView.hasVerticalScroller = true
+        scrollView.drawsBackground = false
+
+        // Add placeholder label
+        let label = NSTextField(labelWithString: placeholder)
+        label.font = font
+        label.textColor = .tertiaryLabelColor
+        label.tag = 999
+        label.translatesAutoresizingMaskIntoConstraints = false
+        textView.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.topAnchor.constraint(equalTo: textView.topAnchor, constant: 8),
+            label.leadingAnchor.constraint(equalTo: textView.leadingAnchor, constant: 12),
+        ])
+        label.isHidden = !text.isEmpty
+
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        let textView = scrollView.documentView as! NSTextView
+        if textView.string != text {
+            textView.string = text
+        }
+        textView.subviews.first(where: { $0.tag == 999 })?.isHidden = !text.isEmpty
+
+        // Make text view first responder so Edit menu (Cmd+C/V/X) works
+        if !context.coordinator.hasFocused, let window = textView.window {
+            window.makeFirstResponder(textView)
+            context.coordinator.hasFocused = true
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        let parent: NativeTextEditor
+        var hasFocused = false
+        init(_ parent: NativeTextEditor) { self.parent = parent }
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            parent.text = textView.string
+        }
+    }
+}
+
+// MARK: - Guidance Editor Sheet
+
+private struct GuidanceEditorSheet: View {
+    let target: GuidanceEditTarget
     let onSave: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var draft: String
 
-    init(target: PromptEditTarget, onSave: @escaping (String) -> Void) {
+    init(target: GuidanceEditTarget, onSave: @escaping (String) -> Void) {
         self.target = target
         self.onSave = onSave
         self._draft = State(initialValue: target.text)
@@ -184,7 +253,7 @@ private struct PromptEditorSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Edit Prompt — \(target.title)")
+                Text("Edit Guidance — \(target.title)")
                     .font(.headline)
                 Spacer()
             }
@@ -192,10 +261,11 @@ private struct PromptEditorSheet: View {
 
             Divider()
 
-            TextEditor(text: $draft)
-                .font(.caption.monospaced())
-                .scrollContentBackground(.hidden)
-                .padding(12)
+            NativeTextEditor(
+                text: $draft,
+                placeholder: "e.g., Focus on typography, color palettes, and layout patterns",
+                font: .monospacedSystemFont(ofSize: 11, weight: .regular)
+            )
 
             Divider()
 
