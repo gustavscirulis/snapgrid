@@ -71,7 +71,7 @@ private extension View {
         self
             .opacity(stage >= threshold ? 1 : 0)
             .offset(y: stage >= threshold ? 0 : 4)
-            .animation(MetadataReveal.spring, value: stage)
+            .animation(SnapSpring.resolvedMetadata, value: stage)
     }
 }
 
@@ -313,7 +313,7 @@ struct FullScreenImageOverlay: View {
             loadFullImage()
             prepareVideoIfNeeded()
             preloadAdjacentImages()
-            withAnimation(SnapSpring.hero) {
+            withAnimation(SnapSpring.resolvedHero) {
                 isExpanded = true
             } completion: {
                 heroComplete = true
@@ -471,7 +471,7 @@ struct FullScreenImageOverlay: View {
                         prepareShareItem()
                     } label: {
                         Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 18, weight: .medium))
+                            .font(.body.weight(.medium))
                             .frame(width: 56, height: 50)
                     }
 
@@ -483,7 +483,7 @@ struct FullScreenImageOverlay: View {
                         showDeleteConfirmation = true
                     } label: {
                         Image(systemName: "trash")
-                            .font(.system(size: 18, weight: .medium))
+                            .font(.body.weight(.medium))
                             .frame(width: 56, height: 50)
                     }
                 }
@@ -495,7 +495,7 @@ struct FullScreenImageOverlay: View {
                     prepareShareItem()
                 } label: {
                     Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 18, weight: .medium))
+                        .font(.body.weight(.medium))
                         .foregroundStyle(.white.opacity(0.9))
                         .frame(width: 56, height: 50)
                 }
@@ -508,7 +508,7 @@ struct FullScreenImageOverlay: View {
                     showDeleteConfirmation = true
                 } label: {
                     Image(systemName: "trash")
-                        .font(.system(size: 18, weight: .medium))
+                        .font(.body.weight(.medium))
                         .foregroundStyle(.white.opacity(0.9))
                         .frame(width: 56, height: 50)
                 }
@@ -585,6 +585,10 @@ struct FullScreenImageOverlay: View {
     // MARK: - Metadata Reveal
 
     private func startMetadataReveal() {
+        if UIAccessibility.isReduceMotionEnabled {
+            metadataStage = 4
+            return
+        }
         revealTask?.cancel()
         revealTask = Task { @MainActor in
             try? await Task.sleep(for: MetadataReveal.titleDelay)
@@ -698,7 +702,7 @@ struct FullScreenImageOverlay: View {
                     if newIndex != currentIndex {
                         navigateTo(newIndex)
                     } else {
-                        withAnimation(SnapSpring.standard) {
+                        withAnimation(SnapSpring.resolvedStandard) {
                             swipeOffset = 0
                         }
                     }
@@ -707,7 +711,7 @@ struct FullScreenImageOverlay: View {
                     if dismissOffset > 100 || value.predictedEndTranslation.height > 300 {
                         close()
                     } else {
-                        withAnimation(SnapSpring.standard) {
+                        withAnimation(SnapSpring.resolvedStandard) {
                             dismissOffset = 0
                         }
                     }
@@ -721,7 +725,7 @@ struct FullScreenImageOverlay: View {
                     } else {
                         snapTarget = 0
                     }
-                    withAnimation(SnapSpring.standard) {
+                    withAnimation(SnapSpring.resolvedStandard) {
                         contentOffset = snapTarget
                     }
                     contentOffsetAtGestureStart = snapTarget
@@ -743,7 +747,7 @@ struct FullScreenImageOverlay: View {
             }
             .onEnded { _ in
                 let clamped = min(max(zoomScale, minZoomScale), maxZoomScale)
-                withAnimation(SnapSpring.standard) {
+                withAnimation(SnapSpring.resolvedStandard) {
                     zoomScale = clamped
                     if clamped <= minZoomScale {
                         zoomPanOffset = .zero
@@ -758,7 +762,7 @@ struct FullScreenImageOverlay: View {
 
     private func handleDoubleTap(at location: CGPoint) {
         let viewCenter = CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
-        withAnimation(SnapSpring.standard) {
+        withAnimation(SnapSpring.resolvedStandard) {
             if zoomScale > minZoomScale {
                 zoomScale = minZoomScale
                 zoomLastScale = minZoomScale
@@ -793,7 +797,7 @@ struct FullScreenImageOverlay: View {
     private func navigateTo(_ newIndex: Int) {
         guard newIndex >= 0, newIndex < items.count,
               newIndex != currentIndex, !isNavigating, !isClosing else {
-            withAnimation(SnapSpring.standard) { swipeOffset = 0 }
+            withAnimation(SnapSpring.resolvedStandard) { swipeOffset = 0 }
             return
         }
         isNavigating = true
@@ -803,7 +807,7 @@ struct FullScreenImageOverlay: View {
         player = nil
         impactFeedback.impactOccurred()
 
-        withAnimation(SnapSpring.standard) {
+        withAnimation(SnapSpring.resolvedStandard) {
             swipeOffset = direction * screenSize.width
         } completion: {
             // Swap without animation
@@ -869,20 +873,29 @@ struct FullScreenImageOverlay: View {
         let deletedItem = items[deletedIndex]
         let isLastItem = deletedIndex == items.count - 1
 
-        // Stage 1 — height crushes inward
-        withAnimation(DeleteAnimation.heightCrush) {
-            deleteStage = 1
+        if UIAccessibility.isReduceMotionEnabled {
+            // Simple fade when Reduce Motion is on
+            withAnimation(.easeOut(duration: 0.2)) {
+                deleteStage = 2
+            }
+        } else {
+            // Stage 1 — height crushes inward
+            withAnimation(DeleteAnimation.heightCrush) {
+                deleteStage = 1
+            }
         }
 
         Task { @MainActor in
-            // Stage 2 — width collapses + fade out
-            try? await Task.sleep(for: DeleteAnimation.widthDelay)
-            withAnimation(DeleteAnimation.widthCrush) {
-                deleteStage = 2
+            if !UIAccessibility.isReduceMotionEnabled {
+                // Stage 2 — width collapses + fade out
+                try? await Task.sleep(for: DeleteAnimation.widthDelay)
+                withAnimation(DeleteAnimation.widthCrush) {
+                    deleteStage = 2
+                }
             }
 
             // Stage 3 — crush complete, commit deletion + slide in replacement
-            try? await Task.sleep(for: DeleteAnimation.completeDelay)
+            try? await Task.sleep(for: UIAccessibility.isReduceMotionEnabled ? .milliseconds(250) : DeleteAnimation.completeDelay)
 
             // Notify parent to handle file move + SwiftData deletion
             onDelete?(deletedItem)
@@ -913,7 +926,7 @@ struct FullScreenImageOverlay: View {
             metadataStage = 0
 
             // Animate the slide-in
-            withAnimation(SnapSpring.standard) {
+            withAnimation(SnapSpring.resolvedStandard) {
                 swipeOffset = 0
             }
 
@@ -985,7 +998,7 @@ struct FullScreenImageOverlay: View {
             onDismissing?(currentItemId)
             closeTargetFrame = correctedRect
 
-            withAnimation(SnapSpring.hero) {
+            withAnimation(SnapSpring.resolvedHero) {
                 isExpanded = false
                 dismissOffset = 0
             } completion: {
@@ -1093,24 +1106,24 @@ private struct DetailMetadataSection: View {
                     ProgressView()
                         .tint(.white)
                     Text("Analyzing...")
-                        .font(.system(size: 14))
+                        .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.6))
                 }
                 .stageReveal(stage: stage, threshold: 1)
             } else if item.analysisError != nil {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 13))
+                        .font(.footnote)
                         .foregroundStyle(.red.opacity(0.8))
                     Text("Analysis failed")
-                        .font(.system(size: 14))
+                        .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.6))
                 }
                 .stageReveal(stage: stage, threshold: 1)
             } else if let result = item.analysisResult {
                 if !result.imageSummary.isEmpty {
                     Text(result.imageSummary)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.9))
                         .lineLimit(2)
                         .stageReveal(stage: stage, threshold: 1)
@@ -1118,16 +1131,17 @@ private struct DetailMetadataSection: View {
                 }
 
                 if !result.patterns.isEmpty {
-                    FlowLayout(spacing: 6) {
+                    FlowLayout(spacing: 8) {
                         ForEach(Array(result.patterns.enumerated()), id: \.element.name) { index, pattern in
                             Text(pattern.name)
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.caption)
                                 .foregroundStyle(.white.opacity(0.9))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(.ultraThinMaterial, in: Capsule())
                                 .environment(\.colorScheme, .dark)
                                 .contentShape(Rectangle())
+                                .accessibilityHint("Double tap to search for this pattern")
                                 .onTapGesture {
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     onSearchPattern?(pattern.name)
@@ -1135,7 +1149,9 @@ private struct DetailMetadataSection: View {
                                 .opacity(stage >= 2 ? 1 : 0)
                                 .offset(y: stage >= 2 ? 0 : MetadataReveal.slideDistance)
                                 .animation(
-                                    MetadataReveal.spring.delay(Double(index) * MetadataReveal.tagStagger),
+                                    UIAccessibility.isReduceMotionEnabled
+                                        ? SnapSpring.resolvedMetadata
+                                        : MetadataReveal.spring.delay(Double(index) * MetadataReveal.tagStagger),
                                     value: stage
                                 )
                         }
@@ -1147,8 +1163,8 @@ private struct DetailMetadataSection: View {
                     ExpandableText(
                         text: result.imageContext,
                         lineLimit: 3,
-                        font: .system(size: 14),
-                        platformFont: .systemFont(ofSize: 14),
+                        font: .subheadline,
+                        platformFont: .preferredFont(forTextStyle: .subheadline),
                         lineSpacing: 3,
                         textColor: .white.opacity(0.5),
                         animation: MetadataReveal.spring,
@@ -1170,7 +1186,7 @@ private struct DetailMetadataSection: View {
                     Text(formatDuration(duration))
                 }
             }
-            .font(.system(size: 12, design: .monospaced))
+            .font(.caption.monospaced())
             .foregroundStyle(.white.opacity(0.3))
             .stageReveal(stage: stage, threshold: 4)
             .padding(.top, 14)

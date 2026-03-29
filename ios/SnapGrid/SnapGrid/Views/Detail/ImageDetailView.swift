@@ -44,7 +44,7 @@ struct ImageDetailView: View {
                                         .font(.system(size: 28))
                                         .foregroundStyle(.white.opacity(0.4))
                                     Text("Couldn't download from iCloud")
-                                        .font(.system(size: 14))
+                                        .font(.subheadline)
                                         .foregroundStyle(.white.opacity(0.4))
                                     Button("Retry") {
                                         loadFailed = false
@@ -122,7 +122,7 @@ struct MetadataPanel: View {
             if let patterns = item.analysisResult?.patterns, !patterns.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Patterns")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.4))
                         .textCase(.uppercase)
 
@@ -130,9 +130,9 @@ struct MetadataPanel: View {
                         ForEach(patterns, id: \.name) { pattern in
                             HStack(spacing: 4) {
                                 Text(pattern.name)
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.footnote.weight(.medium))
                                 Text("\(Int(pattern.confidence * 100))%")
-                                    .font(.system(size: 11))
+                                    .font(.caption2)
                                     .foregroundStyle(.white.opacity(0.4))
                             }
                             .foregroundStyle(.white.opacity(0.8))
@@ -149,12 +149,12 @@ struct MetadataPanel: View {
             if let context = item.analysisResult?.imageContext, !context.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("AI Analysis")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.4))
                         .textCase(.uppercase)
 
                     Text(context)
-                        .font(.system(size: 14))
+                        .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.7))
                         .lineSpacing(4)
                 }
@@ -163,7 +163,7 @@ struct MetadataPanel: View {
             // Technical details
             VStack(alignment: .leading, spacing: 8) {
                 Text("Details")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.4))
                     .textCase(.uppercase)
 
@@ -193,10 +193,10 @@ private struct DetailChip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 11))
+                .font(.caption2)
                 .foregroundStyle(.white.opacity(0.3))
             Text(value)
-                .font(.system(size: 13, weight: .medium))
+                .font(.footnote.weight(.medium))
                 .foregroundStyle(.white.opacity(0.7))
         }
     }

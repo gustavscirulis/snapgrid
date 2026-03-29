@@ -17,11 +17,11 @@ struct OnboardingView: View {
                         .foregroundStyle(.white.opacity(0.9))
 
                     Text("SnapGrid")
-                        .font(.system(size: 34, weight: .bold, design: .default))
+                        .font(.largeTitle.bold())
                         .foregroundStyle(.white)
 
                     Text("Sign in to iCloud to sync\nyour SnapGrid library")
-                        .font(.system(size: 17, weight: .regular))
+                        .font(.body)
                         .foregroundStyle(.white.opacity(0.6))
                         .multilineTextAlignment(.center)
                 }
@@ -36,9 +36,9 @@ struct OnboardingView: View {
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "gear")
-                                .font(.system(size: 17, weight: .medium))
+                                .font(.body.weight(.medium))
                             Text("Open Settings")
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.body.weight(.semibold))
                         }
                         .foregroundStyle(.black)
                         .frame(maxWidth: .infinity)
@@ -52,7 +52,7 @@ struct OnboardingView: View {
                         fileSystem.restoreAccess()
                     } label: {
                         Text("Try Again")
-                            .font(.system(size: 17, weight: .medium))
+                            .font(.body.weight(.medium))
                             .foregroundStyle(.white.opacity(0.6))
                             .frame(maxWidth: .infinity)
                             .frame(height: 44)
@@ -61,7 +61,7 @@ struct OnboardingView: View {
 
                     if let error = fileSystem.error {
                         Text(error)
-                            .font(.system(size: 13))
+                            .font(.footnote)
                             .foregroundStyle(.red.opacity(0.8))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 24)
