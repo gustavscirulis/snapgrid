@@ -2,40 +2,27 @@ import SwiftUI
 import SwiftData
 
 struct DeveloperSettingsTab: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var allItems: [MediaItem]
     @State private var showConfirmReset = false
     @State private var trashEmptied = false
+    @State private var trashCount = 0
 
     var body: some View {
         Form {
-            Section("Storage") {
-                LabeledContent("Location") {
-                    HStack {
-                        Text(MediaStorageService.shared.baseURL.path)
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Button("Open") {
-                            NSWorkspace.shared.open(MediaStorageService.shared.baseURL)
-                        }
-                    }
-                }
-
-                LabeledContent("Items") {
-                    Text("\(allItems.count)")
+            Section("Trash") {
+                LabeledContent("Items in trash") {
+                    Text("\(trashCount)")
                         .foregroundStyle(.secondary)
                 }
-            }
 
-            Section("Trash") {
                 HStack {
                     Button("Empty Trash Now") {
                         MediaStorageService.shared.emptyTrash()
+                        trashCount = 0
                         trashEmptied = true
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { trashEmptied = false }
                     }
+                    .disabled(trashCount == 0)
+
                     if trashEmptied {
                         Text("Emptied")
                             .font(.caption)
@@ -63,15 +50,18 @@ struct DeveloperSettingsTab: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { trashCount = countTrashItems() }
+    }
+
+    private func countTrashItems() -> Int {
+        let fm = FileManager.default
+        let dir = MediaStorageService.shared.trashMediaDir
+        return (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil))?.count ?? 0
     }
 
     private func resetAllData() {
-        // Delete the SwiftData store files directly — trying to delete objects
-        // through the context crashes because @Query views race to read properties
-        // on invalidated objects during the SwiftUI render cycle.
         _ = DataCleanupService.deleteCorruptedStore()
 
-        // Clear file storage
         let fm = FileManager.default
         let storage = MediaStorageService.shared
         for dir in [storage.mediaDir, storage.thumbnailDir, storage.trashMediaDir, storage.trashThumbnailDir] {
@@ -82,10 +72,8 @@ struct DeveloperSettingsTab: View {
             }
         }
 
-        // Clear image cache
         ImageCacheService.shared.clearAll()
 
-        // Relaunch — the store will be recreated on next launch
         let url = Bundle.main.bundleURL
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/open")

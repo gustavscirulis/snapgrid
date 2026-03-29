@@ -61,7 +61,9 @@ final class AIAnalysisService: Sendable {
       9. Provide exactly 6 patterns, ordered by confidence
     """
 
-    private let userText = "Analyze this image and provide a detailed breakdown of its content. If it's a UI screenshot, focus on UI patterns and components. If it's a general scene, focus on objects and subjects. Respond with a strict, valid JSON object in the format specified in the system prompt. Do not include markdown formatting, explanations, or code block symbols. Use title case for pattern/object names. Provide up to 6 patterns/objects, ordered by confidence."
+    static let defaultPromptDescription = "Analyze this image and provide a detailed breakdown of its content. If it's a UI screenshot, focus on UI patterns and components. If it's a general scene, focus on objects and subjects. Respond with a strict, valid JSON object in the format specified in the system prompt. Do not include markdown formatting, explanations, or code block symbols. Use title case for pattern/object names. Provide up to 6 patterns/objects, ordered by confidence."
+
+    private var userText: String { Self.defaultPromptDescription }
 
     private let maxRetries = 2
 

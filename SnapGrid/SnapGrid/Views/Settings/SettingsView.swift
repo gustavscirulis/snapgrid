@@ -3,14 +3,19 @@ import SwiftUI
 struct SettingsView: View {
     var body: some View {
         TabView {
-            GeneralSettingsTab()
+            AISettingsTab()
                 .tabItem {
-                    Label("General", systemImage: "gear")
+                    Label("AI", systemImage: "brain")
                 }
 
-            SpacesSettingsTab()
+            PromptsSettingsTab()
                 .tabItem {
-                    Label("Spaces", systemImage: "square.grid.2x2")
+                    Label("Prompts", systemImage: "text.quote")
+                }
+
+            StorageSettingsTab()
+                .tabItem {
+                    Label("Storage", systemImage: "externaldrive.connected.to.line.below")
                 }
 
             #if DEBUG
@@ -20,6 +25,6 @@ struct SettingsView: View {
                 }
             #endif
         }
-        .frame(width: 600, height: 450)
+        .frame(width: 520, height: 460)
     }
 }
