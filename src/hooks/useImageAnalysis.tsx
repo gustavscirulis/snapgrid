@@ -5,8 +5,8 @@ import { captureVideoFrames } from '../lib/videoUtils';
 import { ImageItem, PatternTag } from "./useImageStore";
 
 export interface UseImageAnalysisReturn {
-  analyzeAndUpdateImage: (media: ImageItem, dataUrl: string, savedFilePath?: string, systemPrompt?: string) => Promise<ImageItem>;
-  retryAnalysis: (imageId: string, images: ImageItem[], updateImageFn: (id: string, updater: (img: ImageItem) => ImageItem) => void, systemPrompt?: string) => Promise<void>;
+  analyzeAndUpdateImage: (media: ImageItem, dataUrl: string, savedFilePath?: string, guidance?: string) => Promise<ImageItem>;
+  retryAnalysis: (imageId: string, images: ImageItem[], updateImageFn: (id: string, updater: (img: ImageItem) => ImageItem) => void, guidance?: string) => Promise<void>;
 }
 
 export function useImageAnalysis(): UseImageAnalysisReturn {
@@ -14,7 +14,7 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
     media: ImageItem,
     dataUrl: string,
     savedFilePath?: string,
-    systemPrompt?: string
+    guidance?: string
   ): Promise<ImageItem> => {
     // Early return if no API key available
     const hasKey = await hasApiKey();
@@ -27,7 +27,7 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
       // Handle different media types
       if (media.type === "image") {
         // For images, use the standard analysis
-        analysis = await analyzeImage(dataUrl, systemPrompt);
+        analysis = await analyzeImage(dataUrl, guidance);
       } else if (media.type === "video") {
         // For videos, capture frames and analyze them
         isAnalyzingVideo = true;
@@ -35,7 +35,7 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
           // Capture frames at 33% and 66% of the video duration
           const frames = await captureVideoFrames(dataUrl);
           // Analyze the captured frames
-          analysis = await analyzeVideoFrames(frames, systemPrompt);
+          analysis = await analyzeVideoFrames(frames, guidance);
         } catch (frameError) {
           console.error("Failed to capture or analyze video frames:", frameError);
           throw new Error("Failed to analyze video: " + (frameError instanceof Error ? frameError.message : 'Unknown error'));
@@ -44,17 +44,17 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
         // Unsupported media type
         return media;
       }
-      
+
       // Extract the imageContext from the first pattern (should be the same for all patterns)
       const imageContext = analysis[0]?.imageContext || '';
-      
+
       const patternTags = analysis
         .map(pattern => {
           const name = pattern.pattern || pattern.name;
           if (!name) return null;
-          
-          return { 
-            name, 
+
+          return {
+            name,
             confidence: pattern.confidence,
             imageContext: pattern.imageContext,
             imageSummary: pattern.imageSummary
@@ -62,9 +62,9 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
         })
         .filter((tag): tag is PatternTag => tag !== null);
 
-      const updatedMedia = { 
-        ...media, 
-        patterns: patternTags, 
+      const updatedMedia = {
+        ...media,
+        patterns: patternTags,
         isAnalyzing: false,
         imageContext: imageContext // Set imageContext at the image level
       };
@@ -108,7 +108,7 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
           console.error("Failed to update error state metadata:", metadataError);
         }
       }
-      
+
       return updatedMedia;
     }
   }, []);
@@ -117,7 +117,7 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
     imageId: string,
     images: ImageItem[],
     updateImageFn: (id: string, updater: (img: ImageItem) => ImageItem) => void,
-    systemPrompt?: string
+    guidance?: string
   ) => {
     // Find the media
     const mediaToAnalyze = images.find(img => img.id === imageId);
@@ -139,7 +139,7 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
     try {
       // Get the data URL for analysis
       let dataUrl;
-      
+
       if (mediaToAnalyze.actualFilePath) {
         if (mediaToAnalyze.type === "image") {
           // If we have a file path, convert image to base64
@@ -154,9 +154,9 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
       } else {
         throw new Error("No media data available for analysis");
       }
-      
+
       // Perform analysis
-      const analyzedMedia = await analyzeAndUpdateImage(mediaToAnalyze, dataUrl, mediaToAnalyze.actualFilePath, systemPrompt);
+      const analyzedMedia = await analyzeAndUpdateImage(mediaToAnalyze, dataUrl, mediaToAnalyze.actualFilePath, guidance);
 
       // Merge analysis results into the current image state (preserves concurrent updates like spaceId)
       updateImageFn(imageId, (img) => ({
@@ -171,7 +171,7 @@ export function useImageAnalysis(): UseImageAnalysisReturn {
 
       // Update error state in UI (merge into current state to preserve concurrent updates)
       updateImageFn(imageId, (img) => ({ ...img, isAnalyzing: false, error: 'Analysis failed' }));
-      
+
       // Persist error state to disk
       if (window.electron && mediaToAnalyze.actualFilePath) {
         try {

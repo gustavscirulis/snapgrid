@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useImageStore, ImageItem } from "@/hooks/useImageStore";
-import { useSpaces, resolvePromptForSpace } from "@/hooks/useSpaces";
+import { useSpaces, resolveGuidanceForSpace } from "@/hooks/useSpaces";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import UploadZone from "@/components/UploadZone";
 import ImageGrid, { ImageGridHandle } from "@/components/ImageGrid";
@@ -39,9 +39,9 @@ const Index = () => {
     renameSpace,
     deleteSpace,
     reorderSpaces,
-    updateSpacePrompt,
+    updateSpaceGuidance,
     allSpacePromptConfig,
-    updateAllSpacePrompt,
+    updateAllSpaceGuidance,
   } = useSpaces();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,17 +84,17 @@ const Index = () => {
   const allSpacePromptConfigRef = useRef(allSpacePromptConfig);
   allSpacePromptConfigRef.current = allSpacePromptConfig;
 
-  // Wrap addImage to auto-assign to active space with prompt resolution
+  // Wrap addImage to auto-assign to active space with guidance resolution
   const addImageToActiveSpace = useCallback(async (file: File) => {
     const spaceId = activeSpaceIdRef.current ?? undefined;
-    const prompt = resolvePromptForSpace(activeSpaceIdRef.current, spacesRef.current, allSpacePromptConfigRef.current);
-    await addImage(file, spaceId, prompt);
+    const guidance = resolveGuidanceForSpace(activeSpaceIdRef.current, spacesRef.current, allSpacePromptConfigRef.current);
+    await addImage(file, spaceId, guidance);
   }, [addImage]);
 
   const importToActiveSpace = useCallback(async (filePath: string) => {
     const spaceId = activeSpaceIdRef.current ?? undefined;
-    const prompt = resolvePromptForSpace(activeSpaceIdRef.current, spacesRef.current, allSpacePromptConfigRef.current);
-    await importFromFilePath(filePath, spaceId, prompt);
+    const guidance = resolveGuidanceForSpace(activeSpaceIdRef.current, spacesRef.current, allSpacePromptConfigRef.current);
+    await importFromFilePath(filePath, spaceId, guidance);
   }, [importFromFilePath]);
 
   // Load saved preferences on mount
@@ -313,24 +313,24 @@ const Index = () => {
   }, [removeImages]);
 
   const handleAssignImageToSpace = useCallback(async (imageId: string, spaceId: string | null) => {
-    const prompt = resolvePromptForSpace(spaceId, spaces, allSpacePromptConfig);
-    await assignImageToSpace(imageId, spaceId, prompt);
+    const guidance = resolveGuidanceForSpace(spaceId, spaces, allSpacePromptConfig);
+    await assignImageToSpace(imageId, spaceId, guidance);
   }, [assignImageToSpace, spaces, allSpacePromptConfig]);
 
   const handleAssignImagesToSpace = useCallback(async (imageIds: string[], spaceId: string | null) => {
-    const prompt = resolvePromptForSpace(spaceId, spaces, allSpacePromptConfig);
-    await assignImagesToSpace(imageIds, spaceId, prompt);
+    const guidance = resolveGuidanceForSpace(spaceId, spaces, allSpacePromptConfig);
+    await assignImagesToSpace(imageIds, spaceId, guidance);
   }, [assignImagesToSpace, spaces, allSpacePromptConfig]);
 
   const handleRemoveFromSpace = useCallback(async (id: string) => {
-    const prompt = resolvePromptForSpace(null, spaces, allSpacePromptConfig);
-    await assignImageToSpace(id, null, prompt);
+    const guidance = resolveGuidanceForSpace(null, spaces, allSpacePromptConfig);
+    await assignImageToSpace(id, null, guidance);
   }, [assignImageToSpace, spaces, allSpacePromptConfig]);
 
   const handleRetryAnalysis = useCallback(async (imageId: string) => {
     const image = images.find(img => img.id === imageId);
-    const prompt = resolvePromptForSpace(image?.spaceId ?? null, spaces, allSpacePromptConfig);
-    await retryAnalysis(imageId, prompt);
+    const guidance = resolveGuidanceForSpace(image?.spaceId ?? null, spaces, allSpacePromptConfig);
+    await retryAnalysis(imageId, guidance);
   }, [images, spaces, allSpacePromptConfig, retryAnalysis]);
 
   // Determine if we're in empty state - consider both actual emptiness and simulated empty state
@@ -478,8 +478,8 @@ const Index = () => {
           onCreateSpace={createSpace}
           onRenameSpace={renameSpace}
           onDeleteSpace={deleteSpace}
-          onUpdateSpacePrompt={updateSpacePrompt}
-          onUpdateAllSpacePrompt={updateAllSpacePrompt}
+          onUpdateSpaceGuidance={updateSpaceGuidance}
+          onUpdateAllSpaceGuidance={updateAllSpaceGuidance}
           onReorderSpaces={reorderSpaces}
           onShuffleImages={shuffleImages}
         />

@@ -34,7 +34,7 @@ enum AIProvider: String, CaseIterable, Codable, Sendable {
 final class AIAnalysisService: Sendable {
     static let shared = AIAnalysisService()
 
-    private let systemPrompt = """
+    private let masterSystemPrompt = """
     You are an expert AI in analyzing images. Your task is to analyze the content of images and provide appropriate descriptions.
 
     Provide your response in the following JSON format:
@@ -59,15 +59,18 @@ final class AIAnalysisService: Sendable {
       7. List patterns in order of confidence/importance
       8. Ensure that the patterns are unique and not duplicates of each other and imageSummary
       9. Provide exactly 6 patterns, ordered by confidence
+      10. Respond with a strict, valid JSON object — do not include markdown formatting, explanations, or code block symbols
+      11. Use title case for pattern/object names
+      12. Provide up to 6 patterns, ordered by confidence
     """
 
-    static let defaultPromptDescription = "Analyze this image and provide a detailed breakdown of its content. If it's a UI screenshot, focus on UI patterns and components. If it's a general scene, focus on objects and subjects. Respond with a strict, valid JSON object in the format specified in the system prompt. Do not include markdown formatting, explanations, or code block symbols. Use title case for pattern/object names. Provide up to 6 patterns/objects, ordered by confidence."
+    static let defaultGuidance = "If it's a UI screenshot, focus on UI patterns and components. If it's a general scene, focus on objects and subjects."
 
-    private var userText: String { Self.defaultPromptDescription }
+    private let userText = "Analyze this image."
 
     private let maxRetries = 2
 
-    func analyze(image: NSImage, provider: AIProvider, model: String, spacePrompt: String? = nil) async throws -> AnalysisResult {
+    func analyze(image: NSImage, provider: AIProvider, model: String, guidance: String? = nil, spaceContext: String? = nil) async throws -> AnalysisResult {
         guard let apiKey = try KeychainService.get(service: provider.keychainService) else {
             throw AnalysisError.noAPIKey
         }
@@ -76,7 +79,7 @@ final class AIAnalysisService: Sendable {
             throw AnalysisError.imageConversionFailed
         }
 
-        let prompt = buildPrompt(spacePrompt: spacePrompt)
+        let prompt = buildPrompt(guidance: guidance, spaceContext: spaceContext)
 
         var lastError: Error?
         for attempt in 0...maxRetries {
@@ -114,14 +117,14 @@ final class AIAnalysisService: Sendable {
         return false
     }
 
-    func analyzeVideo(frames: [NSImage], provider: AIProvider, model: String, spacePrompt: String? = nil) async throws -> AnalysisResult {
+    func analyzeVideo(frames: [NSImage], provider: AIProvider, model: String, guidance: String? = nil, spaceContext: String? = nil) async throws -> AnalysisResult {
         // Analyze each frame and merge results
         var allPatterns: [String: [Double]] = [:]
         var contexts: [String] = []
         var summaries: [String] = []
 
         for frame in frames {
-            let result = try await analyze(image: frame, provider: provider, model: model, spacePrompt: spacePrompt)
+            let result = try await analyze(image: frame, provider: provider, model: model, guidance: guidance, spaceContext: spaceContext)
             contexts.append(result.imageContext)
             summaries.append(result.imageSummary)
 
@@ -284,11 +287,13 @@ final class AIAnalysisService: Sendable {
 
     // MARK: - Helpers
 
-    private func buildPrompt(spacePrompt: String?) -> String {
-        guard let spacePrompt, !spacePrompt.isEmpty else {
-            return systemPrompt
+    private func buildPrompt(guidance: String? = nil, spaceContext: String? = nil) -> String {
+        let effectiveGuidance = (guidance?.isEmpty == false ? guidance : nil) ?? Self.defaultGuidance
+        var result = masterSystemPrompt + "\n\nGuidance:\n" + effectiveGuidance
+        if let spaceContext, !spaceContext.isEmpty {
+            result += "\n" + spaceContext
         }
-        return systemPrompt + "\n\nAdditional instructions:\n" + spacePrompt
+        return result
     }
 
     /// Max dimension recommended by Anthropic — larger images are resized server-side anyway.

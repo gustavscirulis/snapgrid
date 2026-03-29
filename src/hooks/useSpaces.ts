@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { DEFAULT_SYSTEM_PROMPT } from "@/services/aiAnalysisService";
+import { DEFAULT_GUIDANCE } from "@/services/aiAnalysisService";
 
 export interface Space {
   id: string;
@@ -23,47 +23,43 @@ export interface UseSpacesReturn {
   createSpace: (name: string) => Promise<Space>;
   renameSpace: (id: string, name: string) => Promise<void>;
   deleteSpace: (id: string) => Promise<void>;
-  updateSpacePrompt: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  updateSpaceGuidance: (id: string, customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
   allSpacePromptConfig: AllSpacePromptConfig;
   reorderSpaces: (fromIndex: number, toIndex: number) => Promise<void>;
-  updateAllSpacePrompt: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
+  updateAllSpaceGuidance: (customPrompt: string | undefined, useCustomPrompt: boolean) => Promise<void>;
   isLoading: boolean;
 }
 
-export function resolvePromptForSpace(
+export function resolveGuidanceForSpace(
   spaceId: string | null | undefined,
   spaces: Space[],
   allSpacePromptConfig: AllSpacePromptConfig
 ): string | undefined {
-  let spaceName: string | undefined;
-  let customInstructions: string | undefined;
-
+  // Global guidance override (applies when viewing "All")
   if (spaceId === null || spaceId === undefined) {
     if (allSpacePromptConfig.useCustomPrompt && allSpacePromptConfig.customPrompt) {
-      customInstructions = allSpacePromptConfig.customPrompt;
+      return allSpacePromptConfig.customPrompt;
     }
+    return undefined;
+  }
+
+  // Space-specific guidance
+  const space = spaces.find(s => s.id === spaceId);
+  if (!space) return undefined;
+
+  const parts: string[] = [];
+
+  // Space name context
+  parts.push(`This image belongs to a collection called "${space.name}". Use this as context to inform your analysis.`);
+
+  // Custom guidance replaces default; if no custom guidance, include default
+  if (space.useCustomPrompt && space.customPrompt) {
+    parts.push(space.customPrompt);
   } else {
-    const space = spaces.find(s => s.id === spaceId);
-    if (space) {
-      spaceName = space.name;
-      if (space.useCustomPrompt && space.customPrompt) {
-        customInstructions = space.customPrompt;
-      }
-    }
+    parts.push(DEFAULT_GUIDANCE);
   }
 
-  const additions: string[] = [];
-  if (spaceName) {
-    additions.push(`This image belongs to a collection called "${spaceName}". Use this as context to inform your analysis — pay attention to aspects relevant to this theme.`);
-  }
-  if (customInstructions) {
-    additions.push(customInstructions);
-  }
-
-  if (additions.length > 0) {
-    return `${DEFAULT_SYSTEM_PROMPT}\n\nAdditional instructions:\n${additions.join('\n')}`;
-  }
-  return undefined;
+  return parts.join(' ');
 }
 
 function generateId(): string {
@@ -162,7 +158,7 @@ export function useSpaces(): UseSpacesReturn {
     await persistSpaces(updated);
   }, [spaces, persistSpaces]);
 
-  const updateSpacePrompt = useCallback(async (
+  const updateSpaceGuidance = useCallback(async (
     id: string,
     customPrompt: string | undefined,
     useCustomPrompt: boolean
@@ -174,7 +170,7 @@ export function useSpaces(): UseSpacesReturn {
     await persistSpaces(updated);
   }, [spaces, persistSpaces]);
 
-  const updateAllSpacePrompt = useCallback(async (
+  const updateAllSpaceGuidance = useCallback(async (
     customPrompt: string | undefined,
     useCustomPrompt: boolean
   ) => {
@@ -194,9 +190,9 @@ export function useSpaces(): UseSpacesReturn {
     renameSpace,
     deleteSpace,
     reorderSpaces,
-    updateSpacePrompt,
+    updateSpaceGuidance,
     allSpacePromptConfig,
-    updateAllSpacePrompt,
+    updateAllSpaceGuidance,
     isLoading,
   };
 }

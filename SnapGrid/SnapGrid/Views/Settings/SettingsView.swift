@@ -8,9 +8,9 @@ struct SettingsView: View {
                     Label("AI", systemImage: "brain")
                 }
 
-            PromptsSettingsTab()
+            GuidanceSettingsTab()
                 .tabItem {
-                    Label("Prompts", systemImage: "text.quote")
+                    Label("Guidance", systemImage: "text.quote")
                 }
 
             StorageSettingsTab()

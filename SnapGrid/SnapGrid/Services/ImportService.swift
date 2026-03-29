@@ -161,25 +161,31 @@ final class ImportService {
             let result: AnalysisResult
             let storage = self.storage
 
-            // Build space prompt (applies to both images and videos)
-            var spacePrompt: String?
-            if let space = item.space, space.useCustomPrompt, let prompt = space.customPrompt {
-                spacePrompt = "This item belongs to a collection called \"\(space.name)\". \(prompt)"
-            } else if UserDefaults.standard.bool(forKey: "useAllSpacePrompt") {
-                let allPrompt = UserDefaults.standard.string(forKey: "allSpacePrompt") ?? ""
-                if !allPrompt.isEmpty {
-                    spacePrompt = allPrompt
+            // Resolve guidance and space context separately
+            var guidance: String?
+            var spaceContext: String?
+
+            if let space = item.space {
+                spaceContext = "This image belongs to a collection called \"\(space.name)\". Use this as context to inform your analysis."
+                if space.useCustomPrompt, let custom = space.customPrompt, !custom.isEmpty {
+                    guidance = custom
+                }
+            }
+            if guidance == nil, UserDefaults.standard.bool(forKey: "useAllSpacePrompt") {
+                let allGuidance = UserDefaults.standard.string(forKey: "allSpacePrompt") ?? ""
+                if !allGuidance.isEmpty {
+                    guidance = allGuidance
                 }
             }
 
             if item.isVideo {
                 let frames = try await VideoFrameExtractor.extractAnalysisFrames(from: storage.mediaURL(filename: item.filename))
-                result = try await analysisService.analyzeVideo(frames: frames, provider: provider, model: model, spacePrompt: spacePrompt)
+                result = try await analysisService.analyzeVideo(frames: frames, provider: provider, model: model, guidance: guidance, spaceContext: spaceContext)
             } else {
                 guard let image = NSImage(contentsOf: storage.mediaURL(filename: item.filename)) else {
                     throw ImportError.cannotReadDimensions
                 }
-                result = try await analysisService.analyze(image: image, provider: provider, model: model, spacePrompt: spacePrompt)
+                result = try await analysisService.analyze(image: image, provider: provider, model: model, guidance: guidance, spaceContext: spaceContext)
             }
 
             print("[Analysis] Success for \(item.id): \(result.patterns.count) patterns")
