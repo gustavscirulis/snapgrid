@@ -780,21 +780,18 @@ private struct DetailMetadataSection: View {
                 }
 
                 if hasDescription(result) {
-                    Text(result.imageContext)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.4))
-                        .lineSpacing(2)
-                        .lineLimit(isDescriptionExpanded ? nil : 2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .animation(nil, value: isDescriptionExpanded)
-                        .contentShape(Rectangle())
-                        .opacity(stage >= 3 ? 1 : 0)
-                        .animation(MetadataReveal.spring, value: stage)
-                        .onTapGesture {
-                            withAnimation(MetadataReveal.spring) {
-                                isDescriptionExpanded.toggle()
-                            }
-                        }
+                    ExpandableText(
+                        text: result.imageContext,
+                        lineLimit: 3,
+                        font: .system(size: 12),
+                        platformFont: .systemFont(ofSize: 12),
+                        lineSpacing: 2,
+                        textColor: .white.opacity(0.4),
+                        animation: MetadataReveal.spring,
+                        isExpanded: $isDescriptionExpanded
+                    )
+                    .opacity(stage >= 3 ? 1 : 0)
+                    .animation(MetadataReveal.spring, value: stage)
                 }
             }
 
@@ -826,6 +823,109 @@ private struct DetailMetadataSection: View {
         guard seconds.isFinite else { return "0:00" }
         let total = Int(seconds)
         return "\(total / 60):\(String(format: "%02d", total % 60))"
+    }
+}
+
+// MARK: - Expandable Text
+
+/// Truncates to N lines with inline "…" at the exact word boundary.
+/// Expands/collapses with a smooth height-clip animation (no text reflow).
+private struct ExpandableText: View {
+    let text: String
+    let lineLimit: Int
+    let font: Font
+    let platformFont: NSFont
+    let lineSpacing: CGFloat
+    let textColor: Color
+    let animation: Animation
+    @Binding var isExpanded: Bool
+
+    @State private var availableWidth: CGFloat = 0
+    @State private var truncatedString: String?
+    @State private var fullHeight: CGFloat = 0
+    @State private var collapsedHeight: CGFloat = 0
+
+    private var isTruncated: Bool { truncatedString != nil }
+
+    var body: some View {
+        Text(isExpanded ? text : (truncatedString ?? text))
+            .font(font)
+            .foregroundStyle(textColor)
+            .lineSpacing(lineSpacing)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: isExpanded ? max(fullHeight, collapsedHeight) : collapsedHeight,
+                alignment: .topLeading
+            )
+            .clipped()
+            .background(GeometryReader { proxy in
+                Color.clear
+                    .onAppear { updateWidth(proxy.size.width) }
+                    .onChange(of: proxy.size.width) { _, new in updateWidth(new) }
+            })
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard isTruncated else { return }
+                withAnimation(animation) { isExpanded.toggle() }
+            }
+    }
+
+    private func updateWidth(_ width: CGFloat) {
+        guard width > 0, width != availableWidth else { return }
+        availableWidth = width
+        recalculate()
+    }
+
+    private func recalculate() {
+        let ps = NSMutableParagraphStyle()
+        ps.lineSpacing = lineSpacing
+        ps.lineBreakMode = .byWordWrapping
+        let attrs: [NSAttributedString.Key: Any] = [.font: platformFont, .paragraphStyle: ps]
+        let size = CGSize(width: availableWidth, height: .greatestFiniteMagnitude)
+
+        fullHeight = ceil(NSAttributedString(string: text, attributes: attrs)
+            .boundingRect(with: size, options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil).height)
+        let fontLineHeight = ceil(platformFont.ascender - platformFont.descender + platformFont.leading)
+        collapsedHeight = ceil(fontLineHeight * CGFloat(lineLimit) + lineSpacing * CGFloat(lineLimit - 1))
+
+        guard fullHeight > collapsedHeight + 2 else { truncatedString = nil; return }
+
+        let ellipsis = "\u{2026}"
+        let words = wordSegments(text)
+        var lo = 0, hi = words.count
+        while lo < hi {
+            let mid = (lo + hi + 1) / 2
+            let candidate = words[0..<mid].joined().trimmingTrailingWhitespace + ellipsis
+            let h = ceil(NSAttributedString(string: candidate, attributes: attrs)
+                .boundingRect(with: size, options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil).height)
+            if h <= collapsedHeight + 2 { lo = mid } else { hi = mid - 1 }
+        }
+        truncatedString = lo > 0 ? words[0..<lo].joined().trimmingTrailingWhitespace + ellipsis : ellipsis
+    }
+
+    private func wordSegments(_ text: String) -> [String] {
+        var segments: [String] = []
+        var current = ""
+        var inWord = false
+        for ch in text {
+            if ch.isWhitespace || ch.isNewline {
+                current.append(ch)
+                inWord = false
+            } else {
+                if !inWord && !current.isEmpty { segments.append(current); current = "" }
+                current.append(ch)
+                inWord = true
+            }
+        }
+        if !current.isEmpty { segments.append(current) }
+        return segments
+    }
+}
+
+private extension String {
+    var trimmingTrailingWhitespace: String {
+        replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
     }
 }
 
