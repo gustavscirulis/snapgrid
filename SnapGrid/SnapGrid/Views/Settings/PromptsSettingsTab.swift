@@ -193,7 +193,7 @@ private struct PromptEditorSheet: View {
             Divider()
 
             TextEditor(text: $draft)
-                .font(.system(size: 11, design: .monospaced))
+                .font(.caption.monospaced())
                 .scrollContentBackground(.hidden)
                 .padding(12)
 

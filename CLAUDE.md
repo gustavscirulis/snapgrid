@@ -50,3 +50,26 @@ Open `ios/SnapGrid/SnapGrid.xcodeproj` in Xcode 15.4+. Bundle ID: `com.snapgrid.
 Native SwiftUI + SwiftData rewrite. Uses XcodeGen (`SnapGrid/project.yml`).
 
 Open `SnapGrid/SnapGrid.xcodeproj` in Xcode. Bundle ID: `com.snapgrid.app`.
+
+## Apple HIG Compliance (Mac & iOS)
+
+All native SwiftUI code must follow Apple's Human Interface Guidelines. When writing or modifying views:
+
+**Accessibility (non-negotiable):**
+- Every interactive element needs `.accessibilityLabel()` — buttons, grid items, tabs, badges
+- Icon-only buttons always need a label (the icon is not enough for VoiceOver)
+- Status elements (toasts, badges, progress) need `.accessibilityAddTraits(.isStatusElement)`
+- Check `@Environment(\.accessibilityReduceMotion)` before applying spring animations, staggered reveals, or continuous animations (shimmer). Use `.easeInOut(duration: 0.15)` or `.identity` as fallback
+- Use semantic text styles (`.headline`, `.body`, `.caption`) instead of `.system(size: N)` so text scales with Dynamic Type
+
+**Colors & system integration:**
+- Use `Color.accentColor` for selection indicators and interactive highlights — never hardcode `Color.blue`
+- When defining custom adaptive colors, add Increase Contrast variants by checking `NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast`
+- Custom background colors are acceptable for media apps, but interactive/text colors should respect system accessibility settings
+
+**macOS-specific patterns:**
+- Settings must use `Settings {}` scene with `TabView` and `.formStyle(.grouped)`
+- Provide comprehensive menu bar commands with standard keyboard shortcuts
+- Support `Cmd+Click` toggle, `Shift+Click` range, and rubber band selection
+- Windows should have a title (even if title bar is hidden) for Mission Control/Window menu
+- Persist view state (`@AppStorage`/`@SceneStorage`) so the app restores on relaunch

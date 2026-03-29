@@ -20,6 +20,7 @@ struct GridItemView: View {
 
     @Environment(VideoPreviewManager.self) private var videoPreview
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
     @State private var thumbnail: NSImage?
     @State private var globalFrame: CGRect = .zero
@@ -45,6 +46,18 @@ struct GridItemView: View {
 
     private var height: CGFloat {
         width / item.aspectRatio
+    }
+
+    private var accessibilityDescription: String {
+        var parts: [String] = []
+        if item.isVideo { parts.append("Video") } else { parts.append("Image") }
+        if let summary = item.analysisResult?.imageSummary, !summary.isEmpty {
+            parts.append(summary)
+        }
+        parts.append("\(item.width) by \(item.height)")
+        if item.isAnalyzing { parts.append("Analyzing") }
+        if item.analysisError != nil { parts.append("Analysis failed") }
+        return parts.joined(separator: ", ")
     }
 
     /// Continuous opacity driven by fullscreen swipe progress.
@@ -127,7 +140,7 @@ struct GridItemView: View {
                         HStack {
                             Spacer()
                             Image(systemName: "play.fill")
-                                .font(.system(size: 10))
+                                .font(.caption2)
                                 .foregroundStyle(.white)
                                 .padding(6)
                                 .background(.black.opacity(0.5))
@@ -136,6 +149,7 @@ struct GridItemView: View {
                         }
                     }
                     .frame(width: width, height: height)
+                    .accessibilityHidden(true)
                 }
 
                 // Bottom overlay: analyzing shimmer or hover-only pattern tags
@@ -175,18 +189,19 @@ struct GridItemView: View {
                                 endPoint: .init(x: 0.5, y: 0.55)
                             )
                             .opacity(showHoverGradient ? 1 : 0)
-                            .offset(y: effectiveHover ? 0 : 20)
-                            .animation(SnapSpring.standard, value: effectiveHover)
+                            .offset(y: effectiveHover ? 0 : (reduceMotion ? 0 : 20))
+                            .animation(SnapSpring.standard(reduced: reduceMotion), value: effectiveHover)
 
                             HStack {
                                 FlowLayout(spacing: 5) {
                                     ForEach(Array(patterns.prefix(5).enumerated()), id: \.element.name) { index, pattern in
                                         PatternPill(name: pattern.name)
                                             .opacity(effectiveHover ? 1 : 0)
-                                            .offset(y: effectiveHover ? 0 : 8)
+                                            .offset(y: effectiveHover ? 0 : (reduceMotion ? 0 : 8))
                                             .animation(
-                                                SnapSpring.fast
-                                                    .delay(Double(index) * 0.025),
+                                                reduceMotion
+                                                    ? .easeInOut(duration: 0.1)
+                                                    : SnapSpring.fast.delay(Double(index) * 0.025),
                                                 value: effectiveHover
                                             )
                                     }
@@ -198,7 +213,7 @@ struct GridItemView: View {
                     }
                 }
                 .frame(width: width, height: height, alignment: .bottomLeading)
-                .animation(SnapSpring.standard, value: item.isAnalyzing)
+                .animation(SnapSpring.standard(reduced: reduceMotion), value: item.isAnalyzing)
             }
             .allowsHitTesting(false)
         }
@@ -217,6 +232,7 @@ struct GridItemView: View {
                 .buttonStyle(.plain)
                 .padding(8)
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                .accessibilityLabel("Delete")
             }
         }
         .overlay(alignment: .topLeading) {
@@ -232,6 +248,7 @@ struct GridItemView: View {
                 .buttonStyle(.plain)
                 .padding(8)
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                .accessibilityLabel("Remove from space")
             }
         }
         .overlay(alignment: .bottomLeading) {
@@ -239,9 +256,9 @@ struct GridItemView: View {
                 Button(action: onRetryAnalysis) {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 10))
+                            .font(.caption2)
                         Text("Retry")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.caption.weight(.medium))
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 8)
@@ -252,20 +269,24 @@ struct GridItemView: View {
                 .buttonStyle(.plain)
                 .padding(8)
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                .accessibilityLabel("Retry analysis")
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+                .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
         )
-        .shadow(  // ImageCard.tsx:96 — shadow-sm / hover:shadow-md
+        .shadow(
             color: .black.opacity(effectiveHover ? 0.1 : 0.05),
             radius: effectiveHover ? 6 : 2,
             x: 0,
             y: effectiveHover ? 4 : 1
         )
-        .animation(SnapSpring.fast, value: effectiveHover)
+        .animation(SnapSpring.fast(reduced: reduceMotion), value: effectiveHover)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityDescription)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .onHover { hovering in
             isHovered = hovering
             hoverTask?.cancel()
@@ -325,7 +346,7 @@ struct GridItemView: View {
                 }
                 if isBulk {
                     Text("\(selectedCount)")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.caption.bold())
                         .foregroundStyle(.white)
                         .frame(width: 20, height: 20)
                         .background(Color.snapAccent)
@@ -432,32 +453,39 @@ private enum ShimmerConfig {
 
 struct ShimmerText: View {
     let text: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(_ text: String) {
         self.text = text
     }
 
     var body: some View {
-        TimelineView(.animation) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
-                .truncatingRemainder(dividingBy: ShimmerConfig.cycle)
-                / ShimmerConfig.cycle
-            let phase = t * (ShimmerConfig.rangeEnd - ShimmerConfig.rangeStart)
-                + ShimmerConfig.rangeStart
-
+        if reduceMotion {
             Text(text)
-                .font(.system(size: 11))
-                .foregroundStyle(
-                    .linearGradient(
-                        colors: [
-                            .white.opacity(ShimmerConfig.baseBrightness),
-                            .white.opacity(ShimmerConfig.peakBrightness),
-                            .white.opacity(ShimmerConfig.baseBrightness),
-                        ],
-                        startPoint: .init(x: phase - ShimmerConfig.bandHalf, y: 0.5),
-                        endPoint: .init(x: phase + ShimmerConfig.bandHalf, y: 0.5)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(ShimmerConfig.peakBrightness))
+        } else {
+            TimelineView(.animation) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: ShimmerConfig.cycle)
+                    / ShimmerConfig.cycle
+                let phase = t * (ShimmerConfig.rangeEnd - ShimmerConfig.rangeStart)
+                    + ShimmerConfig.rangeStart
+
+                Text(text)
+                    .font(.caption)
+                    .foregroundStyle(
+                        .linearGradient(
+                            colors: [
+                                .white.opacity(ShimmerConfig.baseBrightness),
+                                .white.opacity(ShimmerConfig.peakBrightness),
+                                .white.opacity(ShimmerConfig.baseBrightness),
+                            ],
+                            startPoint: .init(x: phase - ShimmerConfig.bandHalf, y: 0.5),
+                            endPoint: .init(x: phase + ShimmerConfig.bandHalf, y: 0.5)
+                        )
                     )
-                )
+            }
         }
     }
 }

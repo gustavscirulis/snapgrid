@@ -44,16 +44,16 @@ struct EmptyStateView: View {
                 // Onboarding card centered on top
                 VStack(spacing: 24) {
                     Image(systemName: mode == .appLevel ? "photo.on.rectangle.angled" : "rectangle.stack.badge.plus")
-                        .font(.system(size: 56, weight: .light))
+                        .font(.system(size: 56, weight: .light))  // Decorative icon — fixed size intentional
                         .foregroundStyle(Color.snapMutedForeground.opacity(0.5))
 
                     VStack(spacing: 8) {
                         Text(mode == .appLevel ? "Drop screenshots here" : "No items in this space")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.title3.weight(.semibold))
                             .foregroundStyle(Color.snapForeground)
 
                         Text(mode == .appLevel ? "Or use File \u{2192} Import (\u{2318}O) to get started" : "Drop images here or move items from All")
-                            .font(.system(size: 14))
+                            .font(.body)
                             .foregroundStyle(Color.snapMutedForeground)
                     }
 
@@ -76,7 +76,7 @@ struct EmptyStateView: View {
                                 .frame(width: 160)
 
                             Text("Add an AI API key in Settings (\u{2318},) to enable automatic image analysis")
-                                .font(.system(size: 13))
+                                .font(.callout)
                                 .foregroundStyle(Color.snapMutedForeground.opacity(0.7))
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: 300)
@@ -92,6 +92,7 @@ struct EmptyStateView: View {
                                 .stroke(isDragTargeted ? Color.snapAccent : Color.snapBorder, lineWidth: isDragTargeted ? 2 : 1)
                         )
                 )
+                .accessibilityElement(children: .combine)
             }
         }
     }

@@ -4,15 +4,15 @@ import SwiftUI
 /// Uses `.ultraThinMaterial` so it composites correctly above NSView-backed video content.
 struct PatternPill: View {
     let name: String
-    var size: CGFloat = 11
+    var large: Bool = false
 
     var body: some View {
         Text(name)
-            .font(.system(size: size))
+            .font(large ? .subheadline : .callout)
             .foregroundStyle(.white.opacity(0.9))
-            .padding(.horizontal, size <= 11 ? 8 : 10)
-            .padding(.vertical, size <= 11 ? 3 : 5)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: size <= 11 ? 10 : 12))
+            .padding(.horizontal, large ? 10 : 8)
+            .padding(.vertical, large ? 5 : 3)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: large ? 12 : 10))
             .environment(\.colorScheme, .dark)
     }
 }

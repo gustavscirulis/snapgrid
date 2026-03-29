@@ -19,6 +19,7 @@ struct ContentView: View {
     /// Pre-computed search scores keyed by item ID. Empty = no active search.
     @State private var searchScores: [String: Double] = [:]
     @State private var isSearchActive = false
+    @State private var isSearchFieldPresented = false
 
     private func itemsForSpace(_ spaceId: String?) -> [MediaItem] {
         var items = allItems
@@ -158,7 +159,7 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 540, minHeight: 400)
-        .searchable(text: $appState.searchText, placement: .toolbar, prompt: "Search patterns, descriptions...")
+        .searchable(text: $appState.searchText, isPresented: $isSearchFieldPresented, placement: .toolbar, prompt: "Search patterns, descriptions...")
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Spacer()
@@ -182,14 +183,7 @@ struct ContentView: View {
             },
             onCreateNewSpace: { createSpace() },
             onFocusSearch: {
-                // Search from the theme frame (contentView's superview) to reach
-                // toolbar views — .searchable places NSSearchField in the toolbar,
-                // which is outside contentView's hierarchy
-                if let window = NSApp.keyWindow,
-                   let rootView = window.contentView?.superview,
-                   let searchField = findSearchField(in: rootView) {
-                    window.makeFirstResponder(searchField)
-                }
+                isSearchFieldPresented = true
             },
             onSelectAll: { appState.selectAll(activeFilteredItems.map(\.id)) },
             onSwitchToSpace: { digit in
@@ -727,15 +721,6 @@ struct ContentView: View {
         Task {
             await importService.analyzeItem(item, context: modelContext)
         }
-    }
-
-    private func findSearchField(in view: NSView?) -> NSSearchField? {
-        guard let view else { return nil }
-        if let searchField = view as? NSSearchField { return searchField }
-        for subview in view.subviews {
-            if let found = findSearchField(in: subview) { return found }
-        }
-        return nil
     }
 
 }
