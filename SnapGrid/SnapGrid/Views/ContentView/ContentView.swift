@@ -19,7 +19,6 @@ struct ContentView: View {
     /// Pre-computed search scores keyed by item ID. Empty = no active search.
     @State private var searchScores: [String: Double] = [:]
     @State private var isSearchActive = false
-    @AppStorage("appTheme") private var themeSetting: String = AppTheme.system.rawValue
 
     private func itemsForSpace(_ spaceId: String?) -> [MediaItem] {
         var items = allItems
@@ -333,7 +332,6 @@ struct ContentView: View {
         .environment(appState)
         .environment(videoPreview)
         .environment(importService)
-        .preferredColorScheme((AppTheme(rawValue: themeSetting) ?? .system).colorScheme)
     }
 
     // MARK: - Space Navigation
