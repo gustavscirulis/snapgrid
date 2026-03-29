@@ -30,6 +30,7 @@ struct SnapGridApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task { KeySyncService.syncToiCloud() }
         }
         .modelContainer(container)
         .windowStyle(.hiddenTitleBar)

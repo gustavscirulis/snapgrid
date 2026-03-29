@@ -27,6 +27,7 @@
 		572A0BCDDD41A4C5E4D7B75E /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68305A61078FFD8F1E7C722F /* FlowLayout.swift */; };
 		58E281026420E8D7C519E0D6 /* ElectronImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6242DCFA059749F058CC6487 /* ElectronImportService.swift */; };
 		5C1E7DB8A91CE5B34721F868 /* PatternPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35770E61695F4882C7E976DF /* PatternPill.swift */; };
+		638C67ABC5D710901F2CABF2 /* KeySyncCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EB2E945029CE0D88016280 /* KeySyncCrypto.swift */; };
 		65160672513A59B8ED353208 /* SelectionBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFDD4D2B1F3CCB3ED261F5C /* SelectionBadge.swift */; };
 		6616D86A2EE273FDF8805951 /* iCloudDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23EE0E51D2D80BFD49716AA0 /* iCloudDownloadManager.swift */; };
 		67A2F4EA7A945C87AD04E886 /* SpacesSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1E6270DBFF25C7C3C0324E /* SpacesSettingsTab.swift */; };
@@ -40,6 +41,7 @@
 		BA67E76C4D3CB12E2DF2B9A9 /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAF0B485D040D2E5532516AE /* ImportService.swift */; };
 		C353401A790BF3AACFC694AC /* Color+Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3B7921F371383918892A5D /* Color+Theme.swift */; };
 		C8FDB96EEBC17714FF25EEB9 /* DataCleanupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A0CC2831F5CB94D1AF02D9 /* DataCleanupService.swift */; };
+		CE1AE7FAEBC90FACE513DE02 /* KeySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E77D8B810A6C6CFCDA3DF16 /* KeySyncService.swift */; };
 		D016DE668FB1A40FFB11BD0D /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DF384E9543E7A79145F99F8 /* SettingsView.swift */; };
 		D8DEDAFF16754653D39B7B56 /* TransferableFileURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E3151FA585E1C6ACA7945E /* TransferableFileURL.swift */; };
 		D9FE517E672AA97AAD667259 /* AnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D1884A0E94D6BC1F407855 /* AnalysisResult.swift */; };
@@ -57,6 +59,8 @@
 /* Begin PBXFileReference section */
 		0777D2662B06A89DA07B35C3 /* SnapGridApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapGridApp.swift; sourceTree = "<group>"; };
 		0A8B38057F541288379ABCA2 /* AIAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAnalysisService.swift; sourceTree = "<group>"; };
+		0E77D8B810A6C6CFCDA3DF16 /* KeySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncService.swift; sourceTree = "<group>"; };
+		16EB2E945029CE0D88016280 /* KeySyncCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncCrypto.swift; sourceTree = "<group>"; };
 		1A8584DB6A15E23CD509BC39 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1CE02953B123E7318BEBBA18 /* FloatingVideoLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingVideoLayer.swift; sourceTree = "<group>"; };
 		23EE0E51D2D80BFD49716AA0 /* iCloudDownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudDownloadManager.swift; sourceTree = "<group>"; };
@@ -156,6 +160,8 @@
 				AB57D4AB7F12528E5ECD77DF /* ImageCacheService.swift */,
 				AAF0B485D040D2E5532516AE /* ImportService.swift */,
 				47A1525A6C63DFE52779E656 /* KeychainService.swift */,
+				16EB2E945029CE0D88016280 /* KeySyncCrypto.swift */,
+				0E77D8B810A6C6CFCDA3DF16 /* KeySyncService.swift */,
 				963A5601AC378837EA06DF0E /* MediaStorageService.swift */,
 				EB5003E05FB3CAF53FEDBCA5 /* MetadataSidecarService.swift */,
 				9B1BF47348836CDB70325FEE /* MigrationService.swift */,
@@ -361,6 +367,8 @@
 				DAFFFC8B024C7865A3859024 /* HeroDetailOverlay.swift in Sources */,
 				ED7E6EF1043AE2A69F053E6C /* ImageCacheService.swift in Sources */,
 				BA67E76C4D3CB12E2DF2B9A9 /* ImportService.swift in Sources */,
+				638C67ABC5D710901F2CABF2 /* KeySyncCrypto.swift in Sources */,
+				CE1AE7FAEBC90FACE513DE02 /* KeySyncService.swift in Sources */,
 				34F4BEE7907CD4E3B3A6BCB4 /* KeychainService.swift in Sources */,
 				8F71F68AF462303D3E8EFF3F /* MasonryGridView.swift in Sources */,
 				20978B2B412744B389E3D316 /* MediaItem.swift in Sources */,

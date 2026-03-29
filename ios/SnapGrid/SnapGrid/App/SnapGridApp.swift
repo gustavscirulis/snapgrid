@@ -4,6 +4,7 @@ import SwiftData
 @main
 struct SnapGridApp: App {
     @StateObject private var fileSystem = FileSystemManager()
+    @StateObject private var keySyncService = KeySyncService.shared
     let container: ModelContainer
 
     init() {
@@ -34,6 +35,7 @@ struct SnapGridApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(fileSystem)
+                .environmentObject(keySyncService)
                 .preferredColorScheme(.dark)
                 .onAppear {
                     FileSystemManager.shared = fileSystem

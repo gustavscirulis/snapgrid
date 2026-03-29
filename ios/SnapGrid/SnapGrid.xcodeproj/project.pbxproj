@@ -36,6 +36,9 @@
 		A100000031 /* ImageImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000031 /* ImageImportService.swift */; };
 		A100000032 /* PhotoPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000032 /* PhotoPickerView.swift */; };
 		A100000033 /* MediaDeleteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000033 /* MediaDeleteService.swift */; };
+		A100000036 /* KeySyncCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000036 /* KeySyncCrypto.swift */; };
+		A100000037 /* KeySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000037 /* KeySyncService.swift */; };
+		A100000038 /* AIAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000038 /* AIAnalysisService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -95,6 +98,9 @@
 		B100000031 /* ImageImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageImportService.swift; sourceTree = "<group>"; };
 		B100000032 /* PhotoPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerView.swift; sourceTree = "<group>"; };
 		B100000033 /* MediaDeleteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDeleteService.swift; sourceTree = "<group>"; };
+		B100000036 /* KeySyncCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncCrypto.swift; sourceTree = "<group>"; };
+		B100000037 /* KeySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncService.swift; sourceTree = "<group>"; };
+		B100000038 /* AIAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAnalysisService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -193,6 +199,9 @@
 				B100000008 /* ThumbnailCache.swift */,
 				B100000031 /* ImageImportService.swift */,
 				B100000033 /* MediaDeleteService.swift */,
+				B100000036 /* KeySyncCrypto.swift */,
+				B100000037 /* KeySyncService.swift */,
+				B100000038 /* AIAnalysisService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -410,6 +419,9 @@
 				A100000031 /* ImageImportService.swift in Sources */,
 				A100000032 /* PhotoPickerView.swift in Sources */,
 				A100000033 /* MediaDeleteService.swift in Sources */,
+				A100000036 /* KeySyncCrypto.swift in Sources */,
+				A100000037 /* KeySyncService.swift in Sources */,
+				A100000038 /* AIAnalysisService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

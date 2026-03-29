@@ -5,6 +5,7 @@ struct MasonryGrid: View {
     let availableWidth: CGFloat
     var selectedItemId: String?
     var onItemSelected: ((MediaItem, CGRect, UIImage?) -> Void)?
+    var onRetryAnalysis: ((MediaItem) -> Void)?
 
     private let columns = 2
     private let spacing: CGFloat = 8
@@ -36,7 +37,10 @@ struct MasonryGrid: View {
                             item: item,
                             width: columnWidth,
                             isSelected: selectedItemId == item.id,
-                            onSelect: onItemSelected
+                            onSelect: onItemSelected,
+                            onRetryAnalysis: onRetryAnalysis.map { callback in
+                                { callback(item) }
+                            }
                         )
                     }
                 }
