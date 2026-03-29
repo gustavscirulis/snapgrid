@@ -714,12 +714,17 @@ struct ContentView: View {
         appState.activeSpaceId = nil
     }
 
-    private func retryAnalysis(_ item: MediaItem) {
-        item.analysisError = nil
-        item.analysisResult = nil
+    private func retryAnalysis(_ ids: Set<String>) {
+        let items = allItems.filter { ids.contains($0.id) }
+        for item in items {
+            item.analysisError = nil
+            item.analysisResult = nil
+        }
         try? modelContext.save()
-        Task {
-            await importService.analyzeItem(item, context: modelContext)
+        for item in items {
+            Task {
+                await importService.analyzeItem(item, context: modelContext)
+            }
         }
     }
 
