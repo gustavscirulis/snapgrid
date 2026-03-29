@@ -399,13 +399,13 @@ struct FullScreenImageOverlay: View {
                 searchAndClose(pattern: pattern)
             }
                 .id(item.id)
-                .frame(width: max(min(finalFrame.width, screen.width - 32), 300))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(width: screen.width)
                 .background(
                     GeometryReader { proxy in
                         Color.clear.preference(key: MetadataHeightKey.self, value: proxy.size.height)
                     }
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .offset(y: metadataTopY - effectiveContentOffset)
                 .opacity(deleteStage >= 1 ? 0 : metadataOpacity)
 
@@ -1158,7 +1158,8 @@ private struct DetailMetadataSection: View {
             .stageReveal(stage: stage, threshold: 4)
             .padding(.top, 14)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 32)
+        .padding(.bottom, 64)
         .animation(MetadataReveal.spring, value: isDescriptionExpanded)
     }
 
