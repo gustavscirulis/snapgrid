@@ -262,7 +262,8 @@ struct MainView: View {
                         },
                         onSearchPattern: { pattern in
                             searchText = pattern
-                        }
+                        },
+                        onDelete: handleItemDeleted
                     )
                 }
             }
@@ -363,6 +364,18 @@ struct MainView: View {
         sourceRect = rect
         thumbnailImage = thumb
         showOverlay = true
+    }
+
+    // MARK: - Item Deletion
+
+    private func handleItemDeleted(_ item: MediaItem) {
+        if let rootURL = fileSystem.rootURL {
+            try? MediaDeleteService.moveToTrash(
+                filename: item.filename, id: item.id, rootURL: rootURL
+            )
+        }
+        modelContext.delete(item)
+        try? modelContext.save()
     }
 
     // MARK: - Image Import
