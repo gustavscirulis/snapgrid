@@ -9,7 +9,7 @@ import AVKit
  *          hero image springs from sourceRect → finalFrame
  *
  * SETTLED (after hero completes)
- *          ScrollView with image + staggered metadata reveal
+ *          Image centered with faded inline metadata below
  *          Swipe horizontal to navigate, drag down to dismiss
  *          Pinch/double-tap to zoom
  *
@@ -25,7 +25,7 @@ import AVKit
  * METADATA REVEAL
  *    After hero animation completes, metadata section fades in
  *    with staggered timing: title → pills → description → file info.
- *    Scrolling down reveals metadata with a fade mask.
+ *    Metadata is always visible below the image at low opacity.
  * ───────────────────────────────────────────────────────── */
 
 private enum MetadataReveal {
@@ -35,7 +35,6 @@ private enum MetadataReveal {
     static let descriptionDelay: Duration = .milliseconds(450)
     static let fileInfoDelay:    Duration = .milliseconds(600)
     static let slideDistance:    CGFloat  = 8
-    static let spring = SnapSpring.metadata
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -53,15 +52,6 @@ private enum DeleteAnimation {
     static let completeDelay: Duration = .milliseconds(500)
     static let crushedScaleY: CGFloat = 0.05   // near-zero height slit
     static let crushedScaleX: CGFloat = 0.0     // fully collapsed
-}
-
-// MARK: - Scroll Offset Tracking (iOS 17)
-
-private struct ScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
 }
 
 // MARK: - Stage Reveal Modifier
@@ -112,7 +102,7 @@ struct FullScreenImageOverlay: View {
     // Dismiss gesture
     @State private var dismissOffset: CGFloat = 0
 
-    // Metadata reveal (manual scroll)
+    // Metadata reveal (scroll up to show)
     @State private var contentOffset: CGFloat = 0
     @State private var contentOffsetAtGestureStart: CGFloat = 0
     @State private var metadataStage: Int = 0
@@ -230,7 +220,6 @@ struct FullScreenImageOverlay: View {
         if gestureDrag.active && gestureMode == .scroll {
             let proposed = contentOffsetAtGestureStart - gestureDrag.translation.height
             if proposed < 0 {
-                // Rubber band past top — allows bouncy feel when scrolling back to image
                 let overshoot = -proposed
                 return -(log2(1 + overshoot) * 8)
             }
@@ -364,8 +353,8 @@ struct FullScreenImageOverlay: View {
     @ViewBuilder
     private func settledContentView(finalFrame: CGRect) -> some View {
         let screen = UIScreen.main.bounds
-        // Metadata top starts near screen bottom — ~50pt peeks initially
-        let metadataTopY = screen.height - 50
+        // Metadata starts below the image — same gap as horizontal padding
+        let metadataTopY = finalFrame.maxY + 32
 
         ZStack {
             // Image — centered at finalFrame, scrolls up with content
@@ -407,7 +396,7 @@ struct FullScreenImageOverlay: View {
             .position(x: finalFrame.midX, y: finalFrame.midY)
             .offset(y: -effectiveContentOffset)
 
-            // Metadata — positioned so top starts near screen bottom (peek)
+            // Metadata — inline below image, faded until scrolled
             DetailMetadataSection(item: item, stage: metadataStage) { pattern in
                 searchAndClose(pattern: pattern)
             }
@@ -447,9 +436,8 @@ struct FullScreenImageOverlay: View {
         )
         .onPreferenceChange(MetadataHeightKey.self) { metadataHeight = $0 }
         .onChange(of: metadataHeight) { oldHeight, newHeight in
-            // When metadata grows while scrolled (e.g. description expanded), scroll to reveal
             if contentOffset > 0 && newHeight > oldHeight {
-                withAnimation(MetadataReveal.spring) {
+                withAnimation(SnapSpring.resolvedMetadata) {
                     contentOffset = maxContentOffset
                 }
             }
@@ -631,47 +619,45 @@ struct FullScreenImageOverlay: View {
         }
     }
 
-    // MARK: - Metadata Fade Mask
-
-    /// How far the user can scroll up to reveal metadata
+    /// How far the user can scroll up to reveal metadata.
+    /// Calculated so metadata bottom lands 32pt above the action toolbar area.
     private var maxContentOffset: CGFloat {
         let screen = UIScreen.main.bounds
-        // Metadata starts 50pt from screen bottom; allow scrolling enough to reveal it all
-        let neededForMetadata = metadataHeight - 30
-        return max(screen.height * 0.25, neededForMetadata)
+        let finalFrame = computeFinalFrame(for: item)
+        let metadataTopY = finalFrame.maxY + 32
+        let metadataBottomY = metadataTopY + metadataHeight
+        // 32pt margin below metadata + ~44pt for action buttons + 16pt bottom inset
+        let targetBottomY = screen.height - 72
+        return max(0, metadataBottomY - targetBottomY)
     }
 
-    /// Metadata starts faded (0.3), reaches full opacity over 60pt of scroll
+    /// Metadata starts very faded, becomes readable as user scrolls up
     private var metadataOpacity: Double {
-        let base = 0.3
-        let progress = min(effectiveContentOffset / 60, 1.0)
+        let base = 0.15
+        let progress = min(effectiveContentOffset / 80, 1.0)
         return base + (1.0 - base) * progress
     }
 
     // MARK: - Metadata Reveal
 
     private func startMetadataReveal() {
-        if UIAccessibility.isReduceMotionEnabled {
-            metadataStage = 4
-            return
-        }
         revealTask?.cancel()
         revealTask = Task { @MainActor in
             try? await Task.sleep(for: MetadataReveal.titleDelay)
             guard !Task.isCancelled, heroComplete else { return }
-            withAnimation(MetadataReveal.spring) { metadataStage = 1 }
+            withAnimation(SnapSpring.resolvedMetadata) { metadataStage = 1 }
 
             try? await Task.sleep(for: MetadataReveal.pillsDelay - MetadataReveal.titleDelay)
             guard !Task.isCancelled, heroComplete else { return }
-            withAnimation(MetadataReveal.spring) { metadataStage = 2 }
+            withAnimation(SnapSpring.resolvedMetadata) { metadataStage = 2 }
 
             try? await Task.sleep(for: MetadataReveal.descriptionDelay - MetadataReveal.pillsDelay)
             guard !Task.isCancelled, heroComplete else { return }
-            withAnimation(MetadataReveal.spring) { metadataStage = 3 }
+            withAnimation(SnapSpring.resolvedMetadata) { metadataStage = 3 }
 
             try? await Task.sleep(for: MetadataReveal.fileInfoDelay - MetadataReveal.descriptionDelay)
             guard !Task.isCancelled, heroComplete else { return }
-            withAnimation(MetadataReveal.spring) { metadataStage = 4 }
+            withAnimation(SnapSpring.resolvedMetadata) { metadataStage = 4 }
         }
     }
 
@@ -697,6 +683,7 @@ struct FullScreenImageOverlay: View {
                     gestureMode = .zoomPan
                     zoomPanLastOffset = zoomPanOffset
                 } else if contentOffset > 0 {
+                    // Scrolled into metadata — must scroll back before dismiss
                     gestureMode = .scroll
                     contentOffsetAtGestureStart = contentOffset
                 } else if abs(tx) > abs(ty) + 4 {
@@ -784,12 +771,13 @@ struct FullScreenImageOverlay: View {
 
                 case .scroll:
                     let velocity = -(value.predictedEndTranslation.height - ty)
-                    let projected = contentOffset + velocity * 0.3
                     let snapTarget: CGFloat
-                    if projected > maxContentOffset * 0.35 {
-                        snapTarget = maxContentOffset
+                    if abs(velocity) > 100 {
+                        // Clear flick — snap in the direction of the flick
+                        snapTarget = velocity < 0 ? 0 : maxContentOffset
                     } else {
-                        snapTarget = 0
+                        // Gentle release — snap to nearest
+                        snapTarget = contentOffset < maxContentOffset / 2 ? 0 : maxContentOffset
                     }
                     withAnimation(SnapSpring.resolvedStandard) {
                         contentOffset = snapTarget
@@ -938,29 +926,20 @@ struct FullScreenImageOverlay: View {
         let deletedItem = items[deletedIndex]
         let isLastItem = deletedIndex == items.count - 1
 
-        if UIAccessibility.isReduceMotionEnabled {
-            // Simple fade when Reduce Motion is on
-            withAnimation(.easeOut(duration: 0.2)) {
-                deleteStage = 2
-            }
-        } else {
-            // Stage 1 — height crushes inward
-            withAnimation(DeleteAnimation.heightCrush) {
-                deleteStage = 1
-            }
+        // Stage 1 — height crushes inward
+        withAnimation(DeleteAnimation.heightCrush) {
+            deleteStage = 1
         }
 
         Task { @MainActor in
-            if !UIAccessibility.isReduceMotionEnabled {
-                // Stage 2 — width collapses + fade out
-                try? await Task.sleep(for: DeleteAnimation.widthDelay)
-                withAnimation(DeleteAnimation.widthCrush) {
-                    deleteStage = 2
-                }
+            // Stage 2 — width collapses + fade out
+            try? await Task.sleep(for: DeleteAnimation.widthDelay)
+            withAnimation(DeleteAnimation.widthCrush) {
+                deleteStage = 2
             }
 
             // Stage 3 — crush complete, commit deletion + slide in replacement
-            try? await Task.sleep(for: UIAccessibility.isReduceMotionEnabled ? .milliseconds(250) : DeleteAnimation.completeDelay)
+            try? await Task.sleep(for: DeleteAnimation.completeDelay)
 
             // Notify parent to handle file move + SwiftData deletion
             onDelete?(deletedItem)
@@ -1170,24 +1149,24 @@ private struct DetailMetadataSection: View {
                     ProgressView()
                         .tint(.white)
                     Text("Analyzing...")
-                        .font(.subheadline)
+                        .font(.system(size: 14))
                         .foregroundStyle(.white.opacity(0.6))
                 }
                 .stageReveal(stage: stage, threshold: 1)
             } else if item.analysisError != nil {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle")
-                        .font(.footnote)
+                        .font(.system(size: 13))
                         .foregroundStyle(.red.opacity(0.8))
                     Text("Analysis failed")
-                        .font(.subheadline)
+                        .font(.system(size: 14))
                         .foregroundStyle(.white.opacity(0.6))
                 }
                 .stageReveal(stage: stage, threshold: 1)
             } else if let result = item.analysisResult {
                 if !result.imageSummary.isEmpty {
                     Text(result.imageSummary)
-                        .font(.title3.weight(.semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.9))
                         .lineLimit(2)
                         .stageReveal(stage: stage, threshold: 1)
@@ -1201,11 +1180,12 @@ private struct DetailMetadataSection: View {
 
                 if hasDescription(result) {
                     Text(result.imageContext)
-                        .font(.subheadline)
+                        .font(.system(size: 14))
                         .foregroundStyle(.white.opacity(0.5))
                         .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
                         .opacity(stage >= 3 ? 1 : 0)
-                        .animation(MetadataReveal.spring, value: stage)
+                        .animation(SnapSpring.resolvedMetadata, value: stage)
                 }
             }
 
@@ -1220,13 +1200,13 @@ private struct DetailMetadataSection: View {
                     Text(formatDuration(duration))
                 }
             }
-            .font(.caption.monospaced())
+            .font(.system(size: 12, design: .monospaced))
             .foregroundStyle(.white.opacity(0.3))
             .stageReveal(stage: stage, threshold: 4)
             .padding(.top, 14)
         }
         .padding(.horizontal, 32)
-        .padding(.bottom, 64)
+        .padding(.bottom, 32)
     }
 
     private func hasDescription(_ result: AnalysisResult) -> Bool {
@@ -1279,7 +1259,7 @@ private struct DetailMetadataSection: View {
                 .animation(
                     UIAccessibility.isReduceMotionEnabled
                         ? SnapSpring.resolvedMetadata
-                        : MetadataReveal.spring.delay(Double(index) * MetadataReveal.tagStagger),
+                        : SnapSpring.resolvedMetadata.delay(Double(index) * MetadataReveal.tagStagger),
                     value: stage
                 )
         } else {
@@ -1297,7 +1277,7 @@ private struct DetailMetadataSection: View {
                 .animation(
                     UIAccessibility.isReduceMotionEnabled
                         ? SnapSpring.resolvedMetadata
-                        : MetadataReveal.spring.delay(Double(index) * MetadataReveal.tagStagger),
+                        : SnapSpring.resolvedMetadata.delay(Double(index) * MetadataReveal.tagStagger),
                     value: stage
                 )
         }
