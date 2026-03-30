@@ -141,6 +141,9 @@ struct FullScreenImageOverlay: View {
     // Share sheet
     @State private var shareItem: URL?
 
+    // Glass effect namespace for action toolbar union
+    @Namespace private var glassNS
+
     // Search-triggered close (skips rect correction since grid has re-laid out)
     @State private var isSearchDismiss = false
 
@@ -163,6 +166,15 @@ struct FullScreenImageOverlay: View {
     private var item: MediaItem { items[currentIndex] }
 
     private var displayImage: UIImage? { image ?? thumbnailImage }
+
+    /// On iOS 26+ the inline glass confirmation handles delete; skip the system dialog.
+    private var legacyDeleteDialogBinding: Binding<Bool> {
+        if #available(iOS 26.0, *) {
+            return .constant(false)
+        } else {
+            return $showDeleteConfirmation
+        }
+    }
 
     init(
         items: [MediaItem],
@@ -442,7 +454,7 @@ struct FullScreenImageOverlay: View {
                 }
             }
         }
-        .confirmationDialog("Delete this item?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+        .confirmationDialog("Delete this item?", isPresented: legacyDeleteDialogBinding, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 handleDelete()
             }
@@ -466,29 +478,80 @@ struct FullScreenImageOverlay: View {
     @ViewBuilder
     private var actionToolbar: some View {
         if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 0) {
-                HStack(spacing: 0) {
-                    Button {
-                        prepareShareItem()
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.body.weight(.medium))
-                            .frame(width: 56, height: 50)
-                    }
+            GlassEffectContainer {
+                if showDeleteConfirmation {
+                    // Confirmation panel — glass morphs from the toolbar
+                    VStack(spacing: 0) {
+                        Text("Delete this item?")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 14)
+                            .padding(.bottom, 10)
 
-                    Divider()
-                        .frame(height: 24)
-                        .opacity(0.3)
+                        Divider().opacity(0.3)
 
-                    Button {
-                        showDeleteConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.body.weight(.medium))
-                            .frame(width: 56, height: 50)
+                        Button(role: .destructive) {
+                            withAnimation(SnapSpring.fast) {
+                                showDeleteConfirmation = false
+                            }
+                            handleDelete()
+                        } label: {
+                            Text("Delete")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(.red)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider().opacity(0.3)
+
+                        Button {
+                            withAnimation(SnapSpring.fast) {
+                                showDeleteConfirmation = false
+                            }
+                        } label: {
+                            Text("Cancel")
+                                .font(.body.weight(.medium))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                        }
+                        .buttonStyle(.plain)
                     }
+                    .frame(width: 200)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                    .glassEffectID("actionToolbar", in: glassNS)
+                } else {
+                    // Normal toolbar — share + delete
+                    HStack(spacing: 0) {
+                        Button {
+                            prepareShareItem()
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.body.weight(.medium))
+                                .frame(width: 56, height: 50)
+                        }
+                        .buttonStyle(.plain)
+                        .glassEffect(.regular.interactive())
+                        .glassEffectUnion(id: "actionToolbar", namespace: glassNS)
+                        .accessibilityLabel("Share")
+
+                        Button {
+                            withAnimation(SnapSpring.fast) {
+                                showDeleteConfirmation = true
+                            }
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.body.weight(.medium))
+                                .frame(width: 56, height: 50)
+                        }
+                        .buttonStyle(.plain)
+                        .glassEffect(.regular.interactive())
+                        .glassEffectUnion(id: "actionToolbar", namespace: glassNS)
+                        .accessibilityLabel("Delete")
+                    }
+                    .glassEffectID("actionToolbar", in: glassNS)
                 }
-                .glassEffect(.regular.interactive())
             }
         } else {
             HStack(spacing: 0) {
@@ -500,6 +563,7 @@ struct FullScreenImageOverlay: View {
                         .foregroundStyle(.white.opacity(0.9))
                         .frame(width: 56, height: 50)
                 }
+                .accessibilityLabel("Share")
 
                 Divider()
                     .frame(height: 24)
@@ -513,6 +577,7 @@ struct FullScreenImageOverlay: View {
                         .foregroundStyle(.white.opacity(0.9))
                         .frame(width: 56, height: 50)
                 }
+                .accessibilityLabel("Delete")
             }
             .background(.ultraThinMaterial, in: Capsule())
             .environment(\.colorScheme, .dark)
@@ -1130,32 +1195,8 @@ private struct DetailMetadataSection: View {
                 }
 
                 if !result.patterns.isEmpty {
-                    FlowLayout(spacing: 8) {
-                        ForEach(Array(result.patterns.enumerated()), id: \.element.name) { index, pattern in
-                            Text(pattern.name)
-                                .font(.caption)
-                                .foregroundStyle(.white.opacity(0.9))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .environment(\.colorScheme, .dark)
-                                .contentShape(Rectangle())
-                                .accessibilityHint("Double tap to search for this pattern")
-                                .onTapGesture {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    onSearchPattern?(pattern.name)
-                                }
-                                .opacity(stage >= 2 ? 1 : 0)
-                                .offset(y: stage >= 2 ? 0 : MetadataReveal.slideDistance)
-                                .animation(
-                                    UIAccessibility.isReduceMotionEnabled
-                                        ? SnapSpring.resolvedMetadata
-                                        : MetadataReveal.spring.delay(Double(index) * MetadataReveal.tagStagger),
-                                    value: stage
-                                )
-                        }
-                    }
-                    .padding(.bottom, 14)
+                    patternPillsGrid(result.patterns)
+                        .padding(.bottom, 14)
                 }
 
                 if hasDescription(result) {
@@ -1196,6 +1237,70 @@ private struct DetailMetadataSection: View {
         guard seconds.isFinite else { return "0:00" }
         let total = Int(seconds)
         return "\(total / 60):\(String(format: "%02d", total % 60))"
+    }
+
+    // MARK: - Pattern pills (glass on iOS 26+, material fallback)
+
+    @ViewBuilder
+    private func patternPillsGrid(_ patterns: [PatternTag]) -> some View {
+        let pills = FlowLayout(spacing: 8) {
+            ForEach(Array(patterns.enumerated()), id: \.element.name) { index, pattern in
+                patternPill(pattern: pattern, index: index)
+            }
+        }
+
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer { pills }
+        } else {
+            pills
+        }
+    }
+
+    @ViewBuilder
+    private func patternPill(pattern: PatternTag, index: Int) -> some View {
+        let base = Text(pattern.name)
+            .font(.caption)
+            .foregroundStyle(.white.opacity(0.9))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+
+        if #available(iOS 26.0, *) {
+            base
+                .environment(\.colorScheme, .dark)
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .contentShape(Rectangle())
+                .accessibilityHint("Double tap to search for this pattern")
+                .onTapGesture {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onSearchPattern?(pattern.name)
+                }
+                .opacity(stage >= 2 ? 1 : 0)
+                .offset(y: stage >= 2 ? 0 : MetadataReveal.slideDistance)
+                .animation(
+                    UIAccessibility.isReduceMotionEnabled
+                        ? SnapSpring.resolvedMetadata
+                        : MetadataReveal.spring.delay(Double(index) * MetadataReveal.tagStagger),
+                    value: stage
+                )
+        } else {
+            base
+                .background(.ultraThinMaterial, in: Capsule())
+                .environment(\.colorScheme, .dark)
+                .contentShape(Rectangle())
+                .accessibilityHint("Double tap to search for this pattern")
+                .onTapGesture {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onSearchPattern?(pattern.name)
+                }
+                .opacity(stage >= 2 ? 1 : 0)
+                .offset(y: stage >= 2 ? 0 : MetadataReveal.slideDistance)
+                .animation(
+                    UIAccessibility.isReduceMotionEnabled
+                        ? SnapSpring.resolvedMetadata
+                        : MetadataReveal.spring.delay(Double(index) * MetadataReveal.tagStagger),
+                    value: stage
+                )
+        }
     }
 }
 
