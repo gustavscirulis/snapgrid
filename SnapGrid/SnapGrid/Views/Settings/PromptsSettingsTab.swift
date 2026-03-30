@@ -37,6 +37,7 @@ struct GuidanceSettingsTab: View {
                         if !isOn {
                             allSpaceGuidance = ""
                         }
+                        persistToSpacesJson()
                     }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -88,6 +89,7 @@ struct GuidanceSettingsTab: View {
                                     space.useCustomPrompt = true
                                     if space.customPrompt == nil { space.customPrompt = "" }
                                     try? modelContext.save()
+                                    persistToSpacesJson()
                                     selectedOverrideId = space.id
                                     editingTarget = .spaceGuidance(space.id, space.name, "")
                                 }
@@ -101,6 +103,7 @@ struct GuidanceSettingsTab: View {
                             space.customPrompt = ""
                             space.useCustomPrompt = false
                             try? modelContext.save()
+                            persistToSpacesJson()
                             selectedOverrideId = nil
                         }
                         .disabled(selectedSpace == nil)
@@ -133,12 +136,19 @@ struct GuidanceSettingsTab: View {
         case .defaultGuidance:
             allSpaceGuidance = text
             useAllSpaceGuidance = !text.isEmpty
+            persistToSpacesJson()
         case .spaceGuidance(let spaceId, _, _):
             guard let space = spaces.first(where: { $0.id == spaceId }) else { return }
             space.customPrompt = text
             space.useCustomPrompt = !text.isEmpty
             try? modelContext.save()
+            persistToSpacesJson()
         }
+    }
+
+    /// Write current spaces + all-space guidance to spaces.json so iOS picks up changes via iCloud.
+    private func persistToSpacesJson() {
+        MetadataSidecarService.shared.writeSpaces(Array(spaces))
     }
 }
 

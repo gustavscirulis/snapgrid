@@ -413,7 +413,7 @@ struct MainView: View {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         Task {
-            let result = await ImageImportService.importImages(images, to: rootURL)
+            let result = await ImageImportService.importImages(images, to: rootURL, spaceId: activeSpaceId)
             isImporting = false
 
             if result.successCount > 0 {
@@ -525,6 +525,13 @@ struct MainView: View {
                         spaceContext = "This image belongs to a collection called \"\(space.name)\". Use this as context to inform your analysis."
                         if space.useCustomPrompt, let custom = space.customPrompt, !custom.isEmpty {
                             guidance = custom
+                        }
+                    }
+                    // Fall back to all-space guidance if no per-space guidance is set
+                    if guidance == nil, UserDefaults.standard.bool(forKey: "useAllSpacePrompt") {
+                        let allGuidance = UserDefaults.standard.string(forKey: "allSpacePrompt") ?? ""
+                        if !allGuidance.isEmpty {
+                            guidance = allGuidance
                         }
                     }
 
