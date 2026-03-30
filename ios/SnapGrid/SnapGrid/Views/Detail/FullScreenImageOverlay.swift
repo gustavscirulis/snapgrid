@@ -157,6 +157,8 @@ struct FullScreenImageOverlay: View {
 
     private var displayImage: UIImage? { image ?? thumbnailImage }
 
+    private var zoomedCornerRadius: CGFloat { isZoomed ? 0 : 16 }
+
     /// On iOS 26+ the inline glass confirmation handles delete; skip the system dialog.
     private var legacyDeleteDialogBinding: Binding<Bool> {
         if #available(iOS 26.0, *) {
@@ -234,12 +236,51 @@ struct FullScreenImageOverlay: View {
 
     private var effectiveZoomPanOffset: CGSize {
         if gestureDrag.active && gestureMode == .zoomPan {
-            return CGSize(
+            let raw = CGSize(
                 width: zoomPanLastOffset.width + gestureDrag.translation.width,
                 height: zoomPanLastOffset.height + gestureDrag.translation.height
             )
+            return rubberBandZoomPanOffset(raw)
         }
         return zoomPanOffset
+    }
+
+    /// Hard clamp — used as the snap-back target on gesture end
+    private func clampedZoomPanOffset(_ offset: CGSize) -> CGSize {
+        guard zoomScale > minZoomScale else { return .zero }
+        let finalFrame = computeFinalFrame(for: item)
+        let screen = UIScreen.main.bounds
+        let maxOffsetX = max(0, (finalFrame.width * zoomScale - screen.width) / 2)
+        let maxOffsetY = max(0, (finalFrame.height * zoomScale - screen.height) / 2)
+        return CGSize(
+            width: min(max(offset.width, -maxOffsetX), maxOffsetX),
+            height: min(max(offset.height, -maxOffsetY), maxOffsetY)
+        )
+    }
+
+    /// Rubber-band — allows overstretch with logarithmic resistance during live gesture
+    private func rubberBandZoomPanOffset(_ offset: CGSize) -> CGSize {
+        guard zoomScale > minZoomScale else { return .zero }
+        let finalFrame = computeFinalFrame(for: item)
+        let screen = UIScreen.main.bounds
+        let maxOffsetX = max(0, (finalFrame.width * zoomScale - screen.width) / 2)
+        let maxOffsetY = max(0, (finalFrame.height * zoomScale - screen.height) / 2)
+        return CGSize(
+            width: rubberBandAxis(offset.width, limit: maxOffsetX),
+            height: rubberBandAxis(offset.height, limit: maxOffsetY)
+        )
+    }
+
+    /// Applies logarithmic resistance when value exceeds ±limit
+    private func rubberBandAxis(_ value: CGFloat, limit: CGFloat) -> CGFloat {
+        if value > limit {
+            let overshoot = value - limit
+            return limit + log2(1 + overshoot / 12) * 12
+        } else if value < -limit {
+            let overshoot = -value - limit
+            return -limit - log2(1 + overshoot / 12) * 12
+        }
+        return value
     }
 
     private var backdropOpacity: Double {
@@ -375,8 +416,6 @@ struct FullScreenImageOverlay: View {
                         .aspectRatio(contentMode: .fill)
                         .frame(width: finalFrame.width, height: finalFrame.height)
                         .clipped()
-                        .scaleEffect(zoomScale)
-                        .offset(effectiveZoomPanOffset)
                 } else {
                     Rectangle()
                         .fill(Color.snapDarkMuted)
@@ -387,7 +426,7 @@ struct FullScreenImageOverlay: View {
                         }
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .clipShape(RoundedRectangle(cornerRadius: zoomedCornerRadius))
             // Delete animation — wallet card crush (mask approach)
             .mask {
                 let maskH = deleteStage >= 1
@@ -396,9 +435,11 @@ struct FullScreenImageOverlay: View {
                 let maskW = deleteStage >= 2
                     ? finalFrame.width * DeleteAnimation.crushedScaleX
                     : finalFrame.width
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: zoomedCornerRadius)
                     .frame(width: maskW, height: maskH)
             }
+            .scaleEffect(zoomScale)
+            .offset(effectiveZoomPanOffset)
             .opacity(deleteStage >= 2 ? 0 : 1)
             .position(x: finalFrame.midX, y: finalFrame.midY)
             .offset(y: -effectiveContentOffset)
@@ -416,7 +457,7 @@ struct FullScreenImageOverlay: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .offset(y: metadataTopY - effectiveContentOffset)
-                .opacity(deleteStage >= 1 ? 0 : metadataOpacity)
+                .opacity(deleteStage >= 1 ? 0 : (isZoomed ? 0 : metadataOpacity))
 
             // Action toolbar — share + delete (Glass split button)
             VStack {
@@ -712,10 +753,13 @@ struct FullScreenImageOverlay: View {
                 // the fallback value when @GestureState resets.
                 switch mode {
                 case .zoomPan:
-                    zoomPanOffset = CGSize(
+                    // Store the raw (possibly overstretched) offset so @GestureState
+                    // reset doesn't jump — the spring animation below snaps it back.
+                    let raw = CGSize(
                         width: zoomPanLastOffset.width + tx,
                         height: zoomPanLastOffset.height + ty
                     )
+                    zoomPanOffset = rubberBandZoomPanOffset(raw)
                 case .swipe:
                     var proposed = tx
                     if (currentIndex == 0 && proposed > 0) ||
@@ -745,7 +789,14 @@ struct FullScreenImageOverlay: View {
                 // Now handle end-of-gesture animations / navigation
                 switch mode {
                 case .zoomPan:
-                    zoomPanLastOffset = zoomPanOffset
+                    // Spring back to clamped bounds if overstretched
+                    let snapped = clampedZoomPanOffset(zoomPanOffset)
+                    if snapped != zoomPanOffset {
+                        withAnimation(SnapSpring.resolvedStandard) {
+                            zoomPanOffset = snapped
+                        }
+                    }
+                    zoomPanLastOffset = snapped
 
                 case .swipe:
                     let velocity = value.predictedEndTranslation.width - tx
@@ -804,7 +855,12 @@ struct FullScreenImageOverlay: View {
             .onChanged { value in
                 let raw = zoomLastScale * value.magnification
                 zoomScale = rubberBand(raw, min: minZoomScale, max: maxZoomScale)
+                let wasZoomed = isZoomed
                 isZoomed = zoomScale > minZoomScale
+                if isZoomed && !wasZoomed && contentOffset > 0 {
+                    withAnimation(SnapSpring.resolvedFast) { contentOffset = 0 }
+                    contentOffsetAtGestureStart = 0
+                }
             }
             .onEnded { _ in
                 let clamped = min(max(zoomScale, minZoomScale), maxZoomScale)
@@ -812,6 +868,8 @@ struct FullScreenImageOverlay: View {
                     zoomScale = clamped
                     if clamped <= minZoomScale {
                         zoomPanOffset = .zero
+                    } else {
+                        zoomPanOffset = clampedZoomPanOffset(zoomPanOffset)
                     }
                 }
                 zoomLastScale = clamped
@@ -832,10 +890,11 @@ struct FullScreenImageOverlay: View {
             } else {
                 zoomScale = doubleTapZoomScale
                 zoomLastScale = doubleTapZoomScale
-                zoomPanOffset = CGSize(
+                let rawOffset = CGSize(
                     width: (viewCenter.x - location.x) * (doubleTapZoomScale - 1),
                     height: (viewCenter.y - location.y) * (doubleTapZoomScale - 1)
                 )
+                zoomPanOffset = clampedZoomPanOffset(rawOffset)
                 isZoomed = true
             }
         }
@@ -929,6 +988,17 @@ struct FullScreenImageOverlay: View {
     // MARK: - Delete
 
     private func handleDelete() {
+        // Reset zoom before delete animation so mask dimensions are correct
+        if isZoomed {
+            withAnimation(SnapSpring.resolvedFast) {
+                zoomScale = minZoomScale
+                zoomLastScale = minZoomScale
+                zoomPanOffset = .zero
+                zoomPanLastOffset = .zero
+                isZoomed = false
+            }
+        }
+
         let deletedIndex = currentIndex
         let deletedItem = items[deletedIndex]
         let isLastItem = deletedIndex == items.count - 1
