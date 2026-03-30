@@ -248,6 +248,12 @@ struct FullScreenImageOverlay: View {
         return 1.0 - dragProgress * 0.5
     }
 
+    private var blurOpacity: Double {
+        if !isExpanded { return 0 }
+        let dragProgress = min(abs(effectiveDismissOffset) / 80.0, 1.0)
+        return 1.0 - dragProgress
+    }
+
     private var dismissScale: CGFloat {
         let progress = min(abs(effectiveDismissOffset) / 400.0, 1.0)
         return 1.0 - progress * 0.1
@@ -283,9 +289,10 @@ struct FullScreenImageOverlay: View {
             // 1. Backdrop — material blur + tint (matches Mac app)
             ZStack {
                 Rectangle().fill(.ultraThinMaterial)
+                    .opacity(blurOpacity)
                 Color.black.opacity(0.55)
+                    .opacity(backdropOpacity)
             }
-            .opacity(backdropOpacity)
             .ignoresSafeArea()
 
             // 2. Adjacent images — only after hero, hidden during close
