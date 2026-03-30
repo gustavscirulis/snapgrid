@@ -190,12 +190,18 @@ struct VideoControlsOverlay: View {
     private var controlsContent: some View {
         // Center play/pause button
         Button(action: togglePlayback) {
-            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+            let icon = Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
-                .background(.black.opacity(0.5))
-                .clipShape(Circle())
+
+            if #available(macOS 26, *) {
+                icon.glassEffect(.regular.interactive(), in: .circle)
+            } else {
+                icon
+                    .background(.black.opacity(0.5))
+                    .clipShape(Circle())
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isPlaying ? "Pause" : "Play")
@@ -204,13 +210,19 @@ struct VideoControlsOverlay: View {
         VStack {
             Spacer()
             HStack {
-                Text("\(formatTime(currentTime)) / \(formatTime(duration))")
+                let timeText = Text("\(formatTime(currentTime)) / \(formatTime(duration))")
                     .font(.caption.weight(.medium).monospacedDigit())
                     .foregroundStyle(.white.opacity(0.8))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(.black.opacity(0.4))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                if #available(macOS 26, *) {
+                    timeText.glassEffect(.regular, in: .rect(cornerRadius: 4))
+                } else {
+                    timeText
+                        .background(.black.opacity(0.4))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
                 Spacer()
             }
             .padding(8)

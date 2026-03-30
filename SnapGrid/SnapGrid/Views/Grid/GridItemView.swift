@@ -165,11 +165,7 @@ struct GridItemView: View {
                             )
 
                             HStack {
-                                ShimmerText("Analyzing...")
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-                                    .environment(\.colorScheme, .dark)
+                                shimmerBadge
                                 Spacer()
                             }
                             .padding(8)
@@ -222,12 +218,7 @@ struct GridItemView: View {
         .overlay(alignment: .topTrailing) {
             if effectiveHover {
                 Button(action: onDelete) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 24, height: 24)
-                        .background(.black.opacity(0.6))
-                        .clipShape(Circle())
+                    hoverButtonIcon("xmark", size: 10)
                 }
                 .buttonStyle(.plain)
                 .padding(8)
@@ -238,12 +229,7 @@ struct GridItemView: View {
         .overlay(alignment: .topLeading) {
             if effectiveHover && activeSpaceId != nil {
                 Button { onAssignToSpace(nil) } label: {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 24, height: 24)
-                        .background(.black.opacity(0.6))
-                        .clipShape(Circle())
+                    hoverButtonIcon("arrow.uturn.backward", size: 9)
                 }
                 .buttonStyle(.plain)
                 .padding(8)
@@ -254,17 +240,7 @@ struct GridItemView: View {
         .overlay(alignment: .bottomLeading) {
             if !item.isAnalyzing && item.analysisError != nil {
                 Button(action: onRetryAnalysis) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.caption2)
-                        Text("Retry")
-                            .font(.caption.weight(.medium))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.red.opacity(0.7))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    retryBadge
                 }
                 .buttonStyle(.plain)
                 .padding(8)
@@ -420,6 +396,65 @@ struct GridItemView: View {
         }
     }
 
+    // MARK: - Glass-aware sub-views
+
+    /// "Analyzing..." shimmer badge with glass on macOS 26+.
+    @ViewBuilder
+    private var shimmerBadge: some View {
+        let base = ShimmerText("Analyzing...")
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+
+        if #available(macOS 26, *) {
+            base
+                .glassEffect(.regular, in: .rect(cornerRadius: 10))
+                .environment(\.colorScheme, .dark)
+        } else {
+            base
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                .environment(\.colorScheme, .dark)
+        }
+    }
+
+    /// Circular hover-action button icon with glass on macOS 26+.
+    @ViewBuilder
+    private func hoverButtonIcon(_ systemName: String, size: CGFloat) -> some View {
+        let base = Image(systemName: systemName)
+            .font(.system(size: size, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 24, height: 24)
+
+        if #available(macOS 26, *) {
+            base.glassEffect(.regular.interactive(), in: .circle)
+        } else {
+            base
+                .background(.black.opacity(0.6))
+                .clipShape(Circle())
+        }
+    }
+
+    /// Retry analysis badge with red-tinted glass on macOS 26+.
+    @ViewBuilder
+    private var retryBadge: some View {
+        let base = HStack(spacing: 4) {
+            Image(systemName: "arrow.clockwise")
+                .font(.caption2)
+            Text("Retry")
+                .font(.caption.weight(.medium))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+
+        if #available(macOS 26, *) {
+            base.glassEffect(.regular.tint(.red).interactive(), in: .rect(cornerRadius: 6))
+        } else {
+            base
+                .background(.red.opacity(0.7))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
     private func loadThumbnail() async {
         if let loaded = await ImageCacheService.shared.loadThumbnail(id: item.id, filename: item.filename) {
             self.thumbnail = loaded
@@ -462,7 +497,7 @@ struct ShimmerText: View {
     var body: some View {
         if reduceMotion {
             Text(text)
-                .font(.caption)
+                .font(.callout)
                 .foregroundStyle(.white.opacity(ShimmerConfig.peakBrightness))
         } else {
             TimelineView(.animation) { timeline in
@@ -473,7 +508,7 @@ struct ShimmerText: View {
                     + ShimmerConfig.rangeStart
 
                 Text(text)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(
                         .linearGradient(
                             colors: [
