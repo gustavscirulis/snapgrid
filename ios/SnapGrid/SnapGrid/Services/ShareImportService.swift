@@ -1,12 +1,12 @@
 import Foundation
 
-/// Moves images saved by the Share Extension from the App Group staging area
+/// Moves media saved by the Share Extension from the App Group staging area
 /// into the iCloud container so they sync to the Mac app for analysis.
 enum ShareImportService {
 
     private static let appGroupID = "group.com.snapgrid"
 
-    /// Check the App Group pending directory and move any images + metadata
+    /// Check the App Group pending directory and move any media + metadata
     /// into the iCloud container. Safe to call multiple times — completed
     /// imports are deleted from the staging area.
     static func importPendingItems(to rootURL: URL) {
@@ -44,16 +44,19 @@ enum ShareImportService {
 
         for jsonURL in jsonFiles {
             let id = jsonURL.deletingPathExtension().lastPathComponent
-            let imageFilename = "\(id).png"
 
-            let srcImage = pendingImages.appendingPathComponent(imageFilename)
-            let dstImage = imagesDir.appendingPathComponent(imageFilename)
+            // Determine file extension from sidecar type field, falling back to .png
+            let ext = mediaExtension(for: jsonURL) ?? "png"
+            let mediaFilename = "\(id).\(ext)"
+
+            let srcMedia = pendingImages.appendingPathComponent(mediaFilename)
+            let dstImage = imagesDir.appendingPathComponent(mediaFilename)
             let dstMetadata = metadataDir.appendingPathComponent(jsonURL.lastPathComponent)
 
-            // Move image first (SyncWatcher checks for media when sidecar arrives)
-            guard fm.fileExists(atPath: srcImage.path) else {
+            // Move media file first (SyncWatcher checks for media when sidecar arrives)
+            guard fm.fileExists(atPath: srcMedia.path) else {
                 #if DEBUG
-                print("[ShareImport] Source image missing for \(id), skipping")
+                print("[ShareImport] Source media missing for \(id) (\(mediaFilename)), skipping")
                 #endif
                 continue
             }
@@ -62,10 +65,10 @@ enum ShareImportService {
                 if fm.fileExists(atPath: dstImage.path) {
                     try fm.removeItem(at: dstImage)
                 }
-                try fm.moveItem(at: srcImage, to: dstImage)
+                try fm.moveItem(at: srcMedia, to: dstImage)
             } catch {
                 #if DEBUG
-                print("[ShareImport] Failed to move image \(id): \(error)")
+                print("[ShareImport] Failed to move media \(id): \(error)")
                 #endif
                 continue
             }
@@ -87,5 +90,15 @@ enum ShareImportService {
             print("[ShareImport] Imported \(id)")
             #endif
         }
+    }
+
+    /// Read the sidecar JSON to determine whether this is a video or image.
+    private static func mediaExtension(for sidecarURL: URL) -> String? {
+        guard let data = try? Data(contentsOf: sidecarURL),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let type = json["type"] as? String else {
+            return nil
+        }
+        return type == "video" ? "mp4" : "png"
     }
 }

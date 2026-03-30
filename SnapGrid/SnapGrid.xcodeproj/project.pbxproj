@@ -11,6 +11,7 @@
 		071B2A3BF29E5D8C82A0F4DB /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA0DBF4BD46715A129146550 /* AppState.swift */; };
 		0BD6F0F6397C8D6CC98DDFFF /* SyncWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2537EC9D8AD50664BBA121ED /* SyncWatcher.swift */; };
 		0FB79B182FF2453212D42811 /* SpaceTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4091FEF7AEC687AE2DA55B3D /* SpaceTabBar.swift */; };
+		129E975D0AF5F70B0787E1BD /* TwitterVideoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF21DEE8F950B7304A8AA40F /* TwitterVideoService.swift */; };
 		19DF74D39041BCACC5B21A10 /* SemanticSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689AEED4D4344D4F358EC9C1 /* SemanticSearchService.swift */; };
 		20978B2B412744B389E3D316 /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BA6AB7DC0A84E670681EB6C /* MediaItem.swift */; };
 		210A13790BE0E2F8D5123662 /* NSImage+Thumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE5033083DAF80AD07ABC32 /* NSImage+Thumbnail.swift */; };
@@ -100,6 +101,7 @@
 		AB57D4AB7F12528E5ECD77DF /* ImageCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheService.swift; sourceTree = "<group>"; };
 		ADAA221ED457C361084B34E7 /* HeroDetailOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroDetailOverlay.swift; sourceTree = "<group>"; };
 		BBFDD4D2B1F3CCB3ED261F5C /* SelectionBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionBadge.swift; sourceTree = "<group>"; };
+		BF21DEE8F950B7304A8AA40F /* TwitterVideoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwitterVideoService.swift; sourceTree = "<group>"; };
 		CF20E3B5FA0802105388A2AC /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		D12368B01B4DD3634830B038 /* RubberBandOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RubberBandOverlay.swift; sourceTree = "<group>"; };
 		D5AD67C6232580C3B0D9E982 /* MasonryGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MasonryGridView.swift; sourceTree = "<group>"; };
@@ -171,6 +173,7 @@
 				689AEED4D4344D4F358EC9C1 /* SemanticSearchService.swift */,
 				2537EC9D8AD50664BBA121ED /* SyncWatcher.swift */,
 				2F7E099305244B612B096B86 /* ThumbnailService.swift */,
+				BF21DEE8F950B7304A8AA40F /* TwitterVideoService.swift */,
 				2E5C14CF112B283919BE0F7D /* VideoFrameExtractor.swift */,
 				F070C831AF60C5AF79237043 /* VideoPreviewManager.swift */,
 			);
@@ -394,6 +397,7 @@
 				27A5C73EBCC0338561829D33 /* ThumbnailService.swift in Sources */,
 				22B3C67B9FEA9300A6D969AE /* ToastView.swift in Sources */,
 				D8DEDAFF16754653D39B7B56 /* TransferableFileURL.swift in Sources */,
+				129E975D0AF5F70B0787E1BD /* TwitterVideoService.swift in Sources */,
 				9101F365F60BDAB8F4E28C3E /* VideoFrameExtractor.swift in Sources */,
 				429D34E9222F716D0D0BE26C /* VideoPreviewManager.swift in Sources */,
 				3C8305A01967D9D664D9AA3D /* View+DoubleClick.swift in Sources */,

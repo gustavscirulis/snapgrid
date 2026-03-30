@@ -258,11 +258,13 @@ struct FullScreenImageOverlay: View {
         let screen = UIScreen.main.bounds.size
         let maxW = screen.width - 24  // 12pt padding on each side
         let maxH = screen.height * 0.85
-        let widthScale = maxW / CGFloat(mediaItem.width)
-        let heightScale = maxH / CGFloat(mediaItem.height)
+        let itemW = max(CGFloat(mediaItem.width), 1)
+        let itemH = max(CGFloat(mediaItem.height), 1)
+        let widthScale = maxW / itemW
+        let heightScale = maxH / itemH
         let scale = min(widthScale, heightScale)
-        let w = CGFloat(mediaItem.width) * scale
-        let h = CGFloat(mediaItem.height) * scale
+        let w = itemW * scale
+        let h = itemH * scale
         return CGRect(
             x: (screen.width - w) / 2,
             y: (screen.height - h) / 2,

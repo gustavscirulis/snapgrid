@@ -479,19 +479,27 @@ struct ContentView: View {
             }
             if !urls.isEmpty {
                 Task {
-                    appState.showToast("Downloading\(urls.count == 1 ? "" : " \(urls.count) items")...")
+                    let hasTwitterURL = urls.contains(where: { TwitterVideoService.isTwitterURL($0) })
+                    appState.showToast(hasTwitterURL ? "Downloading from X..." : "Downloading\(urls.count == 1 ? "" : " \(urls.count) items")...")
                     var successCount = 0
                     for url in urls {
                         do {
-                            try await importService.importFromURL(url, into: modelContext, spaceId: appState.activeSpaceId)
+                            if TwitterVideoService.isTwitterURL(url) {
+                                try await importService.importFromTwitterURL(url, into: modelContext, spaceId: appState.activeSpaceId)
+                            } else {
+                                try await importService.importFromURL(url, into: modelContext, spaceId: appState.activeSpaceId)
+                            }
                             successCount += 1
                         } catch {
                             print("[Paste] Failed to import URL \(url): \(error)")
+                            if TwitterVideoService.isTwitterURL(url) {
+                                appState.showToast(error.localizedDescription)
+                            }
                         }
                     }
                     if successCount > 0 {
                         appState.showToast("Imported \(successCount) item\(successCount == 1 ? "" : "s")")
-                    } else {
+                    } else if !hasTwitterURL {
                         appState.showToast("URL doesn't point to a supported image or video")
                     }
                 }
