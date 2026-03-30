@@ -2,12 +2,22 @@ import SwiftUI
 import SwiftData
 
 struct DeveloperSettingsTab: View {
+    @AppStorage("debugSimulateEmptyState") private var simulateEmptyState = false
     @State private var showConfirmReset = false
     @State private var trashEmptied = false
     @State private var trashCount = 0
 
     var body: some View {
         Form {
+            Section("Simulation") {
+                Toggle("Simulate Empty State", isOn: $simulateEmptyState)
+                    .accessibilityLabel("Simulate empty state")
+
+                Text("Shows the empty state view without deleting any data.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Trash") {
                 LabeledContent("Items in trash") {
                     Text("\(trashCount)")

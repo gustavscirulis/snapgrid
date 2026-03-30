@@ -21,6 +21,12 @@ struct ContentView: View {
     @State private var isSearchActive = false
     @State private var isSearchFieldPresented = false
 
+    #if DEBUG
+    @AppStorage("debugSimulateEmptyState") private var debugSimulateEmptyState = false
+    #else
+    private let debugSimulateEmptyState = false
+    #endif
+
     private func itemsForSpace(_ spaceId: String?) -> [MediaItem] {
         var items = allItems
 
@@ -79,7 +85,7 @@ struct ContentView: View {
                 // File-import .onDrop is scoped here (not the whole window) so it
                 // doesn't steal drags from SpaceTabBar's .onDrop for space assignment.
                 Group {
-                    if allItems.isEmpty {
+                    if allItems.isEmpty || debugSimulateEmptyState {
                         EmptyStateView(isDragTargeted: isDragTargeted)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
