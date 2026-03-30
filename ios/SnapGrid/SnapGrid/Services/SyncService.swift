@@ -30,6 +30,13 @@ struct SidecarSpace: Codable, Sendable {
     let useCustomPrompt: Bool
 }
 
+/// Wrapper for spaces.json that includes all-space guidance alongside the spaces array.
+struct SidecarSpacesFile: Codable, Sendable {
+    let spaces: [SidecarSpace]
+    let allSpaceGuidance: String?
+    let useAllSpaceGuidance: Bool
+}
+
 // MARK: - SyncService
 
 /// Reads sidecar JSON files from the iCloud container and syncs them into SwiftData.
@@ -191,8 +198,20 @@ final class SyncService {
 
     private func syncSpaces(rootURL: URL, context: ModelContext) {
         let spacesURL = rootURL.appendingPathComponent("spaces.json")
-        guard let data = try? Data(contentsOf: spacesURL),
-              let sidecars = try? Self.decoder.decode([SidecarSpace].self, from: data) else {
+        guard let data = try? Data(contentsOf: spacesURL) else { return }
+
+        // Decode wrapper format first, fall back to legacy bare array
+        let sidecars: [SidecarSpace]
+        if let file = try? Self.decoder.decode(SidecarSpacesFile.self, from: data) {
+            sidecars = file.spaces
+            // Sync all-space guidance to UserDefaults so it's available during analysis
+            if let allGuidance = file.allSpaceGuidance {
+                UserDefaults.standard.set(allGuidance, forKey: "allSpacePrompt")
+            }
+            UserDefaults.standard.set(file.useAllSpaceGuidance, forKey: "useAllSpacePrompt")
+        } else if let legacySpaces = try? Self.decoder.decode([SidecarSpace].self, from: data) {
+            sidecars = legacySpaces
+        } else {
             return
         }
 

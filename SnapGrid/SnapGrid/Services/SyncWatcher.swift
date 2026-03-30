@@ -390,14 +390,21 @@ final class SyncWatcher {
     private func syncSpaces() async {
         guard let context else { return }
 
-        // Phase 1: Read JSON on background thread
-        let sidecarSpaces = await Task.detached {
-            MetadataSidecarService.shared.readSpaces()
+        // Phase 1: Read JSON on background thread (use wrapper format for all-space guidance)
+        let spacesFile = await Task.detached {
+            MetadataSidecarService.shared.readSpacesFile()
         }.value
 
+        let sidecarSpaces = spacesFile.spaces
         guard !sidecarSpaces.isEmpty else { return }
 
-        // Phase 2: Apply to SwiftData on main actor
+        // Phase 2: Sync all-space guidance to UserDefaults
+        if let allGuidance = spacesFile.allSpaceGuidance {
+            UserDefaults.standard.set(allGuidance, forKey: "allSpacePrompt")
+        }
+        UserDefaults.standard.set(spacesFile.useAllSpaceGuidance, forKey: "useAllSpacePrompt")
+
+        // Phase 3: Apply spaces to SwiftData on main actor
         let descriptor = FetchDescriptor<Space>()
         let existingSpaces = (try? context.fetch(descriptor)) ?? []
         let existingById = Dictionary(uniqueKeysWithValues: existingSpaces.map { ($0.id, $0) })
@@ -421,6 +428,8 @@ final class SyncWatcher {
             if let sidecar = sidecarById[space.id] {
                 if space.name != sidecar.name { space.name = sidecar.name }
                 if space.order != sidecar.order { space.order = sidecar.order }
+                if space.customPrompt != sidecar.customPrompt { space.customPrompt = sidecar.customPrompt }
+                if space.useCustomPrompt != sidecar.useCustomPrompt { space.useCustomPrompt = sidecar.useCustomPrompt }
             }
         }
 

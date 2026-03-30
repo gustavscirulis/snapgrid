@@ -29,6 +29,13 @@ struct SidecarSpace: Codable, Sendable {
     let useCustomPrompt: Bool
 }
 
+/// Wrapper for spaces.json that includes all-space guidance alongside the spaces array.
+struct SidecarSpacesFile: Codable, Sendable {
+    let spaces: [SidecarSpace]
+    let allSpaceGuidance: String?
+    let useAllSpaceGuidance: Bool
+}
+
 // MARK: - Service
 
 final class MetadataSidecarService: Sendable {
@@ -89,6 +96,7 @@ final class MetadataSidecarService: Sendable {
 
     // MARK: - Spaces
 
+    /// Write spaces to spaces.json, automatically including the current all-space guidance from UserDefaults.
     func writeSpaces(_ spaces: [Space]) {
         let sidecars = spaces.map { space in
             SidecarSpace(
@@ -103,19 +111,41 @@ final class MetadataSidecarService: Sendable {
         writeSpaceSidecars(sidecars)
     }
 
+    /// Write space sidecars to spaces.json, automatically including the current all-space guidance from UserDefaults.
     func writeSpaceSidecars(_ sidecars: [SidecarSpace]) {
+        let allGuidance = UserDefaults.standard.string(forKey: "allSpacePrompt")
+        let useAllGuidance = UserDefaults.standard.bool(forKey: "useAllSpacePrompt")
+        let file = SidecarSpacesFile(
+            spaces: sidecars,
+            allSpaceGuidance: allGuidance,
+            useAllSpaceGuidance: useAllGuidance
+        )
         let url = MediaStorageService.shared.baseURL.appendingPathComponent("spaces.json")
         do {
-            let data = try Self.encoder.encode(sidecars)
+            let data = try Self.encoder.encode(file)
             try data.write(to: url, options: .atomic)
         } catch {
             print("[MetadataSidecar] Failed to write spaces.json: \(error)")
         }
     }
 
-    func readSpaces() -> [SidecarSpace] {
+    /// Read spaces.json, handling both the new wrapper format and the legacy bare array.
+    func readSpacesFile() -> SidecarSpacesFile {
         let url = MediaStorageService.shared.baseURL.appendingPathComponent("spaces.json")
-        guard let data = try? Data(contentsOf: url) else { return [] }
-        return (try? Self.decoder.decode([SidecarSpace].self, from: data)) ?? []
+        guard let data = try? Data(contentsOf: url) else {
+            return SidecarSpacesFile(spaces: [], allSpaceGuidance: nil, useAllSpaceGuidance: false)
+        }
+        // Try wrapper format first
+        if let file = try? Self.decoder.decode(SidecarSpacesFile.self, from: data) {
+            return file
+        }
+        // Fall back to legacy bare array
+        let spaces = (try? Self.decoder.decode([SidecarSpace].self, from: data)) ?? []
+        return SidecarSpacesFile(spaces: spaces, allSpaceGuidance: nil, useAllSpaceGuidance: false)
+    }
+
+    /// Legacy convenience — returns just the spaces array.
+    func readSpaces() -> [SidecarSpace] {
+        readSpacesFile().spaces
     }
 }
