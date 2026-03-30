@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		69A2FAEBC4355557E9BBF91D /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA2C659B43CBFC9C4825931 /* MediaItem.swift */; };
+		787BBD33FD14A7CC420B8C71 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC24EBA6AD6068C4ADA26030 /* SyncService.swift */; };
+		810E66F164E96C78F5095B7B /* AnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A78C6996F3AEB37B949CCE /* AnalysisResult.swift */; };
 		A0E9D3DA2F7328AC00E35403 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A0E9D3D02F7328AC00E35403 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A100000001 /* SnapGridApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000001 /* SnapGridApp.swift */; };
 		A100000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000002 /* ContentView.swift */; };
@@ -28,10 +31,6 @@
 		A100000021 /* FullScreenImageOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000021 /* FullScreenImageOverlay.swift */; };
 		A100000022 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B100000022 /* AppIcon.icon */; };
 		A100000023 /* ShareImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000025 /* ShareImportService.swift */; };
-		69A2FAEBC4355557E9BBF91D /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA2C659B43CBFC9C4825931 /* MediaItem.swift */; };
-		810E66F164E96C78F5095B7B /* AnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A78C6996F3AEB37B949CCE /* AnalysisResult.swift */; };
-		787BBD33FD14A7CC420B8C71 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC24EBA6AD6068C4ADA26030 /* SyncService.swift */; };
-		F2AD76603369201957F4E1FD /* SearchIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFAB07291230EAED58390B4 /* SearchIndexService.swift */; };
 		A100000030 /* AnimationTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000030 /* AnimationTokens.swift */; };
 		A100000031 /* ImageImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000031 /* ImageImportService.swift */; };
 		A100000032 /* PhotoPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000032 /* PhotoPickerView.swift */; };
@@ -39,6 +38,7 @@
 		A100000036 /* KeySyncCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000036 /* KeySyncCrypto.swift */; };
 		A100000037 /* KeySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000037 /* KeySyncService.swift */; };
 		A100000038 /* AIAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000038 /* AIAnalysisService.swift */; };
+		F2AD76603369201957F4E1FD /* SearchIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFAB07291230EAED58390B4 /* SearchIndexService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -66,6 +66,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5CFAB07291230EAED58390B4 /* SearchIndexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchIndexService.swift; sourceTree = "<group>"; };
+		71A78C6996F3AEB37B949CCE /* AnalysisResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisResult.swift; sourceTree = "<group>"; };
+		8EA2C659B43CBFC9C4825931 /* MediaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItem.swift; sourceTree = "<group>"; };
 		A0E9D3D02F7328AC00E35403 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B100000001 /* SnapGridApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapGridApp.swift; sourceTree = "<group>"; };
 		B100000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -82,7 +85,6 @@
 		B100000016 /* ImageDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageDetailView.swift; sourceTree = "<group>"; };
 		B100000017 /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
 		B100000018 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
-		B100000030 /* AnimationTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationTokens.swift; sourceTree = "<group>"; };
 		B100000019 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B100000020 /* iCloudDownloadMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudDownloadMonitor.swift; sourceTree = "<group>"; };
 		B100000021 /* FullScreenImageOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenImageOverlay.swift; sourceTree = "<group>"; };
@@ -90,17 +92,15 @@
 		B100000023 /* SnapGrid.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SnapGrid.entitlements; sourceTree = "<group>"; };
 		B100000024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B100000025 /* ShareImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareImportService.swift; sourceTree = "<group>"; };
-		C100000001 /* SnapGrid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapGrid.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		8EA2C659B43CBFC9C4825931 /* MediaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItem.swift; sourceTree = "<group>"; };
-		71A78C6996F3AEB37B949CCE /* AnalysisResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisResult.swift; sourceTree = "<group>"; };
-		FC24EBA6AD6068C4ADA26030 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
-		5CFAB07291230EAED58390B4 /* SearchIndexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchIndexService.swift; sourceTree = "<group>"; };
+		B100000030 /* AnimationTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationTokens.swift; sourceTree = "<group>"; };
 		B100000031 /* ImageImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageImportService.swift; sourceTree = "<group>"; };
 		B100000032 /* PhotoPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerView.swift; sourceTree = "<group>"; };
 		B100000033 /* MediaDeleteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDeleteService.swift; sourceTree = "<group>"; };
 		B100000036 /* KeySyncCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncCrypto.swift; sourceTree = "<group>"; };
 		B100000037 /* KeySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncService.swift; sourceTree = "<group>"; };
 		B100000038 /* AIAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAnalysisService.swift; sourceTree = "<group>"; };
+		C100000001 /* SnapGrid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapGrid.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FC24EBA6AD6068C4ADA26030 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
