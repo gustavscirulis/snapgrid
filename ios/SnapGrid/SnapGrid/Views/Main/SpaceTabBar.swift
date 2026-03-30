@@ -37,7 +37,7 @@ struct SpaceTabBar: View {
         }
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.white.opacity(0.15))
+                .fill(Color.white.opacity(0.08))
                 .frame(height: 1)
         }
     }
