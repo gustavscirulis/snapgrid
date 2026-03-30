@@ -1,3 +1,4 @@
+import AVFoundation
 import UIKit
 import UniformTypeIdentifiers
 import os.log
@@ -97,7 +98,7 @@ class ShareViewController: UIViewController {
             return
         }
 
-        completeWithError("This content doesn't contain an image")
+        completeWithError("This content doesn't contain an image or video link")
     }
 
     // MARK: - Image Loading Strategies
@@ -257,7 +258,7 @@ class ShareViewController: UIViewController {
         return nil
     }
 
-    // MARK: - URL-based Image Loading
+    // MARK: - URL-based Loading
 
     private func loadImageFromURL(_ provider: NSItemProvider) {
         _ = provider.loadObject(ofClass: URL.self) { [weak self] object, error in
@@ -267,7 +268,42 @@ class ShareViewController: UIViewController {
                 return
             }
             log.info("URL: \(url.absoluteString)")
+
+            // Check for X / Twitter video URLs first
+            if TwitterVideoService.isTwitterURL(url) {
+                log.info("Detected X/Twitter URL, extracting video")
+                DispatchQueue.main.async {
+                    self?.statusLabel.text = "Downloading video from X…"
+                }
+                self?.downloadTwitterVideo(from: url)
+                return
+            }
+
             self?.downloadImage(from: url)
+        }
+    }
+
+    private func downloadTwitterVideo(from tweetURL: URL) {
+        Task {
+            do {
+                let videoURL = try await TwitterVideoService.extractVideoURL(from: tweetURL)
+                log.info("Video URL resolved: \(videoURL.absoluteString.prefix(100))")
+
+                let (data, response) = try await URLSession.shared.data(from: videoURL)
+                let http = response as? HTTPURLResponse
+                log.info("Video download: HTTP \(http?.statusCode ?? 0), \(data.count)b")
+
+                guard let http, (200...299).contains(http.statusCode) else {
+                    throw TwitterVideoService.TwitterError.apiRequestFailed(
+                        (response as? HTTPURLResponse)?.statusCode ?? 0
+                    )
+                }
+
+                await MainActor.run { self.saveVideo(data) }
+            } catch {
+                log.error("Twitter video extraction failed: \(error.localizedDescription)")
+                await MainActor.run { self.completeWithError(error.localizedDescription) }
+            }
         }
     }
 
@@ -388,6 +424,89 @@ class ShareViewController: UIViewController {
             DispatchQueue.main.async {
                 self.completeWithSuccess()
             }
+        }
+    }
+
+    // MARK: - Save Video
+
+    private func saveVideo(_ videoData: Data) {
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+
+            guard let containerURL = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: self.appGroupID
+            ) else {
+                await MainActor.run { self.completeWithError("App Group not available") }
+                return
+            }
+
+            let pendingDir = containerURL.appendingPathComponent("pending", isDirectory: true)
+            let imagesDir = pendingDir.appendingPathComponent("images", isDirectory: true)
+            let metadataDir = pendingDir.appendingPathComponent("metadata", isDirectory: true)
+
+            let fm = FileManager.default
+            try? fm.createDirectory(at: imagesDir, withIntermediateDirectories: true)
+            try? fm.createDirectory(at: metadataDir, withIntermediateDirectories: true)
+
+            let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+            let chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+            let random = String((0..<7).map { _ in chars.randomElement()! })
+            let id = "vid_\(timestamp)_\(random)"
+
+            let videoURL = imagesDir.appendingPathComponent("\(id).mp4")
+            do {
+                try videoData.write(to: videoURL, options: .atomic)
+            } catch {
+                await MainActor.run { self.completeWithError("Couldn't save the video") }
+                return
+            }
+
+            // Extract dimensions and duration from the saved file
+            let asset = AVURLAsset(url: videoURL)
+            var width = 0
+            var height = 0
+            var duration: Double?
+
+            if let track = try? await asset.loadTracks(withMediaType: .video).first {
+                let size = try? await track.load(.naturalSize)
+                let transform = try? await track.load(.preferredTransform)
+                if let size, let transform {
+                    let transformed = size.applying(transform)
+                    width = Int(abs(transformed.width))
+                    height = Int(abs(transformed.height))
+                }
+            }
+            let cmDuration = try? await asset.load(.duration)
+            if let cmDuration, cmDuration.isValid && !cmDuration.isIndefinite {
+                duration = CMTimeGetSeconds(cmDuration)
+            }
+
+            log.info("Video dimensions: \(width)x\(height), duration: \(duration ?? 0)s")
+
+            let sidecar = ShareSidecarMetadata(
+                id: id,
+                type: "video",
+                width: width,
+                height: height,
+                createdAt: Date(),
+                duration: duration,
+                spaceId: nil,
+                imageContext: nil,
+                imageSummary: nil,
+                patterns: nil
+            )
+
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+            let metadataURL = metadataDir.appendingPathComponent("\(id).json")
+            if let jsonData = try? encoder.encode(sidecar) {
+                try? jsonData.write(to: metadataURL, options: .atomic)
+            }
+
+            log.info("Saved video: \(id).mp4, \(videoData.count) bytes")
+            await MainActor.run { self.completeWithSuccess() }
         }
     }
 
