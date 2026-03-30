@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import SwiftData
 
@@ -495,7 +496,7 @@ struct MainView: View {
         // Query model context directly — @Query may not have refreshed yet after sync
         let descriptor = FetchDescriptor<MediaItem>()
         let allCurrentItems = (try? modelContext.fetch(descriptor)) ?? []
-        let unanalyzed = allCurrentItems.filter { $0.analysisResult == nil && !$0.isAnalyzing && $0.analysisError == nil && !$0.isVideo }
+        let unanalyzed = allCurrentItems.filter { $0.analysisResult == nil && !$0.isAnalyzing && $0.analysisError == nil }
         guard !unanalyzed.isEmpty else {
             print("[Analysis] No unanalyzed items found (total: \(allCurrentItems.count))")
             return
@@ -510,7 +511,12 @@ struct MainView: View {
 
                 item.isAnalyzing = true
                 do {
-                    let image = try loadImage(for: item, rootURL: rootURL)
+                    let image: UIImage
+                    if item.isVideo {
+                        image = try extractPosterFrame(for: item, rootURL: rootURL)
+                    } else {
+                        image = try loadImage(for: item, rootURL: rootURL)
+                    }
 
                     // Resolve guidance and space context
                     var guidance: String?
@@ -557,6 +563,16 @@ struct MainView: View {
             throw AIAnalysisService.AnalysisError.imageConversionFailed
         }
         return image
+    }
+
+    private func extractPosterFrame(for item: MediaItem, rootURL: URL) throws -> UIImage {
+        let videoURL = rootURL.appendingPathComponent("images/\(item.filename)")
+        let asset = AVURLAsset(url: videoURL)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 1280, height: 1280)
+        let cgImage = try generator.copyCGImage(at: CMTime(seconds: 1, preferredTimescale: 600), actualTime: nil)
+        return UIImage(cgImage: cgImage)
     }
 
     private func writeSidecar(for item: MediaItem, rootURL: URL) {
