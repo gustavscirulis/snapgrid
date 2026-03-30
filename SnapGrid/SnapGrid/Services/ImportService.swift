@@ -214,11 +214,14 @@ final class ImportService {
         }
     }
 
-    /// Import a video from an X / Twitter post URL — resolves the tweet to a direct MP4 link
-    /// and runs it through the standard URL import pipeline.
+    /// Import media from an X / Twitter post URL — resolves the tweet to a direct
+    /// MP4 or image link and runs it through the standard URL import pipeline.
     func importFromTwitterURL(_ url: URL, into context: ModelContext, spaceId: String? = nil) async throws {
-        let videoURL = try await TwitterVideoService.extractVideoURL(from: url)
-        try await importFromURL(videoURL, into: context, spaceId: spaceId)
+        let result = try await TwitterVideoService.extractMediaURL(from: url)
+        switch result {
+        case .video(let mediaURL), .image(let mediaURL):
+            try await importFromURL(mediaURL, into: context, spaceId: spaceId)
+        }
     }
 
     /// Import media from a remote HTTP/HTTPS URL — downloads the file, determines its type,

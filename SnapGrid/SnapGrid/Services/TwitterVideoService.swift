@@ -16,15 +16,19 @@ enum TwitterVideoService {
         return extractTweetId(from: url) != nil
     }
 
-    // MARK: - Video Extraction
+    // MARK: - Media Extraction
 
-    /// Fetches the tweet via the syndication API and returns the highest-bitrate MP4 URL.
-    static func extractVideoURL(from tweetURL: URL) async throws -> URL {
+    enum MediaResult {
+        case video(URL)
+        case image(URL)
+    }
+
+    /// Fetches the tweet via the syndication API and returns the best media URL (video or image).
+    static func extractMediaURL(from tweetURL: URL) async throws -> MediaResult {
         guard let tweetId = extractTweetId(from: tweetURL) else {
             throw TwitterError.invalidURL
         }
 
-        // The syndication API requires a `token` param but does not validate its value.
         let apiURL = URL(string: "https://cdn.syndication.twimg.com/tweet-result?id=\(tweetId)&token=x")!
 
         var request = URLRequest(url: apiURL)
@@ -44,34 +48,40 @@ enum TwitterVideoService {
             throw TwitterError.malformedResponse
         }
 
-        // Find the first video or animated_gif media entry.
-        guard let videoMedia = mediaDetails.first(where: {
+        // Prefer video/animated_gif over photos.
+        if let videoMedia = mediaDetails.first(where: {
             let type = $0["type"] as? String
             return type == "video" || type == "animated_gif"
-        }) else {
-            throw TwitterError.noVideoInTweet
-        }
-
-        guard let videoInfo = videoMedia["video_info"] as? [String: Any],
-              let variants = videoInfo["variants"] as? [[String: Any]] else {
-            throw TwitterError.malformedResponse
-        }
-
-        // Filter to MP4 variants and pick the highest bitrate.
-        let mp4Variant = variants
-            .filter { ($0["content_type"] as? String) == "video/mp4" }
-            .compactMap { variant -> (url: String, bitrate: Int)? in
-                guard let url = variant["url"] as? String,
-                      let bitrate = variant["bitrate"] as? Int else { return nil }
-                return (url, bitrate)
+        }) {
+            guard let videoInfo = videoMedia["video_info"] as? [String: Any],
+                  let variants = videoInfo["variants"] as? [[String: Any]] else {
+                throw TwitterError.malformedResponse
             }
-            .max(by: { $0.bitrate < $1.bitrate })
 
-        guard let best = mp4Variant, let videoURL = URL(string: best.url) else {
-            throw TwitterError.noVideoInTweet
+            let mp4Variant = variants
+                .filter { ($0["content_type"] as? String) == "video/mp4" }
+                .compactMap { variant -> (url: String, bitrate: Int)? in
+                    guard let url = variant["url"] as? String,
+                          let bitrate = variant["bitrate"] as? Int else { return nil }
+                    return (url, bitrate)
+                }
+                .max(by: { $0.bitrate < $1.bitrate })
+
+            guard let best = mp4Variant, let videoURL = URL(string: best.url) else {
+                throw TwitterError.noMediaInTweet
+            }
+
+            return .video(videoURL)
         }
 
-        return videoURL
+        // Fall back to photo.
+        if let photoMedia = mediaDetails.first(where: { ($0["type"] as? String) == "photo" }),
+           let mediaURLString = photoMedia["media_url_https"] as? String,
+           let mediaURL = URL(string: mediaURLString + "?name=large") {
+            return .image(mediaURL)
+        }
+
+        throw TwitterError.noMediaInTweet
     }
 
     // MARK: - Private Helpers
@@ -91,7 +101,7 @@ enum TwitterVideoService {
 
     enum TwitterError: LocalizedError {
         case invalidURL
-        case noVideoInTweet
+        case noMediaInTweet
         case apiRequestFailed(Int)
         case malformedResponse
 
@@ -99,8 +109,8 @@ enum TwitterVideoService {
             switch self {
             case .invalidURL:
                 return "Not a valid X post URL"
-            case .noVideoInTweet:
-                return "This post doesn't contain a video"
+            case .noMediaInTweet:
+                return "This post doesn't contain any media"
             case .apiRequestFailed(let code):
                 return "Couldn't fetch post data from X (HTTP \(code))"
             case .malformedResponse:

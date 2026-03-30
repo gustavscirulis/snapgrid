@@ -271,11 +271,11 @@ class ShareViewController: UIViewController {
 
             // Check for X / Twitter video URLs first
             if TwitterVideoService.isTwitterURL(url) {
-                log.info("Detected X/Twitter URL, extracting video")
+                log.info("Detected X/Twitter URL, extracting media")
                 DispatchQueue.main.async {
-                    self?.statusLabel.text = "Downloading video from X…"
+                    self?.statusLabel.text = "Downloading from X…"
                 }
-                self?.downloadTwitterVideo(from: url)
+                self?.downloadTwitterMedia(from: url)
                 return
             }
 
@@ -283,15 +283,21 @@ class ShareViewController: UIViewController {
         }
     }
 
-    private func downloadTwitterVideo(from tweetURL: URL) {
+    private func downloadTwitterMedia(from tweetURL: URL) {
         Task {
             do {
-                let videoURL = try await TwitterVideoService.extractVideoURL(from: tweetURL)
-                log.info("Video URL resolved: \(videoURL.absoluteString.prefix(100))")
+                let result = try await TwitterVideoService.extractMediaURL(from: tweetURL)
 
-                let (data, response) = try await URLSession.shared.data(from: videoURL)
+                let mediaURL: URL
+                switch result {
+                case .video(let url): mediaURL = url
+                case .image(let url): mediaURL = url
+                }
+                log.info("Media URL resolved: \(mediaURL.absoluteString.prefix(100))")
+
+                let (data, response) = try await URLSession.shared.data(from: mediaURL)
                 let http = response as? HTTPURLResponse
-                log.info("Video download: HTTP \(http?.statusCode ?? 0), \(data.count)b")
+                log.info("Media download: HTTP \(http?.statusCode ?? 0), \(data.count)b")
 
                 guard let http, (200...299).contains(http.statusCode) else {
                     throw TwitterVideoService.TwitterError.apiRequestFailed(
@@ -299,9 +305,17 @@ class ShareViewController: UIViewController {
                     )
                 }
 
-                await MainActor.run { self.saveVideo(data) }
+                switch result {
+                case .video:
+                    await MainActor.run { self.saveVideo(data) }
+                case .image:
+                    guard let image = UIImage(data: data) else {
+                        throw TwitterVideoService.TwitterError.malformedResponse
+                    }
+                    await MainActor.run { self.saveImage(image) }
+                }
             } catch {
-                log.error("Twitter video extraction failed: \(error.localizedDescription)")
+                log.error("Twitter media extraction failed: \(error.localizedDescription)")
                 await MainActor.run { self.completeWithError(error.localizedDescription) }
             }
         }

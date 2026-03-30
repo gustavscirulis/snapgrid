@@ -480,7 +480,7 @@ struct ContentView: View {
             if !urls.isEmpty {
                 Task {
                     let hasTwitterURL = urls.contains(where: { TwitterVideoService.isTwitterURL($0) })
-                    appState.showToast(hasTwitterURL ? "Downloading video from X..." : "Downloading\(urls.count == 1 ? "" : " \(urls.count) items")...")
+                    appState.showToast(hasTwitterURL ? "Downloading from X..." : "Downloading\(urls.count == 1 ? "" : " \(urls.count) items")...")
                     var successCount = 0
                     for url in urls {
                         do {
