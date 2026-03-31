@@ -48,6 +48,12 @@ struct HeroDetailOverlay: View {
     let sourceFrame: CGRect
     let onAnimationComplete: () -> Void
     let onCurrentItemChanged: ((String) -> Void)?
+    let onShare: ((String, CGRect) -> Void)?
+    let onRedoAnalysis: ((String) -> Void)?
+    let onDelete: ((String) -> Void)?
+    let onAssignToSpace: ((String, String?) -> Void)?
+    let spaces: [Space]
+    let activeSpaceId: String?
 
     @Environment(VideoPreviewManager.self) private var videoPreview
     @Environment(AppState.self) private var appState
@@ -85,13 +91,25 @@ struct HeroDetailOverlay: View {
         startIndex: Int,
         sourceFrame: CGRect,
         onAnimationComplete: @escaping () -> Void,
-        onCurrentItemChanged: ((String) -> Void)? = nil
+        onCurrentItemChanged: ((String) -> Void)? = nil,
+        onShare: ((String, CGRect) -> Void)? = nil,
+        onRedoAnalysis: ((String) -> Void)? = nil,
+        onDelete: ((String) -> Void)? = nil,
+        onAssignToSpace: ((String, String?) -> Void)? = nil,
+        spaces: [Space] = [],
+        activeSpaceId: String? = nil
     ) {
         _items = State(initialValue: items)
         self.startIndex = startIndex
         self.sourceFrame = sourceFrame
         self.onAnimationComplete = onAnimationComplete
         self.onCurrentItemChanged = onCurrentItemChanged
+        self.onShare = onShare
+        self.onRedoAnalysis = onRedoAnalysis
+        self.onDelete = onDelete
+        self.onAssignToSpace = onAssignToSpace
+        self.spaces = spaces
+        self.activeSpaceId = activeSpaceId
         _currentIndex = State(initialValue: startIndex)
         _closeTargetFrame = State(initialValue: sourceFrame)
         _image = State(initialValue: ImageCacheService.shared.image(forKey: items[startIndex].id))
@@ -559,6 +577,7 @@ struct HeroDetailOverlay: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .onDrag { makeDragProvider() } preview: { dragPreview }
                 .onTapGesture { triggerClose() }
+                .contextMenu { detailContextMenu(frame: finalFrame) }
 
                 DetailMetadataSection(item: currentItem, stage: metadataStage) { pattern in
                     // Set search so grid re-layouts and reports new frame position
@@ -684,6 +703,62 @@ struct HeroDetailOverlay: View {
         }.value
         if let loaded, items[currentIndex].id == item.id {
             self.image = loaded
+        }
+    }
+
+    // MARK: - Context Menu
+
+    @ViewBuilder
+    private func detailContextMenu(frame: CGRect) -> some View {
+        if !spaces.isEmpty {
+            Menu {
+                ForEach(spaces) { space in
+                    Button {
+                        onAssignToSpace?(currentItem.id, space.id)
+                    } label: {
+                        if currentItem.space?.id == space.id {
+                            Label(space.name, systemImage: "checkmark")
+                        } else {
+                            Text(space.name)
+                        }
+                    }
+                }
+            } label: {
+                Label("Move to", systemImage: "folder")
+            }
+
+            if activeSpaceId != nil {
+                Button {
+                    onAssignToSpace?(currentItem.id, nil)
+                } label: {
+                    Label("Remove from Space", systemImage: "folder.badge.minus")
+                }
+            }
+
+            Divider()
+        }
+
+        Button {
+            onShare?(currentItem.id, frame)
+        } label: {
+            Label("Share...", systemImage: "square.and.arrow.up")
+        }
+
+        Button {
+            onRedoAnalysis?(currentItem.id)
+        } label: {
+            Label("Redo Analysis", systemImage: "arrow.clockwise")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            triggerClose()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                onDelete?(currentItem.id)
+            }
+        } label: {
+            Label("Delete", systemImage: "trash")
         }
     }
 

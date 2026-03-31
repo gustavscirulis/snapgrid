@@ -72,7 +72,9 @@ struct SpaceTabBar: View {
             .onPreferenceChange(TabFrameKey.self) { tabFrames = $0 }
         }
         .overlay(alignment: .bottom) {
-            Divider().opacity(0.5)
+            Rectangle()
+                .fill(Color.white.opacity(0.1))
+                .frame(height: 1)
         }
         .alert("Delete Space?", isPresented: Binding(
             get: { spaceToDelete != nil },

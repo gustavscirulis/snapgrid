@@ -19,6 +19,8 @@ struct GridItemView: View {
     var isSelected: Bool = false
     var onSelect: ((MediaItem, CGRect, UIImage?) -> Void)?
     var onRetryAnalysis: (() -> Void)?
+    var onShare: (() -> Void)?
+    var onDelete: (() -> Void)?
     @State private var thumbnail: UIImage?
     @State private var loadFailed = false
 
@@ -150,6 +152,27 @@ struct GridItemView: View {
                     )
             }
         )
+        .contextMenu {
+            Button {
+                onShare?()
+            } label: {
+                Label("Share...", systemImage: "square.and.arrow.up")
+            }
+
+            Button {
+                onRetryAnalysis?()
+            } label: {
+                Label("Redo Analysis", systemImage: "arrow.clockwise")
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                onDelete?()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
         .task {
             await loadThumbnail()
         }

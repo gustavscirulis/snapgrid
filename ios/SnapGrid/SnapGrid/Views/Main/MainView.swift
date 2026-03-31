@@ -77,6 +77,8 @@ struct MainView: View {
     @State private var showPhotosPicker = false
     @State private var showFilesPicker = false
     @State private var isImporting = false
+    @State private var itemToDelete: MediaItem?
+    @State private var shareItem: URL?
 
     // MARK: - Index ↔ activeSpaceId bridging
 
@@ -149,7 +151,9 @@ struct MainView: View {
                                     availableWidth: gridWidth,
                                     selectedItemId: showOverlay ? selectedItemId : nil,
                                     onItemSelected: handleItemSelected,
-                                    onRetryAnalysis: handleRetryAnalysis
+                                    onRetryAnalysis: handleRetryAnalysis,
+                                    onShareItem: handleShareItem,
+                                    onDeleteItem: { item in itemToDelete = item }
                                 )
                                 .padding(.horizontal, 12)
                                 .padding(.bottom, 70)
@@ -181,7 +185,10 @@ struct MainView: View {
                                                 items: allPageItems,
                                                 availableWidth: gridWidth,
                                                 selectedItemId: showOverlay ? selectedItemId : nil,
-                                                onItemSelected: handleItemSelected
+                                                onItemSelected: handleItemSelected,
+                                                onRetryAnalysis: handleRetryAnalysis,
+                                                onShareItem: handleShareItem,
+                                                onDeleteItem: { item in itemToDelete = item }
                                             )
                                             .padding(.horizontal, 12)
                                             .padding(.top, 12)
@@ -206,7 +213,10 @@ struct MainView: View {
                                                     items: spaceItems,
                                                     availableWidth: gridWidth,
                                                     selectedItemId: showOverlay ? selectedItemId : nil,
-                                                    onItemSelected: handleItemSelected
+                                                    onItemSelected: handleItemSelected,
+                                                    onRetryAnalysis: handleRetryAnalysis,
+                                                    onShareItem: handleShareItem,
+                                                    onDeleteItem: { item in itemToDelete = item }
                                                 )
                                                 .padding(.horizontal, 12)
                                                 .padding(.top, 12)
@@ -358,6 +368,30 @@ struct MainView: View {
                 handlePickedImages(images)
             }
         }
+        .sheet(isPresented: Binding(
+            get: { shareItem != nil },
+            set: { if !$0 { shareItem = nil } }
+        )) {
+            if let url = shareItem {
+                ActivityView(activityItems: [url])
+                    .presentationDetents([.medium, .large])
+            }
+        }
+        .confirmationDialog(
+            "Delete this item?",
+            isPresented: Binding(
+                get: { itemToDelete != nil },
+                set: { if !$0 { itemToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let item = itemToDelete {
+                    handleItemDeleted(item)
+                    itemToDelete = nil
+                }
+            }
+        }
     }
 
     // MARK: - Add Images Menu
@@ -402,6 +436,21 @@ struct MainView: View {
         }
         modelContext.delete(item)
         try? modelContext.save()
+    }
+
+    // MARK: - Item Sharing
+
+    private func handleShareItem(_ item: MediaItem) {
+        guard let url = item.mediaURL else { return }
+        let tempDir = FileManager.default.temporaryDirectory
+        let tempURL = tempDir.appendingPathComponent(url.lastPathComponent)
+        try? FileManager.default.removeItem(at: tempURL)
+        do {
+            try FileManager.default.copyItem(at: url, to: tempURL)
+            shareItem = tempURL
+        } catch {
+            shareItem = url
+        }
     }
 
     // MARK: - Image Import
@@ -466,7 +515,9 @@ struct MainView: View {
 
     private func handleRetryAnalysis(_ item: MediaItem) {
         item.analysisError = nil
-        analyzeUnanalyzedItems()
+        item.analysisResult = nil
+        try? modelContext.save()
+        analyzeSingleItem(item)
     }
 
     // MARK: - AI Analysis
@@ -559,6 +610,64 @@ struct MainView: View {
                     item.analysisError = error.localizedDescription
                     print("[Analysis] Failed for \(item.id): \(error.localizedDescription)")
                 }
+            }
+        }
+    }
+
+    private func analyzeSingleItem(_ item: MediaItem) {
+        guard keySyncService.isUnlocked else { return }
+        guard let providerStr = keySyncService.activeProvider,
+              let provider = AIProvider(rawValue: providerStr) else { return }
+        guard let apiKey = keySyncService.activeAPIKey() else { return }
+        guard let rootURL = fileSystem.rootURL else { return }
+
+        let model = keySyncService.activeModel ?? provider.defaultModel
+        let resolvedModel = (model == "auto") ? provider.defaultModel : model
+
+        Task {
+            item.isAnalyzing = true
+            do {
+                let image: UIImage
+                if item.isVideo {
+                    image = try extractPosterFrame(for: item, rootURL: rootURL)
+                } else {
+                    image = try loadImage(for: item, rootURL: rootURL)
+                }
+
+                var guidance: String?
+                var spaceContext: String?
+                if let space = item.space {
+                    spaceContext = "This image belongs to a collection called \"\(space.name)\". Use this as context to inform your analysis."
+                    if space.useCustomPrompt, let custom = space.customPrompt, !custom.isEmpty {
+                        guidance = custom
+                    }
+                }
+                if guidance == nil, UserDefaults.standard.bool(forKey: "useAllSpacePrompt") {
+                    let allGuidance = UserDefaults.standard.string(forKey: "allSpacePrompt") ?? ""
+                    if !allGuidance.isEmpty {
+                        guidance = allGuidance
+                    }
+                }
+
+                let result = try await AIAnalysisService.shared.analyze(
+                    image: image,
+                    provider: provider,
+                    model: resolvedModel,
+                    apiKey: apiKey,
+                    guidance: guidance,
+                    spaceContext: spaceContext
+                )
+                item.analysisResult = result
+                item.isAnalyzing = false
+                item.analysisError = nil
+                writeSidecar(for: item, rootURL: rootURL)
+                searchService.buildIndex(items: allItems)
+                try? modelContext.save()
+                print("[Analysis] Redo completed: \(item.id)")
+            } catch {
+                item.isAnalyzing = false
+                item.analysisError = error.localizedDescription
+                print("[Analysis] Redo failed for \(item.id): \(error.localizedDescription)")
             }
         }
     }
