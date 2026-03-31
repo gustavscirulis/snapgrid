@@ -72,6 +72,10 @@ struct GridItemView: View {
         return item.id == hiddenItemId ? 0 : 1
     }
 
+    private var deleteStage: Int {
+        appState.deleteStage(for: item.id)
+    }
+
     /// Whether this item is part of a multi-selection context menu
     private var isBulk: Bool {
         isSelected && selectedCount > 1
@@ -249,12 +253,19 @@ struct GridItemView: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        // Delete animation — wallet card crush (mask approach)
+        .mask {
+            let maskH = deleteStage >= 1 ? height * CardCrush.crushedScaleY : height
+            let maskW = deleteStage >= 2 ? width * CardCrush.crushedScaleX : width
+            RoundedRectangle(cornerRadius: 12)
+                .frame(width: maskW, height: maskH)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+                .strokeBorder(isSelected && deleteStage == 0 ? Color.accentColor : Color.clear, lineWidth: 2)
         )
         .shadow(
-            color: .black.opacity(effectiveHover ? 0.1 : 0.05),
+            color: .black.opacity(deleteStage > 0 ? 0 : (effectiveHover ? 0.1 : 0.05)),
             radius: effectiveHover ? 6 : 2,
             x: 0,
             y: effectiveHover ? 4 : 1
@@ -263,7 +274,12 @@ struct GridItemView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityDescription)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHidden(deleteStage > 0)
         .onHover { hovering in
+            guard deleteStage == 0 else {
+                isHovered = false
+                return
+            }
             isHovered = hovering
             hoverTask?.cancel()
             if item.isVideo {
@@ -332,7 +348,7 @@ struct GridItemView: View {
             }
             .opacity(0.85)
         }
-        .opacity(gridItemOpacity)
+        .opacity(deleteStage >= 2 ? 0 : gridItemOpacity)
         .onGeometryChange(for: CGRect.self) { proxy in
             proxy.frame(in: .global)
         } action: { newValue in

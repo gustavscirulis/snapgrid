@@ -535,6 +535,9 @@ struct ContentView: View {
 
     private func deleteItems(_ ids: Set<String>) {
         let items = allItems.filter { ids.contains($0.id) }
+        guard !items.isEmpty else { return }
+
+        // Snapshot for undo
         let batch = items.map { item in
             let ar = item.analysisResult
             return DeletedItemInfo(
@@ -554,6 +557,42 @@ struct ContentView: View {
             )
         }
         appState.pushDeleteBatch(batch)
+        appState.clearSelection()
+
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+
+        if reduceMotion {
+            withAnimation(CardCrush.reducedMotionFade) {
+                for id in ids { appState.deletingItemStages[id] = 2 }
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: CardCrush.reducedMotionDelay)
+                commitDeletion(ids)
+            }
+        } else {
+            // Stage 1 — height crushes inward
+            withAnimation(CardCrush.heightCrush) {
+                for id in ids { appState.deletingItemStages[id] = 1 }
+            }
+            Task { @MainActor in
+                // Stage 2 — width collapses + fade out
+                try? await Task.sleep(for: CardCrush.widthDelay)
+                withAnimation(CardCrush.widthCrush) {
+                    for id in ids { appState.deletingItemStages[id] = 2 }
+                }
+
+                // Crush complete — commit deletion
+                try? await Task.sleep(for: CardCrush.completeDelay)
+                commitDeletion(ids)
+            }
+        }
+    }
+
+    private func commitDeletion(_ ids: Set<String>) {
+        // Guard: if undo already removed these from the stage dictionary, skip
+        guard ids.contains(where: { appState.deletingItemStages[$0] != nil }) else { return }
+
+        let items = allItems.filter { ids.contains($0.id) }
 
         syncWatcher.beginLocalChange()
         var trashedCount = 0
@@ -566,9 +605,19 @@ struct ContentView: View {
                 print("[Delete] Failed to trash \(item.id): \(error)")
             }
         }
-        try? modelContext.save()
+        withAnimation(SnapSpring.standard) {
+            try? modelContext.save()
+        }
         syncWatcher.endLocalChange()
-        appState.clearSelection()
+
+        // Clean up animation state after SwiftUI finishes removing views.
+        // If cleaned up immediately, deleteStage snaps to 0 and the crushed
+        // item briefly flashes at full size during the removal transition.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(500))
+            for id in ids { appState.deletingItemStages.removeValue(forKey: id) }
+        }
+
         if trashedCount > 0 {
             appState.showToast("Moved \(trashedCount) item\(trashedCount == 1 ? "" : "s") to trash")
         }

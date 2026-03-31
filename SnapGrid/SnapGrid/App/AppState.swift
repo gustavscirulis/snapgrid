@@ -29,6 +29,14 @@ final class AppState {
     var isSettingsOpen: Bool = false
     var isDraggingFromApp: Bool = false
 
+    /// Per-item delete animation stage: 1 = height crush, 2 = width crush + fade.
+    /// Items not in this dictionary are at stage 0 (normal).
+    var deletingItemStages: [String: Int] = [:]
+
+    func deleteStage(for id: String) -> Int {
+        deletingItemStages[id] ?? 0
+    }
+
     // Undo stack — stores enough info to fully restore deleted items
     private(set) var deletedBatches: [[DeletedItemInfo]] = []
 
