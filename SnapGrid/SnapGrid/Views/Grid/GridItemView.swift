@@ -17,6 +17,7 @@ struct GridItemView: View {
     let onDelete: () -> Void
     let onAssignToSpace: (String?) -> Void
     let onRetryAnalysis: () -> Void
+    let onShare: (CGRect) -> Void
 
     @Environment(VideoPreviewManager.self) private var videoPreview
     @Environment(AppState.self) private var appState
@@ -26,7 +27,13 @@ struct GridItemView: View {
     @State private var globalFrame: CGRect = .zero
     @State private var hoverTask: Task<Void, Never>?
 
-    init(item: MediaItem, width: CGFloat, isSelected: Bool, spaces: [Space], activeSpaceId: String?, selectedCount: Int, effectiveIds: Set<String>, hiddenItemId: String?, onSelect: @escaping (CGRect) -> Void, onToggleSelect: @escaping () -> Void, onShiftSelect: @escaping () -> Void, onDelete: @escaping () -> Void, onAssignToSpace: @escaping (String?) -> Void, onRetryAnalysis: @escaping () -> Void) {
+    // Eagerly resolved SwiftData properties — prevents faults on detached backing stores
+    // when SwiftUI re-evaluates the body (e.g. for context menu snapshots).
+    private let itemIsVideo: Bool
+    private let itemSpaceId: String?
+    private let itemAspectRatio: CGFloat
+
+    init(item: MediaItem, width: CGFloat, isSelected: Bool, spaces: [Space], activeSpaceId: String?, selectedCount: Int, effectiveIds: Set<String>, hiddenItemId: String?, onSelect: @escaping (CGRect) -> Void, onToggleSelect: @escaping () -> Void, onShiftSelect: @escaping () -> Void, onDelete: @escaping () -> Void, onAssignToSpace: @escaping (String?) -> Void, onRetryAnalysis: @escaping () -> Void, onShare: @escaping (CGRect) -> Void) {
         self.item = item
         self.width = width
         self.isSelected = isSelected
@@ -41,16 +48,20 @@ struct GridItemView: View {
         self.onDelete = onDelete
         self.onAssignToSpace = onAssignToSpace
         self.onRetryAnalysis = onRetryAnalysis
+        self.onShare = onShare
+        self.itemIsVideo = item.isVideo
+        self.itemSpaceId = item.space?.id
+        self.itemAspectRatio = item.aspectRatio
         _thumbnail = State(initialValue: ImageCacheService.shared.image(forKey: item.id))
     }
 
     private var height: CGFloat {
-        width / item.aspectRatio
+        width / itemAspectRatio
     }
 
     private var accessibilityDescription: String {
         var parts: [String] = []
-        if item.isVideo { parts.append("Video") } else { parts.append("Image") }
+        if itemIsVideo { parts.append("Video") } else { parts.append("Image") }
         if let summary = item.analysisResult?.imageSummary, !summary.isEmpty {
             parts.append(summary)
         }
@@ -81,15 +92,15 @@ struct GridItemView: View {
     /// The NSView-backed AVPlayerLayer causes a spurious onHover(false) when it appears
     /// on top; this keeps hover UI visible for the duration of the grid preview.
     private var effectiveHover: Bool {
-        isHovered || (item.isVideo && videoPreview.activeItemId == item.id && videoPreview.displayState == .grid)
+        isHovered || (itemIsVideo && videoPreview.activeItemId == item.id && videoPreview.displayState == .grid)
     }
 
     /// Whether to show the SwiftUI gradient scrim behind pattern pills.
     /// Suppressed for video items when the floating video layer provides its own CAGradientLayer.
-    /// Guarded by `item.isVideo` so non-video items never subscribe to `activeItemId` changes.
+    /// Guarded by `itemIsVideo` so non-video items never subscribe to `activeItemId` changes.
     private var showHoverGradient: Bool {
         guard effectiveHover else { return false }
-        guard item.isVideo else { return true }
+        guard itemIsVideo else { return true }
         return videoPreview.activeItemId != item.id
     }
 
@@ -105,7 +116,7 @@ struct GridItemView: View {
                 } else {
                     // Pre-claim the video player BEFORE overlay appears —
                     // prevents onHover(false) race from destroying it
-                    if item.isVideo {
+                    if itemIsVideo {
                         videoPreview.claimForDetail()
                     }
                     onSelect(globalFrame)
@@ -134,7 +145,7 @@ struct GridItemView: View {
             // LAYER 2: Non-interactive visual overlays
             Group {
                 // Video badge (hidden during active preview — floating layer renders video)
-                if item.isVideo && videoPreview.activeItemId != item.id {
+                if itemIsVideo && videoPreview.activeItemId != item.id {
                     VStack {
                         Spacer()
                         HStack {
@@ -245,7 +256,7 @@ struct GridItemView: View {
                 .buttonStyle(.plain)
                 .padding(8)
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
-                .accessibilityLabel("Retry analysis")
+                .accessibilityLabel("Redo analysis")
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -266,7 +277,7 @@ struct GridItemView: View {
         .onHover { hovering in
             isHovered = hovering
             hoverTask?.cancel()
-            if item.isVideo {
+            if itemIsVideo {
                 if hovering {
                     hoverTask = Task {
                         try? await Task.sleep(for: .milliseconds(200))
@@ -313,7 +324,7 @@ struct GridItemView: View {
                     Image(nsImage: thumbnail)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 96, height: 96 / item.aspectRatio)
+                        .frame(width: 96, height: 96 / itemAspectRatio)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else {
                     RoundedRectangle(cornerRadius: 8)
@@ -338,7 +349,7 @@ struct GridItemView: View {
         } action: { newValue in
             globalFrame = newValue
             // Keep the floating video layer in sync with scroll/resize
-            if item.isVideo && videoPreview.activeItemId == item.id {
+            if itemIsVideo && videoPreview.activeItemId == item.id {
                 videoPreview.updateGridFrame(newValue)
             }
             // Keep detail source frame in sync when this item is the active detail
@@ -357,37 +368,51 @@ struct GridItemView: View {
         }
         .contextMenu {
             // Move to space submenu
-            Menu(isBulk ? "Move \(selectedCount) items to" : "Move to") {
+            Menu {
                 ForEach(spaces) { space in
                     Button {
                         onAssignToSpace(space.id)
                     } label: {
-                        if item.space?.id == space.id {
+                        if itemSpaceId == space.id {
                             Label(space.name, systemImage: "checkmark")
                         } else {
                             Text(space.name)
                         }
                     }
                 }
+            } label: {
+                Label(isBulk ? "Move \(selectedCount) Items to" : "Move to", systemImage: "folder")
             }
 
             // Remove from space
             if activeSpaceId != nil {
-                Button(isBulk ? "Remove \(selectedCount) from Space" : "Remove from Space") {
+                Button {
                     onAssignToSpace(nil)
+                } label: {
+                    Label(isBulk ? "Remove \(selectedCount) from Space" : "Remove from Space", systemImage: "folder.badge.minus")
                 }
             }
 
             Divider()
 
-            Button(isBulk ? "Retry Analysis for \(selectedCount) Items" : "Retry Analysis") {
+            Button {
+                onShare(globalFrame)
+            } label: {
+                Label("Share...", systemImage: "square.and.arrow.up")
+            }
+
+            Button {
                 onRetryAnalysis()
+            } label: {
+                Label(isBulk ? "Redo Analysis for \(selectedCount) Items" : "Redo Analysis", systemImage: "arrow.clockwise")
             }
 
             Divider()
 
-            Button(isBulk ? "Delete \(selectedCount) Items" : "Delete", role: .destructive) {
+            Button(role: .destructive) {
                 onDelete()
+            } label: {
+                Label(isBulk ? "Delete \(selectedCount) Items" : "Delete", systemImage: "trash")
             }
         }
         .task {

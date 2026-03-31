@@ -38,6 +38,7 @@
 		A100000036 /* KeySyncCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000036 /* KeySyncCrypto.swift */; };
 		A100000037 /* KeySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000037 /* KeySyncService.swift */; };
 		A100000038 /* AIAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000038 /* AIAnalysisService.swift */; };
+		A100000040 /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000040 /* ActivityView.swift */; };
 		F2AD76603369201957F4E1FD /* SearchIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFAB07291230EAED58390B4 /* SearchIndexService.swift */; };
 /* End PBXBuildFile section */
 
@@ -99,6 +100,7 @@
 		B100000036 /* KeySyncCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncCrypto.swift; sourceTree = "<group>"; };
 		B100000037 /* KeySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncService.swift; sourceTree = "<group>"; };
 		B100000038 /* AIAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAnalysisService.swift; sourceTree = "<group>"; };
+		B100000040 /* ActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityView.swift; sourceTree = "<group>"; };
 		C100000001 /* SnapGrid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapGrid.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FC24EBA6AD6068C4ADA26030 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -266,6 +268,7 @@
 		E100000014 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				B100000040 /* ActivityView.swift */,
 				B100000030 /* AnimationTokens.swift */,
 				B100000018 /* EmptyStateView.swift */,
 			);
@@ -422,6 +425,7 @@
 				A100000036 /* KeySyncCrypto.swift in Sources */,
 				A100000037 /* KeySyncService.swift in Sources */,
 				A100000038 /* AIAnalysisService.swift in Sources */,
+				A100000040 /* ActivityView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

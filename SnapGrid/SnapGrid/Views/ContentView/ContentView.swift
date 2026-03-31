@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppKit
 import UniformTypeIdentifiers
 
 struct ContentView: View {
@@ -131,7 +132,21 @@ struct ContentView: View {
                     },
                     onCurrentItemChanged: { newId in
                         appState.detailItem = newId
-                    }
+                    },
+                    onShare: { id, frame in
+                        shareItems(Set([id]), sourceFrame: frame)
+                    },
+                    onRedoAnalysis: { id in
+                        retryAnalysis(Set([id]))
+                    },
+                    onDelete: { id in
+                        deleteItems(Set([id]))
+                    },
+                    onAssignToSpace: { id, spaceId in
+                        assignToSpace(itemIds: Set([id]), spaceId: spaceId)
+                    },
+                    spaces: spaces,
+                    activeSpaceId: appState.activeSpaceId
                 )
                 }
             }
@@ -387,6 +402,7 @@ struct ContentView: View {
                         onDelete: deleteItems,
                         onAssignToSpace: assignToSpace,
                         onRetryAnalysis: retryAnalysis,
+                        onShare: { ids, frame in shareItems(ids, sourceFrame: frame) },
                         onSetSelection: { ids in appState.selectedIds = ids },
                         coordinateSpaceName: "gridContent-\(spaceId ?? "all")"
                     )
@@ -739,6 +755,32 @@ struct ContentView: View {
             Task {
                 await importService.analyzeItem(item, context: modelContext)
             }
+        }
+    }
+
+    private func shareItems(_ ids: Set<String>, sourceFrame: CGRect) {
+        let urls = allItems
+            .filter { ids.contains($0.id) }
+            .map { MediaStorageService.shared.mediaURL(filename: $0.filename) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !urls.isEmpty else { return }
+
+        // Copy to temp directory so macOS shows "Send Copy" only (no Collaborate option)
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("SnapGridShare")
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let tempURLs = urls.compactMap { url -> URL? in
+            let dest = tempDir.appendingPathComponent(url.lastPathComponent)
+            try? FileManager.default.removeItem(at: dest)
+            try? FileManager.default.copyItem(at: url, to: dest)
+            return dest
+        }
+        guard !tempURLs.isEmpty else { return }
+
+        let picker = NSSharingServicePicker(items: tempURLs)
+        if let window = NSApp.keyWindow,
+           let contentView = window.contentView {
+            let rect = contentView.convert(sourceFrame, from: nil)
+            picker.show(relativeTo: rect, of: contentView, preferredEdge: .minY)
         }
     }
 

@@ -6,6 +6,8 @@ struct MasonryGrid: View {
     var selectedItemId: String?
     var onItemSelected: ((MediaItem, CGRect, UIImage?) -> Void)?
     var onRetryAnalysis: ((MediaItem) -> Void)?
+    var onShareItem: ((MediaItem) -> Void)?
+    var onDeleteItem: ((MediaItem) -> Void)?
 
     private let columns = 2
     private let spacing: CGFloat = 8
@@ -39,6 +41,12 @@ struct MasonryGrid: View {
                             isSelected: selectedItemId == item.id,
                             onSelect: onItemSelected,
                             onRetryAnalysis: onRetryAnalysis.map { callback in
+                                { callback(item) }
+                            },
+                            onShare: onShareItem.map { callback in
+                                { callback(item) }
+                            },
+                            onDelete: onDeleteItem.map { callback in
                                 { callback(item) }
                             }
                         )
