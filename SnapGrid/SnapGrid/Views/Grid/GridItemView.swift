@@ -206,7 +206,7 @@ struct GridItemView: View {
                             HStack {
                                 FlowLayout(spacing: 5) {
                                     ForEach(Array(patterns.prefix(5).enumerated()), id: \.element.name) { index, pattern in
-                                        PatternPill(name: pattern.name)
+                                        PatternPill(name: pattern.name, useGlass: false)
                                             .opacity(effectiveHover ? 1 : 0)
                                             .offset(y: effectiveHover ? 0 : (reduceMotion ? 0 : 8))
                                             .animation(

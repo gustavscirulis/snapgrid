@@ -101,7 +101,7 @@ struct FloatingVideoLayer: View {
                             HStack {
                                 FlowLayout(spacing: 5) {
                                     ForEach(videoPreview.gridPatternNames, id: \.self) { name in
-                                        PatternPill(name: name)
+                                        PatternPill(name: name, useGlass: false)
                                     }
                                 }
                                 Spacer()
