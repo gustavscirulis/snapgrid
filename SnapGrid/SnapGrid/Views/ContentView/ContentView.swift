@@ -109,6 +109,7 @@ struct ContentView: View {
                     }
                 }
                 .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
+                    if appState.isDraggingFromApp { return false }
                     handleDrop(providers)
                     return true
                 }
