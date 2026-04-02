@@ -885,6 +885,12 @@ private struct DetailMetadataSection: View {
             .foregroundStyle(.white.opacity(0.25))
             .stageReveal(stage: stage, threshold: 4)
             .padding(.top, 12)
+
+            if let urlString = item.sourceURL, let url = URL(string: urlString) {
+                SourceLinkButton(url: url)
+                    .stageReveal(stage: stage, threshold: 4)
+                    .padding(.top, 8)
+            }
         }
         .padding(.horizontal, 16)
     }
@@ -897,6 +903,45 @@ private struct DetailMetadataSection: View {
         guard seconds.isFinite else { return "0:00" }
         let total = Int(seconds)
         return "\(total / 60):\(String(format: "%02d", total % 60))"
+    }
+}
+
+// MARK: - Source Link Button
+
+private struct SourceLinkButton: View {
+    let url: URL
+    @State private var isHovered = false
+
+    private var label: String {
+        if let host = url.host?.lowercased(),
+           host.contains("x.com") || host.contains("twitter.com") {
+            return "View on X"
+        }
+        return "View source"
+    }
+
+    private var iconName: String {
+        if let host = url.host?.lowercased(),
+           host.contains("x.com") || host.contains("twitter.com") {
+            return "arrow.up.right.square"
+        }
+        return "link"
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: iconName)
+                .font(.caption2)
+            Text(label)
+                .font(.caption)
+        }
+        .foregroundStyle(.white.opacity(isHovered ? 0.6 : 0.3))
+        .onHover { isHovered = $0 }
+        .onTapGesture {
+            NSWorkspace.shared.open(url)
+        }
+        .accessibilityLabel("View original post on X")
+        .accessibilityAddTraits(.isLink)
     }
 }
 

@@ -307,12 +307,12 @@ class ShareViewController: UIViewController {
 
                 switch result {
                 case .video:
-                    await MainActor.run { self.saveVideo(data) }
+                    await MainActor.run { self.saveVideo(data, sourceURL: tweetURL.absoluteString) }
                 case .image:
                     guard let image = UIImage(data: data) else {
                         throw TwitterVideoService.TwitterError.malformedResponse
                     }
-                    await MainActor.run { self.saveImage(image) }
+                    await MainActor.run { self.saveImage(image, sourceURL: tweetURL.absoluteString) }
                 }
             } catch {
                 log.error("Twitter media extraction failed: \(error.localizedDescription)")
@@ -367,7 +367,7 @@ class ShareViewController: UIViewController {
 
     // MARK: - Save to App Group Shared Container
 
-    private func saveImage(_ image: UIImage) {
+    private func saveImage(_ image: UIImage, sourceURL: String? = nil) {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
 
@@ -423,7 +423,8 @@ class ShareViewController: UIViewController {
                 spaceId: nil,
                 imageContext: nil,
                 imageSummary: nil,
-                patterns: nil
+                patterns: nil,
+                sourceURL: sourceURL
             )
 
             let encoder = JSONEncoder()
@@ -443,7 +444,7 @@ class ShareViewController: UIViewController {
 
     // MARK: - Save Video
 
-    private func saveVideo(_ videoData: Data) {
+    private func saveVideo(_ videoData: Data, sourceURL: String? = nil) {
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
 
@@ -507,7 +508,8 @@ class ShareViewController: UIViewController {
                 spaceId: nil,
                 imageContext: nil,
                 imageSummary: nil,
-                patterns: nil
+                patterns: nil,
+                sourceURL: sourceURL
             )
 
             let encoder = JSONEncoder()
@@ -564,6 +566,7 @@ private struct ShareSidecarMetadata: Codable {
     let imageContext: String?
     let imageSummary: String?
     let patterns: [ShareSidecarPattern]?
+    let sourceURL: String?
 }
 
 private struct ShareSidecarPattern: Codable {

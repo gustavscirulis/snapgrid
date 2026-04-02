@@ -62,7 +62,8 @@ enum ImageImportService {
                     spaceId: spaceId,
                     imageContext: nil,
                     imageSummary: nil,
-                    patterns: nil
+                    patterns: nil,
+                    sourceURL: nil
                 )
 
                 guard let jsonData = try? encoder.encode(sidecar) else { return false }

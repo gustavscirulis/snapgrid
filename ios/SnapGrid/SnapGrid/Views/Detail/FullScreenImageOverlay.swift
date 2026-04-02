@@ -1281,6 +1281,12 @@ private struct DetailMetadataSection: View {
             .foregroundStyle(.white.opacity(0.3))
             .stageReveal(stage: stage, threshold: 4)
             .padding(.top, 14)
+
+            if let urlString = item.sourceURL, let url = URL(string: urlString) {
+                SourceLinkButton(url: url)
+                    .stageReveal(stage: stage, threshold: 4)
+                    .padding(.top, 8)
+            }
         }
         .padding(.horizontal, 32)
         .padding(.bottom, 32)
@@ -1358,6 +1364,46 @@ private struct DetailMetadataSection: View {
                     value: stage
                 )
         }
+    }
+}
+
+// MARK: - Source Link Button
+
+private struct SourceLinkButton: View {
+    let url: URL
+    @Environment(\.openURL) private var openURL
+
+    private var label: String {
+        if let host = url.host?.lowercased(),
+           host.contains("x.com") || host.contains("twitter.com") {
+            return "View on X"
+        }
+        return "View source"
+    }
+
+    private var iconName: String {
+        if let host = url.host?.lowercased(),
+           host.contains("x.com") || host.contains("twitter.com") {
+            return "arrow.up.right.square"
+        }
+        return "link"
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: iconName)
+                .font(.system(size: 11))
+            Text(label)
+                .font(.system(size: 13))
+        }
+        .foregroundStyle(.white.opacity(0.35))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            openURL(url)
+        }
+        .accessibilityLabel("View original post on X")
+        .accessibilityAddTraits(.isLink)
     }
 }
 

@@ -66,7 +66,7 @@ final class ImportService {
         }
     }
 
-    private func importSingleFile(_ url: URL, into context: ModelContext, spaceId: String?) async throws {
+    private func importSingleFile(_ url: URL, into context: ModelContext, spaceId: String?, sourceURL: String? = nil) async throws {
         let ext = url.pathExtension.lowercased()
         let isVideo = videoTypes.contains(ext)
         let isImage = imageTypes.contains(ext)
@@ -128,6 +128,10 @@ final class ImportService {
         }
 
         context.insert(item)
+
+        // Set sourceURL after insert so SwiftData tracks the property change
+        item.sourceURL = sourceURL
+
         try context.save()
         sidecarService.writeSidecar(for: item)
 
@@ -226,13 +230,13 @@ final class ImportService {
         let result = try await TwitterVideoService.extractMediaURL(from: url)
         switch result {
         case .video(let mediaURL), .image(let mediaURL):
-            try await importFromURL(mediaURL, into: context, spaceId: spaceId)
+            try await importFromURL(mediaURL, into: context, spaceId: spaceId, sourceURL: url.absoluteString)
         }
     }
 
     /// Import media from a remote HTTP/HTTPS URL — downloads the file, determines its type,
     /// and runs it through the standard import pipeline.
-    func importFromURL(_ url: URL, into context: ModelContext, spaceId: String? = nil) async throws {
+    func importFromURL(_ url: URL, into context: ModelContext, spaceId: String? = nil, sourceURL: String? = nil) async throws {
         let (data, response) = try await URLSession.shared.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse,
@@ -255,7 +259,7 @@ final class ImportService {
         try data.write(to: tempFile)
         defer { try? FileManager.default.removeItem(at: tempFile) }
 
-        try await importSingleFile(tempFile, into: context, spaceId: spaceId)
+        try await importSingleFile(tempFile, into: context, spaceId: spaceId, sourceURL: sourceURL)
     }
 
     /// Map a Content-Type MIME string to a file extension. Falls back to URL path extension.
