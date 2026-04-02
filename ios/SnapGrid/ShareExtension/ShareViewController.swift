@@ -91,14 +91,28 @@ class ShareViewController: UIViewController {
             return
         }
 
-        // Strategy 2: URL attachment (image URL from Safari/X)
+        // Strategy 2: Direct video attachment
+        if let videoProvider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.movie.identifier) }) {
+            log.info("Strategy: direct video provider")
+            loadVideoFromProvider(videoProvider)
+            return
+        }
+
+        // Strategy 3: URL attachment (image URL from Safari/X)
         if let urlProvider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.url.identifier) }) {
             log.info("Strategy: URL provider")
             loadImageFromURL(urlProvider)
             return
         }
 
-        completeWithError("This content doesn't contain an image or video link")
+        // Strategy 4: Plain text containing a URL (Pinterest, some other apps)
+        if let textProvider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) }) {
+            log.info("Strategy: plain text provider (looking for URL)")
+            loadImageFromText(textProvider)
+            return
+        }
+
+        completeWithError("This content doesn't contain an image, video, or link")
     }
 
     // MARK: - Image Loading Strategies
@@ -214,6 +228,24 @@ class ShareViewController: UIViewController {
         }
     }
 
+    // MARK: - Video Loading
+
+    private func loadVideoFromProvider(_ provider: NSItemProvider) {
+        provider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] tempURL, error in
+            guard let tempURL else {
+                log.error("loadFileRep(movie) failed: \(error?.localizedDescription ?? "nil")")
+                DispatchQueue.main.async { self?.completeWithError("Couldn't read the video") }
+                return
+            }
+            log.info("loadFileRep(movie) OK: \(tempURL.lastPathComponent)")
+            guard let data = try? Data(contentsOf: tempURL) else {
+                DispatchQueue.main.async { self?.completeWithError("Couldn't read the video data") }
+                return
+            }
+            DispatchQueue.main.async { self?.saveVideo(data) }
+        }
+    }
+
     // MARK: - Binary Plist / Embedded Image Parsing
 
     private func unarchiveImage(from data: Data) -> UIImage? {
@@ -279,7 +311,46 @@ class ShareViewController: UIViewController {
                 return
             }
 
+            DispatchQueue.main.async {
+                self?.statusLabel.text = "Fetching page…"
+            }
             self?.downloadImage(from: url)
+        }
+    }
+
+    private func loadImageFromText(_ provider: NSItemProvider) {
+        _ = provider.loadObject(ofClass: NSString.self) { [weak self] object, error in
+            guard let text = object as? String else {
+                log.error("loadObject(NSString) failed: \(error?.localizedDescription ?? "nil")")
+                DispatchQueue.main.async { self?.completeWithError("Couldn't read the shared text") }
+                return
+            }
+
+            // Extract the first HTTP(S) URL from the text
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+                DispatchQueue.main.async { self?.completeWithError("No link found in shared text") }
+                return
+            }
+            let matches = detector.matches(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed))
+            guard let firstURL = matches.first?.url,
+                  let scheme = firstURL.scheme?.lowercased(),
+                  scheme == "http" || scheme == "https" else {
+                DispatchQueue.main.async { self?.completeWithError("No link found in shared text") }
+                return
+            }
+
+            log.info("Extracted URL from text: \(firstURL.absoluteString)")
+
+            if TwitterVideoService.isTwitterURL(firstURL) {
+                log.info("Detected X/Twitter URL in text, extracting media")
+                DispatchQueue.main.async { self?.statusLabel.text = "Downloading from X…" }
+                self?.downloadTwitterMedia(from: firstURL)
+                return
+            }
+
+            DispatchQueue.main.async { self?.statusLabel.text = "Fetching page…" }
+            self?.downloadImage(from: firstURL)
         }
     }
 
@@ -336,12 +407,20 @@ class ShareViewController: UIViewController {
                 return
             }
 
-            // Not an image — try extracting og:image from HTML
-            if let html = String(data: data, encoding: .utf8),
-               let ogImageURL = self?.extractOGImage(from: html) {
-                log.info("Found og:image: \(ogImageURL.absoluteString.prefix(80))")
-                self?.downloadImage(from: ogImageURL)
-                return
+            // Not an image — try extracting og:image from HTML, then scan for largest <img>
+            if let html = String(data: data, encoding: .utf8) {
+                if let ogImageURL = self?.extractOGImage(from: html) {
+                    log.info("Found og:image: \(ogImageURL.absoluteString.prefix(80))")
+                    self?.downloadImage(from: ogImageURL)
+                    return
+                }
+
+                // Fallback: scan all <img> tags and pick the largest
+                if let largestURL = self?.extractLargestImage(from: html, pageURL: url) {
+                    log.info("Found largest image: \(largestURL.absoluteString.prefix(80))")
+                    self?.downloadImage(from: largestURL)
+                    return
+                }
             }
 
             DispatchQueue.main.async { self?.completeWithError("This link doesn't contain an image") }
@@ -363,6 +442,158 @@ class ShareViewController: UIViewController {
             return URL(string: String(html[altRange]))
         }
         return URL(string: String(html[range]))
+    }
+
+    /// Scans HTML for all `<img>` tags, scores them by size, and returns the URL of the largest.
+    private func extractLargestImage(from html: String, pageURL: URL) -> URL? {
+        // Match all <img ...> tags
+        guard let imgRegex = try? NSRegularExpression(
+            pattern: #"<img\s[^>]*>"#,
+            options: .caseInsensitive
+        ) else { return nil }
+
+        let matches = imgRegex.matches(in: html, range: NSRange(html.startIndex..., in: html))
+        guard !matches.isEmpty else { return nil }
+
+        log.info("extractLargestImage: found \(matches.count) <img> tags")
+
+        struct ImageCandidate {
+            let url: URL
+            let score: Int // pixel area, or 0 if unknown
+        }
+
+        let srcPattern = try? NSRegularExpression(
+            pattern: #"src\s*=\s*"([^"]+)""#, options: .caseInsensitive)
+        let widthPattern = try? NSRegularExpression(
+            pattern: #"width\s*=\s*"(\d+)""#, options: .caseInsensitive)
+        let heightPattern = try? NSRegularExpression(
+            pattern: #"height\s*=\s*"(\d+)""#, options: .caseInsensitive)
+        let srcsetPattern = try? NSRegularExpression(
+            pattern: #"srcset\s*=\s*"([^"]+)""#, options: .caseInsensitive)
+
+        let trackerNames: Set<String> = [
+            "pixel", "spacer", "blank", "1x1", "tracking", "beacon", "clear"
+        ]
+
+        var candidates: [ImageCandidate] = []
+
+        for match in matches {
+            guard let tagRange = Range(match.range, in: html) else { continue }
+            let tag = String(html[tagRange])
+            let tagNS = tag as NSString
+            let tagFullRange = NSRange(location: 0, length: tagNS.length)
+
+            // Extract src (required)
+            guard let srcMatch = srcPattern?.firstMatch(in: tag, range: tagFullRange),
+                  let srcRange = Range(srcMatch.range(at: 1), in: tag) else { continue }
+            let src = String(tag[srcRange])
+
+            // Filter out data URIs and SVGs
+            if src.hasPrefix("data:") { continue }
+            if src.hasSuffix(".svg") || src.contains(".svg?") { continue }
+
+            // Resolve relative URL
+            guard let resolved = URL(string: src, relativeTo: pageURL)?.absoluteURL,
+                  let scheme = resolved.scheme?.lowercased(),
+                  scheme == "http" || scheme == "https" else { continue }
+
+            // Filter known trackers by filename
+            let filename = resolved.lastPathComponent.lowercased()
+            if trackerNames.contains(where: { filename.contains($0) }) { continue }
+
+            // Extract width and height
+            var width: Int?
+            var height: Int?
+
+            if let wMatch = widthPattern?.firstMatch(in: tag, range: tagFullRange),
+               let wRange = Range(wMatch.range(at: 1), in: tag) {
+                width = Int(tag[wRange])
+            }
+            if let hMatch = heightPattern?.firstMatch(in: tag, range: tagFullRange),
+               let hRange = Range(hMatch.range(at: 1), in: tag) {
+                height = Int(tag[hRange])
+            }
+
+            // Filter tiny images (both dimensions specified and both < 50px)
+            if let w = width, let h = height, w < 50 && h < 50 { continue }
+
+            // Compute score from explicit dimensions
+            var score = 0
+            if let w = width, let h = height {
+                score = w * h
+            } else if let w = width {
+                score = w * w // rough estimate
+            } else if let h = height {
+                score = h * h
+            }
+
+            // Try srcset for size hints if no dimensions
+            if score == 0, let srcsetMatch = srcsetPattern?.firstMatch(in: tag, range: tagFullRange),
+               let srcsetRange = Range(srcsetMatch.range(at: 1), in: tag) {
+                let srcset = String(tag[srcsetRange])
+                // Parse entries like "image.jpg 800w" or "image.jpg 2x"
+                let entries = srcset.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                var bestW = 0
+                for entry in entries {
+                    let parts = entry.split(separator: " ")
+                    if parts.count >= 2, let descriptor = parts.last {
+                        if descriptor.hasSuffix("w"), let w = Int(descriptor.dropLast()) {
+                            bestW = max(bestW, w)
+                        }
+                    }
+                }
+                if bestW > 0 {
+                    score = bestW * bestW
+                }
+            }
+
+            candidates.append(ImageCandidate(url: resolved, score: score))
+        }
+
+        guard !candidates.isEmpty else { return nil }
+
+        // Sort by score descending
+        candidates.sort { $0.score > $1.score }
+
+        log.info("extractLargestImage: \(candidates.count) candidates, top score=\(candidates[0].score)")
+
+        // If the top candidate has a known size, use it directly
+        if candidates[0].score > 0 {
+            return candidates[0].url
+        }
+
+        // All candidates have unknown size — use HEAD requests to pick by Content-Length
+        // (synchronous in background since we're already on a URLSession callback thread)
+        let topCandidates = Array(candidates.prefix(5))
+        var bestURL = topCandidates[0].url
+        var bestLength: Int64 = 0
+
+        let group = DispatchGroup()
+        let lock = NSLock()
+
+        for candidate in topCandidates {
+            group.enter()
+            var request = URLRequest(url: candidate.url)
+            request.httpMethod = "HEAD"
+            request.timeoutInterval = 5
+
+            URLSession.shared.dataTask(with: request) { _, response, _ in
+                defer { group.leave() }
+                let length = (response as? HTTPURLResponse)?
+                    .value(forHTTPHeaderField: "Content-Length")
+                    .flatMap { Int64($0) } ?? 0
+                lock.lock()
+                if length > bestLength {
+                    bestLength = length
+                    bestURL = candidate.url
+                }
+                lock.unlock()
+            }.resume()
+        }
+
+        group.wait()
+        log.info("extractLargestImage: HEAD tiebreak chose \(bestURL.absoluteString.prefix(80)), \(bestLength)b")
+        return bestURL
     }
 
     // MARK: - Save to App Group Shared Container
