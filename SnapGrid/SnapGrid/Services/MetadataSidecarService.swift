@@ -13,6 +13,7 @@ struct SidecarMetadata: Codable, Sendable {
     let imageContext: String?
     let imageSummary: String?
     let patterns: [SidecarPattern]?
+    let sourceURL: String?
 }
 
 struct SidecarPattern: Codable, Sendable {
@@ -71,7 +72,8 @@ final class MetadataSidecarService: Sendable {
             spaceId: item.space?.id,
             imageContext: item.analysisResult?.imageContext,
             imageSummary: item.analysisResult?.imageSummary,
-            patterns: item.analysisResult?.patterns.map { SidecarPattern(name: $0.name, confidence: $0.confidence) }
+            patterns: item.analysisResult?.patterns.map { SidecarPattern(name: $0.name, confidence: $0.confidence) },
+            sourceURL: item.sourceURL
         )
 
         let url = storage.metadataDir.appendingPathComponent("\(item.id).json")

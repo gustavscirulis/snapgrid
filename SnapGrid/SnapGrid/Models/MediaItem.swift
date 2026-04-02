@@ -26,6 +26,7 @@ class MediaItem {
 
     // Import tracking
     var sourceId: String?
+    var sourceURL: String?
 
     var aspectRatio: CGFloat {
         guard height > 0 else { return 1.0 }

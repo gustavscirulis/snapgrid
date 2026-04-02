@@ -38,10 +38,11 @@ final class SyncWatcher {
         let needsThumbnail: Bool
     }
 
-    /// Lightweight update for existing items whose sidecar changed (e.g. space assignment).
+    /// Lightweight update for existing items whose sidecar changed (e.g. space assignment, source URL).
     private struct SidecarUpdateData: Sendable {
         let id: String
         let spaceId: String?
+        let sourceURL: String?
     }
 
     // MARK: - Public API
@@ -202,7 +203,7 @@ final class SyncWatcher {
             var updates: [SidecarUpdateData] = []
             for id in modifiedIds {
                 if let sidecar = MetadataSidecarService.shared.readSidecar(id: id) {
-                    updates.append(SidecarUpdateData(id: id, spaceId: sidecar.spaceId))
+                    updates.append(SidecarUpdateData(id: id, spaceId: sidecar.spaceId, sourceURL: sidecar.sourceURL))
                 }
             }
 
@@ -294,12 +295,15 @@ final class SyncWatcher {
         let dataId = data.id
         let descriptor = FetchDescriptor<MediaItem>(predicate: #Predicate { $0.id == dataId })
         if let existing = try? context.fetch(descriptor), let existingItem = existing.first {
-            // Item already imported — still reconcile space assignment
+            // Item already imported — still reconcile space assignment and sourceURL
             if let spaceId = data.sidecar.spaceId, existingItem.space?.id != spaceId {
                 let spaceDescriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
                 existingItem.space = try? context.fetch(spaceDescriptor).first
             } else if data.sidecar.spaceId == nil && existingItem.space != nil {
                 existingItem.space = nil
+            }
+            if existingItem.sourceURL == nil, let sourceURL = data.sidecar.sourceURL {
+                existingItem.sourceURL = sourceURL
             }
             return
         }
@@ -318,6 +322,8 @@ final class SyncWatcher {
             createdAt: data.sidecar.createdAt,
             duration: data.sidecar.duration
         )
+
+        item.sourceURL = data.sidecar.sourceURL
 
         if let spaceId = data.sidecar.spaceId {
             let spaceDescriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
@@ -364,7 +370,7 @@ final class SyncWatcher {
         print("[SyncWatcher] Removed \(id) (sidecar deleted on other device)")
     }
 
-    /// Update space assignment on an existing item. No file I/O.
+    /// Update space assignment and source URL on an existing item. No file I/O.
     private func applySpaceUpdate(_ update: SidecarUpdateData) {
         guard let context else { return }
 
@@ -381,6 +387,11 @@ final class SyncWatcher {
         } else if item.space != nil {
             item.space = nil
             print("[SyncWatcher] Removed space assignment for \(update.id)")
+        }
+
+        if item.sourceURL == nil, let sourceURL = update.sourceURL {
+            item.sourceURL = sourceURL
+            print("[SyncWatcher] Updated sourceURL for \(update.id)")
         }
     }
 

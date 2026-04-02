@@ -14,6 +14,7 @@ struct SidecarMetadata: Codable, Sendable {
     let imageContext: String?
     let imageSummary: String?
     let patterns: [SidecarPattern]?
+    let sourceURL: String?
 }
 
 struct SidecarPattern: Codable, Sendable {
@@ -154,6 +155,7 @@ final class SyncService {
                     createdAt: sidecar.createdAt,
                     duration: sidecar.duration
                 )
+                item.sourceURL = sidecar.sourceURL
 
                 // Assign space
                 if let spaceId = sidecar.spaceId {
@@ -258,6 +260,11 @@ final class SyncService {
             }
         } else if item.space != nil {
             item.space = nil
+        }
+
+        // Update source URL if it was added
+        if item.sourceURL == nil, let sourceURL = sidecar.sourceURL {
+            item.sourceURL = sourceURL
         }
 
         // Update analysis if it was added/changed
