@@ -138,6 +138,12 @@ final class ImportService {
     }
 
     func analyzeItem(_ item: MediaItem, context: ModelContext) async {
+        // Prevent duplicate analysis (e.g. SyncWatcher detecting our own sidecar write)
+        guard !item.isAnalyzing else {
+            print("[Analysis] Skipping \(item.id) — already analyzing")
+            return
+        }
+
         // Check for API key
         let provider = AIProvider(rawValue: UserDefaults.standard.string(forKey: "aiProvider") ?? "openai") ?? .openai
         guard KeychainService.exists(service: provider.keychainService) else {
