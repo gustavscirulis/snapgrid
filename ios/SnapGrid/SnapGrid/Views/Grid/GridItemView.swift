@@ -182,6 +182,19 @@ struct GridItemView: View {
                 Label("Delete", systemImage: "trash")
             }
         }
+        .draggable("snapgrid:\(item.id)") {
+            if let thumbnail {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 80, height: 80 / item.gridAspectRatio)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.snapDarkMuted)
+                    .frame(width: 80, height: 60)
+            }
+        }
         .task {
             await loadThumbnail()
         }

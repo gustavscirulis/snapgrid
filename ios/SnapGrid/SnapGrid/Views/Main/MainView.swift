@@ -168,7 +168,8 @@ struct MainView: View {
                             SpaceTabBar(
                                 spaces: spaces,
                                 activeSpaceId: $activeSpaceId,
-                                scrollProgress: tabScrollProgress
+                                scrollProgress: tabScrollProgress,
+                                onAssignToSpace: handleAssignToSpace
                             )
 
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -425,6 +426,52 @@ struct MainView: View {
         sourceRect = rect
         thumbnailImage = thumb
         showOverlay = true
+    }
+
+    // MARK: - Space Assignment (Drag & Drop)
+
+    private func handleAssignToSpace(itemId: String, spaceId: String?) {
+        guard let item = allItems.first(where: { $0.id == itemId }) else { return }
+
+        // Skip if already in the target space
+        let currentSpaceId = item.space?.id
+        if currentSpaceId == spaceId { return }
+
+        // Update SwiftData
+        let space: Space? = spaceId.flatMap { sid in
+            spaces.first(where: { $0.id == sid })
+        }
+        item.space = space
+        try? modelContext.save()
+
+        // Persist to sidecar JSON for iCloud sync
+        if let rootURL = fileSystem.rootURL {
+            writeSidecarSpaceId(for: item, rootURL: rootURL)
+        }
+
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    private func writeSidecarSpaceId(for item: MediaItem, rootURL: URL) {
+        let sidecarURL = rootURL.appendingPathComponent("metadata/\(item.id).json")
+
+        guard let existingData = try? Data(contentsOf: sidecarURL),
+              var json = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any] else {
+            return
+        }
+
+        if let spaceId = item.space?.id {
+            json["spaceId"] = spaceId
+        } else {
+            json.removeValue(forKey: "spaceId")
+        }
+
+        if let updatedData = try? JSONSerialization.data(
+            withJSONObject: json,
+            options: [.prettyPrinted, .sortedKeys]
+        ) {
+            try? updatedData.write(to: sidecarURL, options: .atomic)
+        }
     }
 
     // MARK: - Item Deletion
