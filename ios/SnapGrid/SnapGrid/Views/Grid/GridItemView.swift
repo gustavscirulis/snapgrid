@@ -20,6 +20,7 @@ struct GridItemView: View {
     var onSelect: ((MediaItem, CGRect, UIImage?) -> Void)?
     var onRetryAnalysis: (() -> Void)?
     var onShare: (() -> Void)?
+    var onRemoveFromSpace: (() -> Void)?
     var onDelete: (() -> Void)?
     @State private var thumbnail: UIImage?
     @State private var loadFailed = false
@@ -163,6 +164,14 @@ struct GridItemView: View {
                 onRetryAnalysis?()
             } label: {
                 Label("Redo Analysis", systemImage: "arrow.clockwise")
+            }
+
+            if let onRemoveFromSpace {
+                Button {
+                    onRemoveFromSpace()
+                } label: {
+                    Label("Remove from Space", systemImage: "folder.badge.minus")
+                }
             }
 
             Divider()

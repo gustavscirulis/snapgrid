@@ -216,6 +216,7 @@ struct MainView: View {
                                                     onItemSelected: handleItemSelected,
                                                     onRetryAnalysis: handleRetryAnalysis,
                                                     onShareItem: handleShareItem,
+                                                    onRemoveFromSpace: handleRemoveFromSpace,
                                                     onDeleteItem: { item in itemToDelete = item }
                                                 )
                                                 .padding(.horizontal, 12)
@@ -450,6 +451,36 @@ struct MainView: View {
             shareItem = tempURL
         } catch {
             shareItem = url
+        }
+    }
+
+    // MARK: - Remove from Space
+
+    private func handleRemoveFromSpace(_ item: MediaItem) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        item.space = nil
+        try? modelContext.save()
+
+        if let rootURL = fileSystem.rootURL {
+            updateSidecarSpaceId(for: item, rootURL: rootURL)
+        }
+    }
+
+    private func updateSidecarSpaceId(for item: MediaItem, rootURL: URL) {
+        let metadataDir = rootURL.appendingPathComponent("metadata")
+        let sidecarURL = metadataDir.appendingPathComponent("\(item.id).json")
+
+        guard let existingData = try? Data(contentsOf: sidecarURL) else { return }
+        guard var json = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any] else { return }
+
+        if let space = item.space {
+            json["spaceId"] = space.id
+        } else {
+            json["spaceId"] = NSNull()
+        }
+
+        if let updatedData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) {
+            try? updatedData.write(to: sidecarURL, options: .atomic)
         }
     }
 
