@@ -439,11 +439,13 @@ struct ContentView: View {
                 }
             }
 
-            if !urls.isEmpty {
+            if !urls.isEmpty || !images.isEmpty {
+                syncWatcher.beginLocalChange()
                 await importService.importFiles(urls, into: modelContext, spaceId: appState.activeSpaceId)
-            }
-            for image in images {
-                await importService.importImage(image, into: modelContext, spaceId: appState.activeSpaceId)
+                for image in images {
+                    await importService.importImage(image, into: modelContext, spaceId: appState.activeSpaceId)
+                }
+                syncWatcher.endLocalChange()
             }
         }
     }
@@ -471,8 +473,10 @@ struct ContentView: View {
                                                "mp4","webm","mov","avi","m4v"]
             let validURLs = urls.filter { supportedExts.contains($0.pathExtension.lowercased()) }
             if !validURLs.isEmpty {
+                syncWatcher.beginLocalChange()
                 Task {
                     await importService.importFiles(validURLs, into: modelContext, spaceId: appState.activeSpaceId)
+                    syncWatcher.endLocalChange()
                     appState.showToast("Pasted \(validURLs.count) item\(validURLs.count == 1 ? "" : "s")")
                 }
                 return
@@ -481,10 +485,12 @@ struct ContentView: View {
 
         // Fall back to image data (e.g. copied from browser, Preview, screenshot)
         if let images = pasteboard.readObjects(forClasses: [NSImage.self]) as? [NSImage], !images.isEmpty {
+            syncWatcher.beginLocalChange()
             Task {
                 for image in images {
                     await importService.importImage(image, into: modelContext, spaceId: appState.activeSpaceId)
                 }
+                syncWatcher.endLocalChange()
                 appState.showToast("Pasted \(images.count) image\(images.count == 1 ? "" : "s")")
             }
             return
@@ -500,6 +506,7 @@ struct ContentView: View {
                 return url
             }
             if !urls.isEmpty {
+                syncWatcher.beginLocalChange()
                 Task {
                     let hasTwitterURL = urls.contains(where: { TwitterVideoService.isTwitterURL($0) })
                     appState.showToast(hasTwitterURL ? "Downloading from X..." : "Downloading\(urls.count == 1 ? "" : " \(urls.count) items")...")
@@ -519,6 +526,7 @@ struct ContentView: View {
                             }
                         }
                     }
+                    syncWatcher.endLocalChange()
                     if successCount > 0 {
                         appState.showToast("Imported \(successCount) item\(successCount == 1 ? "" : "s")")
                     } else if !hasTwitterURL {
@@ -542,8 +550,10 @@ struct ContentView: View {
 
         panel.begin { response in
             if response == .OK {
+                syncWatcher.beginLocalChange()
                 Task {
                     await importService.importFiles(panel.urls, into: modelContext, spaceId: appState.activeSpaceId)
+                    syncWatcher.endLocalChange()
                 }
             }
         }
