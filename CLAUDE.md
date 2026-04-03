@@ -51,6 +51,23 @@ Native SwiftUI + SwiftData rewrite. Uses XcodeGen (`SnapGrid/project.yml`).
 
 Open `SnapGrid/SnapGrid.xcodeproj` in Xcode. Bundle ID: `com.snapgrid.app`.
 
+## Testing (Mac & iOS)
+
+Both native apps have Swift Testing test suites. Tests run automatically via a pre-commit hook before every commit.
+
+**When adding new features or changing existing logic, you must:**
+- Write tests for any new service methods, model properties, or business logic
+- Update existing tests if you change the behavior of tested functions
+- Run tests locally before committing: `cd SnapGrid && xcodegen generate && xcodebuild test -project SnapGrid.xcodeproj -scheme SnapGrid -destination 'platform=macOS'`
+
+**Test framework:** Swift Testing (`import Testing`, `@Test`, `@Suite`, `#expect`). Do NOT use XCTest for new tests.
+
+**Test locations:** `SnapGrid/SnapGridTests/` (Mac), `ios/SnapGrid/SnapGridTests/` (iOS). Shared test helpers in `Helpers/`. Tags defined in `TestTags.swift`.
+
+**SwiftData tests** use in-memory containers via `TestContainer.create()` — never touch the real database.
+
+**Access levels:** If you need to test a private method, change it to `internal` (Swift's default). Use `@testable import SnapGrid` in tests.
+
 ## Apple HIG Compliance (Mac & iOS)
 
 All native SwiftUI code must follow Apple's Human Interface Guidelines. When writing or modifying views:

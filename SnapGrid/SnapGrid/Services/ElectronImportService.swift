@@ -66,7 +66,7 @@ final class ElectronImportService {
     }()
     private static let isoFormatterBasic = ISO8601DateFormatter()
 
-    private static func parseDate(_ string: String?) -> Date {
+    static func parseDate(_ string: String?) -> Date {
         guard let string else { return .now }
         return isoFormatterFractional.date(from: string)
             ?? isoFormatterBasic.date(from: string)
@@ -417,7 +417,7 @@ final class ElectronImportService {
     }
 
     /// Extract the base ID from a filename like "abc.json" or ".abc.json.icloud"
-    private static func extractId(from url: URL) -> String {
+    static func extractId(from url: URL) -> String {
         let name = url.lastPathComponent
         if name.hasPrefix(".") && name.hasSuffix(".json.icloud") {
             // ".abc123.json.icloud" → "abc123"

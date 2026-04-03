@@ -7,9 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00B9B3A1CE6741B63334035B /* AIAnalysisParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DD0DAB918AE6C43203687B1 /* AIAnalysisParsingTests.swift */; };
+		11C0F4AB839DF43E22D65B9A /* KeySyncCryptoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D2D2CB68835763A39B0B88 /* KeySyncCryptoTests.swift */; };
+		2D5F5E408DB2900D5E4EB16A /* GuidanceFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB2E6651487D0EFEE5E52932 /* GuidanceFallbackTests.swift */; };
+		38FFE15933CA61B4381699B5 /* ModelRelationshipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E95904BD87CF150598C8CF4 /* ModelRelationshipTests.swift */; };
+		427935C4BB83A9052AEEE6E1 /* ShareImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03B2C30D0292058D69AC3B2 /* ShareImportServiceTests.swift */; };
+		5E5E4765114B409FE5994A83 /* KeySyncServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3694D12FDBE22980A4E2CF /* KeySyncServiceTests.swift */; };
+		62A792952CC5B0204DD1ACB7 /* MediaDeleteServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0AEB8740C7475677E69AF73 /* MediaDeleteServiceTests.swift */; };
 		69A2FAEBC4355557E9BBF91D /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA2C659B43CBFC9C4825931 /* MediaItem.swift */; };
+		777AC6FDEA6C14A464172559 /* SidecarCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54ADC2195271038AAEE8E275 /* SidecarCodableTests.swift */; };
 		787BBD33FD14A7CC420B8C71 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC24EBA6AD6068C4ADA26030 /* SyncService.swift */; };
 		810E66F164E96C78F5095B7B /* AnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A78C6996F3AEB37B949CCE /* AnalysisResult.swift */; };
+		8448C11DC4344A2F90D8BD6F /* SwiftDataTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DF1DFAA1BB8E9D39744CFA9 /* SwiftDataTestSupport.swift */; };
+		84F9DE63370E1B1CC097BECA /* SearchIndexServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E80534FE421A32D569AAE8 /* SearchIndexServiceTests.swift */; };
 		A0E9D3DA2F7328AC00E35403 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A0E9D3D02F7328AC00E35403 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A100000001 /* SnapGridApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000001 /* SnapGridApp.swift */; };
 		A100000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000002 /* ContentView.swift */; };
@@ -39,10 +49,22 @@
 		A100000037 /* KeySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000037 /* KeySyncService.swift */; };
 		A100000038 /* AIAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000038 /* AIAnalysisService.swift */; };
 		A100000040 /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000040 /* ActivityView.swift */; };
+		C325B2DE9C4EBB590CE9AA5B /* MediaItemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BC6070D4921036591CAB048 /* MediaItemTests.swift */; };
+		E34FCD416FC123E6A9B6418F /* ImageImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7283BD792D4DC7DA66FA0273 /* ImageImportServiceTests.swift */; };
+		E740BF023E205C121824CCB6 /* TestTags.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1856679647210724D1E66B /* TestTags.swift */; };
+		F1D89CA57FB5EB4C93E230F1 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F5136715774C9C5C0651A4D4 /* Foundation.framework */; };
 		F2AD76603369201957F4E1FD /* SearchIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFAB07291230EAED58390B4 /* SearchIndexService.swift */; };
+		FF030F761044AEE25ACAEA04 /* SyncServiceDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCAFF8A2EC042170AE7D0DA4 /* SyncServiceDataTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		50D27E1D2BB0C54CF01334B4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = H100000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F100000001;
+			remoteInfo = SnapGrid;
+		};
 		A0E9D3D82F7328AC00E35403 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = H100000001 /* Project object */;
@@ -67,10 +89,19 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0D3694D12FDBE22980A4E2CF /* KeySyncServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeySyncServiceTests.swift; sourceTree = "<group>"; };
+		0E95904BD87CF150598C8CF4 /* ModelRelationshipTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ModelRelationshipTests.swift; sourceTree = "<group>"; };
+		2BC6070D4921036591CAB048 /* MediaItemTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MediaItemTests.swift; sourceTree = "<group>"; };
+		54ADC2195271038AAEE8E275 /* SidecarCodableTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SidecarCodableTests.swift; sourceTree = "<group>"; };
 		5CFAB07291230EAED58390B4 /* SearchIndexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchIndexService.swift; sourceTree = "<group>"; };
+		6DD0DAB918AE6C43203687B1 /* AIAnalysisParsingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AIAnalysisParsingTests.swift; sourceTree = "<group>"; };
 		71A78C6996F3AEB37B949CCE /* AnalysisResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisResult.swift; sourceTree = "<group>"; };
+		7283BD792D4DC7DA66FA0273 /* ImageImportServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageImportServiceTests.swift; sourceTree = "<group>"; };
+		8DF1DFAA1BB8E9D39744CFA9 /* SwiftDataTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SwiftDataTestSupport.swift; sourceTree = "<group>"; };
 		8EA2C659B43CBFC9C4825931 /* MediaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItem.swift; sourceTree = "<group>"; };
+		98D2D2CB68835763A39B0B88 /* KeySyncCryptoTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeySyncCryptoTests.swift; sourceTree = "<group>"; };
 		A0E9D3D02F7328AC00E35403 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B0AEB8740C7475677E69AF73 /* MediaDeleteServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MediaDeleteServiceTests.swift; sourceTree = "<group>"; };
 		B100000001 /* SnapGridApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapGridApp.swift; sourceTree = "<group>"; };
 		B100000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B100000004 /* Space.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Space.swift; sourceTree = "<group>"; };
@@ -102,11 +133,18 @@
 		B100000038 /* AIAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAnalysisService.swift; sourceTree = "<group>"; };
 		B100000040 /* ActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityView.swift; sourceTree = "<group>"; };
 		C100000001 /* SnapGrid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapGrid.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC1856679647210724D1E66B /* TestTags.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TestTags.swift; sourceTree = "<group>"; };
+		D03B2C30D0292058D69AC3B2 /* ShareImportServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareImportServiceTests.swift; sourceTree = "<group>"; };
+		E986591D29AF09AB23D9FF4A /* SnapGridTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = SnapGridTests.xctest; path = SnapGridTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EB2E6651487D0EFEE5E52932 /* GuidanceFallbackTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GuidanceFallbackTests.swift; sourceTree = "<group>"; };
+		F5136715774C9C5C0651A4D4 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		F9E80534FE421A32D569AAE8 /* SearchIndexServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SearchIndexServiceTests.swift; sourceTree = "<group>"; };
 		FC24EBA6AD6068C4ADA26030 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
+		FCAFF8A2EC042170AE7D0DA4 /* SyncServiceDataTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncServiceDataTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A0E9D3DE2F7328AC00E35403 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		A0E9D3DE2F7328AC00E35403 /* Exceptions for "ShareExtension" folder in "ShareExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -116,10 +154,29 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A0E9D3D12F7328AC00E35403 /* ShareExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A0E9D3DE2F7328AC00E35403 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ShareExtension; sourceTree = "<group>"; };
+		A0E9D3D12F7328AC00E35403 /* ShareExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A0E9D3DE2F7328AC00E35403 /* Exceptions for "ShareExtension" folder in "ShareExtension" target */,
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = ShareExtension;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		7A10347D1A3C3DBC0EE55BD4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F1D89CA57FB5EB4C93E230F1 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A0E9D3CD2F7328AC00E35403 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -137,12 +194,61 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		32C93C83CDA2B19AF3A644AF /* Helpers */ = {
+			isa = PBXGroup;
+			children = (
+				8DF1DFAA1BB8E9D39744CFA9 /* SwiftDataTestSupport.swift */,
+				CC1856679647210724D1E66B /* TestTags.swift */,
+			);
+			name = Helpers;
+			path = Helpers;
+			sourceTree = "<group>";
+		};
+		38055792990F5A76CD3DAFEE /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C00B021659DB12CF151B312D /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		8BB7A292A37E87DADFE5B213 /* SnapGridTests */ = {
+			isa = PBXGroup;
+			children = (
+				32C93C83CDA2B19AF3A644AF /* Helpers */,
+				6DD0DAB918AE6C43203687B1 /* AIAnalysisParsingTests.swift */,
+				98D2D2CB68835763A39B0B88 /* KeySyncCryptoTests.swift */,
+				54ADC2195271038AAEE8E275 /* SidecarCodableTests.swift */,
+				B0AEB8740C7475677E69AF73 /* MediaDeleteServiceTests.swift */,
+				2BC6070D4921036591CAB048 /* MediaItemTests.swift */,
+				0E95904BD87CF150598C8CF4 /* ModelRelationshipTests.swift */,
+				F9E80534FE421A32D569AAE8 /* SearchIndexServiceTests.swift */,
+				D03B2C30D0292058D69AC3B2 /* ShareImportServiceTests.swift */,
+				EB2E6651487D0EFEE5E52932 /* GuidanceFallbackTests.swift */,
+				FCAFF8A2EC042170AE7D0DA4 /* SyncServiceDataTests.swift */,
+				0D3694D12FDBE22980A4E2CF /* KeySyncServiceTests.swift */,
+				7283BD792D4DC7DA66FA0273 /* ImageImportServiceTests.swift */,
+			);
+			name = SnapGridTests;
+			path = SnapGridTests;
+			sourceTree = "<group>";
+		};
+		C00B021659DB12CF151B312D /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				F5136715774C9C5C0651A4D4 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
 		E100000001 = {
 			isa = PBXGroup;
 			children = (
 				E100000002 /* SnapGrid */,
 				A0E9D3D12F7328AC00E35403 /* ShareExtension */,
 				E100000099 /* Products */,
+				38055792990F5A76CD3DAFEE /* Frameworks */,
+				8BB7A292A37E87DADFE5B213 /* SnapGridTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -280,6 +386,7 @@
 			children = (
 				C100000001 /* SnapGrid.app */,
 				A0E9D3D02F7328AC00E35403 /* ShareExtension.appex */,
+				E986591D29AF09AB23D9FF4A /* SnapGridTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -303,8 +410,6 @@
 				A0E9D3D12F7328AC00E35403 /* ShareExtension */,
 			);
 			name = ShareExtension;
-			packageProductDependencies = (
-			);
 			productName = ShareExtension;
 			productReference = A0E9D3D02F7328AC00E35403 /* ShareExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -327,6 +432,24 @@
 			productName = SnapGrid;
 			productReference = C100000001 /* SnapGrid.app */;
 			productType = "com.apple.product-type.application";
+		};
+		F9A925E6CB89A0F0B97BBEA2 /* SnapGridTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8A7D6929737B333F9908CD2D /* Build configuration list for PBXNativeTarget "SnapGridTests" */;
+			buildPhases = (
+				8FD79DC664444A2D47B5DB7B /* Sources */,
+				7A10347D1A3C3DBC0EE55BD4 /* Frameworks */,
+				B92C0A5FF8B0478E1A04489C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EFD4AB5D24995D4D5B1EA4DE /* PBXTargetDependency */,
+			);
+			name = SnapGridTests;
+			productName = SnapGridTests;
+			productReference = E986591D29AF09AB23D9FF4A /* SnapGridTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -361,12 +484,20 @@
 			targets = (
 				F100000001 /* SnapGrid */,
 				A0E9D3CF2F7328AC00E35403 /* ShareExtension */,
+				F9A925E6CB89A0F0B97BBEA2 /* SnapGridTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A0E9D3CE2F7328AC00E35403 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B92C0A5FF8B0478E1A04489C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -385,6 +516,27 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		8FD79DC664444A2D47B5DB7B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				00B9B3A1CE6741B63334035B /* AIAnalysisParsingTests.swift in Sources */,
+				8448C11DC4344A2F90D8BD6F /* SwiftDataTestSupport.swift in Sources */,
+				E740BF023E205C121824CCB6 /* TestTags.swift in Sources */,
+				11C0F4AB839DF43E22D65B9A /* KeySyncCryptoTests.swift in Sources */,
+				777AC6FDEA6C14A464172559 /* SidecarCodableTests.swift in Sources */,
+				62A792952CC5B0204DD1ACB7 /* MediaDeleteServiceTests.swift in Sources */,
+				C325B2DE9C4EBB590CE9AA5B /* MediaItemTests.swift in Sources */,
+				38FFE15933CA61B4381699B5 /* ModelRelationshipTests.swift in Sources */,
+				84F9DE63370E1B1CC097BECA /* SearchIndexServiceTests.swift in Sources */,
+				427935C4BB83A9052AEEE6E1 /* ShareImportServiceTests.swift in Sources */,
+				2D5F5E408DB2900D5E4EB16A /* GuidanceFallbackTests.swift in Sources */,
+				FF030F761044AEE25ACAEA04 /* SyncServiceDataTests.swift in Sources */,
+				5E5E4765114B409FE5994A83 /* KeySyncServiceTests.swift in Sources */,
+				E34FCD416FC123E6A9B6418F /* ImageImportServiceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A0E9D3CC2F7328AC00E35403 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -436,6 +588,12 @@
 			isa = PBXTargetDependency;
 			target = A0E9D3CF2F7328AC00E35403 /* ShareExtension */;
 			targetProxy = A0E9D3D82F7328AC00E35403 /* PBXContainerItemProxy */;
+		};
+		EFD4AB5D24995D4D5B1EA4DE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = SnapGrid;
+			target = F100000001 /* SnapGrid */;
+			targetProxy = 50D27E1D2BB0C54CF01334B4 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -502,6 +660,45 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
+		};
+		C3355413B503F864535E9535 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = HJ4HYUU2Y6;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapgrid.ios.tests;
+				PRODUCT_NAME = SnapGridTests;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SnapGrid.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SnapGrid";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		DC298DD1B5F2549526A5AF47 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = HJ4HYUU2Y6;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapgrid.ios.tests;
+				PRODUCT_NAME = SnapGridTests;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SnapGrid.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SnapGrid";
+			};
+			name = Debug;
 		};
 		G100000010 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -695,6 +892,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		8A7D6929737B333F9908CD2D /* Build configuration list for PBXNativeTarget "SnapGridTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C3355413B503F864535E9535 /* Release */,
+				DC298DD1B5F2549526A5AF47 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A0E9D3DF2F7328AC00E35403 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

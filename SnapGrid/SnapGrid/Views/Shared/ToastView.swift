@@ -13,6 +13,7 @@ struct ToastOverlay: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
 
+                #if compiler(>=6.3)
                 if #available(macOS 26, *) {
                     base
                         .glassEffect(.regular, in: .capsule)
@@ -30,6 +31,16 @@ struct ToastOverlay: View {
                         .accessibilityLabel(toast.message)
                         .accessibilityAddTraits(.updatesFrequently)
                 }
+                #else
+                base
+                    .background(.ultraThinMaterial.opacity(0.9))
+                    .background(.black.opacity(0.6))
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .accessibilityLabel(toast.message)
+                    .accessibilityAddTraits(.updatesFrequently)
+                #endif
             }
         }
         .padding(.bottom, 24)

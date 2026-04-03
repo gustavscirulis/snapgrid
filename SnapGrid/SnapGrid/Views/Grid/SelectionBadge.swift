@@ -10,6 +10,7 @@ struct SelectionBadge: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
 
+        #if compiler(>=6.3)
         if #available(macOS 26, *) {
             base
                 .glassEffect(.regular.tint(.accentColor), in: .capsule)
@@ -24,5 +25,13 @@ struct SelectionBadge: View {
                 .accessibilityLabel("\(count) items selected")
                 .accessibilityAddTraits(.updatesFrequently)
         }
+        #else
+        base
+            .background(Color.accentColor)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+            .accessibilityLabel("\(count) items selected")
+            .accessibilityAddTraits(.updatesFrequently)
+        #endif
     }
 }
