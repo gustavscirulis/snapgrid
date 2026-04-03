@@ -19,6 +19,7 @@ struct PatternPill: View {
             .padding(.horizontal, large ? 10 : 8)
             .padding(.vertical, large ? 5 : 3)
 
+        #if compiler(>=6.3)
         if #available(macOS 26, *), useGlass {
             base
                 .glassEffect(.regular.tint(.black.opacity(0.3)), in: .rect(cornerRadius: cornerRadius))
@@ -28,5 +29,10 @@ struct PatternPill: View {
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
                 .environment(\.colorScheme, .dark)
         }
+        #else
+        base
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+            .environment(\.colorScheme, .dark)
+        #endif
     }
 }

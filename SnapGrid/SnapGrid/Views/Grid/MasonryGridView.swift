@@ -144,7 +144,7 @@ struct MasonryGridView: View {
                 }
                 .coordinateSpace(name: coordinateSpaceName)
                 .onPreferenceChange(ItemFramePreferenceKey.self) { frames in
-                    itemFrames = frames
+                    MainActor.assumeIsolated { itemFrames = frames }
                 }
             }
         }

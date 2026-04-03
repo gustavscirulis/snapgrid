@@ -69,7 +69,9 @@ struct SpaceTabBar: View {
             .padding(.horizontal, 24)
             .padding(.top, 6)
             .coordinateSpace(name: "tabBar")
-            .onPreferenceChange(TabFrameKey.self) { tabFrames = $0 }
+            .onPreferenceChange(TabFrameKey.self) { frames in
+                MainActor.assumeIsolated { tabFrames = frames }
+            }
         }
         .overlay(alignment: .bottom) {
             Rectangle()
