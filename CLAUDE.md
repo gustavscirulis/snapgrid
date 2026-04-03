@@ -53,7 +53,7 @@ Open `SnapGrid/SnapGrid.xcodeproj` in Xcode. Bundle ID: `com.snapgrid.app`.
 
 ## Testing (Mac & iOS)
 
-Both native apps have Swift Testing test suites. Tests run automatically on PRs via GitHub Actions.
+Both native apps have Swift Testing test suites. Tests run automatically via a pre-commit hook before every commit.
 
 **When adding new features or changing existing logic, you must:**
 - Write tests for any new service methods, model properties, or business logic
