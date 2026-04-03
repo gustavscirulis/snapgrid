@@ -87,7 +87,7 @@ enum TwitterVideoService {
     // MARK: - Private Helpers
 
     /// Extracts the numeric tweet ID from a path like `/user/status/12345…`.
-    private static func extractTweetId(from url: URL) -> String? {
+    static func extractTweetId(from url: URL) -> String? {
         let parts = url.pathComponents                       // e.g. ["/", "user", "status", "12345"]
         guard let statusIndex = parts.firstIndex(of: "status"),
               statusIndex + 1 < parts.count else { return nil }

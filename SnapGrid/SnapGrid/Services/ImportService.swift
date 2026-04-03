@@ -263,7 +263,7 @@ final class ImportService {
     }
 
     /// Map a Content-Type MIME string to a file extension. Falls back to URL path extension.
-    private static func fileExtension(from contentType: String?, urlPathExtension: String?) -> String? {
+    static func fileExtension(from contentType: String?, urlPathExtension: String?) -> String? {
         if let mime = contentType?.lowercased().split(separator: ";").first?.trimmingCharacters(in: .whitespaces) {
             let mimeMap: [String: String] = [
                 "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg",

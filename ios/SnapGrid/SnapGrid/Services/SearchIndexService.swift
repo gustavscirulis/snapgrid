@@ -32,7 +32,7 @@ final class SearchIndexService {
 
     // MARK: - Tokenization
 
-    private static func tokenize(_ text: String) -> [String] {
+    static func tokenize(_ text: String) -> [String] {
         text.lowercased()
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { $0.count >= 2 }

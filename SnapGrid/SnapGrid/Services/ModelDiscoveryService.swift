@@ -84,14 +84,14 @@ final class ModelDiscoveryService: @unchecked Sendable {
     ]
     private let dateSnapshotRegex = try! NSRegularExpression(pattern: "\\d{4}-?\\d{2}-?\\d{2}")
 
-    private func isOpenAIVisionCapable(_ modelId: String) -> Bool {
+    func isOpenAIVisionCapable(_ modelId: String) -> Bool {
         let lower = modelId.lowercased()
         if excludedPatterns.contains(where: { lower.contains($0) }) { return false }
         if hasDateSnapshot(lower) { return false }
         return visionPrefixes.contains(where: { lower.hasPrefix($0) })
     }
 
-    private func openAIScore(_ modelId: String) -> Int {
+    func openAIScore(_ modelId: String) -> Int {
         let lower = modelId.lowercased()
         var score = 0
         if lower.hasPrefix("gpt-5") {
@@ -130,13 +130,13 @@ final class ModelDiscoveryService: @unchecked Sendable {
 
     // MARK: - Anthropic
 
-    private func isAnthropicVisionCapable(_ modelId: String) -> Bool {
+    func isAnthropicVisionCapable(_ modelId: String) -> Bool {
         let lower = modelId.lowercased()
         guard lower.hasPrefix("claude-") else { return false }
         return !hasDateSnapshot(lower)
     }
 
-    private func anthropicScore(_ modelId: String) -> Int {
+    func anthropicScore(_ modelId: String) -> Int {
         let lower = modelId.lowercased()
         var score = 0
 
@@ -183,14 +183,14 @@ final class ModelDiscoveryService: @unchecked Sendable {
 
     private let geminiExcluded = ["embedding", "aqa", "text", "tuning"]
 
-    private func isGeminiVisionCapable(_ modelId: String) -> Bool {
+    func isGeminiVisionCapable(_ modelId: String) -> Bool {
         let lower = modelId.lowercased()
         guard lower.contains("gemini") else { return false }
         if geminiExcluded.contains(where: { lower.contains($0) }) { return false }
         return !hasDateSnapshot(lower)
     }
 
-    private func geminiScore(_ modelId: String) -> Int {
+    func geminiScore(_ modelId: String) -> Int {
         let lower = modelId.lowercased()
         var score = 0
 
@@ -257,7 +257,7 @@ final class ModelDiscoveryService: @unchecked Sendable {
 
     // MARK: - Helpers
 
-    private func hasDateSnapshot(_ lowercased: String) -> Bool {
+    func hasDateSnapshot(_ lowercased: String) -> Bool {
         let range = NSRange(lowercased.startIndex..., in: lowercased)
         return dateSnapshotRegex.firstMatch(in: lowercased, range: range) != nil
     }

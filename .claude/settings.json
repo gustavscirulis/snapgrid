@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command // \"\"' | grep -q 'git commit' && .claude/scripts/run-tests-for-staged.sh || true",
+            "timeout": 300,
+            "statusMessage": "Running tests before commit..."
+          }
+        ]
+      }
+    ]
+  }
+}

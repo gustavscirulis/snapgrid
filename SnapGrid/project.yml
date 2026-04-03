@@ -54,3 +54,22 @@ targets:
       properties:
         com.apple.developer.ubiquity-container-identifiers:
           - iCloud.com.SnapGrid
+
+  SnapGridTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: SnapGridTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: SnapGrid
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        MACOSX_DEPLOYMENT_TARGET: "15.0"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SnapGrid.app/Contents/MacOS/SnapGrid"
+        PRODUCT_BUNDLE_IDENTIFIER: com.snapgrid.app.tests
+        SWIFT_STRICT_CONCURRENCY: complete
+        GENERATE_INFOPLIST_FILE: "YES"

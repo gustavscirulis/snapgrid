@@ -93,7 +93,7 @@ enum ShareImportService {
     }
 
     /// Read the sidecar JSON to determine whether this is a video or image.
-    private static func mediaExtension(for sidecarURL: URL) -> String? {
+    static func mediaExtension(for sidecarURL: URL) -> String? {
         guard let data = try? Data(contentsOf: sidecarURL),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let type = json["type"] as? String else {

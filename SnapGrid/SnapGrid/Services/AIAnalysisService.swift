@@ -104,7 +104,7 @@ final class AIAnalysisService: Sendable {
         throw lastError!
     }
 
-    private func isRetryable(_ error: Error) -> Bool {
+    func isRetryable(_ error: Error) -> Bool {
         // NSURLError connection lost, timed out, network connection lost
         let nsError = error as NSError
         if nsError.domain == NSURLErrorDomain {
@@ -133,7 +133,24 @@ final class AIAnalysisService: Sendable {
             }
         }
 
-        // Average confidence per pattern
+        return Self.mergeFrameResults(
+            allPatterns: allPatterns,
+            contexts: contexts,
+            summaries: summaries,
+            provider: provider.rawValue,
+            model: model
+        )
+    }
+
+    /// Merge analysis results from multiple video frames. Averages confidence per pattern,
+    /// filters below 0.7, caps at 10, sorts descending.
+    static func mergeFrameResults(
+        allPatterns: [String: [Double]],
+        contexts: [String],
+        summaries: [String],
+        provider: String,
+        model: String
+    ) -> AnalysisResult {
         let mergedPatterns = allPatterns.map { name, confidences in
             PatternTag(name: name, confidence: confidences.reduce(0, +) / Double(confidences.count))
         }
@@ -145,7 +162,7 @@ final class AIAnalysisService: Sendable {
             imageContext: contexts.joined(separator: "\n\n"),
             imageSummary: summaries.first ?? "Video",
             patterns: Array(mergedPatterns),
-            provider: provider.rawValue,
+            provider: provider,
             model: model
         )
     }
@@ -287,7 +304,7 @@ final class AIAnalysisService: Sendable {
 
     // MARK: - Helpers
 
-    private func buildPrompt(guidance: String? = nil, spaceContext: String? = nil) -> String {
+    func buildPrompt(guidance: String? = nil, spaceContext: String? = nil) -> String {
         let effectiveGuidance = (guidance?.isEmpty == false ? guidance : nil) ?? Self.defaultGuidance
         var result = masterSystemPrompt + "\n\nGuidance:\n" + effectiveGuidance
         if let spaceContext, !spaceContext.isEmpty {
@@ -352,7 +369,7 @@ final class AIAnalysisService: Sendable {
         }
     }
 
-    private func parseResponse(_ text: String, provider: String, model: String) throws -> AnalysisResult {
+    func parseResponse(_ text: String, provider: String, model: String) throws -> AnalysisResult {
         // Strip markdown code fences if present
         var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if cleaned.hasPrefix("```") {
