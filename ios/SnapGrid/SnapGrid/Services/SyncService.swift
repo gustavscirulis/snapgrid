@@ -15,6 +15,7 @@ struct SidecarMetadata: Codable, Sendable {
     let imageSummary: String?
     let patterns: [SidecarPattern]?
     let sourceURL: String?
+    let analyzedAt: Date?
 }
 
 struct SidecarPattern: Codable, Sendable {
@@ -170,6 +171,7 @@ final class SyncService {
                         imageContext: imageContext,
                         imageSummary: sidecar.imageSummary ?? "",
                         patterns: patterns,
+                        analyzedAt: sidecar.analyzedAt ?? .now,
                         provider: "synced",
                         model: "icloud-sync"
                     )
@@ -267,17 +269,31 @@ final class SyncService {
             item.sourceURL = sourceURL
         }
 
-        // Update analysis if it was added/changed
+        // Update analysis if the remote sidecar has newer or missing-locally analysis
         let hasAnalysis = sidecar.imageContext != nil && !(sidecar.imageContext?.isEmpty ?? true)
-        if hasAnalysis && item.analysisResult == nil {
-            let patterns = (sidecar.patterns ?? []).map { PatternTag(name: $0.name, confidence: $0.confidence) }
-            item.analysisResult = AnalysisResult(
-                imageContext: sidecar.imageContext!,
-                imageSummary: sidecar.imageSummary ?? "",
-                patterns: patterns,
-                provider: "synced",
-                model: "icloud-sync"
-            )
+        if hasAnalysis {
+            let shouldSync: Bool
+            if item.analysisResult == nil {
+                shouldSync = true
+            } else if let remoteDate = sidecar.analyzedAt,
+                      let localDate = item.analysisResult?.analyzedAt,
+                      remoteDate > localDate {
+                shouldSync = true
+            } else {
+                shouldSync = false
+            }
+
+            if shouldSync {
+                let patterns = (sidecar.patterns ?? []).map { PatternTag(name: $0.name, confidence: $0.confidence) }
+                item.analysisResult = AnalysisResult(
+                    imageContext: sidecar.imageContext!,
+                    imageSummary: sidecar.imageSummary ?? "",
+                    patterns: patterns,
+                    analyzedAt: sidecar.analyzedAt ?? .now,
+                    provider: "synced",
+                    model: "icloud-sync"
+                )
+            }
         }
     }
 }

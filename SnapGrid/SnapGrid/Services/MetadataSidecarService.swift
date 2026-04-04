@@ -15,6 +15,7 @@ struct SidecarMetadata: Codable, Sendable {
     let imageSummary: String?
     let patterns: [SidecarPattern]?
     let sourceURL: String?
+    let analyzedAt: Date?
 }
 
 struct SidecarPattern: Codable, Sendable {
@@ -74,7 +75,8 @@ final class MetadataSidecarService: Sendable {
             imageContext: item.analysisResult?.imageContext,
             imageSummary: item.analysisResult?.imageSummary,
             patterns: item.analysisResult?.patterns.map { SidecarPattern(name: $0.name, confidence: $0.confidence) },
-            sourceURL: item.sourceURL
+            sourceURL: item.sourceURL,
+            analyzedAt: item.analysisResult?.analyzedAt
         )
 
         let url = storage.metadataDir.appendingPathComponent("\(item.id).json")

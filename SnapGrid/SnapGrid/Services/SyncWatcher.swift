@@ -38,11 +38,15 @@ final class SyncWatcher {
         let needsThumbnail: Bool
     }
 
-    /// Lightweight update for existing items whose sidecar changed (e.g. space assignment, source URL).
+    /// Update for existing items whose sidecar changed (e.g. space assignment, analysis, source URL).
     private struct SidecarUpdateData: Sendable {
         let id: String
         let spaceId: String?
         let sourceURL: String?
+        let imageContext: String?
+        let imageSummary: String?
+        let patterns: [SidecarPattern]?
+        let analyzedAt: Date?
     }
 
     // MARK: - Public API
@@ -203,7 +207,15 @@ final class SyncWatcher {
             var updates: [SidecarUpdateData] = []
             for id in modifiedIds {
                 if let sidecar = MetadataSidecarService.shared.readSidecar(id: id) {
-                    updates.append(SidecarUpdateData(id: id, spaceId: sidecar.spaceId, sourceURL: sidecar.sourceURL))
+                    updates.append(SidecarUpdateData(
+                        id: id,
+                        spaceId: sidecar.spaceId,
+                        sourceURL: sidecar.sourceURL,
+                        imageContext: sidecar.imageContext,
+                        imageSummary: sidecar.imageSummary,
+                        patterns: sidecar.patterns,
+                        analyzedAt: sidecar.analyzedAt
+                    ))
                 }
             }
 
@@ -242,7 +254,7 @@ final class SyncWatcher {
                 applyImport(data)
                 count += 1
                 if count % 20 == 0 {
-                    try? context?.save()
+                    context?.saveOrLog()
                     await Task.yield()
                 }
             }
@@ -253,7 +265,7 @@ final class SyncWatcher {
             applySpaceUpdate(update)
         }
 
-        try? context?.save()
+        context?.saveOrLog()
     }
 
     /// Ongoing sync — triggered by DispatchSource after debounce.
@@ -280,7 +292,7 @@ final class SyncWatcher {
         }
 
         if !changes.newItems.isEmpty || !changes.updates.isEmpty || !changes.deletedIds.isEmpty {
-            try? context?.save()
+            context?.saveOrLog()
         }
 
         if !unanalyzedIds.isEmpty {
@@ -336,6 +348,7 @@ final class SyncWatcher {
                 imageContext: imageContext,
                 imageSummary: data.sidecar.imageSummary ?? "",
                 patterns: patterns,
+                analyzedAt: data.sidecar.analyzedAt ?? .now,
                 provider: "synced",
                 model: "icloud-sync"
             )
@@ -370,7 +383,7 @@ final class SyncWatcher {
         print("[SyncWatcher] Removed \(id) (sidecar deleted on other device)")
     }
 
-    /// Update space assignment and source URL on an existing item. No file I/O.
+    /// Update space assignment, analysis, and source URL on an existing item. No file I/O.
     private func applySpaceUpdate(_ update: SidecarUpdateData) {
         guard let context else { return }
 
@@ -393,6 +406,33 @@ final class SyncWatcher {
             item.sourceURL = sourceURL
             print("[SyncWatcher] Updated sourceURL for \(update.id)")
         }
+
+        // Sync analysis results if the remote sidecar has newer or missing-locally analysis
+        if let imageContext = update.imageContext, !imageContext.isEmpty {
+            let shouldSync: Bool
+            if item.analysisResult == nil {
+                shouldSync = true
+            } else if let remoteDate = update.analyzedAt,
+                      let localDate = item.analysisResult?.analyzedAt,
+                      remoteDate > localDate {
+                shouldSync = true
+            } else {
+                shouldSync = false
+            }
+
+            if shouldSync {
+                let patterns = (update.patterns ?? []).map { PatternTag(name: $0.name, confidence: $0.confidence) }
+                item.analysisResult = AnalysisResult(
+                    imageContext: imageContext,
+                    imageSummary: update.imageSummary ?? "",
+                    patterns: patterns,
+                    analyzedAt: update.analyzedAt ?? .now,
+                    provider: "synced",
+                    model: "icloud-sync"
+                )
+                print("[SyncWatcher] Synced analysis result for \(update.id)")
+            }
+        }
     }
 
     // MARK: - Spaces Sync
@@ -407,7 +447,6 @@ final class SyncWatcher {
         }.value
 
         let sidecarSpaces = spacesFile.spaces
-        guard !sidecarSpaces.isEmpty else { return }
 
         // Phase 2: Sync all-space guidance to UserDefaults
         if let allGuidance = spacesFile.allSpaceGuidance {
@@ -441,6 +480,10 @@ final class SyncWatcher {
                 if space.order != sidecar.order { space.order = sidecar.order }
                 if space.customPrompt != sidecar.customPrompt { space.customPrompt = sidecar.customPrompt }
                 if space.useCustomPrompt != sidecar.useCustomPrompt { space.useCustomPrompt = sidecar.useCustomPrompt }
+            } else {
+                // Space was deleted on the other device
+                context.delete(space)
+                print("[SyncWatcher] Removed space \(space.name) (deleted on other device)")
             }
         }
 

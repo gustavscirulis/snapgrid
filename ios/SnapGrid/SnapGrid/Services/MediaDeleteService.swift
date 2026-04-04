@@ -50,4 +50,31 @@ enum MediaDeleteService {
             throw error
         }
     }
+
+    /// Delete trash files older than the given interval (default 30 days).
+    /// Matches the Mac app's `MediaStorageService.emptyOldTrash` behavior.
+    static func emptyOldTrash(rootURL: URL, olderThan interval: TimeInterval = 30 * 24 * 3600) {
+        let fm = FileManager.default
+        let cutoff = Date().addingTimeInterval(-interval)
+
+        let trashDirs = [
+            rootURL.appendingPathComponent(".trash/images"),
+            rootURL.appendingPathComponent(".trash/metadata"),
+            rootURL.appendingPathComponent(".trash/thumbnails")
+        ]
+
+        for dir in trashDirs {
+            guard let files = try? fm.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.contentModificationDateKey]
+            ) else { continue }
+
+            for file in files {
+                guard let attrs = try? fm.attributesOfItem(atPath: file.path),
+                      let modified = attrs[.modificationDate] as? Date,
+                      modified < cutoff else { continue }
+                try? fm.removeItem(at: file)
+            }
+        }
+    }
 }

@@ -94,6 +94,56 @@ final class AIAnalysisService: Sendable {
         throw lastError!
     }
 
+    func analyzeVideo(frames: [UIImage], provider: AIProvider, model: String, apiKey: String, guidance: String? = nil, spaceContext: String? = nil) async throws -> AnalysisResult {
+        // Analyze each frame and merge results
+        var allPatterns: [String: [Double]] = [:]
+        var contexts: [String] = []
+        var summaries: [String] = []
+
+        for frame in frames {
+            let result = try await analyze(image: frame, provider: provider, model: model, apiKey: apiKey, guidance: guidance, spaceContext: spaceContext)
+            contexts.append(result.imageContext)
+            summaries.append(result.imageSummary)
+
+            for pattern in result.patterns {
+                allPatterns[pattern.name, default: []].append(pattern.confidence)
+            }
+        }
+
+        return Self.mergeFrameResults(
+            allPatterns: allPatterns,
+            contexts: contexts,
+            summaries: summaries,
+            provider: provider.rawValue,
+            model: model
+        )
+    }
+
+    /// Merge analysis results from multiple video frames. Averages confidence per pattern,
+    /// filters below 0.7, caps at 10, sorts descending.
+    static func mergeFrameResults(
+        allPatterns: [String: [Double]],
+        contexts: [String],
+        summaries: [String],
+        provider: String,
+        model: String
+    ) -> AnalysisResult {
+        let mergedPatterns = allPatterns.map { name, confidences in
+            PatternTag(name: name, confidence: confidences.reduce(0, +) / Double(confidences.count))
+        }
+        .filter { $0.confidence >= 0.7 }
+        .sorted { $0.confidence > $1.confidence }
+        .prefix(10)
+
+        return AnalysisResult(
+            imageContext: contexts.joined(separator: "\n\n"),
+            imageSummary: summaries.first ?? "Video",
+            patterns: Array(mergedPatterns),
+            provider: provider,
+            model: model
+        )
+    }
+
     func isRetryable(_ error: Error) -> Bool {
         let nsError = error as NSError
         if nsError.domain == NSURLErrorDomain {

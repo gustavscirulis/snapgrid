@@ -30,10 +30,7 @@ enum ImageImportService {
 
         for image in images {
             let ok = autoreleasepool { () -> Bool in
-                let timestamp = Int(Date().timeIntervalSince1970 * 1000)
-                let chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-                let random = String((0..<7).map { _ in chars.randomElement()! })
-                let id = "img_\(timestamp)_\(random)"
+                let id = UUID().uuidString
 
                 guard let pngData = image.pngData() else { return false }
 
@@ -63,7 +60,8 @@ enum ImageImportService {
                     imageContext: nil,
                     imageSummary: nil,
                     patterns: nil,
-                    sourceURL: nil
+                    sourceURL: nil,
+                    analyzedAt: nil
                 )
 
                 guard let jsonData = try? encoder.encode(sidecar) else { return false }

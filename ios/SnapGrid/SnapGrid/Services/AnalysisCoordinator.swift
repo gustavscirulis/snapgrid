@@ -52,18 +52,30 @@ final class AnalysisCoordinator {
 
                 item.isAnalyzing = true
                 do {
-                    let image = try loadImage(for: item, rootURL: rootURL)
-
                     let (guidance, spaceContext) = resolveGuidance(for: item)
 
-                    let result = try await AIAnalysisService.shared.analyze(
-                        image: image,
-                        provider: provider,
-                        model: resolvedModel,
-                        apiKey: apiKey,
-                        guidance: guidance,
-                        spaceContext: spaceContext
-                    )
+                    let result: AnalysisResult
+                    if item.isVideo {
+                        let frames = try extractVideoFrames(for: item, rootURL: rootURL)
+                        result = try await AIAnalysisService.shared.analyzeVideo(
+                            frames: frames,
+                            provider: provider,
+                            model: resolvedModel,
+                            apiKey: apiKey,
+                            guidance: guidance,
+                            spaceContext: spaceContext
+                        )
+                    } else {
+                        let image = try loadImage(for: item, rootURL: rootURL)
+                        result = try await AIAnalysisService.shared.analyze(
+                            image: image,
+                            provider: provider,
+                            model: resolvedModel,
+                            apiKey: apiKey,
+                            guidance: guidance,
+                            spaceContext: spaceContext
+                        )
+                    }
                     item.analysisResult = result
                     item.isAnalyzing = false
                     item.analysisError = nil
@@ -109,20 +121,37 @@ final class AnalysisCoordinator {
 
     private func loadImage(for item: MediaItem, rootURL: URL) throws -> UIImage {
         let fileURL = rootURL.appendingPathComponent("images/\(item.filename)")
-        if item.isVideo {
-            let asset = AVURLAsset(url: fileURL)
-            let generator = AVAssetImageGenerator(asset: asset)
-            generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 1280, height: 1280)
-            let cgImage = try generator.copyCGImage(at: CMTime(seconds: 1, preferredTimescale: 600), actualTime: nil)
-            return UIImage(cgImage: cgImage)
-        } else {
-            guard let data = try? Data(contentsOf: fileURL),
-                  let image = UIImage(data: data) else {
-                throw AIAnalysisService.AnalysisError.imageConversionFailed
-            }
-            return image
+        guard let data = try? Data(contentsOf: fileURL),
+              let image = UIImage(data: data) else {
+            throw AIAnalysisService.AnalysisError.imageConversionFailed
         }
+        return image
+    }
+
+    /// Extract frames at 33% and 66% of video duration for multi-frame analysis,
+    /// matching the Mac app's VideoFrameExtractor.extractAnalysisFrames behavior.
+    private func extractVideoFrames(for item: MediaItem, rootURL: URL) throws -> [UIImage] {
+        let fileURL = rootURL.appendingPathComponent("images/\(item.filename)")
+        let asset = AVURLAsset(url: fileURL)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 1280, height: 1280)
+
+        let duration = CMTimeGetSeconds(asset.duration)
+        guard duration > 0 else {
+            // Fall back to first frame for very short or broken videos
+            let cgImage = try generator.copyCGImage(at: .zero, actualTime: nil)
+            return [UIImage(cgImage: cgImage)]
+        }
+
+        let fractions = [0.33, 0.66]
+        var frames: [UIImage] = []
+        for fraction in fractions {
+            let time = CMTime(seconds: duration * fraction, preferredTimescale: 600)
+            let cgImage = try generator.copyCGImage(at: time, actualTime: nil)
+            frames.append(UIImage(cgImage: cgImage))
+        }
+        return frames
     }
 
     private func resolveGuidance(for item: MediaItem) -> (guidance: String?, spaceContext: String?) {
