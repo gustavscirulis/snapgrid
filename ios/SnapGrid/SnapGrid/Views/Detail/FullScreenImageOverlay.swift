@@ -1306,16 +1306,10 @@ private struct DetailMetadataSection: View {
 
     @ViewBuilder
     private func patternPillsGrid(_ patterns: [PatternTag]) -> some View {
-        let pills = FlowLayout(spacing: 8) {
+        FlowLayout(spacing: 8) {
             ForEach(Array(patterns.enumerated()), id: \.element.name) { index, pattern in
                 patternPill(pattern: pattern, index: index)
             }
-        }
-
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer { pills }
-        } else {
-            pills
         }
     }
 
