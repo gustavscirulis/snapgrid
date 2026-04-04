@@ -1243,7 +1243,7 @@ private struct DetailMetadataSection: View {
             } else if let result = item.analysisResult {
                 if !result.imageSummary.isEmpty {
                     Text(result.imageSummary)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.9))
                         .lineLimit(2)
                         .stageReveal(stage: stage, threshold: 1)
@@ -1252,13 +1252,13 @@ private struct DetailMetadataSection: View {
 
                 if !result.patterns.isEmpty {
                     patternPillsGrid(result.patterns)
-                        .padding(.bottom, 14)
+                        .padding(.bottom, 18)
                 }
 
                 if hasDescription(result) {
                     Text(result.imageContext)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.55))
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                         .opacity(stage >= 3 ? 1 : 0)
@@ -1277,10 +1277,10 @@ private struct DetailMetadataSection: View {
                     Text(formatDuration(duration))
                 }
             }
-            .font(.system(size: 12, design: .monospaced))
-            .foregroundStyle(.white.opacity(0.3))
+            .font(.caption.monospaced())
+            .foregroundStyle(.white.opacity(0.25))
             .stageReveal(stage: stage, threshold: 4)
-            .padding(.top, 14)
+            .padding(.top, 16)
 
             if let urlString = item.sourceURL, let url = URL(string: urlString) {
                 SourceLinkButton(url: url)
@@ -1316,10 +1316,10 @@ private struct DetailMetadataSection: View {
     @ViewBuilder
     private func patternPill(pattern: PatternTag, index: Int) -> some View {
         let base = Text(pattern.name)
-            .font(.caption)
+            .font(.subheadline)
             .foregroundStyle(.white.opacity(0.9))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
 
         if #available(iOS 26.0, *) {
             base

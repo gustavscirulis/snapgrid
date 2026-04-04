@@ -590,7 +590,7 @@ struct HeroDetailOverlay: View {
                         }
                     }
                 }
-                .frame(width: max(min(finalFrame.width, 500), 400))
+                .frame(width: max(min(finalFrame.width, 550), 400))
                 .padding(.top, 40)
                 .padding(.bottom, 40)
                 .mask(metadataFadeMask)
@@ -837,7 +837,7 @@ private struct DetailMetadataSection: View {
             } else if let result = item.analysisResult {
                 if !result.imageSummary.isEmpty {
                     Text(result.imageSummary)
-                        .font(.body.weight(.semibold))
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.85))
                         .lineLimit(2)
                         .stageReveal(stage: stage, threshold: 1)
@@ -858,13 +858,13 @@ private struct DetailMetadataSection: View {
                         }
                     }
                     .padding(.leading, -6)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 18)
                 }
 
                 if hasDescription(result) {
                     Text(result.imageContext)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.4))
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.55))
                         .lineSpacing(2)
                         .stageReveal(stage: stage, threshold: 3)
                 }
@@ -884,7 +884,7 @@ private struct DetailMetadataSection: View {
             .font(.caption.monospaced())
             .foregroundStyle(.white.opacity(0.25))
             .stageReveal(stage: stage, threshold: 4)
-            .padding(.top, 12)
+            .padding(.top, 16)
 
             if let urlString = item.sourceURL, let url = URL(string: urlString) {
                 SourceLinkButton(url: url)
