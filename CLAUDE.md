@@ -73,10 +73,10 @@ Both native apps use Swift Testing (`import Testing`, `@Test`, `@Suite`, `#expec
 
 ```bash
 # Mac tests
-cd SnapGrid && xcodegen generate && xcodebuild test -project SnapGrid.xcodeproj -scheme SnapGrid -destination 'platform=macOS'
+cd SnapGrid && xcodegen generate && xcodebuild test -project SnapGrid.xcodeproj -scheme SnapGrid -destination 'platform=macOS' 2>&1 | xcbeautify --quiet
 
 # iOS tests
-cd ios/SnapGrid && xcodebuild test -project SnapGrid.xcodeproj -scheme SnapGrid -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+cd ios/SnapGrid && xcodebuild test -project SnapGrid.xcodeproj -scheme SnapGrid -destination 'platform=iOS Simulator,name=iPhone 17 Pro' 2>&1 | xcbeautify --quiet
 ```
 
 ### When to add tests

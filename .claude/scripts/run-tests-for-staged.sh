@@ -23,7 +23,7 @@ if [ "$MAC_CHANGED" -gt 0 ]; then
   echo "Running Mac app tests..."
   (cd SnapGrid && xcodegen generate -q 2>/dev/null && \
     xcodebuild test -project SnapGrid.xcodeproj -scheme SnapGrid \
-      -destination 'platform=macOS' -quiet 2>&1) || FAILED=1
+      -destination 'platform=macOS' 2>&1 | xcbeautify --quiet) || FAILED=1
 
   if [ "$FAILED" -eq 1 ]; then
     echo "Mac app tests FAILED"
@@ -37,7 +37,7 @@ if [ "$IOS_CHANGED" -gt 0 ]; then
   xcodebuild test -project ios/SnapGrid/SnapGrid.xcodeproj -scheme SnapGrid \
     -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' \
     CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
-    -quiet 2>&1 || FAILED=1
+    2>&1 | xcbeautify --quiet || FAILED=1
 
   if [ "$FAILED" -eq 1 ]; then
     echo "iOS app tests FAILED"
