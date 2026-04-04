@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var pendingEditSpaceId: String?
     @State private var showElectronImport = false
     @State private var debounceTask: Task<Void, Never>?
+    @State private var indexRebuildTask: Task<Void, Never>?
     /// Pre-computed search scores keyed by item ID. Empty = no active search.
     @State private var searchScores: [String: Double] = [:]
     @State private var isSearchActive = false
@@ -311,8 +312,14 @@ struct ContentView: View {
             }
         }
         .onChange(of: allItems.count) { _, _ in
-            // Rebuild index when items are added/removed (covers imports, syncs, deletions)
-            searchService.buildIndex(items: allItems)
+            // Debounce index rebuild — during batch imports, count can change many times rapidly.
+            // The 500ms delay coalesces these into a single rebuild.
+            indexRebuildTask?.cancel()
+            indexRebuildTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled else { return }
+                searchService.buildIndex(items: allItems)
+            }
         }
         .task {
             for await notification in NotificationCenter.default.notifications(named: .analysisCompleted) {
@@ -374,48 +381,50 @@ struct ContentView: View {
 
     @ViewBuilder
     private func spacePageView(spaceId: String?, pageWidth: CGFloat, pageHeight: CGFloat, pageIndex: Int) -> some View {
-        let items = itemsForSpace(spaceId)
-
+        // Only build the full grid for the active page — non-visible pages are
+        // cheap placeholders, avoiding wasted filter/sort/layout work.
         Color.clear
             .frame(width: pageWidth, height: pageHeight)
             .overlay {
-                if items.isEmpty && isSearchActive {
-                    VStack(spacing: 12) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 32, weight: .light))
-                            .foregroundStyle(.secondary)
-                        Text("No results found")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
+                if pageIndex == activeIndex {
+                    let items = itemsForSpace(spaceId)
+                    if items.isEmpty && isSearchActive {
+                        VStack(spacing: 12) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 32, weight: .light))
+                                .foregroundStyle(.secondary)
+                            Text("No results found")
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if items.isEmpty && spaceId != nil {
+                        EmptyStateView(mode: .spaceLevel, isDragTargeted: isDragTargeted)
+                    } else {
+                        MasonryGridView(
+                            items: items,
+                            thumbnailSize: appState.thumbnailSize,
+                            spaces: spaces,
+                            activeSpaceId: spaceId,
+                            hiddenItemId: appState.detailItem,
+                            onSelect: { id, frame in
+                                appState.detailSourceFrame = frame
+                                appState.detailItem = id
+                            },
+                            onToggleSelect: { id in appState.toggleSelection(id) },
+                            onShiftSelect: { id in
+                                appState.rangeSelect(
+                                    targetId: id,
+                                    orderedIds: items.map(\.id)
+                                )
+                            },
+                            onDelete: deleteItems,
+                            onAssignToSpace: assignToSpace,
+                            onRetryAnalysis: retryAnalysis,
+                            onShare: { ids, frame in shareItems(ids, sourceFrame: frame) },
+                            onSetSelection: { ids in appState.selectedIds = ids },
+                            coordinateSpaceName: "gridContent-\(spaceId ?? "all")"
+                        )
                     }
-                } else if items.isEmpty && spaceId != nil {
-                    EmptyStateView(mode: .spaceLevel, isDragTargeted: isDragTargeted)
-                } else {
-                    MasonryGridView(
-                        items: items,
-                        thumbnailSize: appState.thumbnailSize,
-                        selectedIds: appState.selectedIds,
-                        spaces: spaces,
-                        activeSpaceId: spaceId,
-                        hiddenItemId: appState.detailItem,
-                        onSelect: { id, frame in
-                            appState.detailSourceFrame = frame
-                            appState.detailItem = id
-                        },
-                        onToggleSelect: { id in appState.toggleSelection(id) },
-                        onShiftSelect: { id in
-                            appState.rangeSelect(
-                                targetId: id,
-                                orderedIds: items.map(\.id)
-                            )
-                        },
-                        onDelete: deleteItems,
-                        onAssignToSpace: assignToSpace,
-                        onRetryAnalysis: retryAnalysis,
-                        onShare: { ids, frame in shareItems(ids, sourceFrame: frame) },
-                        onSetSelection: { ids in appState.selectedIds = ids },
-                        coordinateSpaceName: "gridContent-\(spaceId ?? "all")"
-                    )
                 }
             }
             .clipped()

@@ -5,19 +5,16 @@ import AVFoundation
 struct GridItemView: View {
     let item: MediaItem
     let width: CGFloat
-    let isSelected: Bool
     let spaces: [Space]
     let activeSpaceId: String?
-    let selectedCount: Int
-    let effectiveIds: Set<String>
     let hiddenItemId: String?
     let onSelect: (CGRect) -> Void
     let onToggleSelect: () -> Void
     let onShiftSelect: () -> Void
-    let onDelete: () -> Void
-    let onAssignToSpace: (String?) -> Void
-    let onRetryAnalysis: () -> Void
-    let onShare: (CGRect) -> Void
+    let onDelete: (Set<String>) -> Void
+    let onAssignToSpace: (Set<String>, String?) -> Void
+    let onRetryAnalysis: (Set<String>) -> Void
+    let onShare: (Set<String>, CGRect) -> Void
 
     @Environment(VideoPreviewManager.self) private var videoPreview
     @Environment(AppState.self) private var appState
@@ -37,14 +34,19 @@ struct GridItemView: View {
     private let itemSpaceId: String?
     private let itemAspectRatio: CGFloat
 
-    init(item: MediaItem, width: CGFloat, isSelected: Bool, spaces: [Space], activeSpaceId: String?, selectedCount: Int, effectiveIds: Set<String>, hiddenItemId: String?, onSelect: @escaping (CGRect) -> Void, onToggleSelect: @escaping () -> Void, onShiftSelect: @escaping () -> Void, onDelete: @escaping () -> Void, onAssignToSpace: @escaping (String?) -> Void, onRetryAnalysis: @escaping () -> Void, onShare: @escaping (CGRect) -> Void) {
+    // Selection state derived from AppState — changes only invalidate this view,
+    // not the parent MasonryGridView (which no longer depends on selectedIds).
+    private var isSelected: Bool { appState.selectedIds.contains(item.id) }
+    private var selectedCount: Int { appState.selectedIds.count }
+    private var effectiveIds: Set<String> {
+        isSelected && selectedCount > 1 ? appState.selectedIds : [item.id]
+    }
+
+    init(item: MediaItem, width: CGFloat, spaces: [Space], activeSpaceId: String?, hiddenItemId: String?, onSelect: @escaping (CGRect) -> Void, onToggleSelect: @escaping () -> Void, onShiftSelect: @escaping () -> Void, onDelete: @escaping (Set<String>) -> Void, onAssignToSpace: @escaping (Set<String>, String?) -> Void, onRetryAnalysis: @escaping (Set<String>) -> Void, onShare: @escaping (Set<String>, CGRect) -> Void) {
         self.item = item
         self.width = width
-        self.isSelected = isSelected
         self.spaces = spaces
         self.activeSpaceId = activeSpaceId
-        self.selectedCount = selectedCount
-        self.effectiveIds = effectiveIds
         self.hiddenItemId = hiddenItemId
         self.onSelect = onSelect
         self.onToggleSelect = onToggleSelect
@@ -236,7 +238,7 @@ struct GridItemView: View {
         // LAYER 3: Interactive action buttons as overlays
         .overlay(alignment: .topTrailing) {
             if effectiveHover {
-                Button(action: onDelete) {
+                Button { onDelete(effectiveIds) } label: {
                     hoverButtonIcon("trash", size: 10)
                 }
                 .buttonStyle(.plain)
@@ -247,7 +249,7 @@ struct GridItemView: View {
         }
         .overlay(alignment: .topLeading) {
             if effectiveHover && activeSpaceId != nil {
-                Button { onAssignToSpace(nil) } label: {
+                Button { onAssignToSpace(effectiveIds, nil) } label: {
                     hoverButtonIcon("folder.badge.minus", size: 10)
                 }
                 .buttonStyle(.plain)
@@ -258,7 +260,7 @@ struct GridItemView: View {
         }
         .overlay(alignment: .bottomLeading) {
             if !item.isAnalyzing && item.analysisError != nil {
-                Button(action: onRetryAnalysis) {
+                Button { onRetryAnalysis(effectiveIds) } label: {
                     retryBadge
                 }
                 .buttonStyle(.plain)
@@ -360,6 +362,12 @@ struct GridItemView: View {
         .onGeometryChange(for: CGRect.self) { proxy in
             proxy.frame(in: .global)
         } action: { newValue in
+            // Deadband — skip state write when frame barely moved (< 1pt).
+            // Reduces @State churn for all visible items during scroll.
+            guard abs(newValue.origin.x - globalFrame.origin.x) > 1 ||
+                  abs(newValue.origin.y - globalFrame.origin.y) > 1 ||
+                  abs(newValue.size.width - globalFrame.size.width) > 1 ||
+                  abs(newValue.size.height - globalFrame.size.height) > 1 else { return }
             globalFrame = newValue
             // Keep the floating video layer in sync with scroll/resize
             if itemIsVideo && videoPreview.activeItemId == item.id {
@@ -386,10 +394,10 @@ struct GridItemView: View {
                 activeSpaceId: activeSpaceId,
                 currentSpaceId: itemSpaceId,
                 bulkCount: isBulk ? selectedCount : nil,
-                onMoveToSpace: { spaceId in onAssignToSpace(spaceId) },
-                onShare: { onShare(globalFrame) },
-                onRedoAnalysis: { onRetryAnalysis() },
-                onDelete: { onDelete() }
+                onMoveToSpace: { spaceId in onAssignToSpace(effectiveIds, spaceId) },
+                onShare: { onShare(effectiveIds, globalFrame) },
+                onRedoAnalysis: { onRetryAnalysis(effectiveIds) },
+                onDelete: { onDelete(effectiveIds) }
             )
         }
         .task {
