@@ -130,23 +130,11 @@ struct MainView: View {
                         if items.isEmpty && appState.isSearchActive {
                             SearchEmptyStateView()
                         } else {
-                            ScrollView {
-                                MasonryGrid(
-                                    items: items,
-                                    availableWidth: gridWidth,
-                                    selectedItemId: appState.showOverlay ? appState.selectedItemId : nil,
-                                    onItemSelected: handleItemSelected,
-                                    onRetryAnalysis: handleRetryAnalysis,
-                                    onShareItem: handleShareItem,
-                                    onDeleteItem: { item in appState.itemToDelete = item }
-                                )
-                                .padding(.horizontal, 12)
-                                .padding(.bottom, 70)
-                            }
-                            .refreshable {
-                                hasAttemptedRescan = false
-                                await loadContent()
-                            }
+                            masonryPage(items: items, gridWidth: gridWidth)
+                                .refreshable {
+                                    hasAttemptedRescan = false
+                                    await loadContent()
+                                }
                         }
                     } else {
                         VStack(spacing: 0) {
@@ -166,24 +154,11 @@ struct MainView: View {
                                             .id(0)
                                             .background(PageOffsetReporter(pageIndex: 0))
                                     } else {
-                                        ScrollView {
-                                            MasonryGrid(
-                                                items: allPageItems,
-                                                availableWidth: gridWidth,
-                                                selectedItemId: appState.showOverlay ? appState.selectedItemId : nil,
-                                                onItemSelected: handleItemSelected,
-                                                onRetryAnalysis: handleRetryAnalysis,
-                                                onShareItem: handleShareItem,
-                                                onDeleteItem: { item in appState.itemToDelete = item }
-                                            )
-                                            .padding(.horizontal, 12)
-                                            .padding(.top, 12)
-                                            .padding(.bottom, 70)
-                                        }
-                                        .refreshable { await loadContent() }
-                                        .containerRelativeFrame(.horizontal)
-                                        .id(0)
-                                        .background(PageOffsetReporter(pageIndex: 0))
+                                        masonryPage(items: allPageItems, gridWidth: gridWidth, topPadding: true)
+                                            .refreshable { await loadContent() }
+                                            .containerRelativeFrame(.horizontal)
+                                            .id(0)
+                                            .background(PageOffsetReporter(pageIndex: 0))
                                     }
 
                                     ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
@@ -194,25 +169,11 @@ struct MainView: View {
                                                 .id(index + 1)
                                                 .background(PageOffsetReporter(pageIndex: index + 1))
                                         } else {
-                                            ScrollView {
-                                                MasonryGrid(
-                                                    items: spaceItems,
-                                                    availableWidth: gridWidth,
-                                                    selectedItemId: appState.showOverlay ? appState.selectedItemId : nil,
-                                                    onItemSelected: handleItemSelected,
-                                                    onRetryAnalysis: handleRetryAnalysis,
-                                                    onShareItem: handleShareItem,
-                                                    onRemoveFromSpace: handleRemoveFromSpace,
-                                                    onDeleteItem: { item in appState.itemToDelete = item }
-                                                )
-                                                .padding(.horizontal, 12)
-                                                .padding(.top, 12)
-                                                .padding(.bottom, 70)
-                                            }
-                                            .refreshable { await loadContent() }
-                                            .containerRelativeFrame(.horizontal)
-                                            .id(index + 1)
-                                            .background(PageOffsetReporter(pageIndex: index + 1))
+                                            masonryPage(items: spaceItems, gridWidth: gridWidth, topPadding: true, onRemoveFromSpace: handleRemoveFromSpace)
+                                                .refreshable { await loadContent() }
+                                                .containerRelativeFrame(.horizontal)
+                                                .id(index + 1)
+                                                .background(PageOffsetReporter(pageIndex: index + 1))
                                         }
                                     }
                                 }
@@ -381,6 +342,32 @@ struct MainView: View {
         }
     }
 
+    // MARK: - Masonry Page Helper
+
+    @ViewBuilder
+    private func masonryPage(
+        items: [MediaItem],
+        gridWidth: CGFloat,
+        topPadding: Bool = false,
+        onRemoveFromSpace: ((MediaItem) -> Void)? = nil
+    ) -> some View {
+        ScrollView {
+            MasonryGrid(
+                items: items,
+                availableWidth: gridWidth,
+                selectedItemId: appState.showOverlay ? appState.selectedItemId : nil,
+                onItemSelected: handleItemSelected,
+                onRetryAnalysis: handleRetryAnalysis,
+                onShareItem: handleShareItem,
+                onRemoveFromSpace: onRemoveFromSpace,
+                onDeleteItem: { item in appState.itemToDelete = item }
+            )
+            .padding(.horizontal, 12)
+            .padding(.top, topPadding ? 12 : 0)
+            .padding(.bottom, 70)
+        }
+    }
+
     // MARK: - Add Images Menu
 
     private var addImagesMenu: some View {
@@ -534,14 +521,16 @@ struct MainView: View {
         let columnWidth = (screenWidth - 24 - 8) / 2
         prefetchTask = ThumbnailCache.shared.prefetchThumbnails(for: allItems, targetPixelWidth: columnWidth * 2)
 
-        // Analyze unanalyzed items if API keys are available
-        analysisCoordinator.analyzeUnanalyzed(
+        // Configure coordinator dependencies (idempotent — safe to call each sync)
+        analysisCoordinator.configure(
             keySyncService: keySyncService,
             fileSystem: fileSystem,
             modelContext: modelContext,
-            searchService: searchService,
-            allItems: allItems
+            searchService: searchService
         )
+
+        // Analyze unanalyzed items if API keys are available
+        analysisCoordinator.analyzeUnanalyzed(allItems: allItems)
 
         // Re-scan if some iCloud files were still downloading
         if skipped > 0 && !hasAttemptedRescan {
@@ -559,13 +548,6 @@ struct MainView: View {
         item.analysisError = nil
         item.analysisResult = nil
         modelContext.saveOrLog()
-        analysisCoordinator.analyzeItems(
-            [item],
-            keySyncService: keySyncService,
-            fileSystem: fileSystem,
-            modelContext: modelContext,
-            searchService: searchService,
-            allItems: allItems
-        )
+        analysisCoordinator.analyzeItems([item], allItems: allItems)
     }
 }

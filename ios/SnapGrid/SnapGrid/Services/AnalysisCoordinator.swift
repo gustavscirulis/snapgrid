@@ -8,15 +8,31 @@ import UIKit
 final class AnalysisCoordinator {
     private var analysisTask: Task<Void, Never>?
 
-    /// Analyze all unanalyzed items, or re-analyze a single item.
-    func analyzeItems(
-        _ items: [MediaItem],
+    // Dependencies — set once via configure(), used by all analysis methods.
+    private var keySyncService: KeySyncService?
+    private var fileSystem: FileSystemManager?
+    private var modelContext: ModelContext?
+    private var searchService: SearchIndexService?
+
+    /// Store dependencies so they don't need to be passed on every call.
+    func configure(
         keySyncService: KeySyncService,
         fileSystem: FileSystemManager,
         modelContext: ModelContext,
-        searchService: SearchIndexService,
-        allItems: [MediaItem]
+        searchService: SearchIndexService
     ) {
+        self.keySyncService = keySyncService
+        self.fileSystem = fileSystem
+        self.modelContext = modelContext
+        self.searchService = searchService
+    }
+
+    /// Analyze specific items.
+    func analyzeItems(_ items: [MediaItem], allItems: [MediaItem]) {
+        guard let keySyncService, let fileSystem, let modelContext, let searchService else {
+            print("[Analysis] Skipped — coordinator not configured")
+            return
+        }
         guard keySyncService.isUnlocked else {
             print("[Analysis] Skipped — keySyncService not unlocked")
             return
@@ -94,27 +110,18 @@ final class AnalysisCoordinator {
     }
 
     /// Find and analyze all unanalyzed items.
-    func analyzeUnanalyzed(
-        keySyncService: KeySyncService,
-        fileSystem: FileSystemManager,
-        modelContext: ModelContext,
-        searchService: SearchIndexService,
-        allItems: [MediaItem]
-    ) {
+    func analyzeUnanalyzed(allItems: [MediaItem]) {
+        guard let modelContext else {
+            print("[Analysis] Skipped — coordinator not configured")
+            return
+        }
         let descriptor = FetchDescriptor<MediaItem>()
         let allCurrentItems = (try? modelContext.fetch(descriptor)) ?? []
         let unanalyzed = allCurrentItems.filter {
             $0.analysisResult == nil && !$0.isAnalyzing && $0.analysisError == nil
         }
 
-        analyzeItems(
-            unanalyzed,
-            keySyncService: keySyncService,
-            fileSystem: fileSystem,
-            modelContext: modelContext,
-            searchService: searchService,
-            allItems: allItems
-        )
+        analyzeItems(unanalyzed, allItems: allItems)
     }
 
     // MARK: - Private Helpers

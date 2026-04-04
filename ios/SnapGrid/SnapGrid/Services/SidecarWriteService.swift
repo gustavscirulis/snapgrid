@@ -16,37 +16,19 @@ enum SidecarWriteService {
     /// Removes the key when spaceId is nil (not NSNull — that was a bug).
     /// Falls back to writing a complete sidecar if the file doesn't exist yet.
     static func writeSpaceId(for item: MediaItem, rootURL: URL) {
-        let sidecarURL = rootURL.appendingPathComponent("metadata/\(item.id).json")
-
-        if let existingData = try? Data(contentsOf: sidecarURL),
-           var json = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any] {
-            // Merge into existing sidecar
+        updateSidecar(for: item, rootURL: rootURL) { json in
             if let spaceId = item.space?.id {
                 json["spaceId"] = spaceId
             } else {
                 json.removeValue(forKey: "spaceId")
             }
-
-            if let updatedData = try? JSONSerialization.data(
-                withJSONObject: json,
-                options: [.prettyPrinted, .sortedKeys]
-            ) {
-                try? updatedData.write(to: sidecarURL, options: .atomic)
-            }
-        } else {
-            // File not downloaded yet — write a complete sidecar from model data
-            writeFullSidecar(for: item, to: sidecarURL)
         }
     }
 
     /// Write analysis results back to a media item's sidecar JSON.
     /// Falls back to writing a complete sidecar if the file doesn't exist yet.
     static func writeAnalysis(for item: MediaItem, rootURL: URL) {
-        let sidecarURL = rootURL.appendingPathComponent("metadata/\(item.id).json")
-
-        if let existingData = try? Data(contentsOf: sidecarURL),
-           var json = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any] {
-            // Merge into existing sidecar
+        updateSidecar(for: item, rootURL: rootURL) { json in
             if let result = item.analysisResult {
                 json["imageContext"] = result.imageContext
                 json["imageSummary"] = result.imageSummary
@@ -54,7 +36,24 @@ enum SidecarWriteService {
                 let formatter = ISO8601DateFormatter()
                 json["analyzedAt"] = formatter.string(from: result.analyzedAt)
             }
+        }
+    }
 
+    // MARK: - Private
+
+    /// Read-modify-write helper: loads existing sidecar JSON, applies the update
+    /// closure, and writes back. Falls back to a full sidecar if the file
+    /// hasn't downloaded from iCloud yet.
+    private static func updateSidecar(
+        for item: MediaItem,
+        rootURL: URL,
+        update: (inout [String: Any]) -> Void
+    ) {
+        let sidecarURL = rootURL.appendingPathComponent("metadata/\(item.id).json")
+
+        if let existingData = try? Data(contentsOf: sidecarURL),
+           var json = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any] {
+            update(&json)
             if let updatedData = try? JSONSerialization.data(
                 withJSONObject: json,
                 options: [.prettyPrinted, .sortedKeys]
@@ -62,7 +61,6 @@ enum SidecarWriteService {
                 try? updatedData.write(to: sidecarURL, options: .atomic)
             }
         } else {
-            // File not downloaded yet — write a complete sidecar from model data
             writeFullSidecar(for: item, to: sidecarURL)
         }
     }
