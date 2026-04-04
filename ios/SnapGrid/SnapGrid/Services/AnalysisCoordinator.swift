@@ -97,7 +97,7 @@ final class AnalysisCoordinator {
                     item.analysisError = nil
 
                     SidecarWriteService.writeAnalysis(for: item, rootURL: rootURL)
-                    searchService.buildIndex(items: allItems)
+                    searchService.addToIndex(item: item)
                     modelContext.saveOrLog()
                     print("[Analysis] Completed: \(item.id)")
                 } catch {
