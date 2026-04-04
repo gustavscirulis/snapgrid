@@ -88,7 +88,7 @@ struct GuidanceSettingsTab: View {
                                 Button(space.name) {
                                     space.useCustomPrompt = true
                                     if space.customPrompt == nil { space.customPrompt = "" }
-                                    try? modelContext.save()
+                                    modelContext.saveOrLog()
                                     persistToSpacesJson()
                                     selectedOverrideId = space.id
                                     editingTarget = .spaceGuidance(space.id, space.name, "")
@@ -102,7 +102,7 @@ struct GuidanceSettingsTab: View {
                             guard let space = selectedSpace else { return }
                             space.customPrompt = ""
                             space.useCustomPrompt = false
-                            try? modelContext.save()
+                            modelContext.saveOrLog()
                             persistToSpacesJson()
                             selectedOverrideId = nil
                         }
@@ -141,7 +141,7 @@ struct GuidanceSettingsTab: View {
             guard let space = spaces.first(where: { $0.id == spaceId }) else { return }
             space.customPrompt = text
             space.useCustomPrompt = !text.isEmpty
-            try? modelContext.save()
+            modelContext.saveOrLog()
             persistToSpacesJson()
         }
     }

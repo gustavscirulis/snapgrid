@@ -1,4 +1,3 @@
-import AVFoundation
 import SwiftUI
 import SwiftData
 
@@ -54,36 +53,22 @@ struct MainView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \MediaItem.createdAt, order: .reverse) private var allItems: [MediaItem]
     @Query(sort: \Space.order) private var spaces: [Space]
-    @State private var selectedIndex: Int?
-    @State private var selectedItemId: String?
-    @State private var sourceRect: CGRect = .zero
-    @State private var thumbnailImage: UIImage?
-    @State private var showOverlay = false
-    @State private var activeSpaceId: String? = nil
-    @State private var searchText = ""
+    @State private var appState = AppState()
     @State private var gridItemRects: [String: CGRect] = [:]
     @State private var isLoading = true
     @State private var error: String?
     @State private var hasAttemptedRescan = false
     @State private var tabScrollProgress: CGFloat = 0
     @State private var prefetchTask: Task<Void, Never>?
-    @State private var analysisTask: Task<Void, Never>?
     @State private var syncService = SyncService()
     @State private var searchService = SearchIndexService()
+    @State private var analysisCoordinator = AnalysisCoordinator()
     @State private var debounceTask: Task<Void, Never>?
-    @State private var searchScores: [String: Double] = [:]
-    @State private var isSearchActive = false
-    @State private var currentPage: Int? = 0
-    @State private var showPhotosPicker = false
-    @State private var showFilesPicker = false
-    @State private var isImporting = false
-    @State private var itemToDelete: MediaItem?
-    @State private var shareItem: URL?
 
     // MARK: - Index ↔ activeSpaceId bridging
 
     private var activeIndex: Int {
-        guard let id = activeSpaceId else { return 0 }
+        guard let id = appState.activeSpaceId else { return 0 }
         return (spaces.firstIndex { $0.id == id } ?? -1) + 1
     }
 
@@ -97,11 +82,11 @@ struct MainView: View {
             items = Array(allItems)
         }
 
-        guard isSearchActive else { return items }
+        guard appState.isSearchActive else { return items }
 
-        let scores = searchScores
+        let scores = appState.searchScores
         guard !scores.isEmpty else {
-            let query = searchText.lowercased().trimmingCharacters(in: .whitespaces)
+            let query = appState.searchText.lowercased().trimmingCharacters(in: .whitespaces)
             if query == "vid" { return items.filter { $0.isVideo } }
             if query == "img" { return items.filter { !$0.isVideo } }
             return []
@@ -117,7 +102,7 @@ struct MainView: View {
     }
 
     private var currentVisibleItems: [MediaItem] {
-        itemsForSpace(activeSpaceId)
+        itemsForSpace(appState.activeSpaceId)
     }
 
     // MARK: - Body
@@ -142,18 +127,18 @@ struct MainView: View {
                         EmptyStateView()
                     } else if spaces.isEmpty {
                         let items = itemsForSpace(nil)
-                        if items.isEmpty && isSearchActive {
+                        if items.isEmpty && appState.isSearchActive {
                             SearchEmptyStateView()
                         } else {
                             ScrollView {
                                 MasonryGrid(
                                     items: items,
                                     availableWidth: gridWidth,
-                                    selectedItemId: showOverlay ? selectedItemId : nil,
+                                    selectedItemId: appState.showOverlay ? appState.selectedItemId : nil,
                                     onItemSelected: handleItemSelected,
                                     onRetryAnalysis: handleRetryAnalysis,
                                     onShareItem: handleShareItem,
-                                    onDeleteItem: { item in itemToDelete = item }
+                                    onDeleteItem: { item in appState.itemToDelete = item }
                                 )
                                 .padding(.horizontal, 12)
                                 .padding(.bottom, 70)
@@ -167,7 +152,7 @@ struct MainView: View {
                         VStack(spacing: 0) {
                             SpaceTabBar(
                                 spaces: spaces,
-                                activeSpaceId: $activeSpaceId,
+                                activeSpaceId: $appState.activeSpaceId,
                                 scrollProgress: tabScrollProgress,
                                 onAssignToSpace: handleAssignToSpace
                             )
@@ -175,7 +160,7 @@ struct MainView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 0) {
                                     let allPageItems = itemsForSpace(nil)
-                                    if allPageItems.isEmpty && isSearchActive {
+                                    if allPageItems.isEmpty && appState.isSearchActive {
                                         SearchEmptyStateView()
                                             .containerRelativeFrame(.horizontal)
                                             .id(0)
@@ -185,11 +170,11 @@ struct MainView: View {
                                             MasonryGrid(
                                                 items: allPageItems,
                                                 availableWidth: gridWidth,
-                                                selectedItemId: showOverlay ? selectedItemId : nil,
+                                                selectedItemId: appState.showOverlay ? appState.selectedItemId : nil,
                                                 onItemSelected: handleItemSelected,
                                                 onRetryAnalysis: handleRetryAnalysis,
                                                 onShareItem: handleShareItem,
-                                                onDeleteItem: { item in itemToDelete = item }
+                                                onDeleteItem: { item in appState.itemToDelete = item }
                                             )
                                             .padding(.horizontal, 12)
                                             .padding(.top, 12)
@@ -203,7 +188,7 @@ struct MainView: View {
 
                                     ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
                                         let spaceItems = itemsForSpace(space.id)
-                                        if spaceItems.isEmpty && isSearchActive {
+                                        if spaceItems.isEmpty && appState.isSearchActive {
                                             SearchEmptyStateView()
                                                 .containerRelativeFrame(.horizontal)
                                                 .id(index + 1)
@@ -213,12 +198,12 @@ struct MainView: View {
                                                 MasonryGrid(
                                                     items: spaceItems,
                                                     availableWidth: gridWidth,
-                                                    selectedItemId: showOverlay ? selectedItemId : nil,
+                                                    selectedItemId: appState.showOverlay ? appState.selectedItemId : nil,
                                                     onItemSelected: handleItemSelected,
                                                     onRetryAnalysis: handleRetryAnalysis,
                                                     onShareItem: handleShareItem,
                                                     onRemoveFromSpace: handleRemoveFromSpace,
-                                                    onDeleteItem: { item in itemToDelete = item }
+                                                    onDeleteItem: { item in appState.itemToDelete = item }
                                                 )
                                                 .padding(.horizontal, 12)
                                                 .padding(.top, 12)
@@ -234,7 +219,7 @@ struct MainView: View {
                                 .scrollTargetLayout()
                             }
                             .scrollTargetBehavior(.paging)
-                            .scrollPosition(id: $currentPage)
+                            .scrollPosition(id: $appState.currentPage)
                             .coordinateSpace(name: "pagerContainer")
                             .onPreferenceChange(PageOffsetPreferenceKey.self) { data in
                                 guard let data = data else { return }
@@ -254,16 +239,16 @@ struct MainView: View {
                         DefaultToolbarItem(kind: .search, placement: .bottomBar)
                         ToolbarSpacer(.flexible, placement: .bottomBar)
                         ToolbarItem(placement: .bottomBar) {
-                            if isSearchActive {
-                                CloseSearchButton(searchText: $searchText)
+                            if appState.isSearchActive {
+                                CloseSearchButton(searchText: $appState.searchText)
                             } else {
                                 addImagesMenu
                             }
                         }
                     } else {
                         ToolbarItem(placement: .topBarTrailing) {
-                            if isSearchActive {
-                                CloseSearchButton(searchText: $searchText)
+                            if appState.isSearchActive {
+                                CloseSearchButton(searchText: $appState.searchText)
                             } else {
                                 addImagesMenu
                             }
@@ -271,35 +256,35 @@ struct MainView: View {
                     }
                 }
                 .toolbarColorScheme(.dark, for: .navigationBar)
-                .searchable(text: $searchText, prompt: "Search patterns, context...")
+                .searchable(text: $appState.searchText, prompt: "Search patterns, context...")
                 .onPreferenceChange(GridItemRectsPreferenceKey.self) { rects in
                     gridItemRects = rects
                 }
             }
             .overlay {
-                if showOverlay, let startIndex = selectedIndex {
+                if appState.showOverlay, let startIndex = appState.selectedIndex {
                     FullScreenImageOverlay(
                         items: currentVisibleItems,
                         startIndex: startIndex,
-                        sourceRect: sourceRect,
+                        sourceRect: appState.sourceRect,
                         screenSize: geo.size,
-                        thumbnailImage: thumbnailImage,
+                        thumbnailImage: appState.thumbnailImage,
                         gridItemRects: $gridItemRects,
                         onDismissing: { currentItemId in
-                            selectedItemId = currentItemId
+                            appState.selectedItemId = currentItemId
                         },
                         onClose: {
                             var t = Transaction()
                             t.disablesAnimations = true
                             withTransaction(t) {
-                                showOverlay = false
-                                selectedIndex = nil
-                                selectedItemId = nil
-                                thumbnailImage = nil
+                                appState.showOverlay = false
+                                appState.selectedIndex = nil
+                                appState.selectedItemId = nil
+                                appState.thumbnailImage = nil
                             }
                         },
                         onSearchPattern: { pattern in
-                            searchText = pattern
+                            appState.searchText = pattern
                         },
                         onDelete: handleItemDeleted
                     )
@@ -309,27 +294,27 @@ struct MainView: View {
         .task {
             await loadContent()
         }
-        .onChange(of: searchText) { _, newValue in
+        .onChange(of: appState.searchText) { _, newValue in
             debounceTask?.cancel()
             let trimmed = newValue.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty {
-                isSearchActive = false
-                searchScores = [:]
+                appState.isSearchActive = false
+                appState.searchScores = [:]
             } else {
-                isSearchActive = true
+                appState.isSearchActive = true
                 debounceTask = Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(100))
                     guard !Task.isCancelled else { return }
 
                     let lowered = trimmed.lowercased()
                     if lowered == "vid" || lowered == "img" {
-                        searchScores = [:]
+                        appState.searchScores = [:]
                         return
                     }
 
                     let results = searchService.search(query: trimmed)
                     guard !Task.isCancelled else { return }
-                    searchScores = Dictionary(uniqueKeysWithValues: results.map { ($0.itemId, $0.score) })
+                    appState.searchScores = Dictionary(uniqueKeysWithValues: results.map { ($0.itemId, $0.score) })
                 }
             }
         }
@@ -344,37 +329,37 @@ struct MainView: View {
                 Task { await loadContent() }
             }
         }
-        .onChange(of: currentPage) { _, newPage in
+        .onChange(of: appState.currentPage) { _, newPage in
             let page = newPage ?? 0
             if page == 0 {
-                activeSpaceId = nil
+                appState.activeSpaceId = nil
             } else if page > 0 && page <= spaces.count {
-                activeSpaceId = spaces[page - 1].id
+                appState.activeSpaceId = spaces[page - 1].id
             }
         }
-        .onChange(of: activeSpaceId) { _, _ in
+        .onChange(of: appState.activeSpaceId) { _, _ in
             let target = activeIndex
-            if currentPage != target {
+            if appState.currentPage != target {
                 withAnimation(SnapSpring.resolvedStandard) {
-                    currentPage = target
+                    appState.currentPage = target
                 }
             }
         }
-        .sheet(isPresented: $showPhotosPicker) {
+        .sheet(isPresented: $appState.showPhotosPicker) {
             PhotosPickerWrapper { images in
                 handlePickedImages(images)
             }
         }
-        .sheet(isPresented: $showFilesPicker) {
+        .sheet(isPresented: $appState.showFilesPicker) {
             DocumentPickerWrapper { images in
                 handlePickedImages(images)
             }
         }
         .sheet(isPresented: Binding(
-            get: { shareItem != nil },
-            set: { if !$0 { shareItem = nil } }
+            get: { appState.shareItem != nil },
+            set: { if !$0 { appState.shareItem = nil } }
         )) {
-            if let url = shareItem {
+            if let url = appState.shareItem {
                 ActivityView(activityItems: [url])
                     .presentationDetents([.medium, .large])
             }
@@ -382,15 +367,15 @@ struct MainView: View {
         .confirmationDialog(
             "Delete this item?",
             isPresented: Binding(
-                get: { itemToDelete != nil },
-                set: { if !$0 { itemToDelete = nil } }
+                get: { appState.itemToDelete != nil },
+                set: { if !$0 { appState.itemToDelete = nil } }
             ),
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive) {
-                if let item = itemToDelete {
+                if let item = appState.itemToDelete {
                     handleItemDeleted(item)
-                    itemToDelete = nil
+                    appState.itemToDelete = nil
                 }
             }
         }
@@ -401,19 +386,19 @@ struct MainView: View {
     private var addImagesMenu: some View {
         Menu {
             Button {
-                showPhotosPicker = true
+                appState.showPhotosPicker = true
             } label: {
                 Label("Choose from Photos", systemImage: "photo.on.rectangle")
             }
             Button {
-                showFilesPicker = true
+                appState.showFilesPicker = true
             } label: {
                 Label("Choose from Files", systemImage: "folder")
             }
         } label: {
             Label("Add", systemImage: "plus")
         }
-        .disabled(isImporting || fileSystem.rootURL == nil)
+        .disabled(appState.isImporting || fileSystem.rootURL == nil)
     }
 
     // MARK: - Item Selection
@@ -421,11 +406,11 @@ struct MainView: View {
     private func handleItemSelected(_ item: MediaItem, _ rect: CGRect, _ thumb: UIImage?) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let visibleItems = currentVisibleItems
-        selectedIndex = visibleItems.firstIndex(where: { $0.id == item.id }) ?? 0
-        selectedItemId = item.id
-        sourceRect = rect
-        thumbnailImage = thumb
-        showOverlay = true
+        appState.selectedIndex = visibleItems.firstIndex(where: { $0.id == item.id }) ?? 0
+        appState.selectedItemId = item.id
+        appState.sourceRect = rect
+        appState.thumbnailImage = thumb
+        appState.showOverlay = true
     }
 
     // MARK: - Space Assignment (Drag & Drop)
@@ -442,36 +427,14 @@ struct MainView: View {
             spaces.first(where: { $0.id == sid })
         }
         item.space = space
-        try? modelContext.save()
+        modelContext.saveOrLog()
 
         // Persist to sidecar JSON for iCloud sync
         if let rootURL = fileSystem.rootURL {
-            writeSidecarSpaceId(for: item, rootURL: rootURL)
+            SidecarWriteService.writeSpaceId(for: item, rootURL: rootURL)
         }
 
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-    }
-
-    private func writeSidecarSpaceId(for item: MediaItem, rootURL: URL) {
-        let sidecarURL = rootURL.appendingPathComponent("metadata/\(item.id).json")
-
-        guard let existingData = try? Data(contentsOf: sidecarURL),
-              var json = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any] else {
-            return
-        }
-
-        if let spaceId = item.space?.id {
-            json["spaceId"] = spaceId
-        } else {
-            json.removeValue(forKey: "spaceId")
-        }
-
-        if let updatedData = try? JSONSerialization.data(
-            withJSONObject: json,
-            options: [.prettyPrinted, .sortedKeys]
-        ) {
-            try? updatedData.write(to: sidecarURL, options: .atomic)
-        }
     }
 
     // MARK: - Item Deletion
@@ -483,7 +446,7 @@ struct MainView: View {
             )
         }
         modelContext.delete(item)
-        try? modelContext.save()
+        modelContext.saveOrLog()
     }
 
     // MARK: - Item Sharing
@@ -495,9 +458,9 @@ struct MainView: View {
         try? FileManager.default.removeItem(at: tempURL)
         do {
             try FileManager.default.copyItem(at: url, to: tempURL)
-            shareItem = tempURL
+            appState.shareItem = tempURL
         } catch {
-            shareItem = url
+            appState.shareItem = url
         }
     }
 
@@ -506,28 +469,10 @@ struct MainView: View {
     private func handleRemoveFromSpace(_ item: MediaItem) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         item.space = nil
-        try? modelContext.save()
+        modelContext.saveOrLog()
 
         if let rootURL = fileSystem.rootURL {
-            updateSidecarSpaceId(for: item, rootURL: rootURL)
-        }
-    }
-
-    private func updateSidecarSpaceId(for item: MediaItem, rootURL: URL) {
-        let metadataDir = rootURL.appendingPathComponent("metadata")
-        let sidecarURL = metadataDir.appendingPathComponent("\(item.id).json")
-
-        guard let existingData = try? Data(contentsOf: sidecarURL) else { return }
-        guard var json = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any] else { return }
-
-        if let space = item.space {
-            json["spaceId"] = space.id
-        } else {
-            json["spaceId"] = NSNull()
-        }
-
-        if let updatedData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) {
-            try? updatedData.write(to: sidecarURL, options: .atomic)
+            SidecarWriteService.writeSpaceId(for: item, rootURL: rootURL)
         }
     }
 
@@ -536,12 +481,12 @@ struct MainView: View {
     private func handlePickedImages(_ images: [UIImage]) {
         guard !images.isEmpty, let rootURL = fileSystem.rootURL else { return }
 
-        isImporting = true
+        appState.isImporting = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         Task {
-            let result = await ImageImportService.importImages(images, to: rootURL, spaceId: activeSpaceId)
-            isImporting = false
+            let result = await ImageImportService.importImages(images, to: rootURL, spaceId: appState.activeSpaceId)
+            appState.isImporting = false
 
             if result.successCount > 0 {
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -557,6 +502,14 @@ struct MainView: View {
     private func loadContent() async {
         let isInitialLoad = isLoading
         error = nil
+
+        // Reset any isAnalyzing flags stuck from a previous crash/kill
+        let stuckDescriptor = FetchDescriptor<MediaItem>(predicate: #Predicate { $0.isAnalyzing == true })
+        if let stuck = try? modelContext.fetch(stuckDescriptor), !stuck.isEmpty {
+            for item in stuck { item.isAnalyzing = false }
+            modelContext.saveOrLog()
+            print("[Cleanup] Reset \(stuck.count) stuck isAnalyzing flags")
+        }
 
         guard let rootURL = fileSystem.rootURL else {
             self.error = "No access to SnapGrid folder"
@@ -577,7 +530,13 @@ struct MainView: View {
         prefetchTask = ThumbnailCache.shared.prefetchThumbnails(for: allItems, targetPixelWidth: columnWidth * 2)
 
         // Analyze unanalyzed items if API keys are available
-        analyzeUnanalyzedItems()
+        analysisCoordinator.analyzeUnanalyzed(
+            keySyncService: keySyncService,
+            fileSystem: fileSystem,
+            modelContext: modelContext,
+            searchService: searchService,
+            allItems: allItems
+        )
 
         // Re-scan if some iCloud files were still downloading
         if skipped > 0 && !hasAttemptedRescan {
@@ -594,204 +553,14 @@ struct MainView: View {
     private func handleRetryAnalysis(_ item: MediaItem) {
         item.analysisError = nil
         item.analysisResult = nil
-        try? modelContext.save()
-        analyzeSingleItem(item)
-    }
-
-    // MARK: - AI Analysis
-
-    private func analyzeUnanalyzedItems() {
-        guard keySyncService.isUnlocked else {
-            print("[Analysis] Skipped — keySyncService not unlocked")
-            return
-        }
-        guard let providerStr = keySyncService.activeProvider,
-              let provider = AIProvider(rawValue: providerStr) else {
-            print("[Analysis] Skipped — no active provider")
-            return
-        }
-        guard let apiKey = keySyncService.activeAPIKey() else {
-            print("[Analysis] Skipped — no API key for provider \(providerStr)")
-            return
-        }
-        guard let rootURL = fileSystem.rootURL else {
-            print("[Analysis] Skipped — no rootURL")
-            return
-        }
-
-        let model = keySyncService.activeModel ?? provider.defaultModel
-        let resolvedModel = (model == "auto") ? provider.defaultModel : model
-
-        // Query model context directly — @Query may not have refreshed yet after sync
-        let descriptor = FetchDescriptor<MediaItem>()
-        let allCurrentItems = (try? modelContext.fetch(descriptor)) ?? []
-        let unanalyzed = allCurrentItems.filter { $0.analysisResult == nil && !$0.isAnalyzing && $0.analysisError == nil }
-        guard !unanalyzed.isEmpty else {
-            print("[Analysis] No unanalyzed items found (total: \(allCurrentItems.count))")
-            return
-        }
-
-        print("[Analysis] Found \(unanalyzed.count) unanalyzed items, starting analysis")
-
-        analysisTask?.cancel()
-        analysisTask = Task {
-            for item in unanalyzed {
-                guard !Task.isCancelled else { break }
-
-                item.isAnalyzing = true
-                do {
-                    let image: UIImage
-                    if item.isVideo {
-                        image = try extractPosterFrame(for: item, rootURL: rootURL)
-                    } else {
-                        image = try loadImage(for: item, rootURL: rootURL)
-                    }
-
-                    // Resolve guidance and space context
-                    var guidance: String?
-                    var spaceContext: String?
-                    if let space = item.space {
-                        spaceContext = "This image belongs to a collection called \"\(space.name)\". Use this as context to inform your analysis."
-                        if space.useCustomPrompt, let custom = space.customPrompt, !custom.isEmpty {
-                            guidance = custom
-                        }
-                    }
-                    // Fall back to all-space guidance if no per-space guidance is set
-                    if guidance == nil, UserDefaults.standard.bool(forKey: "useAllSpacePrompt") {
-                        let allGuidance = UserDefaults.standard.string(forKey: "allSpacePrompt") ?? ""
-                        if !allGuidance.isEmpty {
-                            guidance = allGuidance
-                        }
-                    }
-
-                    let result = try await AIAnalysisService.shared.analyze(
-                        image: image,
-                        provider: provider,
-                        model: resolvedModel,
-                        apiKey: apiKey,
-                        guidance: guidance,
-                        spaceContext: spaceContext
-                    )
-                    item.analysisResult = result
-                    item.isAnalyzing = false
-
-                    // Write back to sidecar JSON so Mac picks up the analysis
-                    writeSidecar(for: item, rootURL: rootURL)
-
-                    // Rebuild search index to include new analysis
-                    searchService.buildIndex(items: allItems)
-
-                    try? modelContext.save()
-                    print("[Analysis] Completed: \(item.id)")
-                } catch {
-                    item.isAnalyzing = false
-                    item.analysisError = error.localizedDescription
-                    print("[Analysis] Failed for \(item.id): \(error.localizedDescription)")
-                }
-            }
-        }
-    }
-
-    private func analyzeSingleItem(_ item: MediaItem) {
-        guard keySyncService.isUnlocked else { return }
-        guard let providerStr = keySyncService.activeProvider,
-              let provider = AIProvider(rawValue: providerStr) else { return }
-        guard let apiKey = keySyncService.activeAPIKey() else { return }
-        guard let rootURL = fileSystem.rootURL else { return }
-
-        let model = keySyncService.activeModel ?? provider.defaultModel
-        let resolvedModel = (model == "auto") ? provider.defaultModel : model
-
-        Task {
-            item.isAnalyzing = true
-            do {
-                let image: UIImage
-                if item.isVideo {
-                    image = try extractPosterFrame(for: item, rootURL: rootURL)
-                } else {
-                    image = try loadImage(for: item, rootURL: rootURL)
-                }
-
-                var guidance: String?
-                var spaceContext: String?
-                if let space = item.space {
-                    spaceContext = "This image belongs to a collection called \"\(space.name)\". Use this as context to inform your analysis."
-                    if space.useCustomPrompt, let custom = space.customPrompt, !custom.isEmpty {
-                        guidance = custom
-                    }
-                }
-                if guidance == nil, UserDefaults.standard.bool(forKey: "useAllSpacePrompt") {
-                    let allGuidance = UserDefaults.standard.string(forKey: "allSpacePrompt") ?? ""
-                    if !allGuidance.isEmpty {
-                        guidance = allGuidance
-                    }
-                }
-
-                let result = try await AIAnalysisService.shared.analyze(
-                    image: image,
-                    provider: provider,
-                    model: resolvedModel,
-                    apiKey: apiKey,
-                    guidance: guidance,
-                    spaceContext: spaceContext
-                )
-                item.analysisResult = result
-                item.isAnalyzing = false
-                item.analysisError = nil
-                writeSidecar(for: item, rootURL: rootURL)
-                searchService.buildIndex(items: allItems)
-                try? modelContext.save()
-                print("[Analysis] Redo completed: \(item.id)")
-            } catch {
-                item.isAnalyzing = false
-                item.analysisError = error.localizedDescription
-                print("[Analysis] Redo failed for \(item.id): \(error.localizedDescription)")
-            }
-        }
-    }
-
-    private func loadImage(for item: MediaItem, rootURL: URL) throws -> UIImage {
-        let imageURL = rootURL.appendingPathComponent("images/\(item.filename)")
-        guard let data = try? Data(contentsOf: imageURL),
-              let image = UIImage(data: data) else {
-            throw AIAnalysisService.AnalysisError.imageConversionFailed
-        }
-        return image
-    }
-
-    private func extractPosterFrame(for item: MediaItem, rootURL: URL) throws -> UIImage {
-        let videoURL = rootURL.appendingPathComponent("images/\(item.filename)")
-        let asset = AVURLAsset(url: videoURL)
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 1280, height: 1280)
-        let cgImage = try generator.copyCGImage(at: CMTime(seconds: 1, preferredTimescale: 600), actualTime: nil)
-        return UIImage(cgImage: cgImage)
-    }
-
-    private func writeSidecar(for item: MediaItem, rootURL: URL) {
-        let metadataDir = rootURL.appendingPathComponent("metadata")
-        let sidecarURL = metadataDir.appendingPathComponent("\(item.id).json")
-
-        // Read existing sidecar to preserve all fields
-        guard let existingData = try? Data(contentsOf: sidecarURL) else { return }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        guard var json = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any] else { return }
-
-        // Add analysis fields
-        if let result = item.analysisResult {
-            json["imageContext"] = result.imageContext
-            json["imageSummary"] = result.imageSummary
-            json["patterns"] = result.patterns.map { ["name": $0.name, "confidence": $0.confidence] }
-        }
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-
-        if let updatedData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) {
-            try? updatedData.write(to: sidecarURL, options: .atomic)
-        }
+        modelContext.saveOrLog()
+        analysisCoordinator.analyzeItems(
+            [item],
+            keySyncService: keySyncService,
+            fileSystem: fileSystem,
+            modelContext: modelContext,
+            searchService: searchService,
+            allItems: allItems
+        )
     }
 }

@@ -190,7 +190,7 @@ final class ElectronImportService {
         // 3. Import spaces
         let (spaceMap, newSpaceCount) = await importSpaces(from: electronRoot, into: context)
         spacesImported = newSpaceCount
-        try? context.save()
+        context.saveOrLog()
 
         // 4. Process each metadata file — save after each item for safe incremental import
         for fileURL in allFiles {
@@ -230,7 +230,7 @@ final class ElectronImportService {
                     spaceMap: spaceMap,
                     context: context
                 )
-                try? context.save()
+                context.saveOrLog()
 
                 // Write JSON sidecar so item syncs to other devices via iCloud
                 let itemDescriptor = FetchDescriptor<MediaItem>(predicate: #Predicate<MediaItem> { $0.sourceId == electronId })

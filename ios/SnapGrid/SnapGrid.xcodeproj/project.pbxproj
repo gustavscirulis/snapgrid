@@ -55,6 +55,10 @@
 		F1D89CA57FB5EB4C93E230F1 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F5136715774C9C5C0651A4D4 /* Foundation.framework */; };
 		F2AD76603369201957F4E1FD /* SearchIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFAB07291230EAED58390B4 /* SearchIndexService.swift */; };
 		FF030F761044AEE25ACAEA04 /* SyncServiceDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCAFF8A2EC042170AE7D0DA4 /* SyncServiceDataTests.swift */; };
+		A100000041 /* ModelContext+SaveOrLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000041 /* ModelContext+SaveOrLog.swift */; };
+		A100000042 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000042 /* AppState.swift */; };
+		A100000043 /* AnalysisCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000043 /* AnalysisCoordinator.swift */; };
+		A100000044 /* SidecarWriteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000044 /* SidecarWriteService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -132,6 +136,10 @@
 		B100000037 /* KeySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncService.swift; sourceTree = "<group>"; };
 		B100000038 /* AIAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAnalysisService.swift; sourceTree = "<group>"; };
 		B100000040 /* ActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityView.swift; sourceTree = "<group>"; };
+		B100000041 /* ModelContext+SaveOrLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelContext+SaveOrLog.swift"; sourceTree = "<group>"; };
+		B100000042 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		B100000043 /* AnalysisCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisCoordinator.swift; sourceTree = "<group>"; };
+		B100000044 /* SidecarWriteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidecarWriteService.swift; sourceTree = "<group>"; };
 		C100000001 /* SnapGrid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapGrid.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC1856679647210724D1E66B /* TestTags.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TestTags.swift; sourceTree = "<group>"; };
 		D03B2C30D0292058D69AC3B2 /* ShareImportServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareImportServiceTests.swift; sourceTree = "<group>"; };
@@ -270,6 +278,7 @@
 			children = (
 				B100000001 /* SnapGridApp.swift */,
 				B100000002 /* ContentView.swift */,
+				B100000042 /* AppState.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -310,6 +319,8 @@
 				B100000036 /* KeySyncCrypto.swift */,
 				B100000037 /* KeySyncService.swift */,
 				B100000038 /* AIAnalysisService.swift */,
+				B100000043 /* AnalysisCoordinator.swift */,
+				B100000044 /* SidecarWriteService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -318,6 +329,7 @@
 			isa = PBXGroup;
 			children = (
 				B100000009 /* Color+SnapGrid.swift */,
+				B100000041 /* ModelContext+SaveOrLog.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -578,6 +590,10 @@
 				A100000037 /* KeySyncService.swift in Sources */,
 				A100000038 /* AIAnalysisService.swift in Sources */,
 				A100000040 /* ActivityView.swift in Sources */,
+				A100000041 /* ModelContext+SaveOrLog.swift in Sources */,
+				A100000042 /* AppState.swift in Sources */,
+				A100000043 /* AnalysisCoordinator.swift in Sources */,
+				A100000044 /* SidecarWriteService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

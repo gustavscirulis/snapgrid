@@ -31,6 +31,10 @@ struct SnapGridApp: App {
         WindowGroup("SnapGrid") {
             ContentView()
                 .task { KeySyncService.syncToiCloud() }
+                .onAppear {
+                    // Disable native macOS window tabbing — this app has its own Spaces tab bar
+                    NSWindow.allowsAutomaticWindowTabbing = false
+                }
         }
         .modelContainer(container)
         .windowStyle(.hiddenTitleBar)
@@ -94,6 +98,22 @@ struct SnapGridApp: App {
                 .keyboardShortcut("a")
             }
 
+            CommandGroup(replacing: .toolbar) {
+                Button {
+                    NotificationCenter.default.post(name: .zoomIn, object: nil)
+                } label: {
+                    Label("Zoom In", systemImage: "plus.magnifyingglass")
+                }
+                .keyboardShortcut("+")
+
+                Button {
+                    NotificationCenter.default.post(name: .zoomOut, object: nil)
+                } label: {
+                    Label("Zoom Out", systemImage: "minus.magnifyingglass")
+                }
+                .keyboardShortcut("-")
+            }
+
             CommandGroup(replacing: .undoRedo) {
                 Button("Undo") {
                     NotificationCenter.default.post(name: .undoDelete, object: nil)
@@ -151,4 +171,6 @@ extension Notification.Name {
     static let pasteImages = Notification.Name("pasteImages")
     static let deleteSelected = Notification.Name("deleteSelected")
     static let analysisCompleted = Notification.Name("analysisCompleted")
+    static let zoomIn = Notification.Name("zoomIn")
+    static let zoomOut = Notification.Name("zoomOut")
 }

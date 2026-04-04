@@ -181,7 +181,7 @@ final class SyncService {
 
             // Yield periodically
             if imported % 20 == 0 && imported > 0 {
-                try? context.save()
+                context.saveOrLog()
                 await Task.yield()
             }
         }
@@ -191,7 +191,7 @@ final class SyncService {
             context.delete(orphan)
         }
 
-        try? context.save()
+        context.saveOrLog()
         print("[SyncService] Sync complete: \(imported) new, \(skipped) pending iCloud, \(existingById.count) removed")
         return skipped
     }
@@ -246,7 +246,7 @@ final class SyncService {
             context.delete(orphan)
         }
 
-        try? context.save()
+        context.saveOrLog()
     }
 
     // MARK: - Update Helpers

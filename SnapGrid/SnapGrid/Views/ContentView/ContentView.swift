@@ -256,9 +256,18 @@ struct ContentView: View {
             }
         }
         .task {
+            // Reset any isAnalyzing flags stuck from a previous crash/kill
+            let stuckDescriptor = FetchDescriptor<MediaItem>(predicate: #Predicate { $0.isAnalyzing == true })
+            if let stuck = try? modelContext.fetch(stuckDescriptor), !stuck.isEmpty {
+                for item in stuck { item.isAnalyzing = false }
+                modelContext.saveOrLog()
+                print("[Cleanup] Reset \(stuck.count) stuck isAnalyzing flags")
+            }
+
             MediaStorageService.shared.emptyOldTrash()
             MigrationService.migrateIfNeeded(context: modelContext)
             DataCleanupService.cleanOrphanedRecords(context: modelContext)
+            DataCleanupService.cleanOrphanedSidecars()
             await DataCleanupService.migrateVideoDimensions(context: modelContext)
 
             // Sync items that arrived via iCloud while app was closed
@@ -335,15 +344,15 @@ struct ContentView: View {
                 appState.clearSelection()
             }
         }
-        .onKeyPress(.init("="), phases: .down) { press in
-            guard press.modifiers.contains(.command) else { return .ignored }
-            appState.zoomIn()
-            return .handled
+        .task {
+            for await _ in NotificationCenter.default.notifications(named: .zoomIn) {
+                appState.zoomIn()
+            }
         }
-        .onKeyPress(.init("-"), phases: .down) { press in
-            guard press.modifiers.contains(.command) else { return .ignored }
-            appState.zoomOut()
-            return .handled
+        .task {
+            for await _ in NotificationCenter.default.notifications(named: .zoomOut) {
+                appState.zoomOut()
+            }
         }
         .environment(appState)
         .environment(videoPreview)
@@ -470,9 +479,7 @@ struct ContentView: View {
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self],
                                               options: [.urlReadingFileURLsOnly: true]) as? [URL],
            !urls.isEmpty {
-            let supportedExts: Set<String> = ["png","jpg","jpeg","gif","bmp","tiff","webp","heic",
-                                               "mp4","webm","mov","avi","m4v"]
-            let validURLs = urls.filter { supportedExts.contains($0.pathExtension.lowercased()) }
+            let validURLs = urls.filter { SupportedMedia.isSupported($0.pathExtension) }
             if !validURLs.isEmpty {
                 syncWatcher.beginLocalChange()
                 Task {
@@ -542,12 +549,7 @@ struct ContentView: View {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
-        // electron/main.js:1761 — jpg|jpeg|png|gif|webp|bmp|tiff|mp4|webm|mov|avi
-        // UploadZone.tsx:165 — image/*,video/*
-        panel.allowedContentTypes = [
-            .png, .jpeg, .gif, .bmp, .tiff, .webP, .heic,     // Images
-            .mpeg4Movie, .movie, .avi                           // Videos (.webm has no UTType)
-        ]
+        panel.allowedContentTypes = SupportedMedia.importableContentTypes
 
         panel.begin { response in
             if response == .OK {
@@ -633,7 +635,7 @@ struct ContentView: View {
             }
         }
         withAnimation(SnapSpring.standard) {
-            try? modelContext.save()
+            modelContext.saveOrLog()
         }
         syncWatcher.endLocalChange()
 
@@ -694,7 +696,7 @@ struct ContentView: View {
             modelContext.insert(item)
             MetadataSidecarService.shared.writeSidecar(for: item)
         }
-        try? modelContext.save()
+        modelContext.saveOrLog()
         syncWatcher.endLocalChange()
         appState.showToast("Restored \(batch.count) item\(batch.count == 1 ? "" : "s")")
     }
@@ -703,17 +705,8 @@ struct ContentView: View {
         syncWatcher.beginLocalChange()
         let space = Space(name: "New Space", order: spaces.count)
         modelContext.insert(space)
-        try? modelContext.save()
-        // Build sidecar array manually — @Query hasn't updated yet with the new space
-        var allSpaceSidecars = spaces.map { s in
-            SidecarSpace(id: s.id, name: s.name, order: s.order,
-                         createdAt: s.createdAt, customPrompt: s.customPrompt,
-                         useCustomPrompt: s.useCustomPrompt)
-        }
-        allSpaceSidecars.append(SidecarSpace(id: space.id, name: space.name, order: space.order,
-                                              createdAt: space.createdAt, customPrompt: space.customPrompt,
-                                              useCustomPrompt: space.useCustomPrompt))
-        MetadataSidecarService.shared.writeSpaceSidecars(allSpaceSidecars)
+        modelContext.saveOrLog()
+        MetadataSidecarService.shared.writeSpaces(from: modelContext)
         syncWatcher.endLocalChange()
         switchToSpace(space.id)
         pendingEditSpaceId = space.id
@@ -722,26 +715,17 @@ struct ContentView: View {
     private func deleteSpace(_ id: String) {
         guard let space = spaces.first(where: { $0.id == id }) else { return }
 
-        // 1. Capture plain data before any SwiftData mutation
-        let remainingSidecars = spaces.filter { $0.id != id }.map { s in
-            SidecarSpace(id: s.id, name: s.name, order: s.order,
-                         createdAt: s.createdAt, customPrompt: s.customPrompt,
-                         useCustomPrompt: s.useCustomPrompt)
-        }
-
-        // 2. Switch away before mutation
         if appState.activeSpaceId == id {
             appState.activeSpaceId = nil
         }
 
-        // 3. Suppress sync, manually nullify relationships, delete, write sidecar
         syncWatcher.beginLocalChange()
         for item in space.items {
             item.space = nil
         }
         modelContext.delete(space)
-        try? modelContext.save()
-        MetadataSidecarService.shared.writeSpaceSidecars(remainingSidecars)
+        modelContext.saveOrLog()
+        MetadataSidecarService.shared.writeSpaces(from: modelContext)
         syncWatcher.endLocalChange()
     }
 
@@ -749,7 +733,7 @@ struct ContentView: View {
         if let space = spaces.first(where: { $0.id == id }) {
             syncWatcher.beginLocalChange()
             space.name = newName
-            try? modelContext.save()
+            modelContext.saveOrLog()
             MetadataSidecarService.shared.writeSpaces(Array(spaces))
             syncWatcher.endLocalChange()
         }
@@ -768,7 +752,7 @@ struct ContentView: View {
         for (i, space) in ordered.enumerated() {
             space.order = i
         }
-        try? modelContext.save()
+        modelContext.saveOrLog()
         MetadataSidecarService.shared.writeSpaces(Array(spaces))
         syncWatcher.endLocalChange()
     }
@@ -781,7 +765,7 @@ struct ContentView: View {
         for item in itemsToUpdate {
             item.space = space
         }
-        try? modelContext.save()
+        modelContext.saveOrLog()
 
         for item in itemsToUpdate {
             MetadataSidecarService.shared.writeSidecar(for: item)
@@ -810,7 +794,7 @@ struct ContentView: View {
             item.analysisError = nil
             item.analysisResult = nil
         }
-        try? modelContext.save()
+        modelContext.saveOrLog()
         for item in items {
             Task {
                 await importService.analyzeItem(item, context: modelContext)

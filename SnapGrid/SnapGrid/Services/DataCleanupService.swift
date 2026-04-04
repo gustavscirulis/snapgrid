@@ -42,7 +42,7 @@ enum DataCleanupService {
         }
 
         if updated > 0 {
-            try? context.save()
+            context.saveOrLog()
             print("[DataCleanup] Migrated dimensions for \(updated) videos")
         }
 
@@ -75,7 +75,7 @@ enum DataCleanupService {
         }
 
         if removed > 0 {
-            try? context.save()
+            context.saveOrLog()
             print("[DataCleanup] Removed \(removed) orphaned records")
         }
 
@@ -90,9 +90,51 @@ enum DataCleanupService {
                 }
             }
             if orphanedResults > 0 {
-                try? context.save()
+                context.saveOrLog()
                 print("[DataCleanup] Removed \(orphanedResults) orphaned AnalysisResult records")
             }
+        }
+    }
+
+    /// Remove sidecar JSON files from metadata/ whose media file no longer exists.
+    /// This prevents "Media file not found" warnings on every launch.
+    static func cleanOrphanedSidecars() {
+        let storage = MediaStorageService.shared
+        let fm = FileManager.default
+
+        guard let files = try? fm.contentsOfDirectory(
+            at: storage.metadataDir,
+            includingPropertiesForKeys: nil
+        ) else { return }
+
+        let imageExtensions = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "heic"]
+        let videoExtensions = ["mp4", "webm", "mov", "avi", "m4v"]
+        let allExtensions = imageExtensions + videoExtensions
+
+        var removed = 0
+        for file in files where file.pathExtension == "json" {
+            let id = file.deletingPathExtension().lastPathComponent
+
+            // Check if any media file exists for this ID (any extension)
+            let hasMedia = allExtensions.contains { ext in
+                let mediaURL = storage.mediaDir.appendingPathComponent("\(id).\(ext)")
+                if fm.fileExists(atPath: mediaURL.path) { return true }
+                // Check iCloud placeholder
+                let placeholder = storage.mediaDir.appendingPathComponent(".\(id).\(ext).icloud")
+                return fm.fileExists(atPath: placeholder.path)
+            }
+
+            if !hasMedia {
+                try? fm.removeItem(at: file)
+                // Also clean up the thumbnail if it exists
+                let thumbURL = storage.thumbnailDir.appendingPathComponent("\(id).jpg")
+                try? fm.removeItem(at: thumbURL)
+                removed += 1
+            }
+        }
+
+        if removed > 0 {
+            print("[DataCleanup] Removed \(removed) orphaned sidecar files")
         }
     }
 

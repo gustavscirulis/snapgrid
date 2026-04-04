@@ -444,7 +444,7 @@ final class SyncWatcher {
             }
         }
 
-        try? context.save()
+        context.saveOrLog()
     }
 
     // MARK: - Background File I/O Helpers (nonisolated)
