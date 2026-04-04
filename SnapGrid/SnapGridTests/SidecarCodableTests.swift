@@ -36,7 +36,8 @@ struct SidecarCodableTests {
                 SidecarPattern(name: "Mountain", confidence: 0.95),
                 SidecarPattern(name: "Sky", confidence: 0.88)
             ],
-            sourceURL: "https://x.com/user/status/123"
+            sourceURL: "https://x.com/user/status/123",
+            analyzedAt: Date(timeIntervalSince1970: 1700000100)
         )
 
         let data = try Self.encoder.encode(original)
@@ -67,7 +68,8 @@ struct SidecarCodableTests {
             imageContext: nil,
             imageSummary: nil,
             patterns: nil,
-            sourceURL: nil
+            sourceURL: nil,
+            analyzedAt: nil
         )
 
         let data = try Self.encoder.encode(original)
@@ -96,7 +98,8 @@ struct SidecarCodableTests {
             imageContext: nil,
             imageSummary: nil,
             patterns: nil,
-            sourceURL: "https://x.com/user/status/1234567890"
+            sourceURL: "https://x.com/user/status/1234567890",
+            analyzedAt: nil
         )
 
         let data = try Self.encoder.encode(original)

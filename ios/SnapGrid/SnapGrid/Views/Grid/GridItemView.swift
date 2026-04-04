@@ -194,6 +194,13 @@ struct GridItemView: View {
         .task {
             await loadThumbnail()
         }
+        .onChange(of: isSelected) { wasSelected, isNowSelected in
+            // Retry thumbnail load after returning from full-screen overlay
+            // if the iCloud file has since downloaded
+            if wasSelected && !isNowSelected && thumbnail == nil {
+                Task { await loadThumbnail() }
+            }
+        }
     }
 
     // MARK: - Thumbnail Loading
@@ -215,7 +222,7 @@ struct GridItemView: View {
         }
     }
 
-    private func loadThumbnail() async {
+    private func loadThumbnail(isRetry: Bool = false) async {
         let cache = ThumbnailCache.shared
 
         // Try thumbnail first (fast, no wait)
@@ -248,7 +255,15 @@ struct GridItemView: View {
             }
         }
 
-        loadFailed = true
+        // Auto-retry once after a short delay — iCloud files may arrive
+        // just after the initial load attempt
+        if !isRetry {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            await loadThumbnail(isRetry: true)
+        } else {
+            loadFailed = true
+        }
     }
 }
 

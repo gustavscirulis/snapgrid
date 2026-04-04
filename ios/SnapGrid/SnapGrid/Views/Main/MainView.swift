@@ -517,6 +517,11 @@ struct MainView: View {
             return
         }
 
+        // Clean up old trash (30+ days), matching Mac behavior
+        if isInitialLoad {
+            MediaDeleteService.emptyOldTrash(rootURL: rootURL)
+        }
+
         let skipped = await syncService.sync(rootURL: rootURL, context: modelContext)
         isLoading = false
 

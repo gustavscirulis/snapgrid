@@ -30,8 +30,11 @@ class iCloudDownloadMonitor {
     }
 
     /// Check if a file is currently downloaded/local.
+    /// Clears cached resource values first to get fresh iCloud status.
     func isDownloaded(_ url: URL) -> Bool {
-        guard let values = try? url.resourceValues(
+        var freshURL = url
+        freshURL.removeAllCachedResourceValues()
+        guard let values = try? freshURL.resourceValues(
             forKeys: [.ubiquitousItemDownloadingStatusKey]
         ) else {
             // Can't read resource values — assume local file
