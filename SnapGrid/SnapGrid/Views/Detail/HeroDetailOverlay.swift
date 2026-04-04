@@ -710,56 +710,26 @@ struct HeroDetailOverlay: View {
 
     @ViewBuilder
     private func detailContextMenu(frame: CGRect) -> some View {
-        if !spaces.isEmpty {
-            Menu {
-                ForEach(spaces) { space in
-                    Button {
-                        onAssignToSpace?(currentItem.id, space.id)
-                    } label: {
-                        if currentItem.space?.id == space.id {
-                            Label(space.name, systemImage: "checkmark")
-                        } else {
-                            Text(space.name)
-                        }
-                    }
-                }
-            } label: {
-                Label("Move to", systemImage: "folder")
-            }
-
-            if activeSpaceId != nil {
-                Button {
+        MediaItemContextMenu(
+            spaces: spaces,
+            activeSpaceId: activeSpaceId,
+            currentSpaceId: currentItem.space?.id,
+            onMoveToSpace: { spaceId in
+                if let spaceId {
+                    onAssignToSpace?(currentItem.id, spaceId)
+                } else {
                     onAssignToSpace?(currentItem.id, nil)
-                } label: {
-                    Label("Remove from Space", systemImage: "folder.badge.minus")
+                }
+            },
+            onShare: { onShare?(currentItem.id, frame) },
+            onRedoAnalysis: { onRedoAnalysis?(currentItem.id) },
+            onDelete: {
+                triggerClose()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    onDelete?(currentItem.id)
                 }
             }
-
-            Divider()
-        }
-
-        Button {
-            onShare?(currentItem.id, frame)
-        } label: {
-            Label("Share...", systemImage: "square.and.arrow.up")
-        }
-
-        Button {
-            onRedoAnalysis?(currentItem.id)
-        } label: {
-            Label("Redo Analysis", systemImage: "arrow.clockwise")
-        }
-
-        Divider()
-
-        Button(role: .destructive) {
-            triggerClose()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                onDelete?(currentItem.id)
-            }
-        } label: {
-            Label("Delete", systemImage: "trash")
-        }
+        )
     }
 
     // MARK: - Drag to Export
@@ -775,21 +745,8 @@ struct HeroDetailOverlay: View {
         return provider
     }
 
-    @ViewBuilder
     private var dragPreview: some View {
-        if let image {
-            Image(nsImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 96, height: 96 / currentItem.aspectRatio)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .opacity(0.85)
-        } else {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.3))
-                .frame(width: 96, height: 64)
-                .opacity(0.85)
-        }
+        DragThumbnailPreview(image: image, aspectRatio: currentItem.aspectRatio)
     }
 
     private func waitForPlayerReady() async {
