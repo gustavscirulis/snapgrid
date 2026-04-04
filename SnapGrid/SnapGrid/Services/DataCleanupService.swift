@@ -107,9 +107,7 @@ enum DataCleanupService {
             includingPropertiesForKeys: nil
         ) else { return }
 
-        let imageExtensions = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "heic"]
-        let videoExtensions = ["mp4", "webm", "mov", "avi", "m4v"]
-        let allExtensions = imageExtensions + videoExtensions
+        let allExtensions = SupportedMedia.allExtensions
 
         var removed = 0
         for file in files where file.pathExtension == "json" {

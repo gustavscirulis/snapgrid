@@ -350,29 +350,11 @@ struct GridItemView: View {
             }
             return provider
         } preview: {
-            ZStack(alignment: .topTrailing) {
-                if let thumbnail {
-                    Image(nsImage: thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 96, height: 96 / itemAspectRatio)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.snapMuted)
-                        .frame(width: 96, height: 64)
-                }
-                if isBulk {
-                    Text("\(selectedCount)")
-                        .font(.caption.bold())
-                        .foregroundStyle(.white)
-                        .frame(width: 20, height: 20)
-                        .background(Color.snapAccent)
-                        .clipShape(Circle())
-                        .offset(x: 6, y: -6)
-                }
-            }
-            .opacity(0.85)
+            DragThumbnailPreview(
+                image: thumbnail,
+                aspectRatio: itemAspectRatio,
+                bulkCount: isBulk ? selectedCount : nil
+            )
         }
         .opacity(deleteStage >= 2 ? 0 : gridItemOpacity)
         .onGeometryChange(for: CGRect.self) { proxy in
@@ -399,53 +381,16 @@ struct GridItemView: View {
             }
         }
         .contextMenu {
-            // Move to space submenu
-            Menu {
-                ForEach(spaces) { space in
-                    Button {
-                        onAssignToSpace(space.id)
-                    } label: {
-                        if itemSpaceId == space.id {
-                            Label(space.name, systemImage: "checkmark")
-                        } else {
-                            Text(space.name)
-                        }
-                    }
-                }
-            } label: {
-                Label(isBulk ? "Move \(selectedCount) Items to" : "Move to", systemImage: "folder")
-            }
-
-            // Remove from space
-            if activeSpaceId != nil {
-                Button {
-                    onAssignToSpace(nil)
-                } label: {
-                    Label(isBulk ? "Remove \(selectedCount) from Space" : "Remove from Space", systemImage: "folder.badge.minus")
-                }
-            }
-
-            Divider()
-
-            Button {
-                onShare(globalFrame)
-            } label: {
-                Label("Share...", systemImage: "square.and.arrow.up")
-            }
-
-            Button {
-                onRetryAnalysis()
-            } label: {
-                Label(isBulk ? "Redo Analysis for \(selectedCount) Items" : "Redo Analysis", systemImage: "arrow.clockwise")
-            }
-
-            Divider()
-
-            Button(role: .destructive) {
-                onDelete()
-            } label: {
-                Label(isBulk ? "Delete \(selectedCount) Items" : "Delete", systemImage: "trash")
-            }
+            MediaItemContextMenu(
+                spaces: spaces,
+                activeSpaceId: activeSpaceId,
+                currentSpaceId: itemSpaceId,
+                bulkCount: isBulk ? selectedCount : nil,
+                onMoveToSpace: { spaceId in onAssignToSpace(spaceId) },
+                onShare: { onShare(globalFrame) },
+                onRedoAnalysis: { onRetryAnalysis() },
+                onDelete: { onDelete() }
+            )
         }
         .task {
             guard thumbnail == nil else { return }
@@ -462,6 +407,7 @@ struct GridItemView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
 
+        #if compiler(>=6.3)
         if #available(macOS 26, *) {
             base
                 .glassEffect(.regular, in: .rect(cornerRadius: 10))
@@ -471,6 +417,11 @@ struct GridItemView: View {
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                 .environment(\.colorScheme, .dark)
         }
+        #else
+        base
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+            .environment(\.colorScheme, .dark)
+        #endif
     }
 
     /// Circular hover-action button icon with a static dark background.
@@ -498,6 +449,7 @@ struct GridItemView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
 
+        #if compiler(>=6.3)
         if #available(macOS 26, *) {
             base.glassEffect(.regular.tint(.red).interactive(), in: .rect(cornerRadius: 6))
         } else {
@@ -505,6 +457,11 @@ struct GridItemView: View {
                 .background(.red.opacity(0.7))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
         }
+        #else
+        base
+            .background(.red.opacity(0.7))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        #endif
     }
 
     private func loadThumbnail() async {
