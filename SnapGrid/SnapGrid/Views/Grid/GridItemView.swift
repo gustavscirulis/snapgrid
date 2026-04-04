@@ -233,7 +233,7 @@ struct GridItemView: View {
         .overlay(alignment: .topTrailing) {
             if effectiveHover {
                 Button(action: onDelete) {
-                    hoverButtonIcon("xmark", size: 10)
+                    hoverButtonIcon("trash", size: 10)
                 }
                 .buttonStyle(.plain)
                 .padding(8)
@@ -244,7 +244,7 @@ struct GridItemView: View {
         .overlay(alignment: .topLeading) {
             if effectiveHover && activeSpaceId != nil {
                 Button { onAssignToSpace(nil) } label: {
-                    hoverButtonIcon("arrow.uturn.backward", size: 9)
+                    hoverButtonIcon("folder.badge.minus", size: 10)
                 }
                 .buttonStyle(.plain)
                 .padding(8)
