@@ -405,16 +405,17 @@ struct FullScreenImageOverlay: View {
         let metadataTopY = finalFrame.maxY + 32
 
         ZStack {
-            // Image — centered at finalFrame, scrolls up with content
+            // Image — centered at finalFrame, zoomed by frame size (not scaleEffect)
+            // so that clipShape/mask boundaries grow with the content.
             Group {
                 if item.isVideo, let player {
                     VideoPlayer(player: player)
-                        .frame(width: finalFrame.width, height: finalFrame.height)
+                        .frame(width: finalFrame.width * zoomScale, height: finalFrame.height * zoomScale)
                 } else if let displayImage {
                     Image(uiImage: displayImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: finalFrame.width, height: finalFrame.height)
+                        .frame(width: finalFrame.width * zoomScale, height: finalFrame.height * zoomScale)
                         .clipped()
                 } else {
                     Rectangle()
@@ -431,14 +432,13 @@ struct FullScreenImageOverlay: View {
             .mask {
                 let maskH = deleteStage >= 1
                     ? finalFrame.height * DeleteAnimation.crushedScaleY
-                    : finalFrame.height
+                    : finalFrame.height * zoomScale
                 let maskW = deleteStage >= 2
                     ? finalFrame.width * DeleteAnimation.crushedScaleX
-                    : finalFrame.width
+                    : finalFrame.width * zoomScale
                 RoundedRectangle(cornerRadius: zoomedCornerRadius)
                     .frame(width: maskW, height: maskH)
             }
-            .scaleEffect(zoomScale)
             .offset(effectiveZoomPanOffset)
             .opacity(deleteStage >= 2 ? 0 : 1)
             .position(x: finalFrame.midX, y: finalFrame.midY)
@@ -854,12 +854,49 @@ struct FullScreenImageOverlay: View {
         MagnifyGesture()
             .onChanged { value in
                 let raw = zoomLastScale * value.magnification
-                zoomScale = rubberBand(raw, min: minZoomScale, max: maxZoomScale)
+                let prevZoom = zoomScale
+                let newZoom = rubberBand(raw, min: minZoomScale, max: maxZoomScale)
+
+                // Focal-point zoom: adjust pan so the pinch center stays fixed.
+                // Convert startAnchor (UnitPoint 0–1) to screen coordinates.
+                if prevZoom > 0 && newZoom != prevZoom {
+                    let screen = UIScreen.main.bounds
+                    let anchor = CGPoint(
+                        x: value.startAnchor.x * screen.width,
+                        y: value.startAnchor.y * screen.height
+                    )
+                    let finalFrame = computeFinalFrame(for: item)
+                    let currentOffset = effectiveZoomPanOffset
+                    let imageCenterX = finalFrame.midX + currentOffset.width
+                    let imageCenterY = finalFrame.midY + currentOffset.height
+                    let ratio = newZoom / prevZoom
+                    let dx = -(anchor.x - imageCenterX) * (ratio - 1)
+                    let dy = -(anchor.y - imageCenterY) * (ratio - 1)
+                    zoomPanOffset.width += dx
+                    zoomPanOffset.height += dy
+                    zoomPanLastOffset.width += dx
+                    zoomPanLastOffset.height += dy
+                }
+
+                zoomScale = newZoom
                 let wasZoomed = isZoomed
                 isZoomed = zoomScale > minZoomScale
-                if isZoomed && !wasZoomed && contentOffset > 0 {
-                    withAnimation(SnapSpring.resolvedFast) { contentOffset = 0 }
-                    contentOffsetAtGestureStart = 0
+                if isZoomed && !wasZoomed {
+                    // Upgrade simultaneous drag to zoomPan so two-finger
+                    // panning works during the same gesture that started the zoom.
+                    if gestureActive && gestureMode != .zoomPan {
+                        gestureMode = .zoomPan
+                        // Subtract accumulated translation for a seamless handoff
+                        zoomPanLastOffset = CGSize(
+                            width: zoomPanOffset.width - gestureDrag.translation.width,
+                            height: zoomPanOffset.height - gestureDrag.translation.height
+                        )
+                        dismissOffset = 0
+                    }
+                    if contentOffset > 0 {
+                        withAnimation(SnapSpring.resolvedFast) { contentOffset = 0 }
+                        contentOffsetAtGestureStart = 0
+                    }
                 }
             }
             .onEnded { _ in
