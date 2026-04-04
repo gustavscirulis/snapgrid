@@ -39,6 +39,7 @@
 		A100000019 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B100000019 /* Assets.xcassets */; };
 		A100000020 /* iCloudDownloadMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000020 /* iCloudDownloadMonitor.swift */; };
 		A100000021 /* FullScreenImageOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000021 /* FullScreenImageOverlay.swift */; };
+		A100000045 /* DetailMetadataSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000045 /* DetailMetadataSection.swift */; };
 		A100000022 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B100000022 /* AppIcon.icon */; };
 		A100000023 /* ShareImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000025 /* ShareImportService.swift */; };
 		A100000030 /* AnimationTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000030 /* AnimationTokens.swift */; };
@@ -124,6 +125,7 @@
 		B100000019 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B100000020 /* iCloudDownloadMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudDownloadMonitor.swift; sourceTree = "<group>"; };
 		B100000021 /* FullScreenImageOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenImageOverlay.swift; sourceTree = "<group>"; };
+		B100000045 /* DetailMetadataSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailMetadataSection.swift; sourceTree = "<group>"; };
 		B100000022 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		B100000023 /* SnapGrid.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SnapGrid.entitlements; sourceTree = "<group>"; };
 		B100000024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -379,6 +381,7 @@
 				B100000016 /* ImageDetailView.swift */,
 				B100000017 /* ZoomableImageView.swift */,
 				B100000021 /* FullScreenImageOverlay.swift */,
+				B100000045 /* DetailMetadataSection.swift */,
 			);
 			path = Detail;
 			sourceTree = "<group>";
@@ -577,6 +580,7 @@
 				A100000018 /* EmptyStateView.swift in Sources */,
 				A100000020 /* iCloudDownloadMonitor.swift in Sources */,
 				A100000021 /* FullScreenImageOverlay.swift in Sources */,
+				A100000045 /* DetailMetadataSection.swift in Sources */,
 				A100000023 /* ShareImportService.swift in Sources */,
 				69A2FAEBC4355557E9BBF91D /* MediaItem.swift in Sources */,
 				810E66F164E96C78F5095B7B /* AnalysisResult.swift in Sources */,
