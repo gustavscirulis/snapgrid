@@ -14,7 +14,6 @@ struct ItemFramePreferenceKey: PreferenceKey {
 struct MasonryGridView: View {
     let items: [MediaItem]
     let thumbnailSize: ThumbnailSize
-    let selectedIds: Set<String>
     let spaces: [Space]
     let activeSpaceId: String?
     let hiddenItemId: String?
@@ -27,6 +26,8 @@ struct MasonryGridView: View {
     let onShare: (Set<String>, CGRect) -> Void
     let onSetSelection: (Set<String>) -> Void
     var coordinateSpaceName: String = "gridContent"
+
+    @Environment(AppState.self) private var appState
 
     // Rubber band state
     @State private var itemFrames: [String: CGRect] = [:]
@@ -52,6 +53,7 @@ struct MasonryGridView: View {
             let availableWidth = geometry.size.width - horizontalPadding * 2
             let columns = thumbnailSize.columns(forWidth: geometry.size.width)
             let columnWidth = (availableWidth - spacing * CGFloat(columns - 1)) / CGFloat(columns)
+            let distribution = computeDistribution(totalColumns: columns)
 
             ScrollView {
                 ZStack(alignment: .topLeading) {
@@ -66,7 +68,7 @@ struct MasonryGridView: View {
                                         rubberBandStart = value.startLocation
                                         let flags = NSEvent.modifierFlags
                                         frozenSelection = (flags.contains(.shift) || flags.contains(.command))
-                                            ? selectedIds : Set()
+                                            ? appState.selectedIds : Set()
                                     }
                                     rubberBandCurrent = value.location
 
@@ -102,33 +104,28 @@ struct MasonryGridView: View {
                     HStack(alignment: .top, spacing: spacing) {
                         ForEach(0..<columns, id: \.self) { column in
                             LazyVStack(spacing: spacing) {
-                                ForEach(itemsForColumn(column, totalColumns: columns)) { item in
-                                    let effectiveIds = selectedIds.contains(item.id) && selectedIds.count > 1
-                                        ? selectedIds
-                                        : Set([item.id])
-
+                                ForEach(distribution[column]) { item in
                                     GridItemView(
                                         item: item,
                                         width: columnWidth,
-                                        isSelected: selectedIds.contains(item.id),
                                         spaces: spaces,
                                         activeSpaceId: activeSpaceId,
-                                        selectedCount: selectedIds.contains(item.id) ? selectedIds.count : 1,
-                                        effectiveIds: effectiveIds,
                                         hiddenItemId: hiddenItemId,
                                         onSelect: { frame in onSelect(item.id, frame) },
                                         onToggleSelect: { onToggleSelect(item.id) },
                                         onShiftSelect: { onShiftSelect(item.id) },
-                                        onDelete: { onDelete(effectiveIds) },
-                                        onAssignToSpace: { spaceId in onAssignToSpace(effectiveIds, spaceId) },
-                                        onRetryAnalysis: { onRetryAnalysis(effectiveIds) },
-                                        onShare: { frame in onShare(effectiveIds, frame) }
+                                        onDelete: onDelete,
+                                        onAssignToSpace: onAssignToSpace,
+                                        onRetryAnalysis: onRetryAnalysis,
+                                        onShare: onShare
                                     )
                                     .background(
                                         GeometryReader { geo in
                                             Color.clear.preference(
                                                 key: ItemFramePreferenceKey.self,
-                                                value: [item.id: geo.frame(in: .named(coordinateSpaceName))]
+                                                value: rubberBandStart != nil
+                                                    ? [item.id: geo.frame(in: .named(coordinateSpaceName))]
+                                                    : [:]
                                             )
                                         }
                                     )
@@ -161,8 +158,9 @@ struct MasonryGridView: View {
         }
     }
 
-    /// Distribute items across columns using shortest-column-first algorithm
-    private func itemsForColumn(_ column: Int, totalColumns: Int) -> [MediaItem] {
+    /// Distribute items across columns using shortest-column-first algorithm.
+    /// Computed once per body evaluation (O(n)), not per-column.
+    private func computeDistribution(totalColumns: Int) -> [[MediaItem]] {
         var columnHeights = Array(repeating: CGFloat(0), count: totalColumns)
         var columnItems = Array(repeating: [MediaItem](), count: totalColumns)
 
@@ -173,6 +171,6 @@ struct MasonryGridView: View {
             columnHeights[shortest] += estimatedHeight + 16
         }
 
-        return columnItems[column]
+        return columnItems
     }
 }
