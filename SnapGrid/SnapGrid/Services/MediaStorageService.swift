@@ -14,19 +14,11 @@ final class MediaStorageService: Sendable {
     let trashThumbnailDir: URL
     let isUsingiCloud: Bool
 
-    private init() {
-        // Try to resolve the iCloud container; fall back to Application Support
-        let fm = FileManager.default
-        if let containerURL = fm.url(forUbiquityContainerIdentifier: "iCloud.com.SnapGrid") {
-            let docsURL = containerURL.appendingPathComponent("Documents", isDirectory: true)
-            baseURL = docsURL
-            isUsingiCloud = true
-        } else {
-            let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            baseURL = appSupport.appendingPathComponent("SnapGrid", isDirectory: true)
-            isUsingiCloud = false
-        }
-
+    /// Create a storage service pointing at a custom base directory.
+    /// Used by tests to isolate file operations in temp directories.
+    init(baseURL: URL, isUsingiCloud: Bool = false) {
+        self.baseURL = baseURL
+        self.isUsingiCloud = isUsingiCloud
         mediaDir = baseURL.appendingPathComponent("images", isDirectory: true)
         metadataDir = baseURL.appendingPathComponent("metadata", isDirectory: true)
         thumbnailDir = baseURL.appendingPathComponent("thumbnails", isDirectory: true)
@@ -34,9 +26,21 @@ final class MediaStorageService: Sendable {
         trashMetadataDir = baseURL.appendingPathComponent(".trash/metadata", isDirectory: true)
         trashThumbnailDir = baseURL.appendingPathComponent(".trash/thumbnails", isDirectory: true)
 
-        // Create directories on init
+        let fm = FileManager.default
         for dir in [baseURL, mediaDir, metadataDir, thumbnailDir, trashMediaDir, trashMetadataDir, trashThumbnailDir] {
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+    }
+
+    private convenience init() {
+        // Try to resolve the iCloud container; fall back to Application Support
+        let fm = FileManager.default
+        if let containerURL = fm.url(forUbiquityContainerIdentifier: "iCloud.com.SnapGrid") {
+            let docsURL = containerURL.appendingPathComponent("Documents", isDirectory: true)
+            self.init(baseURL: docsURL, isUsingiCloud: true)
+        } else {
+            let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            self.init(baseURL: appSupport.appendingPathComponent("SnapGrid", isDirectory: true))
         }
     }
 

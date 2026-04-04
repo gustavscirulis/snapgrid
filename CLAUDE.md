@@ -69,7 +69,7 @@ Bundle ID: `com.snapgrid.app`.
 
 ## Testing
 
-Both native apps use Swift Testing (`import Testing`, `@Test`, `@Suite`, `#expect`). Do NOT use XCTest for new tests. Tests run via pre-commit hook.
+Both native apps use Swift Testing (`import Testing`, `@Test`, `@Suite`, `#expect`). Do NOT use XCTest for new tests. Tests run automatically via pre-commit hook (`.claude/scripts/run-tests-for-staged.sh`).
 
 ```bash
 # Mac tests
@@ -79,7 +79,29 @@ cd SnapGrid && xcodegen generate && xcodebuild test -project SnapGrid.xcodeproj 
 cd ios/SnapGrid && xcodebuild test -project SnapGrid.xcodeproj -scheme SnapGrid -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
+### When to add tests
+
+**Always add tests when changing:**
+- Sync logic (`SyncWatcher`, `SyncService`) — cross-platform sync has been the #1 source of regressions
+- Import flow (`ImportService`, `ImageImportService`) — ordering bugs (save-before-sidecar, double-analysis) are hard to catch otherwise
+- Sidecar read/write (`MetadataSidecarService`, `SidecarWriteService`) — format changes break cross-platform compat
+- Trash/restore (`MediaStorageService.moveToTrash`, `MediaDeleteService`) — rollback logic is subtle
+- Spaces sync (spaces.json parsing, space assignment) — empty-array edge cases have caused bugs
+- Data model changes (`MediaItem`, `AnalysisResult`, `Space`) — relationship and cascade behavior
+
+**Skip tests for:** View-only changes, animation tweaks, layout adjustments.
+
+### Test infrastructure
+
 **SwiftData tests** use in-memory containers via `TestContainer.create()` — never touch the real database.
+
+**Integration tests** use temp directories via `IntegrationTestSupport.makeTempRoot()` — creates `/tmp/SnapGridTests/{UUID}/` with the full directory structure. Each test gets its own unique dir; safe for parallel runs across git worktrees.
+
+**Injectable services (Mac):** `MediaStorageService(baseURL:)`, `MetadataSidecarService(storage:)`, `SyncWatcher(storage:sidecarService:)`, and `ImportService(storage:sidecarService:)` all accept injected dependencies for testing. Production code uses default `.shared` singletons.
+
+**iOS services** already accept `rootURL` parameters — no injection needed.
+
+**Test tags:** `.integration`, `.sync`, `.filesystem`, `.model`, `.parsing`, `.crypto`, `.serialization`, `.search`, `.state`, `.layout`.
 
 **Access levels:** Change `private` to `internal` (Swift default) to make methods testable. Use `@testable import SnapGrid`.
 
