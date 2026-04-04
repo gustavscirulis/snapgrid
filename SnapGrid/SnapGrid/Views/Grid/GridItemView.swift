@@ -324,7 +324,22 @@ struct GridItemView: View {
                     // first appears. Suppress that single exit; subsequent exits are genuine.
                     if suppressHoverExit {
                         suppressHoverExit = false
-                        return
+                        if mouseIsInsideGridItem() {
+                            // Genuinely spurious exit — poll for real exit since
+                            // macOS won't send another onHover(false).
+                            hoverTask = Task {
+                                while !Task.isCancelled {
+                                    try? await Task.sleep(for: .milliseconds(100))
+                                    guard !Task.isCancelled else { return }
+                                    if !mouseIsInsideGridItem() {
+                                        videoPreview.stopPreview()
+                                        return
+                                    }
+                                }
+                            }
+                            return
+                        }
+                        // Mouse already left — fall through to delayed stopPreview
                     }
                     hoverTask = Task {
                         try? await Task.sleep(for: .milliseconds(100))
@@ -470,6 +485,20 @@ struct GridItemView: View {
             .background(.red.opacity(0.7))
             .clipShape(RoundedRectangle(cornerRadius: 6))
         #endif
+    }
+
+    /// Check if the mouse cursor is currently inside this grid item's frame.
+    /// Converts AppKit window coordinates (origin bottom-left) to SwiftUI's
+    /// flipped global space (origin top-left of content area).
+    private func mouseIsInsideGridItem() -> Bool {
+        guard let window = NSApp.keyWindow ?? NSApp.mainWindow else { return false }
+        let mouseLoc = window.mouseLocationOutsideOfEventStream
+        let contentRect = window.contentLayoutRect
+        let swiftUIPoint = CGPoint(
+            x: mouseLoc.x,
+            y: contentRect.maxY - mouseLoc.y
+        )
+        return globalFrame.contains(swiftUIPoint)
     }
 
     private func loadThumbnail() async {
