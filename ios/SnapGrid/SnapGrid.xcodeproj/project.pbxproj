@@ -60,6 +60,7 @@
 		A100000042 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000042 /* AppState.swift */; };
 		A100000043 /* AnalysisCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000043 /* AnalysisCoordinator.swift */; };
 		A100000044 /* SidecarWriteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000044 /* SidecarWriteService.swift */; };
+		A200000001 /* GridPreferenceKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000001 /* GridPreferenceKeyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -151,6 +152,7 @@
 		F9E80534FE421A32D569AAE8 /* SearchIndexServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SearchIndexServiceTests.swift; sourceTree = "<group>"; };
 		FC24EBA6AD6068C4ADA26030 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
 		FCAFF8A2EC042170AE7D0DA4 /* SyncServiceDataTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncServiceDataTests.swift; sourceTree = "<group>"; };
+		B200000001 /* GridPreferenceKeyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GridPreferenceKeyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -238,6 +240,7 @@
 				FCAFF8A2EC042170AE7D0DA4 /* SyncServiceDataTests.swift */,
 				0D3694D12FDBE22980A4E2CF /* KeySyncServiceTests.swift */,
 				7283BD792D4DC7DA66FA0273 /* ImageImportServiceTests.swift */,
+				B200000001 /* GridPreferenceKeyTests.swift */,
 			);
 			name = SnapGridTests;
 			path = SnapGridTests;
@@ -549,6 +552,7 @@
 				FF030F761044AEE25ACAEA04 /* SyncServiceDataTests.swift in Sources */,
 				5E5E4765114B409FE5994A83 /* KeySyncServiceTests.swift in Sources */,
 				E34FCD416FC123E6A9B6418F /* ImageImportServiceTests.swift in Sources */,
+				A200000001 /* GridPreferenceKeyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -64,12 +64,18 @@ struct MainView: View {
     @State private var searchService = SearchIndexService()
     @State private var analysisCoordinator = AnalysisCoordinator()
     @State private var debounceTask: Task<Void, Never>?
+    @State private var indexRebuildTask: Task<Void, Never>?
 
     // MARK: - Index ↔ activeSpaceId bridging
 
     private var activeIndex: Int {
         guard let id = appState.activeSpaceId else { return 0 }
         return (spaces.firstIndex { $0.id == id } ?? -1) + 1
+    }
+
+    /// Only build grids for the active page ±1 (visible during swipe transitions).
+    private func isPageNearActive(_ pageIndex: Int) -> Bool {
+        abs(pageIndex - activeIndex) <= 1
     }
 
     // MARK: - Filtering
@@ -147,34 +153,43 @@ struct MainView: View {
 
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 0) {
-                                    let allPageItems = itemsForSpace(nil)
-                                    if allPageItems.isEmpty && appState.isSearchActive {
-                                        SearchEmptyStateView()
-                                            .containerRelativeFrame(.horizontal)
-                                            .id(0)
-                                            .background(PageOffsetReporter(pageIndex: 0))
-                                    } else {
-                                        masonryPage(items: allPageItems, gridWidth: gridWidth, topPadding: true)
-                                            .refreshable { await loadContent() }
-                                            .containerRelativeFrame(.horizontal)
-                                            .id(0)
-                                            .background(PageOffsetReporter(pageIndex: 0))
+                                    // Only build grids for the active page and its
+                                    // immediate neighbors (visible during swipe).
+                                    // Off-screen pages skip itemsForSpace + layout work.
+                                    Group {
+                                        if isPageNearActive(0) {
+                                            let allPageItems = itemsForSpace(nil)
+                                            if allPageItems.isEmpty && appState.isSearchActive {
+                                                SearchEmptyStateView()
+                                            } else {
+                                                masonryPage(items: allPageItems, gridWidth: gridWidth, topPadding: true)
+                                                    .refreshable { await loadContent() }
+                                            }
+                                        } else {
+                                            Color.clear
+                                        }
                                     }
+                                    .containerRelativeFrame(.horizontal)
+                                    .id(0)
+                                    .background(PageOffsetReporter(pageIndex: 0))
 
                                     ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
-                                        let spaceItems = itemsForSpace(space.id)
-                                        if spaceItems.isEmpty && appState.isSearchActive {
-                                            SearchEmptyStateView()
-                                                .containerRelativeFrame(.horizontal)
-                                                .id(index + 1)
-                                                .background(PageOffsetReporter(pageIndex: index + 1))
-                                        } else {
-                                            masonryPage(items: spaceItems, gridWidth: gridWidth, topPadding: true, onRemoveFromSpace: handleRemoveFromSpace)
-                                                .refreshable { await loadContent() }
-                                                .containerRelativeFrame(.horizontal)
-                                                .id(index + 1)
-                                                .background(PageOffsetReporter(pageIndex: index + 1))
+                                        Group {
+                                            if isPageNearActive(index + 1) {
+                                                let spaceItems = itemsForSpace(space.id)
+                                                if spaceItems.isEmpty && appState.isSearchActive {
+                                                    SearchEmptyStateView()
+                                                } else {
+                                                    masonryPage(items: spaceItems, gridWidth: gridWidth, topPadding: true, onRemoveFromSpace: handleRemoveFromSpace)
+                                                        .refreshable { await loadContent() }
+                                                }
+                                            } else {
+                                                Color.clear
+                                            }
                                         }
+                                        .containerRelativeFrame(.horizontal)
+                                        .id(index + 1)
+                                        .background(PageOffsetReporter(pageIndex: index + 1))
                                     }
                                 }
                                 .scrollTargetLayout()
@@ -280,7 +295,13 @@ struct MainView: View {
             }
         }
         .onChange(of: allItems.count) { _, _ in
-            searchService.buildIndex(items: allItems)
+            // Debounce — during sync, count changes with each batch of 20 items saved
+            indexRebuildTask?.cancel()
+            indexRebuildTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled else { return }
+                searchService.buildIndex(items: allItems)
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {

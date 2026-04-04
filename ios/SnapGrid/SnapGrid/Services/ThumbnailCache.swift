@@ -37,8 +37,8 @@ class ThumbnailCache {
     private var memoryWarningObserver: NSObjectProtocol?
 
     private init() {
-        cache.countLimit = 500
-        cache.totalCostLimit = 100 * 1024 * 1024 // 100 MB
+        cache.countLimit = 800
+        cache.totalCostLimit = 150 * 1024 * 1024 // 150 MB
 
         let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         diskCacheDir = cachesDir.appendingPathComponent("thumbnails", isDirectory: true)
