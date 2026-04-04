@@ -110,7 +110,7 @@ struct ImageImportServiceTests {
         #expect(imageFiles.count == 3)
     }
 
-    @Test("Generated ID follows expected format")
+    @Test("Generated ID is a valid UUID")
     func idFormat() async throws {
         let root = try makeTempRoot()
         defer { cleanup(root) }
@@ -123,9 +123,7 @@ struct ImageImportServiceTests {
             includingPropertiesForKeys: nil
         )
         let filename = imageFiles[0].deletingPathExtension().lastPathComponent
-        // Format: img_{timestamp}_{random7chars}
-        #expect(filename.hasPrefix("img_"))
-        let parts = filename.split(separator: "_")
-        #expect(parts.count == 3)
+        // ID is a UUID string (e.g. "AB2D0053-8EEE-4D8D-A9B8-A9CB826BC718")
+        #expect(UUID(uuidString: filename) != nil)
     }
 }

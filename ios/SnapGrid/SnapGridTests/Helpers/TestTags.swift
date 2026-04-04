@@ -8,4 +8,6 @@ extension Tag {
     @Tag static var search: Self
     @Tag static var layout: Self
     @Tag static var filesystem: Self
+    @Tag static var integration: Self
+    @Tag static var sync: Self
 }

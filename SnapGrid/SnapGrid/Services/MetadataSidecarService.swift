@@ -45,25 +45,33 @@ final class MetadataSidecarService: Sendable {
 
     static let shared = MetadataSidecarService()
 
-    private static let encoder: JSONEncoder = {
+    static let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601
         e.outputFormatting = [.prettyPrinted, .sortedKeys]
         return e
     }()
 
-    private static let decoder: JSONDecoder = {
+    static let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
         return d
     }()
 
-    private init() {}
+    let storage: MediaStorageService
+
+    private convenience init() {
+        self.init(storage: .shared)
+    }
+
+    init(storage: MediaStorageService) {
+        self.storage = storage
+    }
 
     // MARK: - Item Sidecars
 
     func writeSidecar(for item: MediaItem) {
-        let storage = MediaStorageService.shared
+        let storage = self.storage
         let sidecar = SidecarMetadata(
             id: item.id,
             type: item.mediaType.rawValue,
@@ -89,13 +97,13 @@ final class MetadataSidecarService: Sendable {
     }
 
     func readSidecar(id: String) -> SidecarMetadata? {
-        let url = MediaStorageService.shared.metadataDir.appendingPathComponent("\(id).json")
+        let url = storage.metadataDir.appendingPathComponent("\(id).json")
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? Self.decoder.decode(SidecarMetadata.self, from: data)
     }
 
     func deleteSidecar(id: String) {
-        let url = MediaStorageService.shared.metadataDir.appendingPathComponent("\(id).json")
+        let url = storage.metadataDir.appendingPathComponent("\(id).json")
         try? FileManager.default.removeItem(at: url)
     }
 
@@ -135,7 +143,7 @@ final class MetadataSidecarService: Sendable {
             allSpaceGuidance: allGuidance,
             useAllSpaceGuidance: useAllGuidance
         )
-        let url = MediaStorageService.shared.baseURL.appendingPathComponent("spaces.json")
+        let url = storage.baseURL.appendingPathComponent("spaces.json")
         do {
             let data = try Self.encoder.encode(file)
             try data.write(to: url, options: .atomic)
@@ -146,7 +154,7 @@ final class MetadataSidecarService: Sendable {
 
     /// Read spaces.json, handling both the new wrapper format and the legacy bare array.
     func readSpacesFile() -> SidecarSpacesFile {
-        let url = MediaStorageService.shared.baseURL.appendingPathComponent("spaces.json")
+        let url = storage.baseURL.appendingPathComponent("spaces.json")
         guard let data = try? Data(contentsOf: url) else {
             return SidecarSpacesFile(spaces: [], allSpaceGuidance: nil, useAllSpaceGuidance: false)
         }

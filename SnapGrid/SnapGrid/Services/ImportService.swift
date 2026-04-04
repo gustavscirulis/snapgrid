@@ -7,9 +7,14 @@ import UniformTypeIdentifiers
 @MainActor
 final class ImportService {
 
-    private let storage = MediaStorageService.shared
+    let storage: MediaStorageService
     private let analysisService = AIAnalysisService.shared
-    private let sidecarService = MetadataSidecarService.shared
+    let sidecarService: MetadataSidecarService
+
+    init(storage: MediaStorageService = .shared, sidecarService: MetadataSidecarService = .shared) {
+        self.storage = storage
+        self.sidecarService = sidecarService
+    }
 
     private let imageTypes = SupportedMedia.imageExtensions
     private let videoTypes = SupportedMedia.videoExtensions
@@ -66,7 +71,7 @@ final class ImportService {
         }
     }
 
-    private func importSingleFile(_ url: URL, into context: ModelContext, spaceId: String?, sourceURL: String? = nil) async throws {
+    func importSingleFile(_ url: URL, into context: ModelContext, spaceId: String?, sourceURL: String? = nil) async throws {
         let ext = url.pathExtension.lowercased()
         let isVideo = videoTypes.contains(ext)
         let isImage = imageTypes.contains(ext)
