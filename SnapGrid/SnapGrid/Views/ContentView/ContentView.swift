@@ -22,6 +22,9 @@ struct ContentView: View {
     @State private var searchScores: [String: Double] = [:]
     @State private var isSearchActive = false
     @State private var isSearchFieldPresented = false
+    /// Page indices that should render full content (expands during carousel transitions).
+    @State private var livePages: Set<Int> = [0]
+    @State private var livePagesCleanupTask: Task<Void, Never>?
 
     #if DEBUG
     @AppStorage("debugSimulateEmptyState") private var debugSimulateEmptyState = false
@@ -369,8 +372,28 @@ struct ContentView: View {
     // MARK: - Space Navigation
 
     private func switchToSpace(_ newId: String?) {
+        let newIndex = spaceIndex(for: newId)
+
+        livePagesCleanupTask?.cancel()
+
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            appState.activeSpaceId = newId
+            livePages = [newIndex]
+            return
+        }
+
+        let oldIndex = activeIndex
+        let range = min(oldIndex, newIndex)...max(oldIndex, newIndex)
+        livePages = livePages.union(Set(range))
+
         withAnimation(SnapSpring.standard) {
             appState.activeSpaceId = newId
+        }
+
+        livePagesCleanupTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            livePages = [newIndex]
         }
     }
 
@@ -386,7 +409,7 @@ struct ContentView: View {
         Color.clear
             .frame(width: pageWidth, height: pageHeight)
             .overlay {
-                if pageIndex == activeIndex {
+                if livePages.contains(pageIndex) || pageIndex == activeIndex {
                     let items = itemsForSpace(spaceId)
                     if items.isEmpty && isSearchActive {
                         VStack(spacing: 12) {
@@ -726,6 +749,8 @@ struct ContentView: View {
 
         if appState.activeSpaceId == id {
             appState.activeSpaceId = nil
+            livePagesCleanupTask?.cancel()
+            livePages = [0]
         }
 
         syncWatcher.beginLocalChange()
@@ -764,6 +789,7 @@ struct ContentView: View {
         modelContext.saveOrLog()
         MetadataSidecarService.shared.writeSpaces(Array(spaces))
         syncWatcher.endLocalChange()
+        livePages = [activeIndex]
     }
 
     private func assignToSpace(itemIds: Set<String>, spaceId: String?) {
@@ -795,6 +821,8 @@ struct ContentView: View {
         appState.detailSourceFrame = nil
         appState.clearSelection()
         appState.activeSpaceId = nil
+        livePagesCleanupTask?.cancel()
+        livePages = [0]
     }
 
     private func retryAnalysis(_ ids: Set<String>) {
