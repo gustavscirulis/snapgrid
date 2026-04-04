@@ -141,6 +141,15 @@ struct FloatingVideoLayer: View {
                 }
             .frame(width: videoPreview.currentFrame.width, height: videoPreview.currentFrame.height)
             .clipShape(RoundedRectangle(cornerRadius: videoPreview.cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: videoPreview.cornerRadius)
+                    .strokeBorder(
+                        videoPreview.displayState == .grid
+                            && appState.selectedIds.contains(videoPreview.activeItemId ?? "")
+                            ? Color.accentColor : Color.clear,
+                        lineWidth: 2
+                    )
+            )
             .position(x: videoPreview.currentFrame.midX, y: videoPreview.currentFrame.midY)
             .allowsHitTesting(videoPreview.displayState == .detail)
             .ignoresSafeArea()

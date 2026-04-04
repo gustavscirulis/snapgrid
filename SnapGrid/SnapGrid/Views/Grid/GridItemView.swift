@@ -26,6 +26,10 @@ struct GridItemView: View {
     @State private var thumbnail: NSImage?
     @State private var globalFrame: CGRect = .zero
     @State private var hoverTask: Task<Void, Never>?
+    /// Suppresses the first `.onHover(false)` after a video preview starts.
+    /// The floating NSView (AVPlayerLayer) causes a spurious exit event
+    /// that macOS never corrects with a re-entry.
+    @State private var suppressHoverExit = false
 
     // Eagerly resolved SwiftData properties — prevents faults on detached backing stores
     // when SwiftUI re-evaluates the body (e.g. for context menu snapshots).
@@ -295,9 +299,17 @@ struct GridItemView: View {
             hoverTask?.cancel()
             if itemIsVideo {
                 if hovering {
+                    // Don't start preview during rubber band selection or drag
+                    guard NSEvent.pressedMouseButtons & 1 == 0 else { return }
+                    suppressHoverExit = false
                     hoverTask = Task {
                         try? await Task.sleep(for: .milliseconds(200))
                         guard !Task.isCancelled else { return }
+                        // Only arm the suppress flag when actually creating a new preview —
+                        // re-entering an already-previewing item won't spawn a new layer.
+                        if videoPreview.activeItemId != item.id {
+                            suppressHoverExit = true
+                        }
                         videoPreview.startPreview(
                             itemId: item.id,
                             url: MediaStorageService.shared.mediaURL(filename: item.filename),
@@ -306,9 +318,12 @@ struct GridItemView: View {
                         )
                     }
                 } else if videoPreview.activeItemId == item.id {
-                    // Floating video layer can cause spurious onHover(false) —
-                    // debounce the stop so effectiveHover keeps UI stable.
-                    // A genuine hover-in (same or different item) cancels this.
+                    // The floating NSView causes one spurious onHover(false) when it
+                    // first appears. Suppress that single exit; subsequent exits are genuine.
+                    if suppressHoverExit {
+                        suppressHoverExit = false
+                        return
+                    }
                     hoverTask = Task {
                         try? await Task.sleep(for: .milliseconds(100))
                         guard !Task.isCancelled else { return }
@@ -380,6 +395,7 @@ struct GridItemView: View {
                 // Fullscreen dismissed — mouse may have moved, so clear stale hover state.
                 // If the cursor is still over this item, .onHover will re-fire true immediately.
                 isHovered = false
+                suppressHoverExit = false
             }
         }
         .contextMenu {
