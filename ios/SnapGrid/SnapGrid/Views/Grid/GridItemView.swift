@@ -94,11 +94,7 @@ struct GridItemView: View {
                     )
 
                     HStack {
-                        ShimmerText("Analyzing...")
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-                            .environment(\.colorScheme, .dark)
+                        shimmerBadge
                         Spacer()
                     }
                     .padding(8)
@@ -201,6 +197,23 @@ struct GridItemView: View {
     }
 
     // MARK: - Thumbnail Loading
+
+    @ViewBuilder
+    private var shimmerBadge: some View {
+        let base = ShimmerText("Analyzing...")
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+
+        if #available(iOS 26, *) {
+            base
+                .glassEffect(.regular, in: .rect(cornerRadius: 10))
+                .environment(\.colorScheme, .dark)
+        } else {
+            base
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                .environment(\.colorScheme, .dark)
+        }
+    }
 
     private func loadThumbnail() async {
         let cache = ThumbnailCache.shared

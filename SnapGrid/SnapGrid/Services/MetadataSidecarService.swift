@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 // MARK: - Sidecar JSON Models
 
@@ -97,6 +98,16 @@ final class MetadataSidecarService: Sendable {
     }
 
     // MARK: - Spaces
+
+    /// Write spaces to spaces.json by fetching the current list from the model context.
+    /// Use this instead of manually constructing SidecarSpace arrays in views —
+    /// it always reflects the latest state after inserts/deletes.
+    @MainActor
+    func writeSpaces(from context: ModelContext) {
+        let descriptor = FetchDescriptor<Space>(sortBy: [SortDescriptor(\.order)])
+        let spaces = (try? context.fetch(descriptor)) ?? []
+        writeSpaces(spaces)
+    }
 
     /// Write spaces to spaces.json, automatically including the current all-space guidance from UserDefaults.
     func writeSpaces(_ spaces: [Space]) {

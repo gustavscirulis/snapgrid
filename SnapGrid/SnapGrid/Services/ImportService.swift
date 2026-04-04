@@ -11,8 +11,8 @@ final class ImportService {
     private let analysisService = AIAnalysisService.shared
     private let sidecarService = MetadataSidecarService.shared
 
-    private let imageTypes: Set<String> = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "heic"]
-    private let videoTypes: Set<String> = ["mp4", "webm", "mov", "avi", "m4v"]
+    private let imageTypes = SupportedMedia.imageExtensions
+    private let videoTypes = SupportedMedia.videoExtensions
 
     func importFiles(_ urls: [URL], into context: ModelContext, spaceId: String? = nil) async {
         for url in urls {
@@ -165,7 +165,7 @@ final class ImportService {
         print("[Analysis] Starting analysis with \(provider.rawValue)/\(model) for \(item.id)")
 
         item.isAnalyzing = true
-        try? context.save()
+        context.saveOrLog()
 
         do {
             let result: AnalysisResult
@@ -202,14 +202,14 @@ final class ImportService {
             item.analysisResult = result
             item.isAnalyzing = false
             item.analysisError = nil
-            try? context.save()
+            context.saveOrLog()
             sidecarService.writeSidecar(for: item)
             NotificationCenter.default.post(name: .analysisCompleted, object: nil, userInfo: ["itemId": item.id])
         } catch {
             print("[Analysis] Failed for \(item.id): \(error)")
             item.isAnalyzing = false
             item.analysisError = error.localizedDescription
-            try? context.save()
+            context.saveOrLog()
         }
     }
 
@@ -265,19 +265,10 @@ final class ImportService {
     /// Map a Content-Type MIME string to a file extension. Falls back to URL path extension.
     static func fileExtension(from contentType: String?, urlPathExtension: String?) -> String? {
         if let mime = contentType?.lowercased().split(separator: ";").first?.trimmingCharacters(in: .whitespaces) {
-            let mimeMap: [String: String] = [
-                "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg",
-                "image/gif": "gif", "image/webp": "webp", "image/bmp": "bmp",
-                "image/tiff": "tiff", "image/heic": "heic",
-                "video/mp4": "mp4", "video/webm": "webm",
-                "video/quicktime": "mov", "video/x-msvideo": "avi", "video/x-m4v": "m4v",
-            ]
-            if let ext = mimeMap[mime] { return ext }
+            if let ext = SupportedMedia.mimeToExtension[mime] { return ext }
         }
 
-        let allKnown: Set<String> = ["png","jpg","jpeg","gif","bmp","tiff","webp","heic",
-                                      "mp4","webm","mov","avi","m4v"]
-        if let ext = urlPathExtension, allKnown.contains(ext) { return ext }
+        if let ext = urlPathExtension, SupportedMedia.allExtensions.contains(ext) { return ext }
         return nil
     }
 

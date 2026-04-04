@@ -37,6 +37,8 @@
 		638C67ABC5D710901F2CABF2 /* KeySyncCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EB2E945029CE0D88016280 /* KeySyncCrypto.swift */; };
 		65160672513A59B8ED353208 /* SelectionBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFDD4D2B1F3CCB3ED261F5C /* SelectionBadge.swift */; };
 		6616D86A2EE273FDF8805951 /* iCloudDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23EE0E51D2D80BFD49716AA0 /* iCloudDownloadManager.swift */; };
+		67C13EA251A2A6E0FBDD4FC0 /* SupportedMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99FFBFE4624B0A09BB339F3A /* SupportedMedia.swift */; };
+		73ADFFEAA064D44BB340C37C /* ModelContext+SaveOrLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A60DA384E21F01587028216 /* ModelContext+SaveOrLog.swift */; };
 		7EC7FDEF2B1AB437602F7CBA /* SidecarCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6F116E4024331E85284A3D /* SidecarCodableTests.swift */; };
 		8167D57BFF6AAEC5E1CF20E1 /* AnimationTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 468F744BF11C8965B74EF95F /* AnimationTokens.swift */; };
 		8350DC604AC401431E9CD255 /* Space.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6477AAD40C3308F596D68729 /* Space.swift */; };
@@ -129,6 +131,8 @@
 		9391B9A3F7CE5C394F263B9C /* ModelDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDiscoveryService.swift; sourceTree = "<group>"; };
 		963A5601AC378837EA06DF0E /* MediaStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaStorageService.swift; sourceTree = "<group>"; };
 		998B3A855E657D80396A9CD7 /* KeySyncCryptoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncCryptoTests.swift; sourceTree = "<group>"; };
+		99FFBFE4624B0A09BB339F3A /* SupportedMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportedMedia.swift; sourceTree = "<group>"; };
+		9A60DA384E21F01587028216 /* ModelContext+SaveOrLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelContext+SaveOrLog.swift"; sourceTree = "<group>"; };
 		9B1BF47348836CDB70325FEE /* MigrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationService.swift; sourceTree = "<group>"; };
 		9CF36B9F264117143DF32A8E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9DB5BFB2BC5A94B434803361 /* ElectronImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElectronImportView.swift; sourceTree = "<group>"; };
@@ -178,6 +182,7 @@
 				82D1884A0E94D6BC1F407855 /* AnalysisResult.swift */,
 				3BA6AB7DC0A84E670681EB6C /* MediaItem.swift */,
 				6477AAD40C3308F596D68729 /* Space.swift */,
+				99FFBFE4624B0A09BB339F3A /* SupportedMedia.swift */,
 				A7E3151FA585E1C6ACA7945E /* TransferableFileURL.swift */,
 			);
 			path = Models;
@@ -285,6 +290,7 @@
 			isa = PBXGroup;
 			children = (
 				EA3B7921F371383918892A5D /* Color+Theme.swift */,
+				9A60DA384E21F01587028216 /* ModelContext+SaveOrLog.swift */,
 				3CE5033083DAF80AD07ABC32 /* NSImage+Thumbnail.swift */,
 				6B6205D7E807323F142415FE /* View+DoubleClick.swift */,
 			);
@@ -483,6 +489,7 @@
 				968DDBB08FE3CED44009BC7D /* MediaStorageService.swift in Sources */,
 				F84D4B0142262DA02D0EF60D /* MetadataSidecarService.swift in Sources */,
 				DA12BF6C17557F0E8B625129 /* MigrationService.swift in Sources */,
+				73ADFFEAA064D44BB340C37C /* ModelContext+SaveOrLog.swift in Sources */,
 				439744C29794B39D02563DE6 /* ModelDiscoveryService.swift in Sources */,
 				210A13790BE0E2F8D5123662 /* NSImage+Thumbnail.swift in Sources */,
 				5C1E7DB8A91CE5B34721F868 /* PatternPill.swift in Sources */,
@@ -495,6 +502,7 @@
 				8350DC604AC401431E9CD255 /* Space.swift in Sources */,
 				0FB79B182FF2453212D42811 /* SpaceTabBar.swift in Sources */,
 				FA711149840B9BFF157A8239 /* StorageSettingsTab.swift in Sources */,
+				67C13EA251A2A6E0FBDD4FC0 /* SupportedMedia.swift in Sources */,
 				0BD6F0F6397C8D6CC98DDFFF /* SyncWatcher.swift in Sources */,
 				27A5C73EBCC0338561829D33 /* ThumbnailService.swift in Sources */,
 				22B3C67B9FEA9300A6D969AE /* ToastView.swift in Sources */,
