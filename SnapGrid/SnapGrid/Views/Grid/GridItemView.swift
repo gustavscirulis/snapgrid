@@ -457,21 +457,16 @@ struct GridItemView: View {
         }
     }
 
-    /// Circular hover-action button icon with glass on macOS 26+.
-    @ViewBuilder
+    /// Circular hover-action button icon with a static dark background.
+    /// Glass effect was removed because it adapts to the underlying image,
+    /// causing a visible dark→transparent shift when the button appears on hover.
     private func hoverButtonIcon(_ systemName: String, size: CGFloat) -> some View {
-        let base = Image(systemName: systemName)
+        Image(systemName: systemName)
             .font(.system(size: size, weight: .bold))
             .foregroundStyle(.white)
             .frame(width: 24, height: 24)
-
-        if #available(macOS 26, *) {
-            base.glassEffect(.regular.interactive(), in: .circle)
-        } else {
-            base
-                .background(.black.opacity(0.6))
-                .clipShape(Circle())
-        }
+            .background(.ultraThinMaterial, in: Circle())
+            .environment(\.colorScheme, .dark)
     }
 
     /// Retry analysis badge with red-tinted glass on macOS 26+.
