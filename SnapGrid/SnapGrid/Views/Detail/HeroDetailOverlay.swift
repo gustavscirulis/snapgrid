@@ -490,11 +490,7 @@ struct HeroDetailOverlay: View {
             isLoadingFullRes = true
             let url = MediaStorageService.shared.mediaURL(filename: item.filename)
             let suggestedName = item.analysisResult?.patterns.first?.name
-            let frame = computeFinalFrame(
-                windowSize: CGSize(width: lastWindowWidth, height: NSApp.keyWindow?.frame.height ?? 800),
-                item: item
-            )
-            videoPreview.switchDetailPlayer(itemId: item.id, url: url, frame: frame, suggestedName: suggestedName)
+            videoPreview.switchDetailPlayer(itemId: item.id, url: url, suggestedName: suggestedName)
             await waitForPlayerReady()
         } else {
             if image == nil {
