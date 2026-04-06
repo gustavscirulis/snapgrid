@@ -30,14 +30,18 @@ struct SpaceCardView: View {
             .aspectRatio(1, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            Text(space.name)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.white)
-                .lineLimit(1)
+            HStack(spacing: 4) {
+                Text(space.name)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
 
-            Text("\(space.items.count)")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.5))
+                Spacer(minLength: 2)
+
+                Text("\(space.items.count)")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.5))
+            }
         }
         .task {
             await loadThumbnails()
