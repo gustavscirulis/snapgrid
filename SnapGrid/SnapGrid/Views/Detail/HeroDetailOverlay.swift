@@ -79,6 +79,9 @@ struct HeroDetailOverlay: View {
     @State private var metadataStage: Int = 0
     @State private var revealTask: Task<Void, Never>?
     @State private var navigationFallbackTask: Task<Void, Never>?
+    @State private var isZoomed = false
+    @State private var zoomScale: CGFloat = 1.0
+    @State private var zoomPanDelta: CGSize = .zero
     @FocusState private var isFocused: Bool
 
     private var currentItem: MediaItem { items[currentIndex] }
@@ -149,7 +152,7 @@ struct HeroDetailOverlay: View {
                 // Current content — settled ScrollView (stays visible during swipe) or position-based hero
                 if heroComplete && !isClosing {
                     // SETTLED: scrollable image + metadata, slides with swipe
-                    settledScrollView(image: image, finalFrame: finalFrame)
+                    settledScrollView(image: image, finalFrame: finalFrame, windowSize: windowSize)
                         .offset(x: swipeOffset)
                 } else if let image, isTallImage {
                     // HERO/SWIPE: tall image
@@ -236,22 +239,26 @@ struct HeroDetailOverlay: View {
         .focusEffectDisabled()
         .ignoresSafeArea()
         .onKeyPress(.escape) {
-            triggerClose()
+            if isZoomed {
+                resetZoom()
+            } else {
+                triggerClose()
+            }
             return .handled
         }
         .onKeyPress(.leftArrow) {
-            guard !isNavigating && !isClosing else { return .ignored }
+            guard !isNavigating && !isClosing && !isZoomed else { return .ignored }
             navigateTo(currentIndex - 1)
             return .handled
         }
         .onKeyPress(.rightArrow) {
-            guard !isNavigating && !isClosing else { return .ignored }
+            guard !isNavigating && !isClosing && !isZoomed else { return .ignored }
             navigateTo(currentIndex + 1)
             return .handled
         }
-        // Trackpad scroll wheel monitoring for two-finger swipe
+        // Trackpad scroll wheel monitoring for two-finger swipe (navigation)
         .onChange(of: trackpadScroll.cumulativeOffset) { _, offset in
-            guard heroComplete && !isClosing && !isNavigating && items.count > 1 else { return }
+            guard heroComplete && !isClosing && !isNavigating && !isZoomed && items.count > 1 else { return }
             var proposed = offset
             if (currentIndex == 0 && proposed > 0) ||
                (currentIndex == items.count - 1 && proposed < 0) {
@@ -259,30 +266,39 @@ struct HeroDetailOverlay: View {
             }
             swipeOffset = proposed
         }
+        // Trackpad two-finger scroll for zoom panning
+        .onChange(of: trackpadScroll.scrollDelta) { _, delta in
+            guard isZoomed && heroComplete && !isClosing else { return }
+            zoomPanDelta = delta
+        }
         .onChange(of: trackpadScroll.phase) { _, phase in
-            guard heroComplete && !isClosing && !isNavigating && items.count > 1 else {
-                if phase == .ended {
-                    trackpadScroll.reset()
-                    // Don't animate swipeOffset when a navigation animation owns it —
-                    // interrupting that animation would prevent its completion handler
-                    // from firing, permanently freezing isNavigating = true.
-                    if !isNavigating {
-                        withAnimation(SnapSpring.standard(reduced: reduceMotion)) { swipeOffset = 0 }
-                    }
-                }
-                return
-            }
-            if phase == .ended {
+            guard phase == .ended else { return }
+            if isZoomed {
+                zoomPanDelta = .zero
+                trackpadScroll.reset()
+            } else if heroComplete && !isClosing && !isNavigating && items.count > 1 {
                 evaluateSwipeEnd()
                 trackpadScroll.reset()
+            } else {
+                trackpadScroll.reset()
+                // Don't animate swipeOffset when a navigation animation owns it —
+                // interrupting would prevent its completion handler from firing.
+                if !isNavigating {
+                    withAnimation(SnapSpring.standard(reduced: reduceMotion)) { swipeOffset = 0 }
+                }
             }
         }
         .onChange(of: heroComplete) { _, complete in
-            if complete {
+            if complete && !isZoomed {
                 trackpadScroll.activate()
             } else {
                 trackpadScroll.deactivate()
             }
+        }
+        .onChange(of: isZoomed) { _, zoomed in
+            trackpadScroll.trackBothAxes = zoomed
+            trackpadScroll.reset()
+            zoomPanDelta = .zero
         }
     }
 
@@ -349,6 +365,9 @@ struct HeroDetailOverlay: View {
             scrollEnabled = false
             metadataStage = 0
             scrollOffset = 0
+            isZoomed = false
+            zoomScale = 1.0
+            zoomPanDelta = .zero
 
             // Load new image from cache or preloaded adjacents
             let newItem = items[newIndex]
@@ -568,37 +587,38 @@ struct HeroDetailOverlay: View {
     // MARK: - Settled Scroll View
 
     @ViewBuilder
-    private func settledScrollView(image: NSImage?, finalFrame: CGRect) -> some View {
+    private func settledScrollView(image: NSImage?, finalFrame: CGRect, windowSize: CGSize) -> some View {
         ScrollView(.vertical) {
             VStack(spacing: 0) {
                 Color.clear
                     .frame(height: finalFrame.minY)
                     .contentShape(Rectangle())
-                    .onTapGesture { triggerClose() }
+                    .onTapGesture {
+                        if isZoomed { resetZoom() } else { triggerClose() }
+                    }
 
                 Group {
                     if currentItem.isVideo {
                         Color.clear
                             .frame(width: finalFrame.width, height: finalFrame.height)
-                    } else if let image, isTallImage {
-                        Image(nsImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: finalFrame.width)
                     } else if let image {
-                        Image(nsImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: finalFrame.width, height: finalFrame.height)
-                            .clipped()
+                        ZoomableImageView(
+                            image: image,
+                            frameSize: CGSize(width: finalFrame.width, height: finalFrame.height),
+                            windowSize: windowSize,
+                            zoomScale: $zoomScale,
+                            isZoomed: $isZoomed,
+                            trackpadPanDelta: $zoomPanDelta,
+                            isTallImage: isTallImage,
+                            reduceMotion: reduceMotion,
+                            onTap: { triggerClose() }
+                        )
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
                     if !currentItem.isVideo { loadingIndicator }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 16))
                 .onDrag { makeDragProvider() } preview: { dragPreview }
-                .onTapGesture { triggerClose() }
                 .contextMenu { detailContextMenu(frame: finalFrame) }
 
                 DetailMetadataSection(item: currentItem, stage: metadataStage) { pattern in
@@ -616,9 +636,12 @@ struct HeroDetailOverlay: View {
                 .padding(.top, 40)
                 .padding(.bottom, 40)
                 .mask(metadataFadeMask)
+                .opacity(isZoomed ? 0 : 1)
+                .animation(SnapSpring.fast, value: isZoomed)
             }
             .frame(maxWidth: .infinity)
         }
+        .scrollDisabled(isZoomed)
         .scrollIndicators(.automatic)
         .defaultScrollAnchor(.top)
         .id(currentItem.id)  // Force new ScrollView per item, resetting scroll position
@@ -674,6 +697,16 @@ struct HeroDetailOverlay: View {
         )
     }
 
+    // MARK: - Zoom Reset
+
+    private func resetZoom() {
+        zoomPanDelta = .zero
+        withAnimation(SnapSpring.standard(reduced: reduceMotion)) {
+            zoomScale = 1.0
+            isZoomed = false
+        }
+    }
+
     // MARK: - Close
 
     private func triggerClose(then afterClose: (() -> Void)? = nil) {
@@ -683,6 +716,9 @@ struct HeroDetailOverlay: View {
         scrollEnabled = false
         scrollOffset = 0
         metadataStage = 0
+        isZoomed = false
+        zoomScale = 1.0
+        zoomPanDelta = .zero
         revealTask?.cancel()
         navigationFallbackTask?.cancel()
         appState.detailSwipeProgress = 0
@@ -944,11 +980,15 @@ private extension View {
 @MainActor
 final class TrackpadScrollState {
     private(set) var cumulativeOffset: CGFloat = 0
+    /// Two-axis cumulative scroll delta (used for zoom panning)
+    private(set) var scrollDelta: CGSize = .zero
     private(set) var phase: ScrollPhase = .idle
     // nonisolated(unsafe) so deinit can clean up the monitor from a nonisolated context.
     // The compiler suggests plain `nonisolated` but @Observable macro prevents that.
     nonisolated(unsafe) private var monitor: Any?
     private var isHorizontalLocked = false
+    /// When true, tracks both axes without direction locking (for zoom pan)
+    var trackBothAxes = false
 
     enum ScrollPhase { case idle, scrolling, ended }
 
@@ -975,15 +1015,59 @@ final class TrackpadScrollState {
     }
 
     func reset() {
-        cumulativeOffset = 0
-        phase = .idle
+        if cumulativeOffset != 0 { cumulativeOffset = 0 }
+        if scrollDelta != .zero { scrollDelta = .zero }
+        if phase != .idle { phase = .idle }
         isHorizontalLocked = false
     }
 
     private func handleScroll(_ event: NSEvent) {
         // Only handle trackpad events (not mouse scroll wheel)
         guard event.hasPreciseScrollingDeltas else { return }
-        // Ignore momentum phase — only respond to direct finger contact
+
+        if trackBothAxes {
+            handleZoomPanScroll(event)
+        } else {
+            handleNavigationScroll(event)
+        }
+    }
+
+    /// Two-axis zoom pan mode — allows momentum events for natural deceleration
+    private func handleZoomPanScroll(_ event: NSEvent) {
+        // New finger contact — reset and start fresh
+        if event.phase == .began {
+            scrollDelta = .zero
+            phase = .scrolling
+        }
+
+        // Accumulate delta from both direct touch and momentum
+        if event.phase == .changed || event.phase == .began {
+            scrollDelta.width += event.scrollingDeltaX
+            scrollDelta.height += event.scrollingDeltaY
+            phase = .scrolling
+        }
+
+        // Momentum events (after finger lifts) — keep accumulating for inertia
+        if event.momentumPhase == .changed || event.momentumPhase == .began {
+            scrollDelta.width += event.scrollingDeltaX
+            scrollDelta.height += event.scrollingDeltaY
+            phase = .scrolling
+        }
+
+        // Gesture fully complete (momentum ended or finger lifted without momentum)
+        let fingerEnded = event.phase == .ended || event.phase == .cancelled
+        let momentumEnded = event.momentumPhase == .ended
+
+        if momentumEnded {
+            phase = .ended
+        } else if fingerEnded && event.momentumPhase == [] {
+            // Finger lifted but no momentum will follow (very slow gesture)
+            phase = .ended
+        }
+    }
+
+    /// Horizontal-only navigation mode — ignores momentum for precise control
+    private func handleNavigationScroll(_ event: NSEvent) {
         guard event.momentumPhase == [] else { return }
 
         if event.phase == .began {
@@ -992,7 +1076,6 @@ final class TrackpadScrollState {
         }
 
         if event.phase == .began || event.phase == .changed {
-            // Direction lock on first significant movement
             if !isHorizontalLocked && (abs(event.scrollingDeltaX) > 2 || abs(event.scrollingDeltaY) > 2) {
                 isHorizontalLocked = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY)
             }
