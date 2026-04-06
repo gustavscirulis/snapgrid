@@ -18,9 +18,13 @@ struct SpaceCardView: View {
                 if thumbnails.count >= 4 {
                     miniGrid
                 } else if let first = thumbnails.first {
-                    Image(uiImage: first)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
+                    GeometryReader { geo in
+                        Image(uiImage: first)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .clipped()
+                    }
                 } else {
                     Image(systemName: "folder")
                         .font(.system(size: 28, weight: .light))
@@ -84,14 +88,14 @@ struct SpaceCardView: View {
 
         for item in itemsToLoad {
             if let thumbURL = item.thumbnailURL {
-                let (image, _) = await cache.loadImage(for: thumbURL, targetPixelWidth: 200)
+                let (image, _) = await cache.loadImage(for: thumbURL, targetPixelWidth: 600)
                 if let image {
                     loaded.append(image)
                     continue
                 }
             }
             if let mediaURL = item.mediaURL {
-                let (image, _) = await cache.loadImage(for: mediaURL, targetPixelWidth: 200)
+                let (image, _) = await cache.loadImage(for: mediaURL, targetPixelWidth: 600)
                 if let image {
                     loaded.append(image)
                 }
