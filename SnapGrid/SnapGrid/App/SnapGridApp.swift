@@ -31,13 +31,9 @@ struct SnapGridApp: App {
         WindowGroup("SnapGrid") {
             ContentView()
                 .task { KeySyncService.syncToiCloud() }
-                .onAppear {
-                    // Disable native macOS window tabbing — this app has its own Spaces tab bar
-                    NSWindow.allowsAutomaticWindowTabbing = false
-                }
         }
         .modelContainer(container)
-        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified)
         .defaultSize(width: 1280, height: 800)
         .windowResizability(.contentMinSize)
         .defaultPosition(.center)
@@ -173,4 +169,5 @@ extension Notification.Name {
     static let analysisCompleted = Notification.Name("analysisCompleted")
     static let zoomIn = Notification.Name("zoomIn")
     static let zoomOut = Notification.Name("zoomOut")
+    static let closeDetail = Notification.Name("closeDetail")
 }

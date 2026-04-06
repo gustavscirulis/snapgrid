@@ -82,6 +82,9 @@ struct HeroDetailOverlay: View {
     @State private var isZoomed = false
     @State private var zoomScale: CGFloat = 1.0
     @State private var zoomPanDelta: CGSize = .zero
+    /// Global origin of this overlay's GeometryReader — used to convert
+    /// local frames to global for VideoPreviewManager.
+    @State private var geoOrigin: CGPoint = .zero
     @FocusState private var isFocused: Bool
 
     private var currentItem: MediaItem { items[currentIndex] }
@@ -122,8 +125,15 @@ struct HeroDetailOverlay: View {
     var body: some View {
         GeometryReader { geo in
             let windowSize = geo.size
+            let currentGeoOrigin = geo.frame(in: .global).origin
             let finalFrame = computeFinalFrame(windowSize: windowSize, item: currentItem)
-            let currentFrame = isExpanded ? finalFrame : closeTargetFrame
+            let localCloseTarget = CGRect(
+                x: closeTargetFrame.origin.x - currentGeoOrigin.x,
+                y: closeTargetFrame.origin.y - currentGeoOrigin.y,
+                width: closeTargetFrame.size.width,
+                height: closeTargetFrame.size.height
+            )
+            let currentFrame = isExpanded ? finalFrame : localCloseTarget
 
             ZStack {
                 // Backdrop
@@ -200,9 +210,14 @@ struct HeroDetailOverlay: View {
                         .onTapGesture { triggerClose() }
                 }
             }
-            // Capture window width for navigation calculations
+            .clipped() // Prevent adjacent swipe items from bleeding under the sidebar
+            // Capture window width and geo origin for navigation/coordinate calculations
             .onChange(of: windowSize.width) { _, w in lastWindowWidth = w }
-            .onAppear { lastWindowWidth = windowSize.width }
+            .onChange(of: currentGeoOrigin) { _, origin in geoOrigin = origin }
+            .onAppear {
+                lastWindowWidth = windowSize.width
+                geoOrigin = currentGeoOrigin
+            }
             // Sync swipe progress to AppState so grid thumbnails fade in/out
             .onChange(of: swipeOffset) { _, offset in
                 guard heroComplete else { return }
@@ -225,7 +240,7 @@ struct HeroDetailOverlay: View {
             // Keep floating video layer in sync with window resizes
             .onChange(of: finalFrame) { _, newFrame in
                 if currentItem.isVideo && isExpanded && !isClosing {
-                    videoPreview.updateDetailFrame(newFrame)
+                    videoPreview.updateDetailFrame(localToGlobal(newFrame, origin: geoOrigin))
                 }
             }
             .task {
@@ -237,7 +252,6 @@ struct HeroDetailOverlay: View {
         .focusable()
         .focused($isFocused)
         .focusEffectDisabled()
-        .ignoresSafeArea()
         .onKeyPress(.escape) {
             if isZoomed {
                 resetZoom()
@@ -245,6 +259,9 @@ struct HeroDetailOverlay: View {
                 triggerClose()
             }
             return .handled
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .closeDetail)) { _ in
+            triggerClose()
         }
         .onKeyPress(.leftArrow) {
             guard !isNavigating && !isClosing && !isZoomed else { return .ignored }
@@ -414,19 +431,28 @@ struct HeroDetailOverlay: View {
                 withAnimation(SnapSpring.hero(reduced: reduceMotion)) {
                     isExpanded = true
                     videoPreview.transitionToDetail(
-                        itemId: item.id, url: url, finalFrame: finalFrame, suggestedName: suggestedName
+                        itemId: item.id, url: url, finalFrame: localToGlobal(finalFrame, origin: geoOrigin), suggestedName: suggestedName
                     )
                 } completion: {
+                    // Refresh video frame with current geoOrigin to prevent jump
+                    // when settled scroll view takes over (origin may have shifted
+                    // during the animation due to toolbar safe area settling).
+                    if item.isVideo {
+                        videoPreview.updateDetailFrame(localToGlobal(finalFrame, origin: geoOrigin))
+                    }
                     heroComplete = true
                     startMetadataReveal()
                 }
             } else {
                 videoPreview.transitionToDetail(
-                    itemId: item.id, url: url, finalFrame: finalFrame, suggestedName: suggestedName
+                    itemId: item.id, url: url, finalFrame: localToGlobal(finalFrame, origin: geoOrigin), suggestedName: suggestedName
                 )
                 withAnimation(SnapSpring.hero(reduced: reduceMotion)) {
                     isExpanded = true
                 } completion: {
+                    if item.isVideo {
+                        videoPreview.updateDetailFrame(localToGlobal(finalFrame, origin: geoOrigin))
+                    }
                     heroComplete = true
                     startMetadataReveal()
                 }
@@ -601,6 +627,13 @@ struct HeroDetailOverlay: View {
                     if currentItem.isVideo {
                         Color.clear
                             .frame(width: finalFrame.width, height: finalFrame.height)
+                            .onGeometryChange(for: CGRect.self) { proxy in
+                                proxy.frame(in: .global)
+                            } action: { globalFrame in
+                                if heroComplete && !isClosing {
+                                    videoPreview.updateDetailFrame(globalFrame)
+                                }
+                            }
                     } else if let image {
                         ZoomableImageView(
                             image: image,
@@ -649,14 +682,6 @@ struct HeroDetailOverlay: View {
             geo.contentOffset.y
         } action: { _, newOffset in
             scrollOffset = newOffset
-            if currentItem.isVideo && heroComplete && !isClosing {
-                videoPreview.updateDetailFrame(CGRect(
-                    x: finalFrame.origin.x,
-                    y: finalFrame.origin.y - newOffset,
-                    width: finalFrame.width,
-                    height: finalFrame.height
-                ))
-            }
         }
     }
 
@@ -673,6 +698,19 @@ struct HeroDetailOverlay: View {
     }
 
     // MARK: - Final Frame Computation
+
+    /// Convert a detail-column-local frame to global coordinates so that
+    /// VideoPreviewManager stores all frames in the same coordinate system
+    /// as GridItemView (global). FloatingVideoLayer then subtracts its own
+    /// GeometryReader origin to position correctly.
+    private func localToGlobal(_ frame: CGRect, origin: CGPoint) -> CGRect {
+        CGRect(
+            x: frame.origin.x + origin.x,
+            y: frame.origin.y + origin.y,
+            width: frame.width,
+            height: frame.height
+        )
+    }
 
     private func computeFinalFrame(windowSize: CGSize, item: MediaItem) -> CGRect {
         let maxW = windowSize.width * 0.95

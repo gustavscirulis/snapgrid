@@ -1,6 +1,11 @@
 import Foundation
 import SwiftUI
 
+enum SidebarItem: Hashable {
+    case all
+    case space(String) // Space.id
+}
+
 @Observable
 @MainActor
 final class AppState {
@@ -13,10 +18,23 @@ final class AppState {
            let size = ThumbnailSize(rawValue: saved) {
             thumbnailSize = size
         }
-        activeSpaceId = UserDefaults.standard.string(forKey: "lastActiveSpaceId")
+        if let savedId = UserDefaults.standard.string(forKey: "lastActiveSpaceId") {
+            sidebarSelection = .space(savedId)
+        } else {
+            sidebarSelection = .all
+        }
     }
+
+    var sidebarSelection: SidebarItem = .all {
+        didSet {
+            let newId: String? = if case .space(let id) = sidebarSelection { id } else { nil }
+            UserDefaults.standard.set(newId, forKey: "lastActiveSpaceId")
+        }
+    }
+
     var activeSpaceId: String? {
-        didSet { UserDefaults.standard.set(activeSpaceId, forKey: "lastActiveSpaceId") }
+        if case .space(let id) = sidebarSelection { return id }
+        return nil
     }
     var searchText: String = ""
     var thumbnailSize: ThumbnailSize = .medium {

@@ -88,6 +88,8 @@ struct FloatingVideoLayer: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
+        GeometryReader { geo in
+            let origin = geo.frame(in: .global).origin
         if videoPreview.displayState != .hidden, let player = videoPreview.player {
             VideoPlayerNSView(player: player, showGradient: videoPreview.displayState == .grid)
                 // Pattern pills overlay — .ultraThinMaterial creates an NSVisualEffectView
@@ -150,10 +152,13 @@ struct FloatingVideoLayer: View {
                         lineWidth: 2
                     )
             )
-            .position(x: videoPreview.currentFrame.midX, y: videoPreview.currentFrame.midY)
+            .position(
+                x: videoPreview.currentFrame.midX - origin.x,
+                y: videoPreview.currentFrame.midY - origin.y
+            )
             .allowsHitTesting(videoPreview.displayState == .detail)
-            .ignoresSafeArea()
         }
+        } // GeometryReader
     }
 }
 
