@@ -33,7 +33,7 @@
 		A100000051 /* SpacesTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000051 /* SpacesTab.swift */; };
 		A100000052 /* SpaceCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000052 /* SpaceCardView.swift */; };
 		A100000053 /* SpaceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000053 /* SpaceDetailView.swift */; };
-		A100000054 /* SearchTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000054 /* SearchTab.swift */; };
+
 		A100000013 /* MasonryGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000013 /* MasonryGrid.swift */; };
 		A100000014 /* GridItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000014 /* GridItemView.swift */; };
 		A100000015 /* PatternPills.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000015 /* PatternPills.swift */; };
@@ -124,7 +124,7 @@
 		B100000051 /* SpacesTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacesTab.swift; sourceTree = "<group>"; };
 		B100000052 /* SpaceCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceCardView.swift; sourceTree = "<group>"; };
 		B100000053 /* SpaceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceDetailView.swift; sourceTree = "<group>"; };
-		B100000054 /* SearchTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTab.swift; sourceTree = "<group>"; };
+
 		B100000013 /* MasonryGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MasonryGrid.swift; sourceTree = "<group>"; };
 		B100000014 /* GridItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridItemView.swift; sourceTree = "<group>"; };
 		B100000015 /* PatternPills.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternPills.swift; sourceTree = "<group>"; };
@@ -373,7 +373,7 @@
 				B100000011 /* MainView.swift */,
 				B100000050 /* AllItemsTab.swift */,
 				B100000051 /* SpacesTab.swift */,
-				B100000054 /* SearchTab.swift */,
+
 				B100000032 /* PhotoPickerView.swift */,
 			);
 			path = Main;
@@ -599,7 +599,7 @@
 				A100000051 /* SpacesTab.swift in Sources */,
 				A100000052 /* SpaceCardView.swift in Sources */,
 				A100000053 /* SpaceDetailView.swift in Sources */,
-				A100000054 /* SearchTab.swift in Sources */,
+
 				A100000013 /* MasonryGrid.swift in Sources */,
 				A100000014 /* GridItemView.swift in Sources */,
 				A100000015 /* PatternPills.swift in Sources */,
