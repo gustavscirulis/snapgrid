@@ -2,13 +2,14 @@ import SwiftUI
 
 struct MasonryGrid: View {
     let items: [MediaItem]
+    var spaces: [Space] = []
     let availableWidth: CGFloat
     var selectedItemId: String?
     var onItemSelected: ((MediaItem, CGRect, UIImage?) -> Void)?
     var onRetryAnalysis: ((MediaItem) -> Void)?
     var onShareItem: ((MediaItem) -> Void)?
-    var onRemoveFromSpace: ((MediaItem) -> Void)?
     var onDeleteItem: ((MediaItem) -> Void)?
+    var onAssignToSpace: ((String, String?) -> Void)?
 
     private let columns = 2
     private let spacing: CGFloat = 8
@@ -38,6 +39,7 @@ struct MasonryGrid: View {
                     ForEach(assignments[column]) { item in
                         GridItemView(
                             item: item,
+                            spaces: spaces,
                             width: columnWidth,
                             isSelected: selectedItemId == item.id,
                             onSelect: onItemSelected,
@@ -47,12 +49,10 @@ struct MasonryGrid: View {
                             onShare: onShareItem.map { callback in
                                 { callback(item) }
                             },
-                            onRemoveFromSpace: onRemoveFromSpace.map { callback in
-                                { callback(item) }
-                            },
                             onDelete: onDeleteItem.map { callback in
                                 { callback(item) }
-                            }
+                            },
+                            onAssignToSpace: onAssignToSpace
                         )
                     }
                 }

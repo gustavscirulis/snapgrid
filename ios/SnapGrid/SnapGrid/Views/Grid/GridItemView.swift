@@ -15,13 +15,14 @@ struct GridItemRectsPreferenceKey: PreferenceKey {
 
 struct GridItemView: View {
     let item: MediaItem
+    var spaces: [Space] = []
     let width: CGFloat
     var isSelected: Bool = false
     var onSelect: ((MediaItem, CGRect, UIImage?) -> Void)?
     var onRetryAnalysis: (() -> Void)?
     var onShare: (() -> Void)?
-    var onRemoveFromSpace: (() -> Void)?
     var onDelete: (() -> Void)?
+    var onAssignToSpace: ((String, String?) -> Void)?
     @State private var thumbnail: UIImage?
     @State private var loadFailed = false
 
@@ -162,11 +163,29 @@ struct GridItemView: View {
                 Label("Redo Analysis", systemImage: "arrow.clockwise")
             }
 
-            if let onRemoveFromSpace {
-                Button {
-                    onRemoveFromSpace()
+            if !spaces.isEmpty {
+                Menu {
+                    ForEach(spaces) { space in
+                        Button {
+                            onAssignToSpace?(item.id, space.id)
+                        } label: {
+                            if item.space?.id == space.id {
+                                Label(space.name, systemImage: "checkmark")
+                            } else {
+                                Text(space.name)
+                            }
+                        }
+                    }
+                    if item.space != nil {
+                        Divider()
+                        Button {
+                            onAssignToSpace?(item.id, nil)
+                        } label: {
+                            Label("Remove from Space", systemImage: "folder.badge.minus")
+                        }
+                    }
                 } label: {
-                    Label("Remove from Space", systemImage: "folder.badge.minus")
+                    Label("Move to Space", systemImage: "folder.badge.plus")
                 }
             }
 

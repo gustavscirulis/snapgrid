@@ -29,7 +29,11 @@
 		A100000009 /* Color+SnapGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000009 /* Color+SnapGrid.swift */; };
 		A100000010 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000010 /* OnboardingView.swift */; };
 		A100000011 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000011 /* MainView.swift */; };
-		A100000012 /* SpaceTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000012 /* SpaceTabBar.swift */; };
+		A100000050 /* AllItemsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000050 /* AllItemsTab.swift */; };
+		A100000051 /* SpacesTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000051 /* SpacesTab.swift */; };
+		A100000052 /* SpaceCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000052 /* SpaceCardView.swift */; };
+		A100000053 /* SpaceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000053 /* SpaceDetailView.swift */; };
+		A100000054 /* SearchTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000054 /* SearchTab.swift */; };
 		A100000013 /* MasonryGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000013 /* MasonryGrid.swift */; };
 		A100000014 /* GridItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000014 /* GridItemView.swift */; };
 		A100000015 /* PatternPills.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000015 /* PatternPills.swift */; };
@@ -116,7 +120,11 @@
 		B100000009 /* Color+SnapGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+SnapGrid.swift"; sourceTree = "<group>"; };
 		B100000010 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		B100000011 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
-		B100000012 /* SpaceTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceTabBar.swift; sourceTree = "<group>"; };
+		B100000050 /* AllItemsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllItemsTab.swift; sourceTree = "<group>"; };
+		B100000051 /* SpacesTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacesTab.swift; sourceTree = "<group>"; };
+		B100000052 /* SpaceCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceCardView.swift; sourceTree = "<group>"; };
+		B100000053 /* SpaceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceDetailView.swift; sourceTree = "<group>"; };
+		B100000054 /* SearchTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTab.swift; sourceTree = "<group>"; };
 		B100000013 /* MasonryGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MasonryGrid.swift; sourceTree = "<group>"; };
 		B100000014 /* GridItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridItemView.swift; sourceTree = "<group>"; };
 		B100000015 /* PatternPills.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternPills.swift; sourceTree = "<group>"; };
@@ -303,6 +311,7 @@
 			children = (
 				E100000010 /* Onboarding */,
 				E100000011 /* Main */,
+				E100000050 /* Spaces */,
 				E100000012 /* Grid */,
 				E100000013 /* Detail */,
 				E100000014 /* Shared */,
@@ -362,10 +371,21 @@
 			isa = PBXGroup;
 			children = (
 				B100000011 /* MainView.swift */,
-				B100000012 /* SpaceTabBar.swift */,
+				B100000050 /* AllItemsTab.swift */,
+				B100000051 /* SpacesTab.swift */,
+				B100000054 /* SearchTab.swift */,
 				B100000032 /* PhotoPickerView.swift */,
 			);
 			path = Main;
+			sourceTree = "<group>";
+		};
+		E100000050 /* Spaces */ = {
+			isa = PBXGroup;
+			children = (
+				B100000052 /* SpaceCardView.swift */,
+				B100000053 /* SpaceDetailView.swift */,
+			);
+			path = Spaces;
 			sourceTree = "<group>";
 		};
 		E100000012 /* Grid */ = {
@@ -575,7 +595,11 @@
 				A100000009 /* Color+SnapGrid.swift in Sources */,
 				A100000010 /* OnboardingView.swift in Sources */,
 				A100000011 /* MainView.swift in Sources */,
-				A100000012 /* SpaceTabBar.swift in Sources */,
+				A100000050 /* AllItemsTab.swift in Sources */,
+				A100000051 /* SpacesTab.swift in Sources */,
+				A100000052 /* SpaceCardView.swift in Sources */,
+				A100000053 /* SpaceDetailView.swift in Sources */,
+				A100000054 /* SearchTab.swift in Sources */,
 				A100000013 /* MasonryGrid.swift in Sources */,
 				A100000014 /* GridItemView.swift in Sources */,
 				A100000015 /* PatternPills.swift in Sources */,
