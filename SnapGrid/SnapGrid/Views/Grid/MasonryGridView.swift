@@ -26,6 +26,7 @@ struct MasonryGridView: View {
     let onShare: (Set<String>, CGRect) -> Void
     let onSetSelection: (Set<String>) -> Void
     var coordinateSpaceName: String = "gridContent"
+    var topInset: CGFloat = 0
 
     @Environment(AppState.self) private var appState
 
@@ -134,7 +135,7 @@ struct MasonryGridView: View {
                         }
                     }
                     .padding(.horizontal, horizontalPadding)  // ImageGrid.tsx:598 — px-4
-                    .padding(.top, 24)
+                    .padding(.top, 24 + topInset)
                     .padding(.bottom, 24)
 
                     // Rubber band visual

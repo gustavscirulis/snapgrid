@@ -3,6 +3,13 @@ import SwiftData
 import AppKit
 import UniformTypeIdentifiers
 
+private struct TabBarHeightKey: PreferenceKey {
+    nonisolated static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \MediaItem.createdAt, order: .reverse) private var allItems: [MediaItem]
@@ -25,6 +32,7 @@ struct ContentView: View {
     /// Page indices that should render full content (expands during carousel transitions).
     @State private var livePages: Set<Int> = [0]
     @State private var livePagesCleanupTask: Task<Void, Never>?
+    @State private var tabBarHeight: CGFloat = 0
 
     #if DEBUG
     @AppStorage("debugSimulateEmptyState") private var debugSimulateEmptyState = false
@@ -71,21 +79,7 @@ struct ContentView: View {
         ZStack {
             Color.snapBackground.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // Space tab bar
-                SpaceTabBar(
-                    spaces: spaces,
-                    activeSpaceId: appState.activeSpaceId,
-                    pendingEditSpaceId: $pendingEditSpaceId,
-                    onSelectSpace: switchToSpace,
-                    onCreateSpace: createSpace,
-                    onDeleteSpace: deleteSpace,
-                    onRenameSpace: renameSpace,
-                    onReorderSpaces: reorderSpaces,
-                    onAssignToSpace: assignToSpace
-                )
-                .padding(.top, 8)
-
+            ZStack(alignment: .top) {
                 // Main content — horizontal carousel of space pages
                 // File-import .onDrop is scoped here (not the whole window) so it
                 // doesn't steal drags from SpaceTabBar's .onDrop for space assignment.
@@ -116,6 +110,39 @@ struct ContentView: View {
                     if appState.isDraggingFromApp { return false }
                     handleDrop(providers)
                     return true
+                }
+
+                // Space tab bar — frosted glass overlay
+                SpaceTabBar(
+                    spaces: spaces,
+                    activeSpaceId: appState.activeSpaceId,
+                    pendingEditSpaceId: $pendingEditSpaceId,
+                    onSelectSpace: switchToSpace,
+                    onCreateSpace: createSpace,
+                    onDeleteSpace: deleteSpace,
+                    onRenameSpace: renameSpace,
+                    onReorderSpaces: reorderSpaces,
+                    onAssignToSpace: assignToSpace
+                )
+                .padding(.top, 8)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: TabBarHeightKey.self,
+                            value: geo.size.height
+                        )
+                    }
+                )
+                .onPreferenceChange(TabBarHeightKey.self) { height in
+                    tabBarHeight = height
+                }
+                .background {
+                    ZStack {
+                        Color.snapBackground.opacity(0.8)
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                    }
+                    .ignoresSafeArea(edges: .top)
                 }
             }
 
@@ -191,6 +218,7 @@ struct ContentView: View {
                 Spacer()
             }
         }
+        .toolbarBackground(.hidden, for: .windowToolbar)
         // Note: .onDrop for file imports is on the content area Group above,
         // NOT here on the outer ZStack — so it doesn't steal drags from SpaceTabBar.
         .onChange(of: isDragTargeted) { _, targeted in
@@ -445,7 +473,8 @@ struct ContentView: View {
                             onRetryAnalysis: retryAnalysis,
                             onShare: { ids, frame in shareItems(ids, sourceFrame: frame) },
                             onSetSelection: { ids in appState.selectedIds = ids },
-                            coordinateSpaceName: "gridContent-\(spaceId ?? "all")"
+                            coordinateSpaceName: "gridContent-\(spaceId ?? "all")",
+                            topInset: tabBarHeight
                         )
                     }
                 }
