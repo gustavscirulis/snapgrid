@@ -21,6 +21,9 @@ struct MainView: View {
     @State private var indexRebuildTask: Task<Void, Never>?
     @State private var showNewSpaceAlert = false
     @State private var newSpaceName = ""
+    @State private var showRenameSpaceAlert = false
+    @State private var renameSpaceName = ""
+    @State private var renameSpaceId: String?
 
     // MARK: - Filtering
 
@@ -177,6 +180,15 @@ struct MainView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+        .alert("Rename Space", isPresented: $showRenameSpaceAlert) {
+            TextField("Space name", text: $renameSpaceName)
+            Button("Rename") {
+                let name = renameSpaceName.trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty, let id = renameSpaceId else { return }
+                renameSpace(id, name)
+            }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 
     // MARK: - Tab Content
@@ -244,6 +256,8 @@ struct MainView: View {
             onAssignToSpace: handleAssignToSpace,
             onLoadContent: loadContent,
             onCreateSpace: createSpace,
+            onRenameSpace: beginRenameSpace,
+            onDeleteSpace: deleteSpace,
             addImagesMenu: addImagesMenu
         )
     }
@@ -308,6 +322,47 @@ struct MainView: View {
     private func commitNewSpace(name: String) {
         let space = Space(name: name, order: spaces.count)
         modelContext.insert(space)
+        modelContext.saveOrLog()
+
+        if let rootURL = fileSystem.rootURL {
+            let allSpaces = (try? modelContext.fetch(FetchDescriptor<Space>(sortBy: [SortDescriptor(\.order)]))) ?? []
+            SidecarWriteService.writeSpaces(allSpaces, rootURL: rootURL)
+        }
+
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func beginRenameSpace(_ id: String) {
+        guard let space = spaces.first(where: { $0.id == id }) else { return }
+        renameSpaceName = space.name
+        renameSpaceId = id
+        showRenameSpaceAlert = true
+    }
+
+    private func renameSpace(_ id: String, _ newName: String) {
+        guard let space = spaces.first(where: { $0.id == id }) else { return }
+        space.name = newName
+        modelContext.saveOrLog()
+
+        if let rootURL = fileSystem.rootURL {
+            let allSpaces = (try? modelContext.fetch(FetchDescriptor<Space>(sortBy: [SortDescriptor(\.order)]))) ?? []
+            SidecarWriteService.writeSpaces(allSpaces, rootURL: rootURL)
+        }
+
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func deleteSpace(_ id: String) {
+        guard let space = spaces.first(where: { $0.id == id }) else { return }
+
+        if appState.activeSpaceId == id {
+            appState.activeSpaceId = nil
+        }
+
+        for item in space.items {
+            item.space = nil
+        }
+        modelContext.delete(space)
         modelContext.saveOrLog()
 
         if let rootURL = fileSystem.rootURL {
