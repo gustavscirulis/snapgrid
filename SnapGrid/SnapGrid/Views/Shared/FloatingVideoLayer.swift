@@ -168,6 +168,9 @@ struct VideoControlsOverlay: View {
     @State private var duration: Double = 0
     @State private var showControls = false
     @State private var timeObserver: Any?
+    /// The player instance the time observer was added to — may differ from
+    /// `player` if VideoPreviewManager swapped to a new AVPlayer mid-navigation.
+    @State private var observedPlayer: AVPlayer?
     @State private var hideTask: Task<Void, Never>?
 
     var body: some View {
@@ -193,6 +196,10 @@ struct VideoControlsOverlay: View {
         }
         .onAppear { addTimeObserver() }
         .onDisappear { removeTimeObserver() }
+        .onChange(of: ObjectIdentifier(player)) { _, _ in
+            // Player instance changed (navigated to a different video) — re-register
+            addTimeObserver()
+        }
     }
 
     @ViewBuilder
@@ -249,6 +256,8 @@ struct VideoControlsOverlay: View {
     }
 
     private func addTimeObserver() {
+        removeTimeObserver()
+        observedPlayer = player
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
             currentTime = time.seconds
@@ -261,9 +270,10 @@ struct VideoControlsOverlay: View {
     }
 
     private func removeTimeObserver() {
-        if let observer = timeObserver {
-            player.removeTimeObserver(observer)
+        if let observer = timeObserver, let observedPlayer {
+            observedPlayer.removeTimeObserver(observer)
             timeObserver = nil
+            self.observedPlayer = nil
         }
         hideTask?.cancel()
     }

@@ -78,6 +78,7 @@ struct HeroDetailOverlay: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var metadataStage: Int = 0
     @State private var revealTask: Task<Void, Never>?
+    @State private var navigationFallbackTask: Task<Void, Never>?
     @FocusState private var isFocused: Bool
 
     private var currentItem: MediaItem { items[currentIndex] }
@@ -262,7 +263,12 @@ struct HeroDetailOverlay: View {
             guard heroComplete && !isClosing && !isNavigating && items.count > 1 else {
                 if phase == .ended {
                     trackpadScroll.reset()
-                    withAnimation(SnapSpring.standard(reduced: reduceMotion)) { swipeOffset = 0 }
+                    // Don't animate swipeOffset when a navigation animation owns it —
+                    // interrupting that animation would prevent its completion handler
+                    // from firing, permanently freezing isNavigating = true.
+                    if !isNavigating {
+                        withAnimation(SnapSpring.standard(reduced: reduceMotion)) { swipeOffset = 0 }
+                    }
                 }
                 return
             }
@@ -317,39 +323,55 @@ struct HeroDetailOverlay: View {
         withAnimation(SnapSpring.standard(reduced: reduceMotion)) {
             swipeOffset = direction * lastWindowWidth
         } completion: {
-            // Swap to new item without animation
-            var t = Transaction(animation: nil)
-            withTransaction(t) {
-                currentIndex = newIndex
-                hasNavigated = true
-                swipeOffset = 0
-                scrollEnabled = false
-                metadataStage = 0
-                scrollOffset = 0
-
-                // Load new image from cache or preloaded adjacents
-                let newItem = items[newIndex]
-                image = adjacentImages[newItem.id]
-                    ?? ImageCacheService.shared.image(forKey: newItem.id)
-            }
-
-            // Notify parent so grid hides correct thumbnail
-            onCurrentItemChanged?(items[newIndex].id)
-
-            // Reset swipe progress — new item is now the hidden one
-            appState.detailSwipeProgress = 0
-            appState.detailSwipeTargetId = nil
-
-            // Load full-res image or start video
-            loadTask?.cancel()
-            loadTask = Task {
-                await loadCurrentItem()
-            }
-
-            preloadAdjacentImages()
-            isNavigating = false
-            startMetadataReveal()
+            self.completeNavigation(to: newIndex)
         }
+
+        // Safety fallback: if the completion handler is lost due to animation
+        // interruption, complete the navigation after the spring settles.
+        navigationFallbackTask?.cancel()
+        navigationFallbackTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled, isNavigating else { return }
+            completeNavigation(to: newIndex)
+        }
+    }
+
+    private func completeNavigation(to newIndex: Int) {
+        guard isNavigating else { return }
+        navigationFallbackTask?.cancel()
+
+        // Swap to new item without animation
+        let t = Transaction(animation: nil)
+        withTransaction(t) {
+            currentIndex = newIndex
+            hasNavigated = true
+            swipeOffset = 0
+            scrollEnabled = false
+            metadataStage = 0
+            scrollOffset = 0
+
+            // Load new image from cache or preloaded adjacents
+            let newItem = items[newIndex]
+            image = adjacentImages[newItem.id]
+                ?? ImageCacheService.shared.image(forKey: newItem.id)
+        }
+
+        // Notify parent so grid hides correct thumbnail
+        onCurrentItemChanged?(items[newIndex].id)
+
+        // Reset swipe progress — new item is now the hidden one
+        appState.detailSwipeProgress = 0
+        appState.detailSwipeTargetId = nil
+
+        // Load full-res image or start video
+        loadTask?.cancel()
+        loadTask = Task {
+            await loadCurrentItem()
+        }
+
+        preloadAdjacentImages()
+        isNavigating = false
+        startMetadataReveal()
     }
 
     // MARK: - Item Loading
@@ -662,6 +684,7 @@ struct HeroDetailOverlay: View {
         scrollOffset = 0
         metadataStage = 0
         revealTask?.cancel()
+        navigationFallbackTask?.cancel()
         appState.detailSwipeProgress = 0
         appState.detailSwipeTargetId = nil
 
@@ -701,7 +724,7 @@ struct HeroDetailOverlay: View {
         let loaded: NSImage? = await Task.detached(priority: .utility) {
             return NSImage(contentsOf: MediaStorageService.shared.mediaURL(filename: filename))
         }.value
-        if let loaded, items[currentIndex].id == item.id {
+        if let loaded, !Task.isCancelled, items[currentIndex].id == item.id {
             self.image = loaded
         }
     }
@@ -755,7 +778,7 @@ struct HeroDetailOverlay: View {
             withAnimation(.easeOut(duration: 0.2)) { isLoadingFullRes = false }
             return
         }
-        while item.status == .unknown {
+        while !Task.isCancelled && item.status == .unknown {
             try? await Task.sleep(for: .milliseconds(100))
         }
         withAnimation(.easeOut(duration: 0.2)) { isLoadingFullRes = false }
@@ -922,10 +945,18 @@ private extension View {
 final class TrackpadScrollState {
     private(set) var cumulativeOffset: CGFloat = 0
     private(set) var phase: ScrollPhase = .idle
-    private var monitor: Any?
+    // nonisolated(unsafe) so deinit can clean up the monitor from a nonisolated context.
+    // The compiler suggests plain `nonisolated` but @Observable macro prevents that.
+    nonisolated(unsafe) private var monitor: Any?
     private var isHorizontalLocked = false
 
     enum ScrollPhase { case idle, scrolling, ended }
+
+    deinit {
+        if let m = monitor {
+            NSEvent.removeMonitor(m)
+        }
+    }
 
     func activate() {
         guard monitor == nil else { return }
