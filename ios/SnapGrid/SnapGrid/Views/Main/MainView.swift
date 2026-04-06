@@ -43,9 +43,15 @@ struct MainView: View {
             .sorted { (scores[$0.id] ?? 0) > (scores[$1.id] ?? 0) }
     }
 
+    private var searchContentItems: [MediaItem] {
+        let query = appState.searchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return Array(allItems) }
+        return searchResultItems
+    }
+
     private var currentVisibleItems: [MediaItem] {
         if appState.selectedTab == .search || !appState.searchText.isEmpty {
-            return searchResultItems
+            return searchContentItems
         }
         if let spaceId = appState.activeSpaceId {
             return allItems.filter { $0.space?.id == spaceId }
@@ -207,6 +213,8 @@ struct MainView: View {
                     searchContent(gridWidth: gridWidth)
                 }
             }
+            .searchable(text: $appState.searchText, prompt: "Search patterns, context...")
+            .tabViewSearchActivation(.searchTabSelection)
             .tint(.white)
         } else {
             TabView(selection: $appState.selectedTab) {
@@ -224,13 +232,14 @@ struct MainView: View {
     @ViewBuilder
     private func allItemsContent(gridWidth: CGFloat) -> some View {
         AllItemsTab(
-            items: Array(allItems),
+            items: searchContentItems,
             spaces: spaces,
             gridWidth: gridWidth,
             isLoading: isLoading,
             error: error,
             selectedItemId: appState.selectedItemId,
             showOverlay: appState.showOverlay,
+            searchText: $appState.searchText,
             onItemSelected: handleItemSelected,
             onRetryAnalysis: handleRetryAnalysis,
             onShareItem: handleShareItem,
@@ -264,20 +273,44 @@ struct MainView: View {
 
     @ViewBuilder
     private func searchContent(gridWidth: CGFloat) -> some View {
-        SearchResultsView(
-            items: searchResultItems,
-            spaces: spaces,
-            gridWidth: gridWidth,
-            selectedItemId: appState.selectedItemId,
-            showOverlay: appState.showOverlay,
-            searchText: $appState.searchText,
-            onDismiss: { appState.selectedTab = .all },
-            onItemSelected: handleItemSelected,
-            onRetryAnalysis: handleRetryAnalysis,
-            onShareItem: handleShareItem,
-            onDeleteItem: { item in appState.itemToDelete = item },
-            onAssignToSpace: handleAssignToSpace
-        )
+        let items = searchContentItems
+        NavigationStack {
+            ZStack {
+                Color.snapDarkBackground
+                    .ignoresSafeArea()
+
+                if items.isEmpty && !appState.searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                    SearchEmptyStateView()
+                } else if items.isEmpty {
+                    EmptyStateView()
+                } else {
+                    ScrollView {
+                        MasonryGrid(
+                            items: items,
+                            spaces: spaces,
+                            availableWidth: gridWidth,
+                            selectedItemId: appState.showOverlay ? appState.selectedItemId : nil,
+                            onItemSelected: handleItemSelected,
+                            onRetryAnalysis: handleRetryAnalysis,
+                            onShareItem: handleShareItem,
+                            onDeleteItem: { item in appState.itemToDelete = item },
+                            onAssignToSpace: handleAssignToSpace
+                        )
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 70)
+                    }
+                    .scrollDismissesKeyboard(.interactively)
+                }
+            }
+            .navigationTitle("SnapGrid")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    addImagesMenu
+                }
+            }
+            .toolbarColorScheme(.dark, for: .navigationBar)
+        }
     }
 
     // MARK: - Add Images Menu

@@ -8,6 +8,7 @@ struct AllItemsTab<AddMenu: View>: View {
     let error: String?
     let selectedItemId: String?
     let showOverlay: Bool
+    @Binding var searchText: String
     let onItemSelected: (MediaItem, CGRect, UIImage?) -> Void
     let onRetryAnalysis: (MediaItem) -> Void
     let onShareItem: (MediaItem) -> Void
@@ -29,6 +30,8 @@ struct AllItemsTab<AddMenu: View>: View {
                     ErrorStateView(message: error) {
                         await onLoadContent()
                     }
+                } else if items.isEmpty && !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                    SearchEmptyStateView()
                 } else if items.isEmpty {
                     EmptyStateView()
                 } else {
@@ -47,6 +50,7 @@ struct AllItemsTab<AddMenu: View>: View {
                         .padding(.horizontal, 12)
                         .padding(.bottom, 70)
                     }
+                    .scrollDismissesKeyboard(.interactively)
                     .refreshable {
                         await onLoadContent()
                     }
