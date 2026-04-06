@@ -38,6 +38,10 @@ final class VideoPreviewManager {
     /// Pattern names to display on the floating layer during grid hover
     private(set) var gridPatternNames: [String] = []
 
+    /// Detail frame reported by the settled scroll view's geometry reader.
+    /// Used by switchDetailPlayer to position the video at the SwiftUI-computed position.
+    private(set) var detailPlaceholderFrame: CGRect = .zero
+
     /// File URL of the active video (set during detail mode for drag-to-export)
     private(set) var activeItemURL: URL?
 
@@ -127,8 +131,10 @@ final class VideoPreviewManager {
         activeItemSuggestedName = suggestedName
     }
 
-    /// Update the detail frame on window resize
+    /// Update the detail frame — always stores for future switchDetailPlayer calls,
+    /// and applies immediately when already in detail mode (window resize, scroll).
     func updateDetailFrame(_ frame: CGRect) {
+        detailPlaceholderFrame = frame
         if displayState == .detail {
             currentFrame = frame
         }
@@ -160,8 +166,10 @@ final class VideoPreviewManager {
         isHandedOffToDetail = false
     }
 
-    /// Create a fresh player for arrow key navigation in detail
-    func switchDetailPlayer(itemId: String, url: URL, frame: CGRect, suggestedName: String? = nil) {
+    /// Create a fresh player for arrow key / swipe navigation in detail.
+    /// Reads detailPlaceholderFrame (set by the settled scroll view's onGeometryChange)
+    /// so the video is positioned by the same SwiftUI layout that positions images.
+    func switchDetailPlayer(itemId: String, url: URL, suggestedName: String? = nil) {
         cleanup()
         activeItemURL = url
         activeItemSuggestedName = suggestedName
@@ -170,7 +178,9 @@ final class VideoPreviewManager {
         player = newPlayer
         activeItemId = itemId
         isHandedOffToDetail = true
-        currentFrame = frame
+        if detailPlaceholderFrame != .zero {
+            currentFrame = detailPlaceholderFrame
+        }
         cornerRadius = 16
         displayState = .detail
         newPlayer.play()
