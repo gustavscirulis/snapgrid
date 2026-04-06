@@ -65,6 +65,35 @@ enum SidecarWriteService {
         }
     }
 
+    /// Write the full spaces list to spaces.json, mirroring the Mac app's format.
+    /// Preserves allSpaceGuidance from UserDefaults so it round-trips through iCloud.
+    static func writeSpaces(_ spaces: [Space], rootURL: URL) {
+        let sidecars = spaces.map { space in
+            SidecarSpace(
+                id: space.id,
+                name: space.name,
+                order: space.order,
+                createdAt: space.createdAt,
+                customPrompt: space.customPrompt,
+                useCustomPrompt: space.useCustomPrompt
+            )
+        }
+
+        let allGuidance = UserDefaults.standard.string(forKey: "allSpacePrompt")
+        let useAllGuidance = UserDefaults.standard.bool(forKey: "useAllSpacePrompt")
+
+        let file = SidecarSpacesFile(
+            spaces: sidecars,
+            allSpaceGuidance: allGuidance,
+            useAllSpaceGuidance: useAllGuidance
+        )
+
+        let spacesURL = rootURL.appendingPathComponent("spaces.json")
+        if let data = try? encoder.encode(file) {
+            try? data.write(to: spacesURL, options: .atomic)
+        }
+    }
+
     /// Construct and write a complete sidecar JSON from the MediaItem model.
     /// Used as a fallback when the existing sidecar hasn't downloaded from iCloud.
     private static func writeFullSidecar(for item: MediaItem, to url: URL) {

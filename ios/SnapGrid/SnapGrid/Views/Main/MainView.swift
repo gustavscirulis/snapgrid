@@ -19,6 +19,8 @@ struct MainView: View {
     @State private var analysisCoordinator = AnalysisCoordinator()
     @State private var debounceTask: Task<Void, Never>?
     @State private var indexRebuildTask: Task<Void, Never>?
+    @State private var showNewSpaceAlert = false
+    @State private var newSpaceName = ""
 
     // MARK: - Filtering
 
@@ -166,6 +168,15 @@ struct MainView: View {
                 }
             }
         }
+        .alert("New Space", isPresented: $showNewSpaceAlert) {
+            TextField("Space name", text: $newSpaceName)
+            Button("Create") {
+                let name = newSpaceName.trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty else { return }
+                commitNewSpace(name: name)
+            }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 
     // MARK: - Tab Content
@@ -232,6 +243,7 @@ struct MainView: View {
             onDeleteItem: { item in appState.itemToDelete = item },
             onAssignToSpace: handleAssignToSpace,
             onLoadContent: loadContent,
+            onCreateSpace: createSpace,
             addImagesMenu: addImagesMenu
         )
     }
@@ -284,6 +296,26 @@ struct MainView: View {
         appState.sourceRect = rect
         appState.thumbnailImage = thumb
         appState.showOverlay = true
+    }
+
+    // MARK: - Space Creation
+
+    private func createSpace() {
+        newSpaceName = ""
+        showNewSpaceAlert = true
+    }
+
+    private func commitNewSpace(name: String) {
+        let space = Space(name: name, order: spaces.count)
+        modelContext.insert(space)
+        modelContext.saveOrLog()
+
+        if let rootURL = fileSystem.rootURL {
+            let allSpaces = (try? modelContext.fetch(FetchDescriptor<Space>(sortBy: [SortDescriptor(\.order)]))) ?? []
+            SidecarWriteService.writeSpaces(allSpaces, rootURL: rootURL)
+        }
+
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     // MARK: - Space Assignment

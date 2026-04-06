@@ -12,6 +12,7 @@ struct SpacesTab<AddMenu: View>: View {
     let onDeleteItem: (MediaItem) -> Void
     let onAssignToSpace: (String, String?) -> Void
     let onLoadContent: () async -> Void
+    let onCreateSpace: () -> Void
     let addImagesMenu: AddMenu
 
     private let columns = [
@@ -26,7 +27,7 @@ struct SpacesTab<AddMenu: View>: View {
                     .ignoresSafeArea()
 
                 if spaces.isEmpty {
-                    PlaceholderView(icon: "folder", title: "No spaces yet", subtitle: "Spaces are created in the Mac app")
+                    PlaceholderView(icon: "folder", title: "No spaces yet", subtitle: "Tap + to create a space")
                 } else {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 20) {
@@ -50,7 +51,9 @@ struct SpacesTab<AddMenu: View>: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    addImagesMenu
+                    Button(action: onCreateSpace) {
+                        Image(systemName: "plus")
+                    }
                 }
             }
             .toolbarColorScheme(.dark, for: .navigationBar)
