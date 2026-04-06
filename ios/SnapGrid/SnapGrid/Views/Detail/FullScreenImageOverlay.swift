@@ -54,6 +54,31 @@ private enum DeleteAnimation {
     static let crushedScaleX: CGFloat = 0.0     // fully collapsed
 }
 
+/// Conditionally applies the delete-animation mask only when active.
+/// Skipping `.mask {}` entirely when `deleteStage == 0` avoids an
+/// unnecessary offscreen compositing pass on every frame.
+private struct DeleteMaskModifier: ViewModifier {
+    let deleteStage: Int
+    let finalFrame: CGRect
+    let zoomScale: CGFloat
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        if deleteStage >= 1 {
+            content.mask {
+                let maskH = finalFrame.height * DeleteAnimation.crushedScaleY
+                let maskW = deleteStage >= 2
+                    ? finalFrame.width * DeleteAnimation.crushedScaleX
+                    : finalFrame.width * zoomScale
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .frame(width: maskW, height: maskH)
+            }
+        } else {
+            content
+        }
+    }
+}
+
 // MARK: - Stage Reveal Modifier
 
 extension View {
@@ -245,10 +270,14 @@ struct FullScreenImageOverlay: View {
         return zoomPanOffset
     }
 
-    /// Hard clamp — used as the snap-back target on gesture end
+    /// Hard clamp — used as the snap-back target on gesture end.
+    /// Overload without `finalFrame` recomputes it (convenience for gesture handlers).
     private func clampedZoomPanOffset(_ offset: CGSize) -> CGSize {
+        clampedZoomPanOffset(offset, finalFrame: computeFinalFrame(for: item))
+    }
+
+    private func clampedZoomPanOffset(_ offset: CGSize, finalFrame: CGRect) -> CGSize {
         guard zoomScale > minZoomScale else { return .zero }
-        let finalFrame = computeFinalFrame(for: item)
         let screen = UIScreen.main.bounds
         let maxOffsetX = max(0, (finalFrame.width * zoomScale - screen.width) / 2)
         let maxOffsetY = max(0, (finalFrame.height * zoomScale - screen.height) / 2)
@@ -258,10 +287,14 @@ struct FullScreenImageOverlay: View {
         )
     }
 
-    /// Rubber-band — allows overstretch with logarithmic resistance during live gesture
+    /// Rubber-band — allows overstretch with logarithmic resistance during live gesture.
+    /// Overload without `finalFrame` recomputes it (convenience for gesture handlers).
     private func rubberBandZoomPanOffset(_ offset: CGSize) -> CGSize {
+        rubberBandZoomPanOffset(offset, finalFrame: computeFinalFrame(for: item))
+    }
+
+    private func rubberBandZoomPanOffset(_ offset: CGSize, finalFrame: CGRect) -> CGSize {
         guard zoomScale > minZoomScale else { return .zero }
-        let finalFrame = computeFinalFrame(for: item)
         let screen = UIScreen.main.bounds
         let maxOffsetX = max(0, (finalFrame.width * zoomScale - screen.width) / 2)
         let maxOffsetY = max(0, (finalFrame.height * zoomScale - screen.height) / 2)
@@ -291,6 +324,9 @@ struct FullScreenImageOverlay: View {
 
     private var blurOpacity: Double {
         if !isExpanded { return 0 }
+        // During active dismiss gesture, hide material blur entirely to avoid
+        // per-frame recompositing of the expensive .ultraThinMaterial effect.
+        if gestureDrag.active && gestureMode == .dismiss { return 0 }
         let dragProgress = min(abs(effectiveDismissOffset) / 80.0, 1.0)
         return 1.0 - dragProgress
     }
@@ -417,6 +453,9 @@ struct FullScreenImageOverlay: View {
                         .aspectRatio(contentMode: .fill)
                         .frame(width: finalFrame.width * zoomScale, height: finalFrame.height * zoomScale)
                         .clipped()
+                        // Rasterize static images into a Metal texture so
+                        // offset/scale/opacity are trivial GPU ops.
+                        .drawingGroup(opaque: false)
                 } else {
                     Rectangle()
                         .fill(Color.snapDarkMuted)
@@ -428,17 +467,14 @@ struct FullScreenImageOverlay: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: zoomedCornerRadius))
-            // Delete animation — wallet card crush (mask approach)
-            .mask {
-                let maskH = deleteStage >= 1
-                    ? finalFrame.height * DeleteAnimation.crushedScaleY
-                    : finalFrame.height * zoomScale
-                let maskW = deleteStage >= 2
-                    ? finalFrame.width * DeleteAnimation.crushedScaleX
-                    : finalFrame.width * zoomScale
-                RoundedRectangle(cornerRadius: zoomedCornerRadius)
-                    .frame(width: maskW, height: maskH)
-            }
+            // Delete animation — wallet card crush (mask only when active;
+            // skipping the mask modifier entirely avoids an offscreen compositing pass)
+            .modifier(DeleteMaskModifier(
+                deleteStage: deleteStage,
+                finalFrame: finalFrame,
+                zoomScale: zoomScale,
+                cornerRadius: zoomedCornerRadius
+            ))
             .offset(effectiveZoomPanOffset)
             .opacity(deleteStage >= 2 ? 0 : 1)
             .position(x: finalFrame.midX, y: finalFrame.midY)
@@ -482,7 +518,11 @@ struct FullScreenImageOverlay: View {
                     handleDoubleTap(at: value.location)
                 }
         )
-        .onPreferenceChange(MetadataHeightKey.self) { metadataHeight = $0 }
+        .onPreferenceChange(MetadataHeightKey.self) { newHeight in
+            // Skip preference updates during dismiss to avoid extra layout passes
+            guard !(gestureDrag.active && gestureMode == .dismiss) else { return }
+            metadataHeight = newHeight
+        }
         .onChange(of: metadataHeight) { oldHeight, newHeight in
             if contentOffset > 0 && newHeight > oldHeight {
                 withAnimation(SnapSpring.resolvedMetadata) {
