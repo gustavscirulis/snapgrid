@@ -3,13 +3,6 @@ import SwiftData
 import AppKit
 import UniformTypeIdentifiers
 
-private struct TabBarHeightKey: PreferenceKey {
-    nonisolated static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \MediaItem.createdAt, order: .reverse) private var allItems: [MediaItem]
@@ -29,10 +22,6 @@ struct ContentView: View {
     @State private var searchScores: [String: Double] = [:]
     @State private var isSearchActive = false
     @State private var isSearchFieldPresented = false
-    /// Page indices that should render full content (expands during carousel transitions).
-    @State private var livePages: Set<Int> = [0]
-    @State private var livePagesCleanupTask: Task<Void, Never>?
-    @State private var tabBarHeight: CGFloat = 0
 
     #if DEBUG
     @AppStorage("debugSimulateEmptyState") private var debugSimulateEmptyState = false
@@ -71,156 +60,126 @@ struct ContentView: View {
         itemsForSpace(appState.activeSpaceId)
     }
 
-    private var activeIndex: Int {
-        spaceIndex(for: appState.activeSpaceId)
+    private var detailItemTitle: String? {
+        guard let detailId = appState.detailItem,
+              let item = allItems.first(where: { $0.id == detailId }) else { return nil }
+        return item.analysisResult?.imageSummary
     }
 
     var body: some View {
-        ZStack {
-            Color.snapBackground.ignoresSafeArea()
+        NavigationSplitView {
+            SpaceSidebarView(
+                spaces: spaces,
+                selection: $appState.sidebarSelection,
+                pendingEditSpaceId: $pendingEditSpaceId,
+                onCreateSpace: createSpace,
+                onDeleteSpace: deleteSpace,
+                onRenameSpace: renameSpace,
+                onReorderSpaces: reorderSpaces,
+                onAssignToSpace: assignToSpace
+            )
+        } detail: {
+            ZStack {
+                detailContent
+                    .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
+                        if appState.isDraggingFromApp { return false }
+                        handleDrop(providers)
+                        return true
+                    }
 
-            ZStack(alignment: .top) {
-                // Main content — horizontal carousel of space pages
-                // File-import .onDrop is scoped here (not the whole window) so it
-                // doesn't steal drags from SpaceTabBar's .onDrop for space assignment.
-                Group {
-                    if allItems.isEmpty || debugSimulateEmptyState {
-                        EmptyStateView(isDragTargeted: isDragTargeted)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        GeometryReader { geo in
-                            let pageWidth = geo.size.width
-                            let pageHeight = geo.size.height
-
-                            HStack(spacing: 0) {
-                                // "All" page (index 0)
-                                spacePageView(spaceId: nil, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: 0)
-
-                                // Per-space pages (index 1+)
-                                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
-                                    spacePageView(spaceId: space.id, pageWidth: pageWidth, pageHeight: pageHeight, pageIndex: index + 1)
-                                }
-                            }
-                            .offset(x: -CGFloat(activeIndex) * pageWidth)
-                        }
-                        .clipped()
+                // Detail overlay — hero animation from thumbnail to full-screen view
+                if let detailId = appState.detailItem,
+                   let sourceFrame = appState.detailSourceFrame {
+                    let overlayItems = activeFilteredItems.contains(where: { $0.id == detailId })
+                        ? activeFilteredItems : allItems
+                    if let startIndex = overlayItems.firstIndex(where: { $0.id == detailId }) {
+                    HeroDetailOverlay(
+                        items: overlayItems,
+                        startIndex: startIndex,
+                        sourceFrame: sourceFrame,
+                        onAnimationComplete: {
+                            appState.detailItem = nil
+                            appState.detailSourceFrame = nil
+                        },
+                        onCurrentItemChanged: { newId in
+                            appState.detailItem = newId
+                        },
+                        onShare: { id, frame in
+                            shareItems(Set([id]), sourceFrame: frame)
+                        },
+                        onRedoAnalysis: { id in
+                            retryAnalysis(Set([id]))
+                        },
+                        onDelete: { id in
+                            deleteItems(Set([id]))
+                        },
+                        onAssignToSpace: { id, spaceId in
+                            assignToSpace(itemIds: Set([id]), spaceId: spaceId)
+                        },
+                        spaces: spaces,
+                        activeSpaceId: appState.activeSpaceId
+                    )
                     }
                 }
-                .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
-                    if appState.isDraggingFromApp { return false }
-                    handleDrop(providers)
-                    return true
-                }
 
-                // Space tab bar — frosted glass overlay
-                SpaceTabBar(
-                    spaces: spaces,
-                    activeSpaceId: appState.activeSpaceId,
-                    pendingEditSpaceId: $pendingEditSpaceId,
-                    onSelectSpace: switchToSpace,
-                    onCreateSpace: createSpace,
-                    onDeleteSpace: deleteSpace,
-                    onRenameSpace: renameSpace,
-                    onReorderSpaces: reorderSpaces,
-                    onAssignToSpace: assignToSpace
-                )
-                .padding(.top, 8)
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(
-                            key: TabBarHeightKey.self,
-                            value: geo.size.height
-                        )
+                // Floating video layer — ONE AVPlayerLayer that moves between grid and detail.
+                FloatingVideoLayer()
+
+                // Selection badge
+                if !appState.selectedIds.isEmpty {
+                    VStack {
+                        Spacer()
+                        SelectionBadge(count: appState.selectedIds.count)
+                            .padding(.bottom, 24)
                     }
-                )
-                .onPreferenceChange(TabBarHeightKey.self) { height in
-                    tabBarHeight = height
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(SnapSpring.standard, value: appState.selectedIds.isEmpty)
                 }
-                .background {
-                    ZStack {
-                        Color.snapBackground.opacity(0.8)
-                        Rectangle()
-                            .fill(.ultraThinMaterial)
-                    }
-                    .ignoresSafeArea(edges: .top)
+
+                // Toast notifications
+                ToastOverlay(toasts: appState.toasts)
+
+                // Drag overlay — only for external drags (Finder, browser, etc.)
+                if isDragTargeted && !appState.isDraggingFromApp {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.snapAccent, lineWidth: 3)
+                        .background(Color.snapAccent.opacity(0.1))
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
                 }
-            }
-
-            // Detail overlay — hero animation from thumbnail to centered view
-            // Existence check uses allItems so search changes can't remove the overlay.
-            // Navigation uses activeFilteredItems when the item is in the set, else allItems.
-            if let detailId = appState.detailItem,
-               let sourceFrame = appState.detailSourceFrame {
-                let overlayItems = activeFilteredItems.contains(where: { $0.id == detailId })
-                    ? activeFilteredItems : allItems
-                if let startIndex = overlayItems.firstIndex(where: { $0.id == detailId }) {
-                HeroDetailOverlay(
-                    items: overlayItems,
-                    startIndex: startIndex,
-                    sourceFrame: sourceFrame,
-                    onAnimationComplete: {
-                        appState.detailItem = nil
-                        appState.detailSourceFrame = nil
-                    },
-                    onCurrentItemChanged: { newId in
-                        appState.detailItem = newId
-                    },
-                    onShare: { id, frame in
-                        shareItems(Set([id]), sourceFrame: frame)
-                    },
-                    onRedoAnalysis: { id in
-                        retryAnalysis(Set([id]))
-                    },
-                    onDelete: { id in
-                        deleteItems(Set([id]))
-                    },
-                    onAssignToSpace: { id, spaceId in
-                        assignToSpace(itemIds: Set([id]), spaceId: spaceId)
-                    },
-                    spaces: spaces,
-                    activeSpaceId: appState.activeSpaceId
-                )
-                }
-            }
-
-            // Floating video layer — ONE AVPlayerLayer that moves between grid and detail.
-            // Placed after HeroDetailOverlay so it renders above the backdrop.
-            FloatingVideoLayer()
-
-            // Selection badge
-            if !appState.selectedIds.isEmpty {
-                VStack {
-                    Spacer()
-                    SelectionBadge(count: appState.selectedIds.count)
-                        .padding(.bottom, 24)
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(SnapSpring.standard, value: appState.selectedIds.isEmpty)
-            }
-
-            // Toast notifications
-            ToastOverlay(toasts: appState.toasts)
-
-            // Drag overlay — only for external drags (Finder, browser, etc.)
-            if isDragTargeted && !appState.isDraggingFromApp {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.snapAccent, lineWidth: 3)
-                    .background(Color.snapAccent.opacity(0.1))
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
             }
         }
-        .frame(minWidth: 540, minHeight: 400)
+        .frame(minWidth: 720, minHeight: 400)
+        .navigationTitle(detailItemTitle ?? "SnapGrid")
         .searchable(text: $appState.searchText, isPresented: $isSearchFieldPresented, placement: .toolbar, prompt: "Search patterns, descriptions...")
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                Spacer()
+            if appState.detailItem != nil {
+                ToolbarItem(placement: .navigation) {
+                    Button {
+                        NotificationCenter.default.post(name: .closeDetail, object: nil)
+                    } label: {
+                        Label("Back", systemImage: "chevron.left")
+                    }
+                }
+            }
+            if let detailId = appState.detailItem {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        if let window = NSApp.keyWindow {
+                            let frame = CGRect(
+                                x: window.frame.width - 100,
+                                y: window.frame.height - 50,
+                                width: 40, height: 40
+                            )
+                            shareItems(Set([detailId]), sourceFrame: frame)
+                        }
+                    } label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                }
             }
         }
-        .toolbarBackground(.hidden, for: .windowToolbar)
-        // Note: .onDrop for file imports is on the content area Group above,
-        // NOT here on the outer ZStack — so it doesn't steal drags from SpaceTabBar.
         .onChange(of: isDragTargeted) { _, targeted in
             if !targeted {
                 appState.isDraggingFromApp = false
@@ -334,17 +293,12 @@ struct ContentView: View {
         }
         .task {
             // Re-sync when app regains focus (picks up iCloud changes from other devices).
-            // Uses resyncFromDisk() which clears cached state and does a full disk comparison,
-            // because DispatchSource doesn't reliably fire for iCloud-synced file changes.
             for await _ in NotificationCenter.default.notifications(named: NSApplication.didBecomeActiveNotification) {
                 await syncWatcher.resyncFromDisk()
-                // Analyze any new items that arrived without AI analysis
                 await importService.analyzeUnanalyzedItems(from: allItems, context: modelContext)
             }
         }
         .onChange(of: allItems.count) { _, _ in
-            // Debounce index rebuild — during batch imports, count can change many times rapidly.
-            // The 500ms delay coalesces these into a single rebuild.
             indexRebuildTask?.cancel()
             indexRebuildTask = Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(500))
@@ -374,8 +328,6 @@ struct ContentView: View {
         }
         .onExitCommand {
             if appState.detailItem != nil {
-                // Fallback: overlay normally handles its own close via focus +
-                // .onExitCommand. If focus is lost, dismiss immediately.
                 appState.detailItem = nil
                 appState.detailSourceFrame = nil
             } else if !appState.selectedIds.isEmpty {
@@ -397,90 +349,59 @@ struct ContentView: View {
         .environment(importService)
     }
 
+    // MARK: - Detail Content
+
+    @ViewBuilder
+    private var detailContent: some View {
+        let items = activeFilteredItems
+        if allItems.isEmpty || debugSimulateEmptyState {
+            EmptyStateView(isDragTargeted: isDragTargeted)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if items.isEmpty && isSearchActive {
+            VStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 32, weight: .light))
+                    .foregroundStyle(.secondary)
+                Text("No results found")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if items.isEmpty && appState.activeSpaceId != nil {
+            EmptyStateView(mode: .spaceLevel, isDragTargeted: isDragTargeted)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            MasonryGridView(
+                items: items,
+                thumbnailSize: appState.thumbnailSize,
+                spaces: spaces,
+                activeSpaceId: appState.activeSpaceId,
+                hiddenItemId: appState.detailItem,
+                onSelect: { id, frame in
+                    appState.detailSourceFrame = frame
+                    appState.detailItem = id
+                },
+                onToggleSelect: { id in appState.toggleSelection(id) },
+                onShiftSelect: { id in
+                    appState.rangeSelect(
+                        targetId: id,
+                        orderedIds: items.map(\.id)
+                    )
+                },
+                onDelete: deleteItems,
+                onAssignToSpace: assignToSpace,
+                onRetryAnalysis: retryAnalysis,
+                onShare: { ids, frame in shareItems(ids, sourceFrame: frame) },
+                onSetSelection: { ids in appState.selectedIds = ids },
+                coordinateSpaceName: "gridContent"
+            )
+        }
+    }
+
     // MARK: - Space Navigation
 
     private func switchToSpace(_ newId: String?) {
-        let newIndex = spaceIndex(for: newId)
-
-        livePagesCleanupTask?.cancel()
-
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            appState.activeSpaceId = newId
-            livePages = [newIndex]
-            return
-        }
-
-        let oldIndex = activeIndex
-        let range = min(oldIndex, newIndex)...max(oldIndex, newIndex)
-        livePages = livePages.union(Set(range))
-
-        withAnimation(SnapSpring.standard) {
-            appState.activeSpaceId = newId
-        }
-
-        livePagesCleanupTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(400))
-            guard !Task.isCancelled else { return }
-            livePages = [newIndex]
-        }
-    }
-
-    private func spaceIndex(for id: String?) -> Int {
-        guard let id else { return 0 }
-        return (spaces.firstIndex(where: { $0.id == id }) ?? -1) + 1
-    }
-
-    @ViewBuilder
-    private func spacePageView(spaceId: String?, pageWidth: CGFloat, pageHeight: CGFloat, pageIndex: Int) -> some View {
-        // Only build the full grid for the active page — non-visible pages are
-        // cheap placeholders, avoiding wasted filter/sort/layout work.
-        Color.clear
-            .frame(width: pageWidth, height: pageHeight)
-            .overlay {
-                if livePages.contains(pageIndex) || pageIndex == activeIndex {
-                    let items = itemsForSpace(spaceId)
-                    if items.isEmpty && isSearchActive {
-                        VStack(spacing: 12) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 32, weight: .light))
-                                .foregroundStyle(.secondary)
-                            Text("No results found")
-                                .font(.headline)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if items.isEmpty && spaceId != nil {
-                        EmptyStateView(mode: .spaceLevel, isDragTargeted: isDragTargeted)
-                    } else {
-                        MasonryGridView(
-                            items: items,
-                            thumbnailSize: appState.thumbnailSize,
-                            spaces: spaces,
-                            activeSpaceId: spaceId,
-                            hiddenItemId: appState.detailItem,
-                            onSelect: { id, frame in
-                                appState.detailSourceFrame = frame
-                                appState.detailItem = id
-                            },
-                            onToggleSelect: { id in appState.toggleSelection(id) },
-                            onShiftSelect: { id in
-                                appState.rangeSelect(
-                                    targetId: id,
-                                    orderedIds: items.map(\.id)
-                                )
-                            },
-                            onDelete: deleteItems,
-                            onAssignToSpace: assignToSpace,
-                            onRetryAnalysis: retryAnalysis,
-                            onShare: { ids, frame in shareItems(ids, sourceFrame: frame) },
-                            onSetSelection: { ids in appState.selectedIds = ids },
-                            coordinateSpaceName: "gridContent-\(spaceId ?? "all")",
-                            topInset: tabBarHeight
-                        )
-                    }
-                }
-            }
-            .clipped()
-            .allowsHitTesting(pageIndex == activeIndex)
+        appState.sidebarSelection = newId.map { .space($0) } ?? .all
     }
 
     // MARK: - Actions
@@ -502,8 +423,7 @@ struct ContentView: View {
                     if url.path.hasPrefix(storagePath) { continue }
                     urls.append(url)
                 }
-                // Fall back to image data (browser drags) — uses NSItemProviderReading
-                // to handle any image format the provider offers
+                // Fall back to image data (browser drags)
                 else if provider.canLoadObject(ofClass: NSImage.self),
                         let image = try? await loadImageFromProvider(provider) {
                     images.append(image)
@@ -660,18 +580,15 @@ struct ContentView: View {
                 commitDeletion(ids)
             }
         } else {
-            // Stage 1 — height crushes inward
             withAnimation(CardCrush.heightCrush) {
                 for id in ids { appState.deletingItemStages[id] = 1 }
             }
             Task { @MainActor in
-                // Stage 2 — width collapses + fade out
                 try? await Task.sleep(for: CardCrush.widthDelay)
                 withAnimation(CardCrush.widthCrush) {
                     for id in ids { appState.deletingItemStages[id] = 2 }
                 }
 
-                // Crush complete — commit deletion
                 try? await Task.sleep(for: CardCrush.completeDelay)
                 commitDeletion(ids)
             }
@@ -679,7 +596,6 @@ struct ContentView: View {
     }
 
     private func commitDeletion(_ ids: Set<String>) {
-        // Guard: if undo already removed these from the stage dictionary, skip
         guard ids.contains(where: { appState.deletingItemStages[$0] != nil }) else { return }
 
         let items = allItems.filter { ids.contains($0.id) }
@@ -700,9 +616,6 @@ struct ContentView: View {
         }
         syncWatcher.endLocalChange()
 
-        // Clean up animation state after SwiftUI finishes removing views.
-        // If cleaned up immediately, deleteStage snaps to 0 and the crushed
-        // item briefly flashes at full size during the removal transition.
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(500))
             for id in ids { appState.deletingItemStages.removeValue(forKey: id) }
@@ -777,9 +690,7 @@ struct ContentView: View {
         guard let space = spaces.first(where: { $0.id == id }) else { return }
 
         if appState.activeSpaceId == id {
-            appState.activeSpaceId = nil
-            livePagesCleanupTask?.cancel()
-            livePages = [0]
+            appState.sidebarSelection = .all
         }
 
         syncWatcher.beginLocalChange()
@@ -818,7 +729,6 @@ struct ContentView: View {
         modelContext.saveOrLog()
         MetadataSidecarService.shared.writeSpaces(Array(spaces))
         syncWatcher.endLocalChange()
-        livePages = [activeIndex]
     }
 
     private func assignToSpace(itemIds: Set<String>, spaceId: String?) {
@@ -849,9 +759,7 @@ struct ContentView: View {
         appState.detailItem = nil
         appState.detailSourceFrame = nil
         appState.clearSelection()
-        appState.activeSpaceId = nil
-        livePagesCleanupTask?.cancel()
-        livePages = [0]
+        appState.sidebarSelection = .all
     }
 
     private func retryAnalysis(_ ids: Set<String>) {
@@ -875,7 +783,6 @@ struct ContentView: View {
             .filter { FileManager.default.fileExists(atPath: $0.path) }
         guard !urls.isEmpty else { return }
 
-        // Copy to temp directory so macOS shows "Send Copy" only (no Collaborate option)
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("SnapGridShare")
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         let tempURLs = urls.compactMap { url -> URL? in

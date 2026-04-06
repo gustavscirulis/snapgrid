@@ -13,7 +13,6 @@
 		08DAE144678E84619184D186 /* SearchIndexServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD33117D036F9A35077E816E /* SearchIndexServiceTests.swift */; };
 		0984FED968C13F2B84A806E4 /* MediaStorageTrashIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 154421619E235B15774FC870 /* MediaStorageTrashIntegrationTests.swift */; };
 		0BD6F0F6397C8D6CC98DDFFF /* SyncWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2537EC9D8AD50664BBA121ED /* SyncWatcher.swift */; };
-		0FB79B182FF2453212D42811 /* SpaceTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4091FEF7AEC687AE2DA55B3D /* SpaceTabBar.swift */; };
 		129E975D0AF5F70B0787E1BD /* TwitterVideoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF21DEE8F950B7304A8AA40F /* TwitterVideoService.swift */; };
 		192D309E68A98BCF62C992B6 /* DragThumbnailPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA997027ED4E74CD029CFE3C /* DragThumbnailPreview.swift */; };
 		1CFEA1CEC2CBB74D84C06198 /* ElectronImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A780431387DF4691E028B5 /* ElectronImportServiceTests.swift */; };
@@ -31,6 +30,7 @@
 		439744C29794B39D02563DE6 /* ModelDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9391B9A3F7CE5C394F263B9C /* ModelDiscoveryService.swift */; };
 		449F5BB345A623FFD1B668BB /* ModelDiscoveryScoringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F583D33C78C0944D437A1356 /* ModelDiscoveryScoringTests.swift */; };
 		45D276D4D94785E34DC0F0C4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A8584DB6A15E23CD509BC39 /* Assets.xcassets */; };
+		45E1AAE8DB57B9F1B1E02F58 /* SpaceSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A85F7B01B695649752ABBABE /* SpaceSidebarView.swift */; };
 		4E543C777A373E119A51B5BF /* SearchIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E244B99363F87095BFEC203E /* SearchIndexService.swift */; };
 		52559E4B91F49A6CEDD07719 /* SnapGridApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0777D2662B06A89DA07B35C3 /* SnapGridApp.swift */; };
 		572A0BCDDD41A4C5E4D7B75E /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68305A61078FFD8F1E7C722F /* FlowLayout.swift */; };
@@ -113,7 +113,6 @@
 		3A7AD2552C0E5EF0A3708956 /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
 		3BA6AB7DC0A84E670681EB6C /* MediaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItem.swift; sourceTree = "<group>"; };
 		3CE5033083DAF80AD07ABC32 /* NSImage+Thumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSImage+Thumbnail.swift"; sourceTree = "<group>"; };
-		4091FEF7AEC687AE2DA55B3D /* SpaceTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceTabBar.swift; sourceTree = "<group>"; };
 		468F744BF11C8965B74EF95F /* AnimationTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationTokens.swift; sourceTree = "<group>"; };
 		47A1525A6C63DFE52779E656 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		4945D23305D50B9C7D0873C9 /* GridItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridItemView.swift; sourceTree = "<group>"; };
@@ -147,6 +146,7 @@
 		9DB5BFB2BC5A94B434803361 /* ElectronImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElectronImportView.swift; sourceTree = "<group>"; };
 		9DF384E9543E7A79145F99F8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A2D061099D3271418E045006 /* SnapGridTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SnapGridTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A85F7B01B695649752ABBABE /* SpaceSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceSidebarView.swift; sourceTree = "<group>"; };
 		A89F00709738612D0D756F5B /* ErrorDescriptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorDescriptionTests.swift; sourceTree = "<group>"; };
 		AAF0B485D040D2E5532516AE /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
 		AB0EEC1133F2A0A3770E116D /* DeveloperSettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperSettingsTab.swift; sourceTree = "<group>"; };
@@ -200,7 +200,7 @@
 		13C800D7951450CF02E86C36 /* Spaces */ = {
 			isa = PBXGroup;
 			children = (
-				4091FEF7AEC687AE2DA55B3D /* SpaceTabBar.swift */,
+				A85F7B01B695649752ABBABE /* SpaceSidebarView.swift */,
 			);
 			path = Spaces;
 			sourceTree = "<group>";
@@ -516,7 +516,7 @@
 				D016DE668FB1A40FFB11BD0D /* SettingsView.swift in Sources */,
 				52559E4B91F49A6CEDD07719 /* SnapGridApp.swift in Sources */,
 				8350DC604AC401431E9CD255 /* Space.swift in Sources */,
-				0FB79B182FF2453212D42811 /* SpaceTabBar.swift in Sources */,
+				45E1AAE8DB57B9F1B1E02F58 /* SpaceSidebarView.swift in Sources */,
 				FA711149840B9BFF157A8239 /* StorageSettingsTab.swift in Sources */,
 				67C13EA251A2A6E0FBDD4FC0 /* SupportedMedia.swift in Sources */,
 				0BD6F0F6397C8D6CC98DDFFF /* SyncWatcher.swift in Sources */,
