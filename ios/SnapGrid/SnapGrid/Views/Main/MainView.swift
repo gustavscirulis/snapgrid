@@ -1,51 +1,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Preference key for continuous TabView scroll tracking
-
-private struct PageOffsetData: Equatable {
-    let pageIndex: Int
-    let minX: CGFloat
-}
-
-private struct PageOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: PageOffsetData? = nil
-    static func reduce(value: inout PageOffsetData?, nextValue: () -> PageOffsetData?) {
-        value = nextValue() ?? value
-    }
-}
-
-private struct PageOffsetReporter: View {
-    let pageIndex: Int
-
-    var body: some View {
-        GeometryReader { geo in
-            Color.clear
-                .preference(
-                    key: PageOffsetPreferenceKey.self,
-                    value: PageOffsetData(
-                        pageIndex: pageIndex,
-                        minX: geo.frame(in: .named("pagerContainer")).minX
-                    )
-                )
-        }
-    }
-}
-
-private struct CloseSearchButton: View {
-    @Environment(\.dismissSearch) private var dismissSearch
-    @Binding var searchText: String
-
-    var body: some View {
-        Button {
-            searchText = ""
-            dismissSearch()
-        } label: {
-            Label("Close Search", systemImage: "xmark")
-        }
-    }
-}
-
 struct MainView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
     @EnvironmentObject var keySyncService: KeySyncService
@@ -58,7 +13,6 @@ struct MainView: View {
     @State private var isLoading = true
     @State private var error: String?
     @State private var hasAttemptedRescan = false
-    @State private var tabScrollProgress: CGFloat = 0
     @State private var prefetchTask: Task<Void, Never>?
     @State private var syncService = SyncService()
     @State private var searchService = SearchIndexService()
@@ -66,49 +20,32 @@ struct MainView: View {
     @State private var debounceTask: Task<Void, Never>?
     @State private var indexRebuildTask: Task<Void, Never>?
 
-    // MARK: - Index ↔ activeSpaceId bridging
-
-    private var activeIndex: Int {
-        guard let id = appState.activeSpaceId else { return 0 }
-        return (spaces.firstIndex { $0.id == id } ?? -1) + 1
-    }
-
-    /// Only build grids for the active page ±1 (visible during swipe transitions).
-    private func isPageNearActive(_ pageIndex: Int) -> Bool {
-        abs(pageIndex - activeIndex) <= 1
-    }
-
     // MARK: - Filtering
 
-    private func itemsForSpace(_ spaceId: String?) -> [MediaItem] {
-        var items: [MediaItem]
-        if let spaceId {
-            items = allItems.filter { $0.space?.id == spaceId }
-        } else {
-            items = Array(allItems)
-        }
-
-        guard appState.isSearchActive else { return items }
-
+    private var searchResultItems: [MediaItem] {
         let scores = appState.searchScores
-        guard !scores.isEmpty else {
-            let query = appState.searchText.lowercased().trimmingCharacters(in: .whitespaces)
-            if query == "vid" { return items.filter { $0.isVideo } }
-            if query == "img" { return items.filter { !$0.isVideo } }
-            return []
-        }
+        let query = appState.searchText.lowercased().trimmingCharacters(in: .whitespaces)
 
-        return items
+        guard !query.isEmpty else { return [] }
+
+        if query == "vid" { return allItems.filter { $0.isVideo } }
+        if query == "img" { return allItems.filter { !$0.isVideo } }
+
+        guard !scores.isEmpty else { return [] }
+
+        return allItems
             .filter { scores[$0.id] != nil }
-            .sorted { a, b in
-                let scoreA = scores[a.id] ?? 0
-                let scoreB = scores[b.id] ?? 0
-                return scoreA > scoreB
-            }
+            .sorted { (scores[$0.id] ?? 0) > (scores[$1.id] ?? 0) }
     }
 
     private var currentVisibleItems: [MediaItem] {
-        itemsForSpace(appState.activeSpaceId)
+        if appState.selectedTab == .search || !appState.searchText.isEmpty {
+            return searchResultItems
+        }
+        if let spaceId = appState.activeSpaceId {
+            return allItems.filter { $0.space?.id == spaceId }
+        }
+        return allItems
     }
 
     // MARK: - Body
@@ -117,127 +54,13 @@ struct MainView: View {
         GeometryReader { geo in
             let gridWidth = geo.size.width - 24
 
-            NavigationStack {
-                ZStack {
-                    Color.snapDarkBackground
-                        .ignoresSafeArea()
-
-                    if isLoading {
-                        ProgressView()
-                            .tint(.white.opacity(0.6))
-                    } else if let error {
-                        ErrorStateView(message: error) {
-                            await loadContent()
-                        }
-                    } else if allItems.isEmpty {
-                        EmptyStateView()
-                    } else if spaces.isEmpty {
-                        let items = itemsForSpace(nil)
-                        if items.isEmpty && appState.isSearchActive {
-                            SearchEmptyStateView()
-                        } else {
-                            masonryPage(items: items, gridWidth: gridWidth)
-                                .refreshable {
-                                    hasAttemptedRescan = false
-                                    await loadContent()
-                                }
-                        }
-                    } else {
-                        VStack(spacing: 0) {
-                            SpaceTabBar(
-                                spaces: spaces,
-                                activeSpaceId: $appState.activeSpaceId,
-                                scrollProgress: tabScrollProgress,
-                                onAssignToSpace: handleAssignToSpace
-                            )
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 0) {
-                                    // Only build grids for the active page and its
-                                    // immediate neighbors (visible during swipe).
-                                    // Off-screen pages skip itemsForSpace + layout work.
-                                    Group {
-                                        if isPageNearActive(0) {
-                                            let allPageItems = itemsForSpace(nil)
-                                            if allPageItems.isEmpty && appState.isSearchActive {
-                                                SearchEmptyStateView()
-                                            } else {
-                                                masonryPage(items: allPageItems, gridWidth: gridWidth, topPadding: true)
-                                                    .refreshable { await loadContent() }
-                                            }
-                                        } else {
-                                            Color.clear
-                                        }
-                                    }
-                                    .containerRelativeFrame(.horizontal)
-                                    .id(0)
-                                    .background(PageOffsetReporter(pageIndex: 0))
-
-                                    ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
-                                        Group {
-                                            if isPageNearActive(index + 1) {
-                                                let spaceItems = itemsForSpace(space.id)
-                                                if spaceItems.isEmpty && appState.isSearchActive {
-                                                    SearchEmptyStateView()
-                                                } else {
-                                                    masonryPage(items: spaceItems, gridWidth: gridWidth, topPadding: true, onRemoveFromSpace: handleRemoveFromSpace)
-                                                        .refreshable { await loadContent() }
-                                                }
-                                            } else {
-                                                Color.clear
-                                            }
-                                        }
-                                        .containerRelativeFrame(.horizontal)
-                                        .id(index + 1)
-                                        .background(PageOffsetReporter(pageIndex: index + 1))
-                                    }
-                                }
-                                .scrollTargetLayout()
-                            }
-                            .scrollTargetBehavior(.paging)
-                            .scrollPosition(id: $appState.currentPage)
-                            .coordinateSpace(name: "pagerContainer")
-                            .onPreferenceChange(PageOffsetPreferenceKey.self) { data in
-                                guard let data = data else { return }
-                                let containerWidth = geo.size.width
-                                guard containerWidth > 0 else { return }
-                                let progress = CGFloat(data.pageIndex) - data.minX / containerWidth
-                                tabScrollProgress = min(max(progress, 0), CGFloat(spaces.count))
-                            }
-                        }
+            ZStack {
+                tabContent(gridWidth: gridWidth)
+                    .onPreferenceChange(GridItemRectsPreferenceKey.self) { rects in
+                        gridItemRects = rects
                     }
-                }
-                .ignoresSafeArea(edges: .bottom)
-                .navigationTitle("SnapGrid")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    if #available(iOS 26.0, *) {
-                        DefaultToolbarItem(kind: .search, placement: .bottomBar)
-                        ToolbarSpacer(.flexible, placement: .bottomBar)
-                        ToolbarItem(placement: .bottomBar) {
-                            if appState.isSearchActive {
-                                CloseSearchButton(searchText: $appState.searchText)
-                            } else {
-                                addImagesMenu
-                            }
-                        }
-                    } else {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            if appState.isSearchActive {
-                                CloseSearchButton(searchText: $appState.searchText)
-                            } else {
-                                addImagesMenu
-                            }
-                        }
-                    }
-                }
-                .toolbarColorScheme(.dark, for: .navigationBar)
-                .searchable(text: $appState.searchText, prompt: "Search patterns, context...")
-                .onPreferenceChange(GridItemRectsPreferenceKey.self) { rects in
-                    gridItemRects = rects
-                }
-            }
-            .overlay {
+
+                // Full-screen image overlay above everything
                 if appState.showOverlay, let startIndex = appState.selectedIndex {
                     FullScreenImageOverlay(
                         items: currentVisibleItems,
@@ -260,6 +83,7 @@ struct MainView: View {
                             }
                         },
                         onSearchPattern: { pattern in
+                            appState.selectedTab = .search
                             appState.searchText = pattern
                         },
                         onDelete: handleItemDeleted
@@ -274,10 +98,8 @@ struct MainView: View {
             debounceTask?.cancel()
             let trimmed = newValue.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty {
-                appState.isSearchActive = false
                 appState.searchScores = [:]
             } else {
-                appState.isSearchActive = true
                 debounceTask = Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(100))
                     guard !Task.isCancelled else { return }
@@ -295,7 +117,6 @@ struct MainView: View {
             }
         }
         .onChange(of: allItems.count) { _, _ in
-            // Debounce — during sync, count changes with each batch of 20 items saved
             indexRebuildTask?.cancel()
             indexRebuildTask = Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(500))
@@ -309,22 +130,6 @@ struct MainView: View {
                     ShareImportService.importPendingItems(to: rootURL)
                 }
                 Task { await loadContent() }
-            }
-        }
-        .onChange(of: appState.currentPage) { _, newPage in
-            let page = newPage ?? 0
-            if page == 0 {
-                appState.activeSpaceId = nil
-            } else if page > 0 && page <= spaces.count {
-                appState.activeSpaceId = spaces[page - 1].id
-            }
-        }
-        .onChange(of: appState.activeSpaceId) { _, _ in
-            let target = activeIndex
-            if appState.currentPage != target {
-                withAnimation(SnapSpring.resolvedStandard) {
-                    appState.currentPage = target
-                }
             }
         }
         .sheet(isPresented: $appState.showPhotosPicker) {
@@ -363,30 +168,90 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Masonry Page Helper
+    // MARK: - Tab Content
 
     @ViewBuilder
-    private func masonryPage(
-        items: [MediaItem],
-        gridWidth: CGFloat,
-        topPadding: Bool = false,
-        onRemoveFromSpace: ((MediaItem) -> Void)? = nil
-    ) -> some View {
-        ScrollView {
-            MasonryGrid(
-                items: items,
-                availableWidth: gridWidth,
-                selectedItemId: appState.showOverlay ? appState.selectedItemId : nil,
-                onItemSelected: handleItemSelected,
-                onRetryAnalysis: handleRetryAnalysis,
-                onShareItem: handleShareItem,
-                onRemoveFromSpace: onRemoveFromSpace,
-                onDeleteItem: { item in appState.itemToDelete = item }
-            )
-            .padding(.horizontal, 12)
-            .padding(.top, topPadding ? 12 : 0)
-            .padding(.bottom, 70)
+    private func tabContent(gridWidth: CGFloat) -> some View {
+        if #available(iOS 26, *) {
+            TabView {
+                Tab("All", systemImage: "square.grid.2x2") {
+                    allItemsContent(gridWidth: gridWidth)
+                }
+                Tab("Spaces", systemImage: "folder") {
+                    spacesContent(gridWidth: gridWidth)
+                }
+                Tab(role: .search) {
+                    searchContent(gridWidth: gridWidth)
+                }
+            }
+            .tint(.white)
+        } else {
+            TabView(selection: $appState.selectedTab) {
+                allItemsContent(gridWidth: gridWidth)
+                    .tabItem { Label("All", systemImage: "square.grid.2x2") }
+                    .tag(AppTab.all)
+                spacesContent(gridWidth: gridWidth)
+                    .tabItem { Label("Spaces", systemImage: "folder") }
+                    .tag(AppTab.spaces)
+            }
+            .tint(.white)
         }
+    }
+
+    @ViewBuilder
+    private func allItemsContent(gridWidth: CGFloat) -> some View {
+        AllItemsTab(
+            items: Array(allItems),
+            spaces: spaces,
+            gridWidth: gridWidth,
+            isLoading: isLoading,
+            error: error,
+            selectedItemId: appState.selectedItemId,
+            showOverlay: appState.showOverlay,
+            onItemSelected: handleItemSelected,
+            onRetryAnalysis: handleRetryAnalysis,
+            onShareItem: handleShareItem,
+            onDeleteItem: { item in appState.itemToDelete = item },
+            onAssignToSpace: handleAssignToSpace,
+            onLoadContent: loadContent,
+            addImagesMenu: addImagesMenu
+        )
+    }
+
+    @ViewBuilder
+    private func spacesContent(gridWidth: CGFloat) -> some View {
+        SpacesTab(
+            spaces: spaces,
+            allItems: allItems,
+            selectedItemId: appState.selectedItemId,
+            showOverlay: appState.showOverlay,
+            setActiveSpaceId: { appState.activeSpaceId = $0 },
+            onItemSelected: handleItemSelected,
+            onRetryAnalysis: handleRetryAnalysis,
+            onShareItem: handleShareItem,
+            onDeleteItem: { item in appState.itemToDelete = item },
+            onAssignToSpace: handleAssignToSpace,
+            onLoadContent: loadContent,
+            addImagesMenu: addImagesMenu
+        )
+    }
+
+    @ViewBuilder
+    private func searchContent(gridWidth: CGFloat) -> some View {
+        SearchResultsView(
+            items: searchResultItems,
+            spaces: spaces,
+            gridWidth: gridWidth,
+            selectedItemId: appState.selectedItemId,
+            showOverlay: appState.showOverlay,
+            searchText: $appState.searchText,
+            onDismiss: { appState.selectedTab = .all },
+            onItemSelected: handleItemSelected,
+            onRetryAnalysis: handleRetryAnalysis,
+            onShareItem: handleShareItem,
+            onDeleteItem: { item in appState.itemToDelete = item },
+            onAssignToSpace: handleAssignToSpace
+        )
     }
 
     // MARK: - Add Images Menu
@@ -421,23 +286,20 @@ struct MainView: View {
         appState.showOverlay = true
     }
 
-    // MARK: - Space Assignment (Drag & Drop)
+    // MARK: - Space Assignment
 
     private func handleAssignToSpace(itemId: String, spaceId: String?) {
         guard let item = allItems.first(where: { $0.id == itemId }) else { return }
 
-        // Skip if already in the target space
         let currentSpaceId = item.space?.id
         if currentSpaceId == spaceId { return }
 
-        // Update SwiftData
         let space: Space? = spaceId.flatMap { sid in
             spaces.first(where: { $0.id == sid })
         }
         item.space = space
         modelContext.saveOrLog()
 
-        // Persist to sidecar JSON for iCloud sync
         if let rootURL = fileSystem.rootURL {
             SidecarWriteService.writeSpaceId(for: item, rootURL: rootURL)
         }
@@ -472,18 +334,6 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Remove from Space
-
-    private func handleRemoveFromSpace(_ item: MediaItem) {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        item.space = nil
-        modelContext.saveOrLog()
-
-        if let rootURL = fileSystem.rootURL {
-            SidecarWriteService.writeSpaceId(for: item, rootURL: rootURL)
-        }
-    }
-
     // MARK: - Image Import
 
     private func handlePickedImages(_ images: [UIImage]) {
@@ -511,7 +361,6 @@ struct MainView: View {
         let isInitialLoad = isLoading
         error = nil
 
-        // Reset any isAnalyzing flags stuck from a previous crash/kill
         let stuckDescriptor = FetchDescriptor<MediaItem>(predicate: #Predicate { $0.isAnalyzing == true })
         if let stuck = try? modelContext.fetch(stuckDescriptor), !stuck.isEmpty {
             for item in stuck { item.isAnalyzing = false }
@@ -525,7 +374,6 @@ struct MainView: View {
             return
         }
 
-        // Clean up old trash (30+ days), matching Mac behavior
         if isInitialLoad {
             MediaDeleteService.emptyOldTrash(rootURL: rootURL)
         }
@@ -533,16 +381,13 @@ struct MainView: View {
         let skipped = await syncService.sync(rootURL: rootURL, context: modelContext)
         isLoading = false
 
-        // Build search index
         searchService.buildIndex(items: allItems)
 
-        // Prefetch thumbnails
         prefetchTask?.cancel()
         let screenWidth = UIScreen.main.bounds.width
         let columnWidth = (screenWidth - 24 - 8) / 2
         prefetchTask = ThumbnailCache.shared.prefetchThumbnails(for: allItems, targetPixelWidth: columnWidth * 2)
 
-        // Configure coordinator dependencies (idempotent — safe to call each sync)
         analysisCoordinator.configure(
             keySyncService: keySyncService,
             fileSystem: fileSystem,
@@ -550,10 +395,8 @@ struct MainView: View {
             searchService: searchService
         )
 
-        // Analyze unanalyzed items if API keys are available
         analysisCoordinator.analyzeUnanalyzed(allItems: allItems)
 
-        // Re-scan if some iCloud files were still downloading
         if skipped > 0 && !hasAttemptedRescan {
             hasAttemptedRescan = true
             print("[MainView] \(skipped) files pending iCloud download, will re-scan in 15s")

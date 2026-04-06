@@ -1,8 +1,15 @@
 import SwiftUI
 
+enum AppTab: Hashable {
+    case all
+    case spaces
+    case search
+}
+
 @Observable
 @MainActor
 final class AppState {
+    var selectedTab: AppTab = .all
     var selectedIndex: Int?
     var selectedItemId: String?
     var sourceRect: CGRect = .zero
@@ -10,9 +17,7 @@ final class AppState {
     var showOverlay = false
     var activeSpaceId: String? = nil
     var searchText = ""
-    var isSearchActive = false
     var searchScores: [String: Double] = [:]
-    var currentPage: Int? = 0
     var showPhotosPicker = false
     var showFilesPicker = false
     var isImporting = false
