@@ -52,8 +52,8 @@ struct AllItemsTab<AddMenu: View>: View {
                     }
                 }
             }
-            .navigationTitle("SnapGrid")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("All media")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     addImagesMenu
