@@ -6,9 +6,9 @@ import SwiftUI
 /// NSView subclass that owns a single AVPlayerLayer and keeps it sized
 /// to bounds on every layout pass. Uses .resizeAspect so the video is
 /// never cropped — the frame is always sized to match the video's aspect
-/// ratio (both in grid and detail), so .resizeAspect fills identically
-/// to .resizeAspectFill without amplifying tiny aspect-ratio mismatches.
-private class VideoHostView: NSView {
+/// ratio, so .resizeAspect fills identically to .resizeAspectFill
+/// without amplifying tiny aspect-ratio mismatches.
+class VideoHostView: NSView {
     let playerLayer: AVPlayerLayer
     let gradientLayer: CAGradientLayer
 
@@ -54,15 +54,17 @@ private class VideoHostView: NSView {
 
     // Prevent this NSView from intercepting AppKit hit tests.
     // The floating layer is purely visual — all interaction goes through
-    // SwiftUI views overlaid on top (VideoControlsOverlay in detail mode).
+    // SwiftUI views overlaid on top.
     // Without this, the NSView can steal hover tracking from grid items
     // underneath, causing spurious onHover(false) events.
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// Single AVPlayerLayer that lives at the ContentView level.
-/// Never destroyed during hover→detail→grid transitions — only repositioned.
-private struct VideoPlayerNSView: NSViewRepresentable {
+/// Used for grid hover video previews only.
+/// Reusable NSViewRepresentable wrapping an AVPlayerLayer.
+/// Used by both FloatingVideoLayer (grid hover) and DetailItemView (detail playback).
+struct VideoPlayerNSView: NSViewRepresentable {
     let player: AVPlayer
     var showGradient: Bool = false
 
@@ -81,8 +83,7 @@ private struct VideoPlayerNSView: NSViewRepresentable {
 // MARK: - Floating Video Layer
 
 /// A single floating video view placed at the ContentView ZStack level.
-/// Moves between grid cell position (hover) and detail position (expanded).
-/// No view swap ever occurs — one AVPlayerLayer, animated between frames.
+/// Shows grid hover video previews — positioned at the hovered grid cell.
 struct FloatingVideoLayer: View {
     @Environment(VideoPreviewManager.self) private var videoPreview
     @Environment(AppState.self) private var appState
@@ -90,81 +91,49 @@ struct FloatingVideoLayer: View {
     var body: some View {
         GeometryReader { geo in
             let origin = geo.frame(in: .global).origin
-        if videoPreview.displayState != .hidden, let player = videoPreview.player {
-            VideoPlayerNSView(player: player, showGradient: videoPreview.displayState == .grid)
-                // Pattern pills overlay — .ultraThinMaterial creates an NSVisualEffectView
-                // that composites correctly above the NSView-backed video layer.
-                // The gradient scrim is a CAGradientLayer inside VideoHostView for the
-                // same reason — plain SwiftUI views can't render above NSViewRepresentable.
-                .overlay {
-                    if videoPreview.displayState == .grid, !videoPreview.gridPatternNames.isEmpty {
-                        VStack {
-                            Spacer()
-                            HStack {
-                                FlowLayout(spacing: 5) {
-                                    ForEach(videoPreview.gridPatternNames, id: \.self) { name in
-                                        PatternPill(name: name, useGlass: false)
-                                    }
-                                }
+            if videoPreview.displayState == .grid, let player = videoPreview.player {
+                VideoPlayerNSView(player: player, showGradient: true)
+                    // Pattern pills overlay
+                    .overlay {
+                        if !videoPreview.gridPatternNames.isEmpty {
+                            VStack {
                                 Spacer()
+                                HStack {
+                                    FlowLayout(spacing: 5) {
+                                        ForEach(videoPreview.gridPatternNames, id: \.self) { name in
+                                            PatternPill(name: name, useGlass: false)
+                                        }
+                                    }
+                                    Spacer()
+                                }
+                                .padding(8)
                             }
-                            .padding(8)
+                            .allowsHitTesting(false)
                         }
-                        .allowsHitTesting(false)
                     }
-                }
-                // Controls overlay — only in detail mode
-                .overlay {
-                    if videoPreview.displayState == .detail {
-                        VideoControlsOverlay(player: player)
-                    }
-                }
-                // Drag-to-export — only in detail mode
-                .onDrag {
-                    appState.isDraggingFromApp = true
-                    guard videoPreview.displayState == .detail,
-                          let url = videoPreview.activeItemURL else {
-                        return NSItemProvider()
-                    }
-                    let provider = NSItemProvider(contentsOf: url) ?? NSItemProvider()
-                    if let name = videoPreview.activeItemSuggestedName {
-                        let ext = url.pathExtension
-                        provider.suggestedName = ext.isEmpty ? name : "\(name).\(ext)"
-                    }
-                    return provider
-                } preview: {
-                    Image(systemName: "video.fill")
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                        .frame(width: 96, height: 64)
-                        .background(Color.gray.opacity(0.5))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .opacity(0.85)
-                }
-            .frame(width: videoPreview.currentFrame.width, height: videoPreview.currentFrame.height)
-            .clipShape(RoundedRectangle(cornerRadius: videoPreview.cornerRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: videoPreview.cornerRadius)
-                    .strokeBorder(
-                        videoPreview.displayState == .grid
-                            && appState.selectedIds.contains(videoPreview.activeItemId ?? "")
-                            ? Color.accentColor : Color.clear,
-                        lineWidth: 2
+                    .frame(width: videoPreview.currentFrame.width, height: videoPreview.currentFrame.height)
+                    .clipShape(RoundedRectangle(cornerRadius: videoPreview.cornerRadius))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: videoPreview.cornerRadius)
+                            .strokeBorder(
+                                appState.selectedIds.contains(videoPreview.activeItemId ?? "")
+                                    ? Color.accentColor : Color.clear,
+                                lineWidth: 2
+                            )
                     )
-            )
-            .position(
-                x: videoPreview.currentFrame.midX - origin.x,
-                y: videoPreview.currentFrame.midY - origin.y
-            )
-            .allowsHitTesting(videoPreview.displayState == .detail)
+                    .position(
+                        x: videoPreview.currentFrame.midX - origin.x,
+                        y: videoPreview.currentFrame.midY - origin.y
+                    )
+                    .allowsHitTesting(false)
+            }
         }
-        } // GeometryReader
     }
 }
 
 // MARK: - Video Controls Overlay
 
-/// Minimal controls (play/pause, time) shown on hover in detail mode.
+/// Minimal controls (play/pause, time) shown on hover over video content.
 struct VideoControlsOverlay: View {
     let player: AVPlayer
 
@@ -174,7 +143,7 @@ struct VideoControlsOverlay: View {
     @State private var showControls = false
     @State private var timeObserver: Any?
     /// The player instance the time observer was added to — may differ from
-    /// `player` if VideoPreviewManager swapped to a new AVPlayer mid-navigation.
+    /// `player` if the player was swapped mid-navigation.
     @State private var observedPlayer: AVPlayer?
     @State private var hideTask: Task<Void, Never>?
 
@@ -202,7 +171,6 @@ struct VideoControlsOverlay: View {
         .onAppear { addTimeObserver() }
         .onDisappear { removeTimeObserver() }
         .onChange(of: ObjectIdentifier(player)) { _, _ in
-            // Player instance changed (navigated to a different video) — re-register
             addTimeObserver()
         }
     }
@@ -293,10 +261,13 @@ struct VideoControlsOverlay: View {
     }
 
     private func formatTime(_ seconds: Double) -> String {
-        guard seconds.isFinite else { return "0:00" }
-        let total = Int(seconds)
-        let m = total / 60
-        let s = total % 60
-        return "\(m):\(String(format: "%02d", s))"
+        formatDuration(seconds)
     }
+}
+
+/// Shared duration formatting: "m:ss"
+func formatDuration(_ seconds: Double) -> String {
+    guard seconds.isFinite else { return "0:00" }
+    let total = Int(seconds)
+    return "\(total / 60):\(String(format: "%02d", total % 60))"
 }

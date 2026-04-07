@@ -7,7 +7,6 @@ struct GridItemView: View {
     let width: CGFloat
     let spaces: [Space]
     let activeSpaceId: String?
-    let hiddenItemId: String?
     let onSelect: (CGRect) -> Void
     let onToggleSelect: () -> Void
     let onShiftSelect: () -> Void
@@ -42,12 +41,11 @@ struct GridItemView: View {
         isSelected && selectedCount > 1 ? appState.selectedIds : [item.id]
     }
 
-    init(item: MediaItem, width: CGFloat, spaces: [Space], activeSpaceId: String?, hiddenItemId: String?, onSelect: @escaping (CGRect) -> Void, onToggleSelect: @escaping () -> Void, onShiftSelect: @escaping () -> Void, onDelete: @escaping (Set<String>) -> Void, onAssignToSpace: @escaping (Set<String>, String?) -> Void, onRetryAnalysis: @escaping (Set<String>) -> Void, onShare: @escaping (Set<String>, CGRect) -> Void) {
+    init(item: MediaItem, width: CGFloat, spaces: [Space], activeSpaceId: String?, onSelect: @escaping (CGRect) -> Void, onToggleSelect: @escaping () -> Void, onShiftSelect: @escaping () -> Void, onDelete: @escaping (Set<String>) -> Void, onAssignToSpace: @escaping (Set<String>, String?) -> Void, onRetryAnalysis: @escaping (Set<String>) -> Void, onShare: @escaping (Set<String>, CGRect) -> Void) {
         self.item = item
         self.width = width
         self.spaces = spaces
         self.activeSpaceId = activeSpaceId
-        self.hiddenItemId = hiddenItemId
         self.onSelect = onSelect
         self.onToggleSelect = onToggleSelect
         self.onShiftSelect = onShiftSelect
@@ -77,16 +75,8 @@ struct GridItemView: View {
         return parts.joined(separator: ", ")
     }
 
-    /// Continuous opacity driven by fullscreen swipe progress.
-    /// Current detail item fades in as it's swiped away; target item fades out as it approaches.
     private var gridItemOpacity: Double {
-        if item.id == appState.detailItem {
-            return Double(appState.detailSwipeProgress)
-        }
-        if item.id == appState.detailSwipeTargetId {
-            return Double(1 - appState.detailSwipeProgress)
-        }
-        return item.id == hiddenItemId ? 0 : 1
+        item.id == appState.detailItem ? 0 : 1
     }
 
     private var deleteStage: Int {
@@ -124,11 +114,6 @@ struct GridItemView: View {
                 } else if flags.contains(.shift) {
                     onShiftSelect()
                 } else {
-                    // Pre-claim the video player BEFORE overlay appears —
-                    // prevents onHover(false) race from destroying it
-                    if itemIsVideo {
-                        videoPreview.claimForDetail()
-                    }
                     onSelect(globalFrame)
                 }
             } label: {
@@ -397,8 +382,7 @@ struct GridItemView: View {
             if newId == item.id {
                 appState.detailSourceFrame = globalFrame
             } else if oldId == item.id {
-                // Fullscreen dismissed — mouse may have moved, so clear stale hover state.
-                // If the cursor is still over this item, .onHover will re-fire true immediately.
+                // Detail dismissed — mouse may have moved, so clear stale hover state.
                 isHovered = false
                 suppressHoverExit = false
             }

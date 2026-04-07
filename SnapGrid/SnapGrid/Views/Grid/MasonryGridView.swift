@@ -16,7 +16,6 @@ struct MasonryGridView: View {
     let thumbnailSize: ThumbnailSize
     let spaces: [Space]
     let activeSpaceId: String?
-    let hiddenItemId: String?
     let onSelect: (String, CGRect) -> Void
     let onToggleSelect: (String) -> Void
     let onShiftSelect: (String) -> Void
@@ -111,7 +110,6 @@ struct MasonryGridView: View {
                                         width: columnWidth,
                                         spaces: spaces,
                                         activeSpaceId: activeSpaceId,
-                                        hiddenItemId: hiddenItemId,
                                         onSelect: { frame in onSelect(item.id, frame) },
                                         onToggleSelect: { onToggleSelect(item.id) },
                                         onShiftSelect: { onShiftSelect(item.id) },
@@ -151,11 +149,14 @@ struct MasonryGridView: View {
                             .allowsHitTesting(false)
                     }
                 }
-                .coordinateSpace(name: coordinateSpaceName)
+                .coordinateSpace(.named(coordinateSpaceName))
                 .onPreferenceChange(ItemFramePreferenceKey.self) { frames in
                     MainActor.assumeIsolated { itemFrames = frames }
                 }
             }
+            #if compiler(>=6.3)
+            .modifier(SoftScrollEdgeModifier())
+            #endif
         }
     }
 
@@ -175,3 +176,17 @@ struct MasonryGridView: View {
         return columnItems
     }
 }
+
+// MARK: - Scroll Edge Effect (macOS 26+)
+
+#if compiler(>=6.3)
+struct SoftScrollEdgeModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content.scrollEdgeEffectStyle(.soft, for: .top)
+        } else {
+            content
+        }
+    }
+}
+#endif

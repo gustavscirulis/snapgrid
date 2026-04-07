@@ -42,8 +42,6 @@ final class AppState {
     }
     var detailItem: String? = nil  // MediaItem id
     var detailSourceFrame: CGRect? = nil  // Global frame of tapped thumbnail for hero animation
-    var detailSwipeProgress: CGFloat = 0  // 0 = viewing current item, 1 = fully swiped to next
-    var detailSwipeTargetId: String? = nil  // Item being swiped toward (its grid cell fades out)
     var isSettingsOpen: Bool = false
     var isDraggingFromApp: Bool = false
 
