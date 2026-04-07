@@ -6,6 +6,8 @@ struct SnapGridApp: App {
     let container: ModelContainer
 
     init() {
+        NSWindow.allowsAutomaticWindowTabbing = false
+
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let snapGridDir = appSupport.appendingPathComponent("SnapGrid", isDirectory: true)
         try? FileManager.default.createDirectory(at: snapGridDir, withIntermediateDirectories: true)
