@@ -6,14 +6,13 @@ import SwiftUI
 enum VideoDisplayState: Equatable {
     case hidden
     case grid
-    case detail
 }
 
 // MARK: - VideoPreviewManager
 
-/// Manages a single AVPlayer and the floating video layer's display frame.
+/// Manages a single AVPlayer for grid hover video previews.
 /// The floating video layer reads `currentFrame`, `cornerRadius`, and `displayState`
-/// to position itself. No view swap ever occurs — one player, one layer, repositioned.
+/// to position itself. Grid hover only — detail views manage their own players.
 @Observable
 @MainActor
 final class VideoPreviewManager {
@@ -29,7 +28,7 @@ final class VideoPreviewManager {
     /// The animated frame for the floating video layer
     var currentFrame: CGRect = .zero
 
-    /// The animated corner radius (12 for grid, 16 for detail)
+    /// The animated corner radius
     var cornerRadius: CGFloat = 12
 
     /// The grid cell's live global frame — updated continuously by GridItemView
@@ -38,17 +37,6 @@ final class VideoPreviewManager {
     /// Pattern names to display on the floating layer during grid hover
     private(set) var gridPatternNames: [String] = []
 
-    /// Detail frame reported by the settled scroll view's geometry reader.
-    /// Used by switchDetailPlayer to position the video at the SwiftUI-computed position.
-    private(set) var detailPlaceholderFrame: CGRect = .zero
-
-    /// File URL of the active video (set during detail mode for drag-to-export)
-    private(set) var activeItemURL: URL?
-
-    /// Suggested export name for the active video (from AI analysis)
-    private(set) var activeItemSuggestedName: String?
-
-    private var isHandedOffToDetail = false
     private var loopObserver: NSObjectProtocol?
 
     // MARK: - Grid Hover
@@ -87,103 +75,10 @@ final class VideoPreviewManager {
         }
     }
 
-    /// Stop hover preview (blocked while handed off to detail)
+    /// Stop hover preview
     func stopPreview() {
-        guard !isHandedOffToDetail else { return }
         displayState = .hidden
         cleanup()
-    }
-
-    // MARK: - Detail Transition
-
-    /// Pre-claim the player for detail (called synchronously in click handler).
-    /// Prevents onHover(false) from destroying the player when overlay appears.
-    func claimForDetail() {
-        guard player != nil else { return }
-        isHandedOffToDetail = true
-        player?.isMuted = false
-        removeLoopObserver()
-    }
-
-    /// Transition to detail mode. Sets properties — caller wraps in withAnimation.
-    /// If no hover preview exists, creates a fresh player at finalFrame (no animation needed).
-    func transitionToDetail(itemId: String, url: URL, finalFrame: CGRect, suggestedName: String? = nil) {
-        if player == nil || activeItemId != itemId {
-            // No hover preview — create fresh player directly at detail position
-            cleanup()
-            let newPlayer = AVPlayer(url: url)
-            newPlayer.isMuted = false
-            player = newPlayer
-            activeItemId = itemId
-            isHandedOffToDetail = true
-            displayState = .detail
-            currentFrame = finalFrame
-            cornerRadius = 16
-            newPlayer.play()
-        } else {
-            // Hover preview exists — just update state. Frame change animates.
-            displayState = .detail
-            currentFrame = finalFrame
-            cornerRadius = 16
-        }
-
-        activeItemURL = url
-        activeItemSuggestedName = suggestedName
-    }
-
-    /// Update the detail frame — always stores for future switchDetailPlayer calls,
-    /// and applies immediately when already in detail mode (window resize, scroll).
-    func updateDetailFrame(_ frame: CGRect) {
-        detailPlaceholderFrame = frame
-        if displayState == .detail {
-            currentFrame = frame
-        }
-    }
-
-    /// Animate back to grid position. Sets properties — caller wraps in withAnimation.
-    func transitionToGrid() {
-        player?.isMuted = true
-        addLoopObserver(for: player)
-        currentFrame = gridItemFrame
-        cornerRadius = 12
-    }
-
-    /// Called when close animation completes and overlay is removed.
-    /// Stops the preview entirely — the hero spring already animated the layer
-    /// back to the grid cell, so hiding it now is seamless. If the cursor is
-    /// still over the thumbnail, normal hover will restart the preview.
-    func completeTransitionToGrid() {
-        isHandedOffToDetail = false
-        displayState = .hidden
-        cleanup()
-    }
-
-    /// Stop detail video without transitioning back to grid.
-    /// Used when swiping from a video to a non-video item.
-    func stopDetailPlayer() {
-        cleanup()
-        displayState = .hidden
-        isHandedOffToDetail = false
-    }
-
-    /// Create a fresh player for arrow key / swipe navigation in detail.
-    /// Reads detailPlaceholderFrame (set by the settled scroll view's onGeometryChange)
-    /// so the video is positioned by the same SwiftUI layout that positions images.
-    func switchDetailPlayer(itemId: String, url: URL, suggestedName: String? = nil) {
-        cleanup()
-        activeItemURL = url
-        activeItemSuggestedName = suggestedName
-        let newPlayer = AVPlayer(url: url)
-        newPlayer.isMuted = false
-        player = newPlayer
-        activeItemId = itemId
-        isHandedOffToDetail = true
-        if detailPlaceholderFrame != .zero {
-            currentFrame = detailPlaceholderFrame
-        }
-        cornerRadius = 16
-        displayState = .detail
-        newPlayer.play()
     }
 
     // MARK: - Private
@@ -193,8 +88,6 @@ final class VideoPreviewManager {
         player?.pause()
         player = nil
         activeItemId = nil
-        activeItemURL = nil
-        activeItemSuggestedName = nil
         gridPatternNames = []
     }
 

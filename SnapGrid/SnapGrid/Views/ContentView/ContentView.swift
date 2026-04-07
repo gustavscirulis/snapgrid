@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var isDragTargeted = false
     @State private var pendingEditSpaceId: String?
     @State private var showElectronImport = false
+    @State private var showImportPanel = false
     @State private var debounceTask: Task<Void, Never>?
     @State private var indexRebuildTask: Task<Void, Never>?
     /// Pre-computed search scores keyed by item ID. Empty = no active search.
@@ -60,13 +61,18 @@ struct ContentView: View {
         itemsForSpace(appState.activeSpaceId)
     }
 
-    private var detailItemTitle: String? {
+    private var detailNavigationTitle: String {
         guard let detailId = appState.detailItem,
-              let item = allItems.first(where: { $0.id == detailId }) else { return nil }
-        return item.analysisResult?.imageSummary
+              let item = allItems.first(where: { $0.id == detailId }),
+              let summary = item.analysisResult?.imageSummary,
+              !summary.isEmpty else {
+            return "SnapGrid"
+        }
+        return summary
     }
 
     var body: some View {
+        @Bindable var appState = appState
         NavigationSplitView {
             SpaceSidebarView(
                 spaces: spaces,
@@ -87,17 +93,16 @@ struct ContentView: View {
                         return true
                     }
 
-                // Detail overlay — hero animation from thumbnail to full-screen view
+                // Detail overlay — hero zoom from thumbnail
                 if let detailId = appState.detailItem,
                    let sourceFrame = appState.detailSourceFrame {
                     let overlayItems = activeFilteredItems.contains(where: { $0.id == detailId })
                         ? activeFilteredItems : allItems
-                    if let startIndex = overlayItems.firstIndex(where: { $0.id == detailId }) {
-                    HeroDetailOverlay(
+                    DetailItemView(
                         items: overlayItems,
-                        startIndex: startIndex,
+                        startItemId: detailId,
                         sourceFrame: sourceFrame,
-                        onAnimationComplete: {
+                        onClose: {
                             appState.detailItem = nil
                             appState.detailSourceFrame = nil
                         },
@@ -119,14 +124,13 @@ struct ContentView: View {
                         spaces: spaces,
                         activeSpaceId: appState.activeSpaceId
                     )
-                    }
                 }
 
-                // Floating video layer — ONE AVPlayerLayer that moves between grid and detail.
+                // Floating video layer — grid hover previews only
                 FloatingVideoLayer()
 
                 // Selection badge
-                if !appState.selectedIds.isEmpty {
+                if !appState.selectedIds.isEmpty && appState.detailItem == nil {
                     VStack {
                         Spacer()
                         SelectionBadge(count: appState.selectedIds.count)
@@ -151,12 +155,14 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 720, minHeight: 400)
-        .navigationTitle(detailItemTitle ?? "SnapGrid")
+        .navigationTitle(detailNavigationTitle)
         .searchable(text: $appState.searchText, isPresented: $isSearchFieldPresented, placement: .toolbar, prompt: "Search patterns, descriptions...")
         .toolbar {
             if appState.detailItem != nil {
                 ToolbarItem(placement: .navigation) {
                     Button {
+                        // DetailItemView handles the close animation via its own triggerClose;
+                        // post notification so it can animate properly.
                         NotificationCenter.default.post(name: .closeDetail, object: nil)
                     } label: {
                         Label("Back", systemImage: "chevron.left")
@@ -185,8 +191,14 @@ struct ContentView: View {
                 appState.isDraggingFromApp = false
             }
         }
+        .fileImporter(
+            isPresented: $showImportPanel,
+            allowedContentTypes: SupportedMedia.importableContentTypes,
+            allowsMultipleSelection: true,
+            onCompletion: handleFileImport
+        )
         .modifier(NotificationModifier(
-            onImportFiles: { openImportPanel() },
+            onImportFiles: { showImportPanel = true },
             onImportElectron: { showElectronImport = true },
             onUndoDelete: { undoLastDelete() },
             onApiKeySaved: {
@@ -376,8 +388,8 @@ struct ContentView: View {
                 thumbnailSize: appState.thumbnailSize,
                 spaces: spaces,
                 activeSpaceId: appState.activeSpaceId,
-                hiddenItemId: appState.detailItem,
                 onSelect: { id, frame in
+                    videoPreview.stopPreview()
                     appState.detailSourceFrame = frame
                     appState.detailItem = id
                 },
@@ -405,6 +417,16 @@ struct ContentView: View {
     }
 
     // MARK: - Actions
+
+    private func handleFileImport(_ result: Result<[URL], Error>) {
+        if case .success(let urls) = result {
+            syncWatcher.beginLocalChange()
+            Task {
+                await importService.importFiles(urls, into: modelContext, spaceId: appState.activeSpaceId)
+                syncWatcher.endLocalChange()
+            }
+        }
+    }
 
     private func handleDrop(_ providers: [NSItemProvider]) {
         Task {
@@ -521,23 +543,6 @@ struct ContentView: View {
                     } else if !hasTwitterURL {
                         appState.showToast("URL doesn't point to a supported image or video")
                     }
-                }
-            }
-        }
-    }
-
-    private func openImportPanel() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = SupportedMedia.importableContentTypes
-
-        panel.begin { response in
-            if response == .OK {
-                syncWatcher.beginLocalChange()
-                Task {
-                    await importService.importFiles(panel.urls, into: modelContext, spaceId: appState.activeSpaceId)
-                    syncWatcher.endLocalChange()
                 }
             }
         }
@@ -849,3 +854,4 @@ private struct NotificationModifier: ViewModifier {
             }
     }
 }
+
