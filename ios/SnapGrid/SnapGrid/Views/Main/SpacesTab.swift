@@ -31,7 +31,7 @@ struct SpacesTab<AddMenu: View>: View {
                     .ignoresSafeArea()
 
                 if spaces.isEmpty {
-                    PlaceholderView(icon: "folder", title: "No spaces yet", subtitle: "Tap + to create a space")
+                    PlaceholderView(icon: "folder", title: "No spaces yet", subtitle: "Tap the folder icon to create a space")
                 } else {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 20) {
@@ -72,7 +72,7 @@ struct SpacesTab<AddMenu: View>: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: onCreateSpace) {
-                        Image(systemName: "plus")
+                        Image(systemName: "folder.badge.plus")
                     }
                 }
             }
