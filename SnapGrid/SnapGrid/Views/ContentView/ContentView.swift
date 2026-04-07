@@ -241,6 +241,10 @@ struct ContentView: View {
                 searchScores = [:]
             } else {
                 isSearchActive = true
+                if appState.detailItem != nil {
+                    appState.detailItem = nil
+                    appState.detailSourceFrame = nil
+                }
                 debounceTask = Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(100))
                     guard !Task.isCancelled else { return }
