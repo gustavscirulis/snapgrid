@@ -6,7 +6,7 @@ struct SpacesTab<AddMenu: View>: View {
     let selectedItemId: String?
     let showOverlay: Bool
     let setActiveSpaceId: (String?) -> Void
-    let onItemSelected: (MediaItem, CGRect, UIImage?) -> Void
+    let onItemSelected: (MediaItem, CGRect, UIImage?, DetailHost) -> Void
     let onRetryAnalysis: (MediaItem) -> Void
     let onShareItem: (MediaItem) -> Void
     let onDeleteItem: (MediaItem) -> Void
@@ -103,7 +103,9 @@ struct SpacesTab<AddMenu: View>: View {
                     selectedItemId: selectedItemId,
                     showOverlay: showOverlay,
                     setActiveSpaceId: setActiveSpaceId,
-                    onItemSelected: onItemSelected,
+                    onItemSelected: { item, rect, thumbnail in
+                        onItemSelected(item, rect, thumbnail, .space(spaceId))
+                    },
                     onRetryAnalysis: onRetryAnalysis,
                     onShareItem: onShareItem,
                     onDeleteItem: onDeleteItem,

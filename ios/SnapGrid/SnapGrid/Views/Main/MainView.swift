@@ -9,7 +9,6 @@ struct MainView: View {
     @Query(sort: \MediaItem.createdAt, order: .reverse) private var allItems: [MediaItem]
     @Query(sort: \Space.order) private var spaces: [Space]
     @State private var appState = AppState()
-    @State private var gridItemRects: [String: CGRect] = [:]
     @State private var isLoading = true
     @State private var error: String?
     @State private var hasAttemptedRescan = false
@@ -24,6 +23,7 @@ struct MainView: View {
     @State private var showRenameSpaceAlert = false
     @State private var renameSpaceName = ""
     @State private var renameSpaceId: String?
+    @State private var gridItemRects: [String: CGRect] = [:]
 
     // MARK: - Filtering
 
@@ -49,58 +49,60 @@ struct MainView: View {
         return searchResultItems
     }
 
-    private var currentVisibleItems: [MediaItem] {
-        if appState.selectedTab == .search || !appState.searchText.isEmpty {
+    private var detailOverlayItems: [MediaItem] {
+        guard let host = appState.detailHost else { return [] }
+
+        switch host {
+        case .all, .search:
             return searchContentItems
-        }
-        if let spaceId = appState.activeSpaceId {
+        case .space(let spaceId):
             return allItems.filter { $0.space?.id == spaceId }
         }
-        return allItems
+    }
+
+    private var detailOverlayTitle: String {
+        guard let host = appState.detailHost else { return "SnapGrid" }
+
+        switch host {
+        case .all:
+            return "All media"
+        case .search:
+            return "SnapGrid"
+        case .space(let spaceId):
+            return spaces.first(where: { $0.id == spaceId })?.name ?? "Space"
+        }
     }
 
     // MARK: - Body
 
     var body: some View {
+        @Bindable var appState = appState
+
         GeometryReader { geo in
             let gridWidth = geo.size.width - 24
 
             ZStack {
                 tabContent(gridWidth: gridWidth)
-                    .onPreferenceChange(GridItemRectsPreferenceKey.self) { rects in
-                        gridItemRects = rects
-                    }
+                    .allowsHitTesting(!appState.showOverlay)
 
-                // Full-screen image overlay above everything
-                if appState.showOverlay, let startIndex = appState.selectedIndex {
-                    FullScreenImageOverlay(
-                        items: currentVisibleItems,
-                        startIndex: startIndex,
+                if appState.showOverlay, appState.selectedIndex != nil, !detailOverlayItems.isEmpty {
+                    MediaDetailModal(
+                        items: detailOverlayItems,
+                        title: detailOverlayTitle,
+                        showOverlay: $appState.showOverlay,
+                        selectedItemId: $appState.selectedItemId,
+                        selectedIndex: $appState.selectedIndex,
                         sourceRect: appState.sourceRect,
-                        screenSize: geo.size,
-                        thumbnailImage: appState.thumbnailImage,
+                        thumbnailImage: $appState.thumbnailImage,
                         gridItemRects: $gridItemRects,
-                        onDismissing: { currentItemId in
-                            appState.selectedItemId = currentItemId
-                        },
-                        onClose: {
-                            var t = Transaction()
-                            t.disablesAnimations = true
-                            withTransaction(t) {
-                                appState.showOverlay = false
-                                appState.selectedIndex = nil
-                                appState.selectedItemId = nil
-                                appState.thumbnailImage = nil
-                            }
-                        },
-                        onSearchPattern: { pattern in
-                            appState.selectedTab = .search
-                            appState.searchText = pattern
-                        },
-                        onDelete: handleItemDeleted
+                        onSearchPattern: handleSearchPattern,
+                        onDelete: handleItemDeleted,
+                        onOverlayClosed: handleOverlayClosed
                     )
+                    .zIndex(1)
                 }
             }
+            .onPreferenceChange(GridItemRectsPreferenceKey.self) { gridItemRects = $0 }
         }
         .task {
             await loadContent()
@@ -231,6 +233,8 @@ struct MainView: View {
 
     @ViewBuilder
     private func allItemsContent(gridWidth: CGFloat) -> some View {
+        @Bindable var appState = appState
+
         AllItemsTab(
             items: searchContentItems,
             spaces: spaces,
@@ -240,7 +244,9 @@ struct MainView: View {
             selectedItemId: appState.selectedItemId,
             showOverlay: appState.showOverlay,
             searchText: $appState.searchText,
-            onItemSelected: handleItemSelected,
+            onItemSelected: { item, rect, thumbnail in
+                handleItemSelected(item, rect, thumbnail, host: .all)
+            },
             onRetryAnalysis: handleRetryAnalysis,
             onShareItem: handleShareItem,
             onDeleteItem: { item in appState.itemToDelete = item },
@@ -252,6 +258,8 @@ struct MainView: View {
 
     @ViewBuilder
     private func spacesContent(gridWidth: CGFloat) -> some View {
+        @Bindable var appState = appState
+
         SpacesTab(
             spaces: spaces,
             allItems: allItems,
@@ -273,7 +281,9 @@ struct MainView: View {
 
     @ViewBuilder
     private func searchContent(gridWidth: CGFloat) -> some View {
+        @Bindable var appState = appState
         let items = searchContentItems
+
         NavigationStack {
             ZStack {
                 Color.snapDarkBackground
@@ -290,7 +300,9 @@ struct MainView: View {
                             spaces: spaces,
                             availableWidth: gridWidth,
                             selectedItemId: appState.showOverlay ? appState.selectedItemId : nil,
-                            onItemSelected: handleItemSelected,
+                            onItemSelected: { item, rect, thumbnail in
+                                handleItemSelected(item, rect, thumbnail, host: .search)
+                            },
                             onRetryAnalysis: handleRetryAnalysis,
                             onShareItem: handleShareItem,
                             onDeleteItem: { item in appState.itemToDelete = item },
@@ -304,11 +316,6 @@ struct MainView: View {
             }
             .navigationTitle("SnapGrid")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    addImagesMenu
-                }
-            }
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
@@ -335,14 +342,28 @@ struct MainView: View {
 
     // MARK: - Item Selection
 
-    private func handleItemSelected(_ item: MediaItem, _ rect: CGRect, _ thumb: UIImage?) {
+    private func handleItemSelected(_ item: MediaItem, _ rect: CGRect, _ thumb: UIImage?, host: DetailHost) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        let visibleItems = currentVisibleItems
+        appState.detailHost = host
+        let visibleItems = detailOverlayItems
         appState.selectedIndex = visibleItems.firstIndex(where: { $0.id == item.id }) ?? 0
         appState.selectedItemId = item.id
         appState.sourceRect = rect
         appState.thumbnailImage = thumb
         appState.showOverlay = true
+    }
+
+    private func handleOverlayClosed() {
+        appState.detailHost = nil
+        if appState.pendingSearchActivation {
+            appState.selectedTab = .search
+            appState.pendingSearchActivation = false
+        }
+    }
+
+    private func handleSearchPattern(_ pattern: String) {
+        appState.searchText = pattern
+        appState.pendingSearchActivation = true
     }
 
     // MARK: - Space Creation
