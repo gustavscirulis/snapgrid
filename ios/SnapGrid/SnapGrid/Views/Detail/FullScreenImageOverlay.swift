@@ -88,6 +88,19 @@ extension View {
             .offset(y: stage >= threshold ? 0 : 4)
             .animation(SnapSpring.resolvedMetadata, value: stage)
     }
+
+    @ViewBuilder
+    func detailScrollTracking(contentOffset: Binding<CGFloat>) -> some View {
+        if #available(iOS 18.0, *) {
+            self.onScrollGeometryChange(for: CGFloat.self) { geo in
+                max(geo.contentOffset.y, 0)
+            } action: { _, newOffset in
+                contentOffset.wrappedValue = newOffset
+            }
+        } else {
+            self
+        }
+    }
 }
 
 // MARK: - Full Screen Image Overlay
@@ -98,7 +111,12 @@ struct FullScreenImageOverlay: View {
     let screenSize: CGSize
     let thumbnailImage: UIImage?
     @Binding var gridItemRects: [String: CGRect]
-    var onDismissing: ((String) -> Void)?
+    let closeRequestID: Int
+    let shareRequestID: Int
+    let deleteRequestID: Int
+    let topReservedInset: CGFloat
+    var onCurrentItemChanged: ((String) -> Void)?
+    var onHeroSettledChanged: ((Bool) -> Void)?
     var onClose: () -> Void
     var onSearchPattern: ((String) -> Void)?
     var onDelete: ((MediaItem) -> Void)?
@@ -129,7 +147,6 @@ struct FullScreenImageOverlay: View {
 
     // Metadata reveal (scroll up to show)
     @State private var contentOffset: CGFloat = 0
-    @State private var contentOffsetAtGestureStart: CGFloat = 0
     @State private var metadataStage: Int = 0
     @State private var revealTask: Task<Void, Never>?
     @State private var metadataHeight: CGFloat = 0
@@ -146,18 +163,12 @@ struct FullScreenImageOverlay: View {
     private enum GestureMode { case none, dismiss, scroll, swipe, zoomPan }
     @State private var gestureMode: GestureMode = .none
 
-    // Delete confirmation
-    @State private var showDeleteConfirmation = false
-
     // Delete animation — wallet-style card crush
     // Stage 0: normal, 1: height clips inward, 2: width shrinks + fade, 3: complete
     @State private var deleteStage: Int = 0
 
     // Share sheet
     @State private var shareItem: URL?
-
-    // Glass effect namespace for action toolbar union
-    @Namespace private var glassNS
 
     // Search-triggered close (skips rect correction since grid has re-laid out)
     @State private var isSearchDismiss = false
@@ -184,15 +195,6 @@ struct FullScreenImageOverlay: View {
 
     private var zoomedCornerRadius: CGFloat { isZoomed ? 0 : 16 }
 
-    /// On iOS 26+ the inline glass confirmation handles delete; skip the system dialog.
-    private var legacyDeleteDialogBinding: Binding<Bool> {
-        if #available(iOS 26.0, *) {
-            return .constant(false)
-        } else {
-            return $showDeleteConfirmation
-        }
-    }
-
     init(
         items: [MediaItem],
         startIndex: Int,
@@ -200,7 +202,12 @@ struct FullScreenImageOverlay: View {
         screenSize: CGSize,
         thumbnailImage: UIImage?,
         gridItemRects: Binding<[String: CGRect]>,
-        onDismissing: ((String) -> Void)? = nil,
+        closeRequestID: Int = 0,
+        shareRequestID: Int = 0,
+        deleteRequestID: Int = 0,
+        topReservedInset: CGFloat = 0,
+        onCurrentItemChanged: ((String) -> Void)? = nil,
+        onHeroSettledChanged: ((Bool) -> Void)? = nil,
         onClose: @escaping () -> Void,
         onSearchPattern: ((String) -> Void)? = nil,
         onDelete: ((MediaItem) -> Void)? = nil
@@ -211,7 +218,12 @@ struct FullScreenImageOverlay: View {
         self.screenSize = screenSize
         self.thumbnailImage = thumbnailImage
         _gridItemRects = gridItemRects
-        self.onDismissing = onDismissing
+        self.closeRequestID = closeRequestID
+        self.shareRequestID = shareRequestID
+        self.deleteRequestID = deleteRequestID
+        self.topReservedInset = topReservedInset
+        self.onCurrentItemChanged = onCurrentItemChanged
+        self.onHeroSettledChanged = onHeroSettledChanged
         self.onClose = onClose
         self.onSearchPattern = onSearchPattern
         self.onDelete = onDelete
@@ -243,22 +255,6 @@ struct FullScreenImageOverlay: View {
         return dismissOffset
     }
 
-    private var effectiveContentOffset: CGFloat {
-        if gestureDrag.active && gestureMode == .scroll {
-            let proposed = contentOffsetAtGestureStart - gestureDrag.translation.height
-            if proposed < 0 {
-                let overshoot = -proposed
-                return -(log2(1 + overshoot) * 8)
-            }
-            if proposed > maxContentOffset {
-                let overshoot = proposed - maxContentOffset
-                return maxContentOffset + log2(1 + overshoot) * 8
-            }
-            return proposed
-        }
-        return contentOffset
-    }
-
     private var effectiveZoomPanOffset: CGSize {
         if gestureDrag.active && gestureMode == .zoomPan {
             let raw = CGSize(
@@ -278,7 +274,7 @@ struct FullScreenImageOverlay: View {
 
     private func clampedZoomPanOffset(_ offset: CGSize, finalFrame: CGRect) -> CGSize {
         guard zoomScale > minZoomScale else { return .zero }
-        let screen = UIScreen.main.bounds
+        let screen = CGRect(origin: .zero, size: screenSize)
         let maxOffsetX = max(0, (finalFrame.width * zoomScale - screen.width) / 2)
         let maxOffsetY = max(0, (finalFrame.height * zoomScale - screen.height) / 2)
         return CGSize(
@@ -295,7 +291,7 @@ struct FullScreenImageOverlay: View {
 
     private func rubberBandZoomPanOffset(_ offset: CGSize, finalFrame: CGRect) -> CGSize {
         guard zoomScale > minZoomScale else { return .zero }
-        let screen = UIScreen.main.bounds
+        let screen = CGRect(origin: .zero, size: screenSize)
         let maxOffsetX = max(0, (finalFrame.width * zoomScale - screen.width) / 2)
         let maxOffsetY = max(0, (finalFrame.height * zoomScale - screen.height) / 2)
         return CGSize(
@@ -337,11 +333,11 @@ struct FullScreenImageOverlay: View {
     }
 
     private func computeFinalFrame(for mediaItem: MediaItem) -> CGRect {
-        // Use actual screen bounds for true centering (screenSize from GeometryReader
-        // excludes safe area, but the overlay ignores safe area)
-        let screen = UIScreen.main.bounds.size
+        let screen = screenSize
         let maxW = screen.width - 24  // 12pt padding on each side
-        let maxH = screen.height * 0.85
+        let bottomReservedInset: CGFloat = 88
+        let availableHeight = max(screen.height - topReservedInset - bottomReservedInset, 1)
+        let maxH = min(screen.height * 0.85, availableHeight)
         let itemW = max(CGFloat(mediaItem.width), 1)
         let itemH = max(CGFloat(mediaItem.height), 1)
         let widthScale = maxW / itemW
@@ -351,7 +347,7 @@ struct FullScreenImageOverlay: View {
         let h = itemH * scale
         return CGRect(
             x: (screen.width - w) / 2,
-            y: (screen.height - h) / 2,
+            y: topReservedInset + ((availableHeight - h) / 2),
             width: w,
             height: h
         )
@@ -363,11 +359,11 @@ struct FullScreenImageOverlay: View {
         let finalFrame = computeFinalFrame(for: item)
 
         ZStack {
-            // 1. Backdrop — material blur + tint (matches Mac app)
+            // 1. Backdrop — keep the underlying screen visible through blur.
             ZStack {
                 Rectangle().fill(.ultraThinMaterial)
                     .opacity(blurOpacity)
-                Color.black.opacity(0.55)
+                Color.black.opacity(0.3)
                     .opacity(backdropOpacity)
             }
             .ignoresSafeArea()
@@ -399,12 +395,26 @@ struct FullScreenImageOverlay: View {
             loadFullImage()
             prepareVideoIfNeeded()
             preloadAdjacentImages()
+            onCurrentItemChanged?(item.id)
             withAnimation(SnapSpring.resolvedHero) {
                 isExpanded = true
             } completion: {
                 heroComplete = true
+                onHeroSettledChanged?(true)
                 startMetadataReveal()
             }
+        }
+        .onChange(of: closeRequestID) { oldValue, newValue in
+            guard newValue != oldValue, !isClosing else { return }
+            close()
+        }
+        .onChange(of: shareRequestID) { oldValue, newValue in
+            guard newValue != oldValue else { return }
+            prepareShareItem()
+        }
+        .onChange(of: deleteRequestID) { oldValue, newValue in
+            guard newValue != oldValue, deleteStage == 0, !isClosing else { return }
+            handleDelete()
         }
     }
 
@@ -436,54 +446,49 @@ struct FullScreenImageOverlay: View {
 
     @ViewBuilder
     private func settledContentView(finalFrame: CGRect) -> some View {
-        let screen = UIScreen.main.bounds
-        // Metadata starts below the image — same gap as horizontal padding
-        let metadataTopY = finalFrame.maxY + 32
+        let screen = CGRect(origin: .zero, size: screenSize)
+        ScrollView(.vertical) {
+            VStack(spacing: 0) {
+                Spacer()
+                    .frame(height: finalFrame.minY)
 
-        ZStack {
-            // Image — centered at finalFrame, zoomed by frame size (not scaleEffect)
-            // so that clipShape/mask boundaries grow with the content.
-            Group {
-                if item.isVideo, let player {
-                    VideoPlayer(player: player)
-                        .frame(width: finalFrame.width * zoomScale, height: finalFrame.height * zoomScale)
-                } else if let displayImage {
-                    Image(uiImage: displayImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: finalFrame.width * zoomScale, height: finalFrame.height * zoomScale)
-                        .clipped()
-                        // Rasterize static images into a Metal texture so
-                        // offset/scale/opacity are trivial GPU ops.
-                        .drawingGroup(opaque: false)
-                } else {
-                    Rectangle()
-                        .fill(Color.snapDarkMuted)
-                        .frame(width: finalFrame.width, height: finalFrame.height)
-                        .overlay {
-                            ProgressView()
-                                .tint(.white.opacity(0.3))
+                ZStack {
+                    Group {
+                        if item.isVideo, let player {
+                            VideoPlayer(player: player)
+                                .frame(width: finalFrame.width * zoomScale, height: finalFrame.height * zoomScale)
+                        } else if let displayImage {
+                            Image(uiImage: displayImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: finalFrame.width * zoomScale, height: finalFrame.height * zoomScale)
+                                .clipped()
+                                .drawingGroup(opaque: false)
+                        } else {
+                            Rectangle()
+                                .fill(Color.snapDarkMuted)
+                                .frame(width: finalFrame.width, height: finalFrame.height)
+                                .overlay {
+                                    ProgressView()
+                                        .tint(.white.opacity(0.3))
+                                }
                         }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: zoomedCornerRadius))
+                    .modifier(DeleteMaskModifier(
+                        deleteStage: deleteStage,
+                        finalFrame: finalFrame,
+                        zoomScale: zoomScale,
+                        cornerRadius: zoomedCornerRadius
+                    ))
+                    .offset(effectiveZoomPanOffset)
+                    .opacity(deleteStage >= 2 ? 0 : 1)
                 }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: zoomedCornerRadius))
-            // Delete animation — wallet card crush (mask only when active;
-            // skipping the mask modifier entirely avoids an offscreen compositing pass)
-            .modifier(DeleteMaskModifier(
-                deleteStage: deleteStage,
-                finalFrame: finalFrame,
-                zoomScale: zoomScale,
-                cornerRadius: zoomedCornerRadius
-            ))
-            .offset(effectiveZoomPanOffset)
-            .opacity(deleteStage >= 2 ? 0 : 1)
-            .position(x: finalFrame.midX, y: finalFrame.midY)
-            .offset(y: -effectiveContentOffset)
+                .frame(width: screen.width, height: finalFrame.height)
 
-            // Metadata — inline below image, faded until scrolled
-            DetailMetadataSection(item: item, stage: metadataStage) { pattern in
-                searchAndClose(pattern: pattern)
-            }
+                DetailMetadataSection(item: item, stage: metadataStage) { pattern in
+                    searchAndClose(pattern: pattern)
+                }
                 .id(item.id)
                 .frame(width: screen.width)
                 .background(
@@ -491,26 +496,19 @@ struct FullScreenImageOverlay: View {
                         Color.clear.preference(key: MetadataHeightKey.self, value: proxy.size.height)
                     }
                 )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .offset(y: metadataTopY - effectiveContentOffset)
+                .padding(.top, 32)
+                .padding(.bottom, 120)
                 .opacity(deleteStage >= 1 ? 0 : (isZoomed ? 0 : metadataOpacity))
-
-            // Action toolbar — share + delete (Glass split button)
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    actionToolbar
-                }
-                .padding(.trailing, 20)
-                .padding(.bottom, 16)
-                .opacity(!isZoomed && deleteStage == 0 ? 1 : 0)
-                .animation(SnapSpring.fast, value: isZoomed)
             }
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .scrollDisabled(isZoomed)
+        .scrollIndicators(.hidden)
+        .defaultScrollAnchor(.top)
+        .detailScrollTracking(contentOffset: $contentOffset)
         .contentShape(Rectangle())
-        .gesture(settledDragGesture)
+        .simultaneousGesture(settledDragGesture)
         .simultaneousGesture(pinchGesture)
         .simultaneousGesture(
             SpatialTapGesture(count: 2)
@@ -522,18 +520,6 @@ struct FullScreenImageOverlay: View {
             // Skip preference updates during dismiss to avoid extra layout passes
             guard !(gestureDrag.active && gestureMode == .dismiss) else { return }
             metadataHeight = newHeight
-        }
-        .onChange(of: metadataHeight) { oldHeight, newHeight in
-            if contentOffset > 0 && newHeight > oldHeight {
-                withAnimation(SnapSpring.resolvedMetadata) {
-                    contentOffset = maxContentOffset
-                }
-            }
-        }
-        .confirmationDialog("Delete this item?", isPresented: legacyDeleteDialogBinding, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
-                handleDelete()
-            }
         }
         .sheet(isPresented: Binding(
             get: { shareItem != nil },
@@ -547,117 +533,6 @@ struct FullScreenImageOverlay: View {
         // Dismiss visual effects
         .offset(y: effectiveDismissOffset)
         .scaleEffect(effectiveDismissOffset > 0 ? dismissScale : 1.0)
-    }
-
-    // MARK: - Action Toolbar (Glass split button)
-
-    @ViewBuilder
-    private var actionToolbar: some View {
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer {
-                if showDeleteConfirmation {
-                    // Confirmation panel — glass morphs from the toolbar
-                    VStack(spacing: 0) {
-                        Text("Delete this item?")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 14)
-                            .padding(.bottom, 10)
-
-                        Divider().opacity(0.3)
-
-                        Button(role: .destructive) {
-                            withAnimation(SnapSpring.fast) {
-                                showDeleteConfirmation = false
-                            }
-                            handleDelete()
-                        } label: {
-                            Text("Delete")
-                                .font(.body.weight(.medium))
-                                .foregroundStyle(.red)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                        }
-                        .buttonStyle(.plain)
-
-                        Divider().opacity(0.3)
-
-                        Button {
-                            withAnimation(SnapSpring.fast) {
-                                showDeleteConfirmation = false
-                            }
-                        } label: {
-                            Text("Cancel")
-                                .font(.body.weight(.medium))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .frame(width: 200)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 16))
-                    .glassEffectID("actionToolbar", in: glassNS)
-                } else {
-                    // Normal toolbar — share + delete
-                    HStack(spacing: 0) {
-                        Button {
-                            prepareShareItem()
-                        } label: {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.body.weight(.medium))
-                                .frame(width: 56, height: 50)
-                        }
-                        .buttonStyle(.plain)
-                        .glassEffect(.regular.interactive())
-                        .glassEffectUnion(id: "actionToolbar", namespace: glassNS)
-                        .accessibilityLabel("Share")
-
-                        Button {
-                            withAnimation(SnapSpring.fast) {
-                                showDeleteConfirmation = true
-                            }
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.body.weight(.medium))
-                                .frame(width: 56, height: 50)
-                        }
-                        .buttonStyle(.plain)
-                        .glassEffect(.regular.interactive())
-                        .glassEffectUnion(id: "actionToolbar", namespace: glassNS)
-                        .accessibilityLabel("Delete")
-                    }
-                    .glassEffectID("actionToolbar", in: glassNS)
-                }
-            }
-        } else {
-            HStack(spacing: 0) {
-                Button {
-                    prepareShareItem()
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .frame(width: 56, height: 50)
-                }
-                .accessibilityLabel("Share")
-
-                Divider()
-                    .frame(height: 24)
-                    .opacity(0.3)
-
-                Button {
-                    showDeleteConfirmation = true
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .frame(width: 56, height: 50)
-                }
-                .accessibilityLabel("Delete")
-            }
-            .background(.ultraThinMaterial, in: Capsule())
-            .environment(\.colorScheme, .dark)
-        }
     }
 
     /// Copy file to temp directory so share sheet shows "Send a Copy" only (no iCloud collaboration).
@@ -707,22 +582,10 @@ struct FullScreenImageOverlay: View {
         }
     }
 
-    /// How far the user can scroll up to reveal metadata.
-    /// Calculated so metadata bottom lands 32pt above the action toolbar area.
-    private var maxContentOffset: CGFloat {
-        let screen = UIScreen.main.bounds
-        let finalFrame = computeFinalFrame(for: item)
-        let metadataTopY = finalFrame.maxY + 32
-        let metadataBottomY = metadataTopY + metadataHeight
-        // 32pt margin below metadata + ~44pt for action buttons + 16pt bottom inset
-        let targetBottomY = screen.height - 72
-        return max(0, metadataBottomY - targetBottomY)
-    }
-
     /// Metadata starts very faded, becomes readable as user scrolls up
     private var metadataOpacity: Double {
         let base = 0.15
-        let progress = min(effectiveContentOffset / 80, 1.0)
+        let progress = min(contentOffset / 80, 1.0)
         return base + (1.0 - base) * progress
     }
 
@@ -770,17 +633,12 @@ struct FullScreenImageOverlay: View {
                 if isZoomed {
                     gestureMode = .zoomPan
                     zoomPanLastOffset = zoomPanOffset
-                } else if contentOffset > 0 {
-                    // Scrolled into metadata — must scroll back before dismiss
-                    gestureMode = .scroll
-                    contentOffsetAtGestureStart = contentOffset
                 } else if abs(tx) > abs(ty) + 4 {
                     gestureMode = .swipe
-                } else if ty > 0 {
+                } else if ty > 0 && contentOffset <= 0.5 {
                     gestureMode = .dismiss
                 } else {
-                    gestureMode = .scroll
-                    contentOffsetAtGestureStart = contentOffset
+                    gestureMode = .none
                 }
             }
             .onEnded { value in
@@ -810,16 +668,7 @@ struct FullScreenImageOverlay: View {
                 case .dismiss:
                     dismissOffset = max(0, ty)
                 case .scroll:
-                    let proposed = contentOffsetAtGestureStart - ty
-                    if proposed < 0 {
-                        let overshoot = -proposed
-                        contentOffset = -(log2(1 + overshoot) * 8)
-                    } else if proposed > maxContentOffset {
-                        let overshoot = proposed - maxContentOffset
-                        contentOffset = maxContentOffset + log2(1 + overshoot) * 8
-                    } else {
-                        contentOffset = proposed
-                    }
+                    break
                 case .none: break
                 }
 
@@ -868,19 +717,7 @@ struct FullScreenImageOverlay: View {
                     }
 
                 case .scroll:
-                    let velocity = -(value.predictedEndTranslation.height - ty)
-                    let snapTarget: CGFloat
-                    if abs(velocity) > 100 {
-                        // Clear flick — snap in the direction of the flick
-                        snapTarget = velocity < 0 ? 0 : maxContentOffset
-                    } else {
-                        // Gentle release — snap to nearest
-                        snapTarget = contentOffset < maxContentOffset / 2 ? 0 : maxContentOffset
-                    }
-                    withAnimation(SnapSpring.resolvedStandard) {
-                        contentOffset = snapTarget
-                    }
-                    contentOffsetAtGestureStart = snapTarget
+                    break
 
                 case .none:
                     break
@@ -932,10 +769,6 @@ struct FullScreenImageOverlay: View {
                             height: zoomPanOffset.height - gestureDrag.translation.height
                         )
                         dismissOffset = 0
-                    }
-                    if contentOffset > 0 {
-                        withAnimation(SnapSpring.resolvedFast) { contentOffset = 0 }
-                        contentOffsetAtGestureStart = 0
                     }
                 }
             }
@@ -1023,7 +856,7 @@ struct FullScreenImageOverlay: View {
                 image = adjacentImages[items[newIndex].id]
             }
 
-            onDismissing?(items[newIndex].id)
+            onCurrentItemChanged?(items[newIndex].id)
 
             revealTask?.cancel()
 
@@ -1111,6 +944,8 @@ struct FullScreenImageOverlay: View {
                 currentIndex = items.count - 1
             }
 
+            onCurrentItemChanged?(items[currentIndex].id)
+
             // Prepare new image before resetting delete state
             player?.pause()
             player = nil
@@ -1146,6 +981,7 @@ struct FullScreenImageOverlay: View {
         guard !isClosing else { return }
         isClosing = true
         heroComplete = false
+        onHeroSettledChanged?(false)
         metadataStage = 0
         revealTask?.cancel()
         contentOffset = 0
@@ -1160,6 +996,7 @@ struct FullScreenImageOverlay: View {
         isZoomed = false
 
         let currentItemId = items[currentIndex].id
+        onCurrentItemChanged?(currentItemId)
         let rawRect = gridItemRects[currentItemId]
 
         // For search dismiss, only accept rects on the visible screen.
@@ -1193,7 +1030,6 @@ struct FullScreenImageOverlay: View {
                 }
             }
 
-            onDismissing?(currentItemId)
             closeTargetFrame = correctedRect
 
             withAnimation(SnapSpring.resolvedHero) {
@@ -1297,4 +1133,3 @@ private struct MetadataHeightKey: PreferenceKey {
         value = max(value, nextValue())
     }
 }
-

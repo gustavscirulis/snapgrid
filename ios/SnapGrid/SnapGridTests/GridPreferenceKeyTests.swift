@@ -63,3 +63,52 @@ struct GridPreferenceKeyTests {
         #expect(value["item"] == onScreen, "Existing on-screen frame should be kept")
     }
 }
+
+@Suite("DetailChrome", .tags(.layout))
+@MainActor
+struct DetailChromeTests {
+
+    @Test("Toolbar title prefers current item summary and falls back when missing")
+    func toolbarTitlePrefersSummary() {
+        let summarized = MediaItem(mediaType: .image, filename: "a.jpg", width: 100, height: 100)
+        summarized.analysisResult = AnalysisResult(
+            imageContext: "Context",
+            imageSummary: "Hero Shot",
+            patterns: [],
+            provider: "test",
+            model: "test"
+        )
+
+        let untitled = MediaItem(mediaType: .image, filename: "b.jpg", width: 100, height: 100)
+
+        #expect(
+            DetailChrome.toolbarTitle(
+                currentItemId: summarized.id,
+                items: [summarized, untitled],
+                fallback: "All media"
+            ) == "Hero Shot"
+        )
+
+        #expect(
+            DetailChrome.toolbarTitle(
+                currentItemId: untitled.id,
+                items: [summarized, untitled],
+                fallback: "All media"
+            ) == "All media"
+        )
+    }
+
+    @Test("Detail mode hides top actions and tab bar")
+    func detailModeVisibilityRules() {
+        #expect(DetailChrome.showsTopBarActions(isDetailPresented: false))
+        #expect(!DetailChrome.showsTopBarActions(isDetailPresented: true))
+        #expect(!DetailChrome.hidesTabBar(isDetailPresented: false))
+        #expect(DetailChrome.hidesTabBar(isDetailPresented: true))
+    }
+
+    @Test("Reserved top inset includes safe area and toolbar spacing")
+    func reservedTopInsetAddsToolbarClearance() {
+        let inset = DetailChrome.reservedTopInset(safeAreaTop: 59)
+        #expect(inset == 59 + DetailChrome.navigationBarHeight + DetailChrome.mediaTopPadding)
+    }
+}
