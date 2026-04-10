@@ -187,6 +187,9 @@ struct FullScreenImageOverlay: View {
     private let minZoomScale: CGFloat = 1.0
     private let maxZoomScale: CGFloat = 4.0
     private let doubleTapZoomScale: CGFloat = 2.5
+    private let dismissResistanceStart: CGFloat = 120
+    private let dismissProgressDistance: CGFloat = 220
+    private let dismissPredictedThreshold: CGFloat = 240
 
     /// Current item derived from index
     private var item: MediaItem { items[currentIndex] }
@@ -249,10 +252,19 @@ struct FullScreenImageOverlay: View {
     }
 
     private var effectiveDismissOffset: CGFloat {
+        let rawOffset: CGFloat
         if gestureDrag.active && gestureMode == .dismiss {
-            return max(0, gestureDrag.translation.height)
+            rawOffset = max(0, gestureDrag.translation.height)
+        } else {
+            rawOffset = dismissOffset
         }
-        return dismissOffset
+
+        // Preserve the full slide-down travel for the no-target close fallback.
+        if isClosing && !isExpanded {
+            return rawOffset
+        }
+
+        return resistedDismissOffset(for: rawOffset)
     }
 
     private var effectiveZoomPanOffset: CGSize {
@@ -312,24 +324,30 @@ struct FullScreenImageOverlay: View {
         return value
     }
 
+    /// Downward dismiss tracks directly at first, then gains strong resistance
+    /// so the image stays near the finger instead of drifting too far away.
+    private func resistedDismissOffset(for rawOffset: CGFloat) -> CGFloat {
+        guard rawOffset > dismissResistanceStart else { return rawOffset }
+        let overshoot = rawOffset - dismissResistanceStart
+        return dismissResistanceStart + log2(1 + overshoot / 12) * 12
+    }
+
+    private var dismissProgress: CGFloat {
+        min(effectiveDismissOffset / dismissProgressDistance, 1)
+    }
+
     private var backdropOpacity: Double {
         if !isExpanded { return 0 }
-        let dragProgress = min(abs(effectiveDismissOffset) / 300.0, 1.0)
-        return 1.0 - dragProgress * 0.5
+        return 1.0 - Double(dismissProgress) * 0.6
     }
 
     private var blurOpacity: Double {
         if !isExpanded { return 0 }
-        // During active dismiss gesture, hide material blur entirely to avoid
-        // per-frame recompositing of the expensive .ultraThinMaterial effect.
-        if gestureDrag.active && gestureMode == .dismiss { return 0 }
-        let dragProgress = min(abs(effectiveDismissOffset) / 80.0, 1.0)
-        return 1.0 - dragProgress
+        return 1.0 - Double(dismissProgress) * 0.82
     }
 
     private var dismissScale: CGFloat {
-        let progress = min(abs(effectiveDismissOffset) / 400.0, 1.0)
-        return 1.0 - progress * 0.1
+        1.0 - dismissProgress * 0.06
     }
 
     private func computeFinalFrame(for mediaItem: MediaItem) -> CGRect {
@@ -586,7 +604,8 @@ struct FullScreenImageOverlay: View {
     private var metadataOpacity: Double {
         let base = 0.15
         let progress = min(contentOffset / 80, 1.0)
-        return base + (1.0 - base) * progress
+        let revealOpacity = base + (1.0 - base) * progress
+        return revealOpacity * (1.0 - Double(dismissProgress))
     }
 
     // MARK: - Metadata Reveal
@@ -708,7 +727,8 @@ struct FullScreenImageOverlay: View {
                     }
 
                 case .dismiss:
-                    if dismissOffset > 100 || value.predictedEndTranslation.height > 300 {
+                    if effectiveDismissOffset > dismissResistanceStart ||
+                        value.predictedEndTranslation.height > dismissPredictedThreshold {
                         close()
                     } else {
                         withAnimation(SnapSpring.resolvedStandard) {

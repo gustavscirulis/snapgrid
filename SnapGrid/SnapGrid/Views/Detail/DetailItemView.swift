@@ -166,7 +166,6 @@ struct DetailItemView: View {
                         .position(x: currentFrame.midX, y: currentFrame.midY)
                 }
             }
-            .clipped() // Prevent adjacent swipe images from bleeding under the sidebar
             .onChange(of: windowSize.width) { _, w in lastWindowWidth = w }
             .onChange(of: currentGeoOrigin) { _, origin in geoOrigin = origin }
             .onChange(of: appState.detailSourceFrame) { _, newFrame in
