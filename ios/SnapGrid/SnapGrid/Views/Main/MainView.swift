@@ -202,18 +202,17 @@ struct MainView: View {
     @ViewBuilder
     private func tabContent(gridWidth: CGFloat) -> some View {
         if #available(iOS 26, *) {
-            TabView {
-                Tab("All", systemImage: "square.grid.2x2") {
+            TabView(selection: $appState.selectedTab) {
+                Tab("All", systemImage: "square.grid.2x2", value: AppTab.all) {
                     allItemsContent(gridWidth: gridWidth)
                 }
-                Tab("Spaces", systemImage: "folder") {
+                Tab("Spaces", systemImage: "folder", value: AppTab.spaces) {
                     spacesContent(gridWidth: gridWidth)
                 }
-                Tab(role: .search) {
+                Tab(value: AppTab.search, role: .search) {
                     searchContent(gridWidth: gridWidth)
                 }
             }
-            .searchable(text: $appState.searchText, prompt: "Search patterns, context...")
             .tabViewSearchActivation(.searchTabSelection)
             .tint(.white)
         } else {
@@ -302,8 +301,21 @@ struct MainView: View {
                     .scrollDismissesKeyboard(.interactively)
                 }
             }
-            .navigationTitle("SnapGrid")
-            .navigationBarTitleDisplayMode(.inline)
+            .searchable(
+                text: $appState.searchText,
+                isPresented: Binding(
+                    get: { appState.selectedTab == .search },
+                    set: { isPresented in
+                        if isPresented {
+                            appState.selectedTab = .search
+                        } else if appState.selectedTab == .search,
+                                  appState.searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                            appState.selectedTab = .all
+                        }
+                    }
+                ),
+                prompt: "Search patterns, context..."
+            )
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     addImagesMenu
