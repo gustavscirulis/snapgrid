@@ -3,9 +3,9 @@ import SwiftUI
 struct SettingsView: View {
     var body: some View {
         TabView {
-            AISettingsTab()
+            GeneralSettingsTab()
                 .tabItem {
-                    Label("AI", systemImage: "brain")
+                    Label("General", systemImage: "gearshape")
                 }
 
             GuidanceSettingsTab()
