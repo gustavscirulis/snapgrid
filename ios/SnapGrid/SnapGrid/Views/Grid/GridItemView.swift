@@ -169,23 +169,23 @@ struct GridItemView: View {
                         Button {
                             onAssignToSpace?(item.id, space.id)
                         } label: {
-                            if item.space?.id == space.id {
+                            if item.belongs(to: space.id) {
                                 Label(space.name, systemImage: "checkmark")
                             } else {
                                 Text(space.name)
                             }
                         }
                     }
-                    if item.space != nil {
+                    if !item.spaces.isEmpty {
                         Divider()
                         Button {
                             onAssignToSpace?(item.id, nil)
                         } label: {
-                            Label("Remove from Space", systemImage: "folder.badge.minus")
+                            Label("Remove from All Spaces", systemImage: "folder.badge.minus")
                         }
                     }
                 } label: {
-                    Label("Move to Space", systemImage: "folder.badge.plus")
+                    Label("Update Spaces", systemImage: "folder.badge.plus")
                 }
             }
 

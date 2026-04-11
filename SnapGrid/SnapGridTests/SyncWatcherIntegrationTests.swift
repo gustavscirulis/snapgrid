@@ -81,7 +81,7 @@ struct SyncWatcherIntegrationTests {
         #expect(result.provider == "synced")
     }
 
-    @Test("initialSync assigns space when spaceId matches")
+    @Test("initialSync assigns spaces when spaceIds match")
     @MainActor func initialSyncAssignsSpace() async throws {
         let space = Space(id: "sp-mac-1", name: "Designs", order: 0)
         context.insert(space)
@@ -94,7 +94,7 @@ struct SyncWatcherIntegrationTests {
         )
         try IntegrationTestSupport.writeSpacesJSON(spacesFile, to: tempRoot)
 
-        let sidecar = IntegrationTestSupport.makeSidecar(id: "spaced-mac-1", spaceId: "sp-mac-1")
+        let sidecar = IntegrationTestSupport.makeSidecar(id: "spaced-mac-1", spaceIds: ["sp-mac-1"])
         try IntegrationTestSupport.writeSidecarJSON(sidecar, to: tempRoot)
         try IntegrationTestSupport.createDummyMedia(id: "spaced-mac-1", in: tempRoot)
 
@@ -103,7 +103,7 @@ struct SyncWatcherIntegrationTests {
 
         let items = try context.fetch(FetchDescriptor<MediaItem>())
         let item = try #require(items.first)
-        #expect(item.space?.id == "sp-mac-1")
+        #expect(item.belongs(to: "sp-mac-1"))
     }
 
     @Test("initialSync handles batch of 25+ items")
@@ -229,13 +229,13 @@ struct SyncWatcherIntegrationTests {
         #expect(item.sourceURL == "https://original.com/img.png")
     }
 
-    @Test("resync removes space when sidecar has nil spaceId")
+    @Test("resync removes all spaces when sidecar has no memberships")
     @MainActor func resyncRemovesSpaceWhenNil() async throws {
         let space = Space(id: "sp-remove", name: "Remove Me", order: 0)
         context.insert(space)
 
         let item = MediaItem(id: "unspace-mac-1", mediaType: .image, filename: "unspace-mac-1.png", width: 800, height: 600)
-        item.space = space
+        item.addSpace(space)
         context.insert(item)
         context.saveOrLog()
 
@@ -246,7 +246,35 @@ struct SyncWatcherIntegrationTests {
         let watcher = makeWatcher()
         await watcher.initialSync(context: context)
 
-        #expect(item.space == nil)
+        #expect(item.orderedSpaceIDs.isEmpty)
+    }
+
+    @Test("initialSync imports multiple memberships from spaceIds")
+    @MainActor func initialSyncAssignsMultipleSpaces() async throws {
+        let firstSpace = Space(id: "sp-mac-a", name: "Designs", order: 0)
+        let secondSpace = Space(id: "sp-mac-b", name: "Research", order: 1)
+        context.insert(firstSpace)
+        context.insert(secondSpace)
+        context.saveOrLog()
+
+        let spacesFile = SidecarSpacesFile(
+            spaces: [
+                SidecarSpace(id: "sp-mac-a", name: "Designs", order: 0, createdAt: Date(), customPrompt: nil, useCustomPrompt: false),
+                SidecarSpace(id: "sp-mac-b", name: "Research", order: 1, createdAt: Date(), customPrompt: nil, useCustomPrompt: false)
+            ],
+            allSpaceGuidance: nil, useAllSpaceGuidance: false
+        )
+        try IntegrationTestSupport.writeSpacesJSON(spacesFile, to: tempRoot)
+
+        let sidecar = IntegrationTestSupport.makeSidecar(id: "spaced-mac-many", spaceIds: ["sp-mac-b", "sp-mac-a"])
+        try IntegrationTestSupport.writeSidecarJSON(sidecar, to: tempRoot)
+        try IntegrationTestSupport.createDummyMedia(id: "spaced-mac-many", in: tempRoot)
+
+        let watcher = makeWatcher()
+        await watcher.initialSync(context: context)
+
+        let item = try #require(try context.fetch(FetchDescriptor<MediaItem>()).first(where: { $0.id == "spaced-mac-many" }))
+        #expect(item.orderedSpaceIDs == ["sp-mac-a", "sp-mac-b"])
     }
 
     // MARK: - Resync: Deletion

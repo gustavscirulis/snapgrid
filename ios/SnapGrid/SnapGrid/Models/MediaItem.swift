@@ -14,7 +14,7 @@ class MediaItem {
     var width: Int
     var height: Int
     var createdAt: Date
-    var space: Space?
+    var spaces: [Space] = []
 
     // AI analysis
     @Relationship(deleteRule: .cascade) var analysisResult: AnalysisResult?

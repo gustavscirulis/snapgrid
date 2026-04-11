@@ -6,6 +6,13 @@ enum SidebarItem: Hashable {
     case space(String) // Space.id
 }
 
+enum SpaceMembershipAction {
+    case toggle(String)
+    case add(String)
+    case remove(String)
+    case clearAll
+}
+
 @Observable
 @MainActor
 final class AppState {
@@ -149,7 +156,7 @@ struct DeletedItemInfo {
     let width: Int
     let height: Int
     let duration: Double?
-    let spaceId: String?
+    let spaceIds: [String]
 
     // Snapshot of analysis data — stored as plain values, NOT a reference to
     // the SwiftData @Model object, which becomes invalid after deletion.

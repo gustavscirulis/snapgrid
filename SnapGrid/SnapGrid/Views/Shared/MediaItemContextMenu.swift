@@ -4,9 +4,10 @@ import SwiftUI
 struct MediaItemContextMenu: View {
     let spaces: [Space]
     let activeSpaceId: String?
-    let currentSpaceId: String?
+    let currentSpaceIds: [String]
     var bulkCount: Int? = nil
-    let onMoveToSpace: (String?) -> Void
+    let onToggleSpace: (String) -> Void
+    let onRemoveFromActiveSpace: (() -> Void)?
     let onShare: () -> Void
     let onRedoAnalysis: () -> Void
     let onDelete: () -> Void
@@ -19,9 +20,9 @@ struct MediaItemContextMenu: View {
             Menu {
                 ForEach(spaces) { space in
                     Button {
-                        onMoveToSpace(space.id)
+                        onToggleSpace(space.id)
                     } label: {
-                        if currentSpaceId == space.id {
+                        if currentSpaceIds.contains(space.id) {
                             Label(space.name, systemImage: "checkmark")
                         } else {
                             Text(space.name)
@@ -29,14 +30,14 @@ struct MediaItemContextMenu: View {
                     }
                 }
             } label: {
-                Label(isBulk ? "Move \(count) Items to" : "Move to", systemImage: "folder")
+                Label(isBulk ? "Update \(count) Items in Spaces" : "Update Spaces", systemImage: "folder")
             }
 
-            if activeSpaceId != nil {
+            if activeSpaceId != nil, let onRemoveFromActiveSpace {
                 Button {
-                    onMoveToSpace(nil)
+                    onRemoveFromActiveSpace()
                 } label: {
-                    Label(isBulk ? "Remove \(count) from Space" : "Remove from Space", systemImage: "folder.badge.minus")
+                    Label(isBulk ? "Remove \(count) from Current Space" : "Remove from Current Space", systemImage: "folder.badge.minus")
                 }
             }
 

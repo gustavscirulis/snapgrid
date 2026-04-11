@@ -8,7 +8,7 @@ struct SpaceSidebarView: View {
     let onDeleteSpace: (String) -> Void
     let onRenameSpace: (String, String) -> Void
     let onReorderSpaces: (Int, Int) -> Void
-    let onAssignToSpace: (Set<String>, String?) -> Void
+    let onChangeSpaceMembership: (Set<String>, SpaceMembershipAction) -> Void
 
     @State private var editingSpaceId: String?
     @State private var editName: String = ""
@@ -22,7 +22,7 @@ struct SpaceSidebarView: View {
                 .tag(SidebarItem.all)
                 .listItemTint(.primary)
                 .dropDestination(for: String.self) { strings, _ in
-                    handleDropStrings(strings, spaceId: nil)
+                    handleDropStrings(strings, action: .clearAll)
                 } isTargeted: { targeted in
                     dropTargetId = targeted ? "ALL" : nil
                 }
@@ -111,7 +111,7 @@ struct SpaceSidebarView: View {
                     editingSpaceId = space.id
                 }
                 .dropDestination(for: String.self) { strings, _ in
-                    handleDropStrings(strings, spaceId: space.id)
+                    handleDropStrings(strings, action: .add(space.id))
                 } isTargeted: { targeted in
                     dropTargetId = targeted ? space.id : nil
                 }
@@ -120,13 +120,13 @@ struct SpaceSidebarView: View {
 
     // MARK: - Drop Helpers
 
-    private func handleDropStrings(_ strings: [String], spaceId: String?) -> Bool {
+    private func handleDropStrings(_ strings: [String], action: SpaceMembershipAction) -> Bool {
         for text in strings {
             if text.hasPrefix("snapgrid:") {
                 let idsString = String(text.dropFirst("snapgrid:".count))
                 let itemIds = Set(idsString.split(separator: ",").map(String.init))
                 if !itemIds.isEmpty {
-                    onAssignToSpace(itemIds, spaceId)
+                    onChangeSpaceMembership(itemIds, action)
                     return true
                 }
             }

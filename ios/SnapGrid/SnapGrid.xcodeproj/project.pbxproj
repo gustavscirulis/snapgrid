@@ -18,6 +18,8 @@
 		777AC6FDEA6C14A464172559 /* SidecarCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54ADC2195271038AAEE8E275 /* SidecarCodableTests.swift */; };
 		787BBD33FD14A7CC420B8C71 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC24EBA6AD6068C4ADA26030 /* SyncService.swift */; };
 		810E66F164E96C78F5095B7B /* AnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A78C6996F3AEB37B949CCE /* AnalysisResult.swift */; };
+		81BCDEF1234567890ABCDE12 /* SpaceMembership.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91BCDEF1234567890ABCDE12 /* SpaceMembership.swift */; };
+		93BCDEF1234567890ABCDE12 /* SpaceGuidanceResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BCDEF1234567890ABCDE12 /* SpaceGuidanceResolverTests.swift */; };
 		8448C11DC4344A2F90D8BD6F /* SwiftDataTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DF1DFAA1BB8E9D39744CFA9 /* SwiftDataTestSupport.swift */; };
 		84F9DE63370E1B1CC097BECA /* SearchIndexServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E80534FE421A32D569AAE8 /* SearchIndexServiceTests.swift */; };
 		A0E9D3DA2F7328AC00E35403 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A0E9D3D02F7328AC00E35403 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -160,6 +162,8 @@
 		F9E80534FE421A32D569AAE8 /* SearchIndexServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SearchIndexServiceTests.swift; sourceTree = "<group>"; };
 		FC24EBA6AD6068C4ADA26030 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
 		FCAFF8A2EC042170AE7D0DA4 /* SyncServiceDataTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncServiceDataTests.swift; sourceTree = "<group>"; };
+		91BCDEF1234567890ABCDE12 /* SpaceMembership.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceMembership.swift; sourceTree = "<group>"; };
+		92BCDEF1234567890ABCDE12 /* SpaceGuidanceResolverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpaceGuidanceResolverTests.swift; sourceTree = "<group>"; };
 		B200000001 /* GridPreferenceKeyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GridPreferenceKeyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -242,6 +246,7 @@
 				B0AEB8740C7475677E69AF73 /* MediaDeleteServiceTests.swift */,
 				2BC6070D4921036591CAB048 /* MediaItemTests.swift */,
 				0E95904BD87CF150598C8CF4 /* ModelRelationshipTests.swift */,
+				92BCDEF1234567890ABCDE12 /* SpaceGuidanceResolverTests.swift */,
 				F9E80534FE421A32D569AAE8 /* SearchIndexServiceTests.swift */,
 				D03B2C30D0292058D69AC3B2 /* ShareImportServiceTests.swift */,
 				EB2E6651487D0EFEE5E52932 /* GuidanceFallbackTests.swift */,
@@ -300,6 +305,7 @@
 			isa = PBXGroup;
 			children = (
 				B100000004 /* Space.swift */,
+				91BCDEF1234567890ABCDE12 /* SpaceMembership.swift */,
 				8EA2C659B43CBFC9C4825931 /* MediaItem.swift */,
 				71A78C6996F3AEB37B949CCE /* AnalysisResult.swift */,
 			);
@@ -566,6 +572,7 @@
 				62A792952CC5B0204DD1ACB7 /* MediaDeleteServiceTests.swift in Sources */,
 				C325B2DE9C4EBB590CE9AA5B /* MediaItemTests.swift in Sources */,
 				38FFE15933CA61B4381699B5 /* ModelRelationshipTests.swift in Sources */,
+				93BCDEF1234567890ABCDE12 /* SpaceGuidanceResolverTests.swift in Sources */,
 				84F9DE63370E1B1CC097BECA /* SearchIndexServiceTests.swift in Sources */,
 				427935C4BB83A9052AEEE6E1 /* ShareImportServiceTests.swift in Sources */,
 				2D5F5E408DB2900D5E4EB16A /* GuidanceFallbackTests.swift in Sources */,
@@ -611,6 +618,7 @@
 				A100000045 /* DetailMetadataSection.swift in Sources */,
 				A100000023 /* ShareImportService.swift in Sources */,
 				69A2FAEBC4355557E9BBF91D /* MediaItem.swift in Sources */,
+				81BCDEF1234567890ABCDE12 /* SpaceMembership.swift in Sources */,
 				810E66F164E96C78F5095B7B /* AnalysisResult.swift in Sources */,
 				787BBD33FD14A7CC420B8C71 /* SyncService.swift in Sources */,
 				F2AD76603369201957F4E1FD /* SearchIndexService.swift in Sources */,

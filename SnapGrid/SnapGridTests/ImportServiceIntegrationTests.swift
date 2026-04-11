@@ -104,7 +104,7 @@ struct ImportServiceIntegrationTests {
 
         let items = try context.fetch(FetchDescriptor<MediaItem>())
         let item = try #require(items.first)
-        #expect(item.space?.id == "sp-import")
+        #expect(item.belongs(to: "sp-import"))
     }
 
     @Test("Import sets sourceURL after insert")

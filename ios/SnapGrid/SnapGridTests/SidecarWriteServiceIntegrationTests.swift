@@ -4,7 +4,7 @@ import Foundation
 @testable import SnapGrid
 
 /// Integration tests for iOS SidecarWriteService merge-in-place logic.
-/// Verifies that writing one field (spaceId or analysis) doesn't clobber other fields.
+/// Verifies that writing one field (space membership or analysis) doesn't clobber other fields.
 @Suite(.tags(.integration, .filesystem))
 struct SidecarWriteServiceIntegrationTests {
     let tempRoot: URL
@@ -18,10 +18,10 @@ struct SidecarWriteServiceIntegrationTests {
     }
 
 
-    // MARK: - SpaceId Merge
+    // MARK: - Space Membership Merge
 
-    @Test("writeSpaceId merges into existing sidecar without losing analysis")
-    @MainActor func writeSpaceIdMergesIntoExistingSidecar() throws {
+    @Test("writeSpaceMembership merges into existing sidecar without losing analysis")
+    @MainActor func writeSpaceMembershipMergesIntoExistingSidecar() throws {
         // Write a sidecar with analysis fields
         let sidecar = IntegrationTestSupport.makeSidecar(
             id: "merge-1",
@@ -32,30 +32,34 @@ struct SidecarWriteServiceIntegrationTests {
         )
         try IntegrationTestSupport.writeSidecarJSON(sidecar, to: tempRoot)
 
-        // Create MediaItem with a space
-        let space = Space(id: "sp-merge", name: "Dashboards", order: 0)
-        context.insert(space)
+        // Create MediaItem with multiple spaces
+        let primarySpace = Space(id: "sp-merge", name: "Dashboards", order: 0)
+        let secondarySpace = Space(id: "sp-keep", name: "Review", order: 1)
+        context.insert(primarySpace)
+        context.insert(secondarySpace)
         let item = MediaItem(id: "merge-1", mediaType: .image, filename: "merge-1.png", width: 800, height: 600)
-        item.space = space
+        item.addSpace(primarySpace)
+        item.addSpace(secondarySpace)
         context.insert(item)
         context.saveOrLog()
 
-        // Write spaceId — should merge, not clobber
-        SidecarWriteService.writeSpaceId(for: item, rootURL: tempRoot)
+        // Write memberships — should merge, not clobber
+        SidecarWriteService.writeSpaceMembership(for: item, rootURL: tempRoot)
 
         // Read the raw JSON and verify both fields exist
         let url = tempRoot.appendingPathComponent("metadata/merge-1.json")
         let data = try Data(contentsOf: url)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
-        #expect(json["spaceId"] as? String == "sp-merge")
+        #expect(json["spaceIds"] as? [String] == ["sp-merge", "sp-keep"])
+        #expect(json["spaceId"] == nil)
         #expect(json["imageContext"] as? String == "Dashboard with charts")
         #expect((json["patterns"] as? [[String: Any]])?.count == 1)
     }
 
-    @Test("writeSpaceId removes key when space is nil (not NSNull)")
-    @MainActor func writeSpaceIdRemovesKeyWhenNil() throws {
-        // Write a sidecar with spaceId
+    @Test("writeSpaceMembership removes both space keys when item has no spaces")
+    @MainActor func writeSpaceMembershipRemovesKeysWhenEmpty() throws {
+        // Write a legacy sidecar with spaceId
         let sidecar = IntegrationTestSupport.makeSidecar(id: "remove-space-1", spaceId: "sp-old")
         try IntegrationTestSupport.writeSidecarJSON(sidecar, to: tempRoot)
 
@@ -64,22 +68,23 @@ struct SidecarWriteServiceIntegrationTests {
         context.insert(item)
         context.saveOrLog()
 
-        SidecarWriteService.writeSpaceId(for: item, rootURL: tempRoot)
+        SidecarWriteService.writeSpaceMembership(for: item, rootURL: tempRoot)
 
         let url = tempRoot.appendingPathComponent("metadata/remove-space-1.json")
         let data = try Data(contentsOf: url)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
-        // Key should be absent, not null
+        // Keys should be absent, not null
         #expect(json["spaceId"] == nil)
+        #expect(json["spaceIds"] == nil)
     }
 
     // MARK: - Analysis Merge
 
-    @Test("writeAnalysis merges into existing sidecar without losing spaceId")
+    @Test("writeAnalysis merges into existing sidecar without losing spaceIds")
     @MainActor func writeAnalysisMergesIntoExistingSidecar() throws {
-        // Write a sidecar with spaceId
-        let sidecar = IntegrationTestSupport.makeSidecar(id: "analysis-merge-1", spaceId: "sp-keep")
+        // Write a sidecar with canonical spaceIds
+        let sidecar = IntegrationTestSupport.makeSidecar(id: "analysis-merge-1", spaceIds: ["sp-keep", "sp-also"])
         try IntegrationTestSupport.writeSidecarJSON(sidecar, to: tempRoot)
 
         // Create MediaItem with analysis
@@ -102,7 +107,8 @@ struct SidecarWriteServiceIntegrationTests {
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
         // Both fields preserved
-        #expect(json["spaceId"] as? String == "sp-keep")
+        #expect(json["spaceIds"] as? [String] == ["sp-keep", "sp-also"])
+        #expect(json["spaceId"] == nil)
         #expect(json["imageContext"] as? String == "New analysis")
         #expect(json["analyzedAt"] != nil)
     }

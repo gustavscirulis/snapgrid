@@ -34,9 +34,12 @@ struct MetadataSidecarIntegrationTests {
             model: "gpt-4o"
         )
 
-        let space = Space(id: "sp-rt", name: "UI", order: 0)
-        context.insert(space)
-        item.space = space
+        let primarySpace = Space(id: "sp-rt", name: "UI", order: 0)
+        let secondarySpace = Space(id: "sp-secondary", name: "Favorites", order: 1)
+        context.insert(primarySpace)
+        context.insert(secondarySpace)
+        item.addSpace(primarySpace)
+        item.addSpace(secondarySpace)
         context.insert(item)
         context.saveOrLog()
 
@@ -49,11 +52,18 @@ struct MetadataSidecarIntegrationTests {
         #expect(sidecar.width == 1024)
         #expect(sidecar.height == 768)
         #expect(sidecar.sourceURL == "https://example.com/img.png")
-        #expect(sidecar.spaceId == "sp-rt")
+        #expect(sidecar.spaceIds == ["sp-rt", "sp-secondary"])
+        #expect(sidecar.normalizedSpaceIDs == ["sp-rt", "sp-secondary"])
         #expect(sidecar.imageContext == "A settings panel")
         #expect(sidecar.imageSummary == "Settings")
         #expect(sidecar.patterns?.count == 1)
         #expect(sidecar.analyzedAt != nil)
+
+        let url = storage.metadataDir.appendingPathComponent("roundtrip-1.json")
+        let data = try Data(contentsOf: url)
+        let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(json["spaceIds"] as? [String] == ["sp-rt", "sp-secondary"])
+        #expect(json["spaceId"] == nil)
     }
 
     @Test("Sidecar includes analysis fields when present")

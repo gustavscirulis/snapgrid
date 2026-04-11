@@ -46,7 +46,7 @@ final class SyncWatcher {
     /// Update for existing items whose sidecar changed (e.g. space assignment, analysis, source URL).
     private struct SidecarUpdateData: Sendable {
         let id: String
-        let spaceId: String?
+        let spaceIds: [String]
         let sourceURL: String?
         let imageContext: String?
         let imageSummary: String?
@@ -136,7 +136,7 @@ final class SyncWatcher {
     /// Perform an initial sync on launch — picks up items that arrived via iCloud while the app was closed.
     func initialSync(context: ModelContext) async {
         self.context = context
-        await syncSpaces()          // Spaces FIRST so items can resolve spaceId
+        await syncSpaces()          // Spaces FIRST so items can resolve space IDs
         await syncMetadataAsync()
     }
 
@@ -216,7 +216,7 @@ final class SyncWatcher {
                 if let sidecar = sidecarService.readSidecar(id: id) {
                     updates.append(SidecarUpdateData(
                         id: id,
-                        spaceId: sidecar.spaceId,
+                        spaceIds: sidecar.normalizedSpaceIDs,
                         sourceURL: sidecar.sourceURL,
                         imageContext: sidecar.imageContext,
                         imageSummary: sidecar.imageSummary,
@@ -315,11 +315,9 @@ final class SyncWatcher {
         let descriptor = FetchDescriptor<MediaItem>(predicate: #Predicate { $0.id == dataId })
         if let existing = try? context.fetch(descriptor), let existingItem = existing.first {
             // Item already imported — still reconcile space assignment and sourceURL
-            if let spaceId = data.sidecar.spaceId, existingItem.space?.id != spaceId {
-                let spaceDescriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
-                existingItem.space = try? context.fetch(spaceDescriptor).first
-            } else if data.sidecar.spaceId == nil && existingItem.space != nil {
-                existingItem.space = nil
+            let resolvedSpaces = spaces(for: data.sidecar.normalizedSpaceIDs)
+            if existingItem.orderedSpaceIDs != resolvedSpaces.map(\.id) {
+                existingItem.setMembership(resolvedSpaces)
             }
             if existingItem.sourceURL == nil, let sourceURL = data.sidecar.sourceURL {
                 existingItem.sourceURL = sourceURL
@@ -344,10 +342,7 @@ final class SyncWatcher {
 
         item.sourceURL = data.sidecar.sourceURL
 
-        if let spaceId = data.sidecar.spaceId {
-            let spaceDescriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
-            item.space = try? context.fetch(spaceDescriptor).first
-        }
+        item.setMembership(spaces(for: data.sidecar.normalizedSpaceIDs))
 
         if let imageContext = data.sidecar.imageContext, !imageContext.isEmpty {
             let patterns = (data.sidecar.patterns ?? []).map { PatternTag(name: $0.name, confidence: $0.confidence) }
@@ -398,15 +393,10 @@ final class SyncWatcher {
         let descriptor = FetchDescriptor<MediaItem>(predicate: #Predicate { $0.id == updateId })
         guard let item = (try? context.fetch(descriptor))?.first else { return }
 
-        if let spaceId = update.spaceId {
-            if item.space?.id != spaceId {
-                let spaceDescriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
-                item.space = try? context.fetch(spaceDescriptor).first
-                print("[SyncWatcher] Updated space for \(update.id) -> \(spaceId)")
-            }
-        } else if item.space != nil {
-            item.space = nil
-            print("[SyncWatcher] Removed space assignment for \(update.id)")
+        let resolvedSpaces = spaces(for: update.spaceIds)
+        if item.orderedSpaceIDs != resolvedSpaces.map(\.id) {
+            item.setMembership(resolvedSpaces)
+            print("[SyncWatcher] Updated spaces for \(update.id) -> \(resolvedSpaces.map(\.id))")
         }
 
         if item.sourceURL == nil, let sourceURL = update.sourceURL {
@@ -440,6 +430,15 @@ final class SyncWatcher {
                 print("[SyncWatcher] Synced analysis result for \(update.id)")
             }
         }
+    }
+
+    private func spaces(for ids: [String]) -> [Space] {
+        guard let context, !ids.isEmpty else { return [] }
+        let availableSpaces = (try? context.fetch(FetchDescriptor<Space>())) ?? []
+        let idSet = Set(ids)
+        return availableSpaces
+            .filter { idSet.contains($0.id) }
+            .membershipSorted()
     }
 
     // MARK: - Spaces Sync

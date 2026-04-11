@@ -11,7 +11,7 @@ struct GridItemView: View {
     let onToggleSelect: () -> Void
     let onShiftSelect: () -> Void
     let onDelete: (Set<String>) -> Void
-    let onAssignToSpace: (Set<String>, String?) -> Void
+    let onChangeSpaceMembership: (Set<String>, SpaceMembershipAction) -> Void
     let onRetryAnalysis: (Set<String>) -> Void
     let onShare: (Set<String>, CGRect) -> Void
 
@@ -30,7 +30,7 @@ struct GridItemView: View {
     // Eagerly resolved SwiftData properties — prevents faults on detached backing stores
     // when SwiftUI re-evaluates the body (e.g. for context menu snapshots).
     private let itemIsVideo: Bool
-    private let itemSpaceId: String?
+    private let itemSpaceIds: [String]
     private let itemAspectRatio: CGFloat
 
     // Selection state derived from AppState — changes only invalidate this view,
@@ -41,7 +41,7 @@ struct GridItemView: View {
         isSelected && selectedCount > 1 ? appState.selectedIds : [item.id]
     }
 
-    init(item: MediaItem, width: CGFloat, spaces: [Space], activeSpaceId: String?, onSelect: @escaping (CGRect) -> Void, onToggleSelect: @escaping () -> Void, onShiftSelect: @escaping () -> Void, onDelete: @escaping (Set<String>) -> Void, onAssignToSpace: @escaping (Set<String>, String?) -> Void, onRetryAnalysis: @escaping (Set<String>) -> Void, onShare: @escaping (Set<String>, CGRect) -> Void) {
+    init(item: MediaItem, width: CGFloat, spaces: [Space], activeSpaceId: String?, onSelect: @escaping (CGRect) -> Void, onToggleSelect: @escaping () -> Void, onShiftSelect: @escaping () -> Void, onDelete: @escaping (Set<String>) -> Void, onChangeSpaceMembership: @escaping (Set<String>, SpaceMembershipAction) -> Void, onRetryAnalysis: @escaping (Set<String>) -> Void, onShare: @escaping (Set<String>, CGRect) -> Void) {
         self.item = item
         self.width = width
         self.spaces = spaces
@@ -50,11 +50,11 @@ struct GridItemView: View {
         self.onToggleSelect = onToggleSelect
         self.onShiftSelect = onShiftSelect
         self.onDelete = onDelete
-        self.onAssignToSpace = onAssignToSpace
+        self.onChangeSpaceMembership = onChangeSpaceMembership
         self.onRetryAnalysis = onRetryAnalysis
         self.onShare = onShare
         self.itemIsVideo = item.isVideo
-        self.itemSpaceId = item.space?.id
+        self.itemSpaceIds = item.orderedSpaceIDs
         self.itemAspectRatio = item.aspectRatio
         _thumbnail = State(initialValue: ImageCacheService.shared.image(forKey: item.id))
     }
@@ -86,6 +86,11 @@ struct GridItemView: View {
     /// Whether this item is part of a multi-selection context menu
     private var isBulk: Bool {
         isSelected && selectedCount > 1
+    }
+
+    private var isInActiveSpace: Bool {
+        guard let activeSpaceId else { return false }
+        return itemSpaceIds.contains(activeSpaceId)
     }
 
     /// Hover state that stays true while the floating video layer covers this item.
@@ -233,8 +238,8 @@ struct GridItemView: View {
             }
         }
         .overlay(alignment: .topLeading) {
-            if effectiveHover && activeSpaceId != nil {
-                Button { onAssignToSpace(effectiveIds, nil) } label: {
+            if effectiveHover && isInActiveSpace, let activeSpaceId {
+                Button { onChangeSpaceMembership(effectiveIds, .remove(activeSpaceId)) } label: {
                     hoverButtonIcon("folder.badge.minus", size: 10)
                 }
                 .buttonStyle(.plain)
@@ -388,12 +393,22 @@ struct GridItemView: View {
             }
         }
         .contextMenu {
+            let removeFromActiveSpace: (() -> Void)? = {
+                guard let activeSpaceId, itemSpaceIds.contains(activeSpaceId) else {
+                    return nil
+                }
+                return { onChangeSpaceMembership(effectiveIds, .remove(activeSpaceId)) }
+            }()
+
             MediaItemContextMenu(
                 spaces: spaces,
                 activeSpaceId: activeSpaceId,
-                currentSpaceId: itemSpaceId,
+                currentSpaceIds: itemSpaceIds,
                 bulkCount: isBulk ? selectedCount : nil,
-                onMoveToSpace: { spaceId in onAssignToSpace(effectiveIds, spaceId) },
+                onToggleSpace: { spaceId in
+                    onChangeSpaceMembership(effectiveIds, .toggle(spaceId))
+                },
+                onRemoveFromActiveSpace: removeFromActiveSpace,
                 onShare: { onShare(effectiveIds, globalFrame) },
                 onRedoAnalysis: { onRetryAnalysis(effectiveIds) },
                 onDelete: { onDelete(effectiveIds) }
@@ -554,4 +569,3 @@ struct ShimmerText: View {
         }
     }
 }
-

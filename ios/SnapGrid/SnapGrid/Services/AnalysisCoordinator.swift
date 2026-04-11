@@ -68,7 +68,7 @@ final class AnalysisCoordinator {
 
                 item.isAnalyzing = true
                 do {
-                    let (guidance, spaceContext) = resolveGuidance(for: item)
+                    let (guidance, spaceContext) = SpaceGuidanceResolver.resolve(for: item)
 
                     let result: AnalysisResult
                     if item.isVideo {
@@ -161,23 +161,4 @@ final class AnalysisCoordinator {
         return frames
     }
 
-    private func resolveGuidance(for item: MediaItem) -> (guidance: String?, spaceContext: String?) {
-        var guidance: String?
-        var spaceContext: String?
-
-        if let space = item.space {
-            spaceContext = "This image belongs to a collection called \"\(space.name)\". Use this as context to inform your analysis."
-            if space.useCustomPrompt, let custom = space.customPrompt, !custom.isEmpty {
-                guidance = custom
-            }
-        }
-        if guidance == nil, UserDefaults.standard.bool(forKey: "useAllSpacePrompt") {
-            let allGuidance = UserDefaults.standard.string(forKey: "allSpacePrompt") ?? ""
-            if !allGuidance.isEmpty {
-                guidance = allGuidance
-            }
-        }
-
-        return (guidance, spaceContext)
-    }
 }

@@ -10,7 +10,7 @@ class Space {
     var customPrompt: String?
     var useCustomPrompt: Bool = false
 
-    @Relationship(deleteRule: .nullify, inverse: \MediaItem.space)
+    @Relationship(deleteRule: .nullify, inverse: \MediaItem.spaces)
     var items: [MediaItem] = []
 
     init(id: String = UUID().uuidString, name: String, order: Int, createdAt: Date = .now) {

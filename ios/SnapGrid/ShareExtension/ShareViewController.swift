@@ -651,7 +651,7 @@ class ShareViewController: UIViewController {
                 height: height,
                 createdAt: Date(),
                 duration: nil,
-                spaceId: nil,
+                spaceIds: nil,
                 imageContext: nil,
                 imageSummary: nil,
                 patterns: nil,
@@ -736,7 +736,7 @@ class ShareViewController: UIViewController {
                 height: height,
                 createdAt: Date(),
                 duration: duration,
-                spaceId: nil,
+                spaceIds: nil,
                 imageContext: nil,
                 imageSummary: nil,
                 patterns: nil,
@@ -793,7 +793,7 @@ private struct ShareSidecarMetadata: Codable {
     let height: Int
     let createdAt: Date
     let duration: Double?
-    let spaceId: String?
+    let spaceIds: [String]?
     let imageContext: String?
     let imageSummary: String?
     let patterns: [ShareSidecarPattern]?

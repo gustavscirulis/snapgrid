@@ -46,6 +46,7 @@
 		7EC7FDEF2B1AB437602F7CBA /* SidecarCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6F116E4024331E85284A3D /* SidecarCodableTests.swift */; };
 		8167D57BFF6AAEC5E1CF20E1 /* AnimationTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 468F744BF11C8965B74EF95F /* AnimationTokens.swift */; };
 		8350DC604AC401431E9CD255 /* Space.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6477AAD40C3308F596D68729 /* Space.swift */; };
+		83A4E1B2C3D4E5F60718293A /* SpaceMembership.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93A4E1B2C3D4E5F60718293A /* SpaceMembership.swift */; };
 		8F71F68AF462303D3E8EFF3F /* MasonryGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5AD67C6232580C3B0D9E982 /* MasonryGridView.swift */; };
 		90E631F7D9C9E3645285E61A /* DeveloperSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0EEC1133F2A0A3770E116D /* DeveloperSettingsTab.swift */; };
 		9101F365F60BDAB8F4E28C3E /* VideoFrameExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E5C14CF112B283919BE0F7D /* VideoFrameExtractor.swift */; };
@@ -77,6 +78,7 @@
 		E3CF37F05242E8078AC2B79B /* KeySyncCryptoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 998B3A855E657D80396A9CD7 /* KeySyncCryptoTests.swift */; };
 		ED7E6EF1043AE2A69F053E6C /* ImageCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB57D4AB7F12528E5ECD77DF /* ImageCacheService.swift */; };
 		EDFCACF450DFF848F52E6103 /* ModelRelationshipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1455E0958E33E6A111BD604E /* ModelRelationshipTests.swift */; };
+		EFACBD1234567890ABCDEF12 /* SpaceGuidanceResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFACBD1234567890ABCDEF12 /* SpaceGuidanceResolverTests.swift */; };
 		EED812B5100CAE8E3D506AEE /* FloatingVideoLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CE02953B123E7318BEBBA18 /* FloatingVideoLayer.swift */; };
 		F84D4B0142262DA02D0EF60D /* MetadataSidecarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB5003E05FB3CAF53FEDBCA5 /* MetadataSidecarService.swift */; };
 		FA711149840B9BFF157A8239 /* StorageSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50DDD531DF326D845D4CCA67 /* StorageSettingsTab.swift */; };
@@ -134,6 +136,7 @@
 		7EA5CD58DFE308DF284CE4AE /* ImportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportServiceTests.swift; sourceTree = "<group>"; };
 		82D1884A0E94D6BC1F407855 /* AnalysisResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisResult.swift; sourceTree = "<group>"; };
 		8698BA9F19DB6BE06979FE75 /* MetadataSidecarIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataSidecarIntegrationTests.swift; sourceTree = "<group>"; };
+		93A4E1B2C3D4E5F60718293A /* SpaceMembership.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceMembership.swift; sourceTree = "<group>"; };
 		8F5C8EE662A5F61686B9D75F /* AIAnalysisParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAnalysisParsingTests.swift; sourceTree = "<group>"; };
 		91A0CC2831F5CB94D1AF02D9 /* DataCleanupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataCleanupService.swift; sourceTree = "<group>"; };
 		9391B9A3F7CE5C394F263B9C /* ModelDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDiscoveryService.swift; sourceTree = "<group>"; };
@@ -170,6 +173,7 @@
 		EB5003E05FB3CAF53FEDBCA5 /* MetadataSidecarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataSidecarService.swift; sourceTree = "<group>"; };
 		F070C831AF60C5AF79237043 /* VideoPreviewManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPreviewManager.swift; sourceTree = "<group>"; };
 		F583D33C78C0944D437A1356 /* ModelDiscoveryScoringTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDiscoveryScoringTests.swift; sourceTree = "<group>"; };
+		FFACBD1234567890ABCDEF12 /* SpaceGuidanceResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceGuidanceResolverTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -191,6 +195,7 @@
 			children = (
 				82D1884A0E94D6BC1F407855 /* AnalysisResult.swift */,
 				3BA6AB7DC0A84E670681EB6C /* MediaItem.swift */,
+				93A4E1B2C3D4E5F60718293A /* SpaceMembership.swift */,
 				6477AAD40C3308F596D68729 /* Space.swift */,
 				99FFBFE4624B0A09BB339F3A /* SupportedMedia.swift */,
 			);
@@ -225,6 +230,7 @@
 				1455E0958E33E6A111BD604E /* ModelRelationshipTests.swift */,
 				CD33117D036F9A35077E816E /* SearchIndexServiceTests.swift */,
 				0C6F116E4024331E85284A3D /* SidecarCodableTests.swift */,
+				FFACBD1234567890ABCDEF12 /* SpaceGuidanceResolverTests.swift */,
 				6598B587FE431314D84564BF /* SyncWatcherDataTests.swift */,
 				736BF8FF80CB87437CBFAB02 /* SyncWatcherIntegrationTests.swift */,
 				2B22E27F602D62D0D71F8B81 /* TwitterVideoServiceTests.swift */,
@@ -516,6 +522,7 @@
 				D016DE668FB1A40FFB11BD0D /* SettingsView.swift in Sources */,
 				52559E4B91F49A6CEDD07719 /* SnapGridApp.swift in Sources */,
 				8350DC604AC401431E9CD255 /* Space.swift in Sources */,
+				83A4E1B2C3D4E5F60718293A /* SpaceMembership.swift in Sources */,
 				45E1AAE8DB57B9F1B1E02F58 /* SpaceSidebarView.swift in Sources */,
 				FA711149840B9BFF157A8239 /* StorageSettingsTab.swift in Sources */,
 				67C13EA251A2A6E0FBDD4FC0 /* SupportedMedia.swift in Sources */,
@@ -552,6 +559,7 @@
 				EDFCACF450DFF848F52E6103 /* ModelRelationshipTests.swift in Sources */,
 				08DAE144678E84619184D186 /* SearchIndexServiceTests.swift in Sources */,
 				7EC7FDEF2B1AB437602F7CBA /* SidecarCodableTests.swift in Sources */,
+				EFACBD1234567890ABCDEF12 /* SpaceGuidanceResolverTests.swift in Sources */,
 				BEA03F6A0BE41527598D7E81 /* SwiftDataTestSupport.swift in Sources */,
 				ACD5CD7D34819BB6E99CACD5 /* SyncWatcherDataTests.swift in Sources */,
 				A1DD9F32448B920AC6E63BB2 /* SyncWatcherIntegrationTests.swift in Sources */,

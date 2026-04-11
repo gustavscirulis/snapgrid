@@ -34,7 +34,7 @@ struct ContentView: View {
         var items = allItems
 
         if let spaceId {
-            items = items.filter { $0.space?.id == spaceId }
+            items = items.filter { $0.belongs(to: spaceId) }
         }
 
         guard isSearchActive else { return items }
@@ -82,7 +82,7 @@ struct ContentView: View {
                 onDeleteSpace: deleteSpace,
                 onRenameSpace: renameSpace,
                 onReorderSpaces: reorderSpaces,
-                onAssignToSpace: assignToSpace
+                onChangeSpaceMembership: updateSpaceMembership
             )
         } detail: {
             ZStack {
@@ -118,8 +118,8 @@ struct ContentView: View {
                         onDelete: { id in
                             deleteItems(Set([id]))
                         },
-                        onAssignToSpace: { id, spaceId in
-                            assignToSpace(itemIds: Set([id]), spaceId: spaceId)
+                        onChangeSpaceMembership: { id, action in
+                            updateSpaceMembership(itemIds: Set([id]), action: action)
                         },
                         spaces: spaces,
                         activeSpaceId: appState.activeSpaceId
@@ -405,7 +405,7 @@ struct ContentView: View {
                     )
                 },
                 onDelete: deleteItems,
-                onAssignToSpace: assignToSpace,
+                onChangeSpaceMembership: updateSpaceMembership,
                 onRetryAnalysis: retryAnalysis,
                 onShare: { ids, frame in shareItems(ids, sourceFrame: frame) },
                 onSetSelection: { ids in appState.selectedIds = ids },
@@ -566,7 +566,7 @@ struct ContentView: View {
                 width: item.width,
                 height: item.height,
                 duration: item.duration,
-                spaceId: item.space?.id,
+                spaceIds: item.orderedSpaceIDs,
                 imageContext: ar?.imageContext,
                 imageSummary: ar?.imageSummary,
                 patterns: ar?.patterns,
@@ -671,9 +671,9 @@ struct ContentView: View {
                 )
             }
 
-            if let spaceId = info.spaceId {
-                let descriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
-                item.space = try? modelContext.fetch(descriptor).first
+            if !info.spaceIds.isEmpty {
+                let idSet = Set(info.spaceIds)
+                item.setMembership(spaces.filter { idSet.contains($0.id) })
             }
 
             modelContext.insert(item)
@@ -703,12 +703,16 @@ struct ContentView: View {
         }
 
         syncWatcher.beginLocalChange()
-        for item in space.items {
-            item.space = nil
+        let itemsToUpdate = space.items
+        for item in itemsToUpdate {
+            item.removeSpace(id: id)
         }
         modelContext.delete(space)
         modelContext.saveOrLog()
         MetadataSidecarService.shared.writeSpaces(from: modelContext)
+        for item in itemsToUpdate {
+            MetadataSidecarService.shared.writeSidecar(for: item)
+        }
         syncWatcher.endLocalChange()
     }
 
@@ -740,13 +744,30 @@ struct ContentView: View {
         syncWatcher.endLocalChange()
     }
 
-    private func assignToSpace(itemIds: Set<String>, spaceId: String?) {
-        let space = spaceId.flatMap { sid in spaces.first(where: { $0.id == sid }) }
+    private func updateSpaceMembership(itemIds: Set<String>, action: SpaceMembershipAction) {
         let itemsToUpdate = allItems.filter { itemIds.contains($0.id) }
+        var reanalyzeItems: [MediaItem] = []
 
         syncWatcher.beginLocalChange()
         for item in itemsToUpdate {
-            item.space = space
+            switch action {
+            case .toggle(let spaceId):
+                guard let space = spaces.first(where: { $0.id == spaceId }) else { continue }
+                let added = item.toggleSpace(space)
+                if added, space.useCustomPrompt, space.customPrompt != nil {
+                    reanalyzeItems.append(item)
+                }
+            case .add(let spaceId):
+                guard let space = spaces.first(where: { $0.id == spaceId }) else { continue }
+                let added = item.addSpace(space)
+                if added, space.useCustomPrompt, space.customPrompt != nil {
+                    reanalyzeItems.append(item)
+                }
+            case .remove(let spaceId):
+                _ = item.removeSpace(id: spaceId)
+            case .clearAll:
+                _ = item.clearSpaces()
+            }
         }
         modelContext.saveOrLog()
 
@@ -755,11 +776,9 @@ struct ContentView: View {
         }
         syncWatcher.endLocalChange()
 
-        if let space, space.useCustomPrompt, space.customPrompt != nil {
-            for item in itemsToUpdate {
-                Task {
-                    await importService.analyzeItem(item, context: modelContext)
-                }
+        for item in reanalyzeItems {
+            Task {
+                await importService.analyzeItem(item, context: modelContext)
             }
         }
     }
@@ -858,4 +877,3 @@ private struct NotificationModifier: ViewModifier {
             }
     }
 }
-
