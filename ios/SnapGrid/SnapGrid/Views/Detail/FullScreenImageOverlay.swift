@@ -1030,7 +1030,7 @@ struct FullScreenImageOverlay: View {
         if let targetRect {
             // Grid cell is visible — hero animation back to it
             var correctedRect = targetRect
-            if !isSearchDismiss {
+            if !isSearchDismiss && !hasNavigated {
                 // Apply correction: sourceRect is ground truth for the original item.
                 // Preference-based rects may have a systematic offset (e.g. from
                 // off-screen TabView pages), so anchor to sourceRect.
