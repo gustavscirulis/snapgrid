@@ -14,30 +14,30 @@ struct DetailMetadataSection: View {
                     ProgressView()
                         .tint(.white)
                     Text("Analyzing...")
-                        .font(.system(size: 14))
+                        .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.6))
                 }
                 .stageReveal(stage: stage, threshold: 1)
             } else if item.analysisError != nil {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 13))
+                        .font(.footnote)
                         .foregroundStyle(.red.opacity(0.8))
                     Text("Analysis failed")
-                        .font(.system(size: 14))
+                        .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.6))
                 }
                 .stageReveal(stage: stage, threshold: 1)
             } else if let result = item.analysisResult {
                 if !result.patterns.isEmpty {
                     patternPillsGrid(result.patterns)
-                        .padding(.bottom, 18)
+                        .padding(.bottom, 16)
                 }
 
                 if hasDescription(result) {
                     Text(result.imageContext)
                         .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(.white.opacity(0.5))
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                         .opacity(stage >= 3 ? 1 : 0)
@@ -67,7 +67,7 @@ struct DetailMetadataSection: View {
                     .padding(.top, 8)
             }
         }
-        .padding(.horizontal, 32)
+        .padding(.horizontal, 24)
     }
 
     private func hasDescription(_ result: AnalysisResult) -> Bool {
@@ -97,13 +97,15 @@ struct DetailMetadataSection: View {
             .font(.subheadline)
             .foregroundStyle(.white.opacity(0.9))
             .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .padding(.vertical, 8)
 
         if #available(iOS 26.0, *) {
             base
                 .environment(\.colorScheme, .dark)
                 .glassEffect(.regular.interactive(), in: .capsule)
                 .contentShape(Rectangle())
+                .accessibilityLabel("Pattern: \(pattern.name)")
+                .accessibilityAddTraits(.isButton)
                 .accessibilityHint("Double tap to search for this pattern")
                 .onTapGesture {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -122,6 +124,8 @@ struct DetailMetadataSection: View {
                 .background(.ultraThinMaterial, in: Capsule())
                 .environment(\.colorScheme, .dark)
                 .contentShape(Rectangle())
+                .accessibilityLabel("Pattern: \(pattern.name)")
+                .accessibilityAddTraits(.isButton)
                 .accessibilityHint("Double tap to search for this pattern")
                 .onTapGesture {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -164,9 +168,9 @@ struct SourceLinkButton: View {
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: iconName)
-                .font(.system(size: 11))
+                .font(.caption2)
             Text(label)
-                .font(.system(size: 13))
+                .font(.footnote)
         }
         .foregroundStyle(.white.opacity(0.35))
         .contentShape(Rectangle())

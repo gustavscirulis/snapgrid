@@ -50,7 +50,7 @@ struct GridItemView: View {
                     .fill(Color.snapDarkMuted)
                     .frame(width: width, height: height)
                     .overlay {
-                        VStack(spacing: 6) {
+                        VStack(spacing: 8) {
                             Image(systemName: "icloud.and.arrow.down")
                                 .font(.body)
                                 .foregroundStyle(.white.opacity(0.3))
@@ -76,7 +76,7 @@ struct GridItemView: View {
                     Image(systemName: "play.fill")
                         .font(.caption2)
                         .foregroundStyle(.white)
-                        .padding(6)
+                        .padding(8)
                         .background(.black.opacity(0.5))
                         .clipShape(Circle())
                         .padding(8)
@@ -215,7 +215,7 @@ struct GridItemView: View {
     private var shimmerBadge: some View {
         let base = ShimmerText("Analyzing...")
             .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .padding(.vertical, 4)
 
         if #available(iOS 26, *) {
             base

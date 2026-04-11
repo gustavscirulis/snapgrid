@@ -620,24 +620,24 @@ struct DetailItemView: View {
         if isLoadingFullRes {
             let base = ProgressView()
                 .controlSize(.small)
-                .padding(6)
+                .padding(8)
 
             #if compiler(>=6.3)
             if #available(macOS 26, *) {
                 base
-                    .glassEffect(.regular, in: .rect(cornerRadius: 6))
-                    .padding(10)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 8))
+                    .padding(8)
                     .transition(.opacity)
             } else {
                 base
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
-                    .padding(10)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .padding(8)
                     .transition(.opacity)
             }
             #else
             base
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
-                .padding(10)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .padding(8)
                 .transition(.opacity)
             #endif
         }
@@ -802,7 +802,7 @@ struct DetailMetadataSection: View {
                 }
                 .stageReveal(stage: stage, threshold: 1)
             } else if item.analysisError != nil {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.caption)
                         .foregroundStyle(.red.opacity(0.8))
@@ -813,7 +813,7 @@ struct DetailMetadataSection: View {
                 .stageReveal(stage: stage, threshold: 1)
             } else if let result = item.analysisResult {
                 if !result.patterns.isEmpty {
-                    let pillsContent = FlowLayout(spacing: 6) {
+                    let pillsContent = FlowLayout(spacing: 8) {
                         ForEach(Array(result.patterns.enumerated()), id: \.element.name) { index, pattern in
                             Button {
                                 onSearchPattern?(pattern.name)
@@ -821,6 +821,8 @@ struct DetailMetadataSection: View {
                                 PatternPill(name: pattern.name, large: true)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("Pattern: \(pattern.name)")
+                            .accessibilityHint("Searches for items with this pattern")
                             .opacity(stage >= 2 ? 1 : 0)
                             .offset(y: stage >= 2 ? 0 : MetadataReveal.slideDistance)
                             .animation(
@@ -829,12 +831,12 @@ struct DetailMetadataSection: View {
                             )
                         }
                     }
-                    .padding(.leading, -6)
-                    .padding(.bottom, 18)
+                    .padding(.leading, -8)
+                    .padding(.bottom, 16)
 
                     #if compiler(>=6.3)
                     if #available(macOS 26, *) {
-                        GlassEffectContainer(spacing: 6) { pillsContent }
+                        GlassEffectContainer(spacing: 8) { pillsContent }
                     } else {
                         pillsContent
                     }
@@ -899,7 +901,7 @@ private struct SourceLinkButton: View {
 
     var body: some View {
         Link(destination: url) {
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Image(systemName: iconName)
                     .font(.caption2)
                 Text(label)
@@ -909,6 +911,7 @@ private struct SourceLinkButton: View {
             .onHover { isHovered = $0 }
         }
         .accessibilityLabel("View original post on X")
+        .accessibilityHint("Opens the source URL in your browser")
     }
 }
 

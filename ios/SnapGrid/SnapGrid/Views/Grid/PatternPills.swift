@@ -10,7 +10,7 @@ struct PatternPills: View {
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.white.opacity(0.9))
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
+                    .padding(.vertical, 4)
                     .background(.white.opacity(0.15))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }

@@ -200,7 +200,7 @@ struct GridItemView: View {
                             .animation(SnapSpring.standard(reduced: reduceMotion), value: effectiveHover)
 
                             HStack {
-                                FlowLayout(spacing: 5) {
+                                FlowLayout(spacing: 4) {
                                     ForEach(Array(patterns.prefix(5).enumerated()), id: \.element.name) { index, pattern in
                                         PatternPill(name: pattern.name, useGlass: false)
                                             .opacity(effectiveHover ? 1 : 0)
@@ -235,6 +235,7 @@ struct GridItemView: View {
                 .padding(8)
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 .accessibilityLabel("Delete")
+                .accessibilityHint("Moves this item to the trash")
             }
         }
         .overlay(alignment: .topLeading) {
@@ -246,6 +247,7 @@ struct GridItemView: View {
                 .padding(8)
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 .accessibilityLabel("Remove from space")
+                .accessibilityHint("Removes this item from the current space")
             }
         }
         .overlay(alignment: .bottomLeading) {
@@ -257,6 +259,7 @@ struct GridItemView: View {
                 .padding(8)
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 .accessibilityLabel("Redo analysis")
+                .accessibilityHint("Runs AI analysis again on this item")
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
