@@ -125,7 +125,7 @@ struct MediaDetailModal: View {
                                 Button {
                                     closeRequestID += 1
                                 } label: {
-                                    Label("Back", systemImage: "chevron.left")
+                                    Label("Close", systemImage: "xmark")
                                 }
                             }
 
