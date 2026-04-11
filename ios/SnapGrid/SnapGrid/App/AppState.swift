@@ -25,6 +25,7 @@ final class AppState {
     var pendingSearchActivation = false
     var pendingSearchPattern: String?
     var activeSpaceId: String? = nil
+    var searchSpaceId: String? = nil
     var searchText = ""
     var searchScores: [String: Double] = [:]
     var showPhotosPicker = false
