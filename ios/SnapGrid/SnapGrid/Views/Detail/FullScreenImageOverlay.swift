@@ -250,7 +250,7 @@ struct FullScreenImageOverlay: View {
 
     private var effectiveDismissOffset: CGFloat {
         if gestureDrag.active && gestureMode == .dismiss {
-            return max(0, gestureDrag.translation.height)
+            return resistedDismissOffset(for: gestureDrag.translation.height)
         }
         return dismissOffset
     }
@@ -312,19 +312,31 @@ struct FullScreenImageOverlay: View {
         return value
     }
 
+    /// Lets the initial pull track the finger, then adds resistance so
+    /// downward dismisses feel heavier without changing gesture routing.
+    private func resistedDismissOffset(for rawOffset: CGFloat) -> CGFloat {
+        let offset = max(0, rawOffset)
+        let freeDistance: CGFloat = 56
+        guard offset > freeDistance else { return offset }
+
+        let overshoot = offset - freeDistance
+        return freeDistance + log2(1 + overshoot / 16) * 18
+    }
+
+    private var dismissVisualProgress: CGFloat {
+        min(effectiveDismissOffset / 120.0, 1.0)
+    }
+
     private var backdropOpacity: Double {
         if !isExpanded { return 0 }
-        let dragProgress = min(abs(effectiveDismissOffset) / 300.0, 1.0)
+        let dragProgress = dismissVisualProgress
         return 1.0 - dragProgress * 0.5
     }
 
     private var blurOpacity: Double {
         if !isExpanded { return 0 }
-        // During active dismiss gesture, hide material blur entirely to avoid
-        // per-frame recompositing of the expensive .ultraThinMaterial effect.
-        if gestureDrag.active && gestureMode == .dismiss { return 0 }
-        let dragProgress = min(abs(effectiveDismissOffset) / 80.0, 1.0)
-        return 1.0 - dragProgress
+        let dragProgress = dismissVisualProgress
+        return 1.0 - dragProgress * 0.75
     }
 
     private var dismissScale: CGFloat {
@@ -498,7 +510,8 @@ struct FullScreenImageOverlay: View {
                 )
                 .padding(.top, 32)
                 .padding(.bottom, 120)
-                .opacity(deleteStage >= 1 ? 0 : (isZoomed ? 0 : metadataOpacity))
+                .opacity(deleteStage >= 1 ? 0 : (isZoomed ? 0 : metadataOpacity * metadataDismissOpacity))
+                .offset(y: dismissVisualProgress * 24)
             }
             .frame(maxWidth: .infinity)
         }
@@ -589,6 +602,10 @@ struct FullScreenImageOverlay: View {
         return base + (1.0 - base) * progress
     }
 
+    private var metadataDismissOpacity: Double {
+        1.0 - min(dismissVisualProgress * 1.35, 1.0)
+    }
+
     // MARK: - Metadata Reveal
 
     private func startMetadataReveal() {
@@ -666,7 +683,7 @@ struct FullScreenImageOverlay: View {
                     }
                     swipeOffset = proposed
                 case .dismiss:
-                    dismissOffset = max(0, ty)
+                    dismissOffset = resistedDismissOffset(for: ty)
                 case .scroll:
                     break
                 case .none: break
@@ -708,7 +725,7 @@ struct FullScreenImageOverlay: View {
                     }
 
                 case .dismiss:
-                    if dismissOffset > 100 || value.predictedEndTranslation.height > 300 {
+                    if ty > 120 || value.predictedEndTranslation.height > 300 {
                         close()
                     } else {
                         withAnimation(SnapSpring.resolvedStandard) {
