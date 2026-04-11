@@ -15,24 +15,36 @@ struct PatternPill: View {
     var body: some View {
         let base = Text(name)
             .font(large ? .subheadline : .callout)
-            .foregroundStyle(.white.opacity(0.9))
+            .foregroundStyle(large ? AnyShapeStyle(.primary) : AnyShapeStyle(.white.opacity(0.9)))
             .padding(.horizontal, large ? 10 : 8)
             .padding(.vertical, large ? 5 : 3)
 
         #if compiler(>=6.3)
         if #available(macOS 26, *), useGlass {
-            base
-                .glassEffect(.regular.tint(.black.opacity(0.3)), in: .rect(cornerRadius: cornerRadius))
-                .environment(\.colorScheme, .dark)
+            if large {
+                base.glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
+            } else {
+                base
+                    .glassEffect(.regular.tint(.black.opacity(0.3)), in: .rect(cornerRadius: cornerRadius))
+                    .environment(\.colorScheme, .dark)
+            }
+        } else {
+            if large {
+                base.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+            } else {
+                base
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+                    .environment(\.colorScheme, .dark)
+            }
+        }
+        #else
+        if large {
+            base.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
         } else {
             base
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
                 .environment(\.colorScheme, .dark)
         }
-        #else
-        base
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
-            .environment(\.colorScheme, .dark)
         #endif
     }
 }

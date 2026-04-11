@@ -1,6 +1,35 @@
 import SwiftUI
 
-struct AISettingsTab: View {
+enum AppearanceMode: String, CaseIterable {
+    case dark, light, auto
+
+    var label: String {
+        switch self {
+        case .dark: "Dark"
+        case .light: "Light"
+        case .auto: "Auto"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .dark: "moon.fill"
+        case .light: "sun.max.fill"
+        case .auto: "circle.lefthalf.filled"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .dark: .dark
+        case .light: .light
+        case .auto: nil
+        }
+    }
+}
+
+struct GeneralSettingsTab: View {
+    @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.dark.rawValue
     @AppStorage("aiProvider") private var selectedProvider: String = AIProvider.openai.rawValue
     @AppStorage("openaiModel") private var openaiModel: String = ModelDiscoveryService.autoModelValue
     @AppStorage("anthropicModel") private var anthropicModel: String = ModelDiscoveryService.autoModelValue
@@ -38,7 +67,17 @@ struct AISettingsTab: View {
 
     var body: some View {
         Form {
-            Section {
+            Section("Appearance") {
+                Picker("Mode", selection: $appearanceMode) {
+                    ForEach(AppearanceMode.allCases, id: \.rawValue) { mode in
+                        Label(mode.label, systemImage: mode.icon)
+                            .tag(mode.rawValue)
+                    }
+                }
+                .pickerStyle(.inline)
+            }
+
+            Section("AI Analysis") {
                 Picker("Provider", selection: $selectedProvider) {
                     ForEach(AIProvider.allCases, id: \.rawValue) { p in
                         Text(p.displayName).tag(p.rawValue)
@@ -80,9 +119,7 @@ struct AISettingsTab: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
-            }
 
-            Section("Model") {
                 modelPicker
             }
         }

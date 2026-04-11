@@ -44,6 +44,7 @@ struct DetailItemView: View {
 
     @Environment(AppState.self) private var appState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var items: [MediaItem]
     @State private var currentIndex: Int
@@ -126,7 +127,7 @@ struct DetailItemView: View {
         ZStack {
             ZStack {
                 Rectangle().fill(.ultraThinMaterial)
-                Color.black.opacity(0.55)
+                (colorScheme == .dark ? Color.black : Color.white).opacity(0.55)
             }
             .opacity(isExpanded ? 1.0 : 0.0)
             .ignoresSafeArea()
@@ -345,8 +346,7 @@ struct DetailItemView: View {
                 .frame(width: max(min(imageFrame.width, 550), 400))
                 .padding(.top, 40)
                 .padding(.bottom, 40)
-                .mask(metadataFadeMask)
-                .opacity(isZoomed ? 0 : 1)
+                .opacity(isZoomed ? 0 : metadataScrollOpacity)
                 .animation(SnapSpring.fast, value: isZoomed)
             }
             .frame(maxWidth: .infinity)
@@ -581,7 +581,7 @@ struct DetailItemView: View {
                 .position(x: windowSize.width / 2, y: windowSize.height / 2)
         } else {
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.05))
+                .fill(Color.primary.opacity(0.05))
                 .frame(width: frame.width, height: frame.height)
                 .position(x: windowSize.width / 2, y: windowSize.height / 2)
         }
@@ -618,14 +618,28 @@ struct DetailItemView: View {
     @ViewBuilder
     private var loadingIndicator: some View {
         if isLoadingFullRes {
-            ProgressView()
+            let base = ProgressView()
                 .controlSize(.small)
-                .tint(.white)
                 .padding(6)
-                .background(.black.opacity(0.4))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+            #if compiler(>=6.3)
+            if #available(macOS 26, *) {
+                base
+                    .glassEffect(.regular, in: .rect(cornerRadius: 6))
+                    .padding(10)
+                    .transition(.opacity)
+            } else {
+                base
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+                    .padding(10)
+                    .transition(.opacity)
+            }
+            #else
+            base
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
                 .padding(10)
                 .transition(.opacity)
+            #endif
         }
     }
 
@@ -658,16 +672,11 @@ struct DetailItemView: View {
         }
     }
 
-    private var metadataFadeMask: some View {
+    /// Scroll-responsive opacity for metadata: starts partially transparent,
+    /// becomes fully opaque after scrolling ~60pt.
+    private var metadataScrollOpacity: Double {
         let fade = max(0, 1 - scrollOffset / 60)
-        return LinearGradient(
-            colors: [
-                .white.opacity(1 - 0.8 * fade),
-                .white.opacity(1 - 0.4 * fade)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        return 1 - 0.6 * fade
     }
 
     // MARK: - Frame Computation
@@ -787,7 +796,6 @@ struct DetailMetadataSection: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
-                        .tint(.white)
                     Text("Analyzing...")
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -814,7 +822,7 @@ struct DetailMetadataSection: View {
                 }
 
                 if !result.patterns.isEmpty {
-                    FlowLayout(spacing: 6) {
+                    let pillsContent = FlowLayout(spacing: 6) {
                         ForEach(Array(result.patterns.enumerated()), id: \.element.name) { index, pattern in
                             Button {
                                 onSearchPattern?(pattern.name)
@@ -832,6 +840,16 @@ struct DetailMetadataSection: View {
                     }
                     .padding(.leading, -6)
                     .padding(.bottom, 18)
+
+                    #if compiler(>=6.3)
+                    if #available(macOS 26, *) {
+                        GlassEffectContainer(spacing: 6) { pillsContent }
+                    } else {
+                        pillsContent
+                    }
+                    #else
+                    pillsContent
+                    #endif
                 }
 
                 if hasDescription(result) {

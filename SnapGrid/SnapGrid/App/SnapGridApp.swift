@@ -3,8 +3,13 @@ import SwiftData
 
 @main
 struct SnapGridApp: App {
+    @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.dark.rawValue
     let container: ModelContainer
     private static let multiSpaceStoreResetKey = "multiSpaceStoreReset_v1"
+
+    private var appearanceColorScheme: ColorScheme? {
+        (AppearanceMode(rawValue: appearanceMode) ?? .dark).colorScheme
+    }
 
     init() {
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -48,6 +53,7 @@ struct SnapGridApp: App {
     var body: some Scene {
         WindowGroup("SnapGrid") {
             ContentView()
+                .preferredColorScheme(appearanceColorScheme)
                 .task { KeySyncService.syncToiCloud() }
         }
         .modelContainer(container)
@@ -148,6 +154,7 @@ struct SnapGridApp: App {
 
         Settings {
             SettingsView()
+                .preferredColorScheme(appearanceColorScheme)
         }
         .modelContainer(container)
     }
