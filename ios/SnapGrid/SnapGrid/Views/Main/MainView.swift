@@ -217,6 +217,12 @@ struct MainView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+        .alert("Enable AI Analysis?", isPresented: $analysisCoordinator.needsConsentPrompt) {
+            Button("Enable") { analysisCoordinator.grantConsent() }
+            Button("Not Now", role: .cancel) { analysisCoordinator.declineConsent() }
+        } message: {
+            Text("Your images will be sent to your configured AI provider's API for analysis. Image data is transmitted directly to the provider and is subject to their privacy policy.")
+        }
     }
 
     // MARK: - Tab Content

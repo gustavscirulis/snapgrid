@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A100000060 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B100000060 /* PrivacyInfo.xcprivacy */; };
 		00B9B3A1CE6741B63334035B /* AIAnalysisParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DD0DAB918AE6C43203687B1 /* AIAnalysisParsingTests.swift */; };
 		11C0F4AB839DF43E22D65B9A /* KeySyncCryptoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D2D2CB68835763A39B0B88 /* KeySyncCryptoTests.swift */; };
 		2D5F5E408DB2900D5E4EB16A /* GuidanceFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB2E6651487D0EFEE5E52932 /* GuidanceFallbackTests.swift */; };
@@ -140,6 +141,7 @@
 		B100000022 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		B100000023 /* SnapGrid.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SnapGrid.entitlements; sourceTree = "<group>"; };
 		B100000024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B100000060 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B100000025 /* ShareImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareImportService.swift; sourceTree = "<group>"; };
 		B100000030 /* AnimationTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationTokens.swift; sourceTree = "<group>"; };
 		B100000031 /* ImageImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageImportService.swift; sourceTree = "<group>"; };
@@ -361,6 +363,7 @@
 				B100000022 /* AppIcon.icon */,
 				B100000023 /* SnapGrid.entitlements */,
 				B100000024 /* Info.plist */,
+				B100000060 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -554,6 +557,7 @@
 			files = (
 				A100000019 /* Assets.xcassets in Resources */,
 				A100000022 /* AppIcon.icon in Resources */,
+				A100000060 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

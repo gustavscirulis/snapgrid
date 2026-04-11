@@ -160,6 +160,14 @@ final class ImportService {
             return
         }
 
+        // First-time consent: confirm user understands images are sent to external AI provider
+        if !UserDefaults.standard.bool(forKey: "aiAnalysisConsentGiven") {
+            let confirmed = await MainActor.run {
+                showAnalysisConsentAlert(provider: provider)
+            }
+            guard confirmed else { return }
+        }
+
         let storedModel = UserDefaults.standard.string(forKey: "\(provider.rawValue)Model") ?? ModelDiscoveryService.autoModelValue
         let model: String
         if storedModel == ModelDiscoveryService.autoModelValue {
@@ -262,6 +270,25 @@ final class ImportService {
 
         if let ext = urlPathExtension, SupportedMedia.allExtensions.contains(ext) { return ext }
         return nil
+    }
+
+    /// Shows a one-time consent alert explaining that images will be sent to an external AI provider.
+    /// Returns `true` if the user consented, `false` if they declined.
+    @MainActor
+    private func showAnalysisConsentAlert(provider: AIProvider) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Enable AI Analysis?"
+        alert.informativeText = "Your images will be sent to \(provider.displayName)'s API for analysis using your API key. Image data is transmitted directly to the provider and is subject to their privacy policy.\n\nYou can change or remove your API key in Settings at any time."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Enable")
+        alert.addButton(withTitle: "Not Now")
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            UserDefaults.standard.set(true, forKey: "aiAnalysisConsentGiven")
+            return true
+        }
+        return false
     }
 
     enum ImportError: LocalizedError {
