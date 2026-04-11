@@ -511,7 +511,7 @@ struct FullScreenImageOverlay: View {
                     }
                 )
                 .padding(.top, 32)
-                .padding(.bottom, 120)
+                .padding(.bottom, 50)
                 .opacity(deleteStage >= 1 ? 0 : (isZoomed ? 0 : metadataOpacity * metadataDismissOpacity))
                 .offset(y: dismissVisualProgress * 24)
             }
