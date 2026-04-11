@@ -63,13 +63,17 @@ struct ContentView: View {
     }
 
     private var detailNavigationTitle: String {
-        guard let detailId = appState.detailItem,
-              let item = allItems.first(where: { $0.id == detailId }),
-              let summary = item.analysisResult?.imageSummary,
-              !summary.isEmpty else {
-            return "SnapGrid"
+        if let detailId = appState.detailItem,
+           let item = allItems.first(where: { $0.id == detailId }),
+           let summary = item.analysisResult?.imageSummary,
+           !summary.isEmpty {
+            return summary
         }
-        return summary
+        if let spaceId = appState.activeSpaceId,
+           let space = spaces.first(where: { $0.id == spaceId }) {
+            return space.name
+        }
+        return "All media"
     }
 
     var body: some View {
