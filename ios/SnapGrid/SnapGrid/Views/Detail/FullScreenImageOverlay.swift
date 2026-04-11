@@ -121,6 +121,8 @@ struct FullScreenImageOverlay: View {
     var onSearchPattern: ((String) -> Void)?
     var onDelete: ((MediaItem) -> Void)?
 
+    @Environment(\.colorScheme) private var colorScheme
+
     /// Captured at open time — stays stable even when parent re-filters.
     @State private var items: [MediaItem]
     @State private var currentIndex: Int
@@ -375,7 +377,7 @@ struct FullScreenImageOverlay: View {
             ZStack {
                 Rectangle().fill(.ultraThinMaterial)
                     .opacity(blurOpacity)
-                Color.black.opacity(0.3)
+                (colorScheme == .dark ? Color.black : Color.white).opacity(0.55)
                     .opacity(backdropOpacity)
             }
             .ignoresSafeArea()
