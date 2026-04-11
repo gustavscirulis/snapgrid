@@ -16,8 +16,8 @@ struct PatternPill: View {
         let base = Text(name)
             .font(large ? .subheadline : .callout)
             .foregroundStyle(large ? AnyShapeStyle(.primary) : AnyShapeStyle(.white.opacity(0.9)))
-            .padding(.horizontal, large ? 10 : 8)
-            .padding(.vertical, large ? 5 : 3)
+            .padding(.horizontal, large ? 12 : 8)
+            .padding(.vertical, large ? 4 : 4)
 
         #if compiler(>=6.3)
         if #available(macOS 26, *), useGlass {

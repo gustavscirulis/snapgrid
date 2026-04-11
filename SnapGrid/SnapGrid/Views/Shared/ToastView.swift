@@ -11,7 +11,7 @@ struct ToastOverlay: View {
                     .font(.callout.weight(.medium))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 8)
 
                 #if compiler(>=6.3)
                 if #available(macOS 26, *) {

@@ -16,6 +16,7 @@ struct EmptyStateView: View {
                 .foregroundStyle(.white.opacity(0.4))
                 .multilineTextAlignment(.center)
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -30,6 +31,7 @@ struct SearchEmptyStateView: View {
                 .font(.headline)
                 .foregroundStyle(.white.opacity(0.7))
         }
+        .accessibilityElement(children: .combine)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
@@ -53,6 +55,7 @@ struct PlaceholderView: View {
                     .foregroundStyle(.white.opacity(0.4))
             }
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -81,7 +84,7 @@ struct ErrorStateView: View {
             .font(.subheadline.weight(.medium))
             .foregroundStyle(.white)
             .padding(.horizontal, 20)
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             .background(.white.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
