@@ -68,6 +68,16 @@ struct MediaDetailModal: View {
         return items[selectedIndex]
     }
 
+    private var resolvedStartIndex: Int? {
+        if let selectedItemId,
+           let matchedIndex = items.firstIndex(where: { $0.id == selectedItemId }) {
+            return matchedIndex
+        }
+
+        guard let selectedIndex, !items.isEmpty else { return nil }
+        return min(max(selectedIndex, 0), items.count - 1)
+    }
+
     var body: some View {
         GeometryReader { geo in
             let overlaySize = CGSize(
@@ -76,7 +86,7 @@ struct MediaDetailModal: View {
             )
             let topReservedInset = DetailChrome.reservedTopInset(safeAreaTop: geo.safeAreaInsets.top)
 
-            if let startIndex = selectedIndex {
+            if let startIndex = resolvedStartIndex {
                 NavigationStack {
                     Color.clear
                         .background(TransparentNavigationContainer())
