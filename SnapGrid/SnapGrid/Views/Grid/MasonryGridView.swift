@@ -20,7 +20,7 @@ struct MasonryGridView: View {
     let onToggleSelect: (String) -> Void
     let onShiftSelect: (String) -> Void
     let onDelete: (Set<String>) -> Void
-    let onAssignToSpace: (Set<String>, String?) -> Void
+    let onChangeSpaceMembership: (Set<String>, SpaceMembershipAction) -> Void
     let onRetryAnalysis: (Set<String>) -> Void
     let onShare: (Set<String>, CGRect) -> Void
     let onSetSelection: (Set<String>) -> Void
@@ -114,7 +114,7 @@ struct MasonryGridView: View {
                                         onToggleSelect: { onToggleSelect(item.id) },
                                         onShiftSelect: { onShiftSelect(item.id) },
                                         onDelete: onDelete,
-                                        onAssignToSpace: onAssignToSpace,
+                                        onChangeSpaceMembership: onChangeSpaceMembership,
                                         onRetryAnalysis: onRetryAnalysis,
                                         onShare: onShare
                                     )

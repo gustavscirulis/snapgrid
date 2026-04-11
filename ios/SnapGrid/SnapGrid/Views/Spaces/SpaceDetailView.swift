@@ -19,7 +19,7 @@ struct SpaceDetailView<AddMenu: View>: View {
     }
 
     private var spaceItems: [MediaItem] {
-        allItems.filter { $0.space?.id == spaceId }
+        allItems.filter { $0.belongs(to: spaceId) }
     }
 
     var body: some View {

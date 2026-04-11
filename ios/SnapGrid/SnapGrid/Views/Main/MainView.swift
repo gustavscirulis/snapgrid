@@ -56,7 +56,7 @@ struct MainView: View {
         case .all, .search:
             return searchContentItems
         case .space(let spaceId):
-            return allItems.filter { $0.space?.id == spaceId }
+            return allItems.filter { $0.belongs(to: spaceId) }
         }
     }
 
@@ -204,17 +204,18 @@ struct MainView: View {
     @ViewBuilder
     private func tabContent(gridWidth: CGFloat) -> some View {
         if #available(iOS 26, *) {
-            TabView(selection: $appState.selectedTab) {
-                Tab("All", systemImage: "square.grid.2x2", value: AppTab.all) {
+            TabView {
+                Tab("All", systemImage: "square.grid.2x2") {
                     allItemsContent(gridWidth: gridWidth)
                 }
-                Tab("Spaces", systemImage: "folder", value: AppTab.spaces) {
+                Tab("Spaces", systemImage: "folder") {
                     spacesContent(gridWidth: gridWidth)
                 }
-                Tab(value: AppTab.search, role: .search) {
+                Tab(role: .search) {
                     searchContent(gridWidth: gridWidth)
                 }
             }
+            .searchable(text: $appState.searchText, prompt: "Search patterns, context...")
             .tabViewSearchActivation(.searchTabSelection)
             .tint(.white)
         } else {
@@ -313,26 +314,8 @@ struct MainView: View {
                     .scrollDismissesKeyboard(.interactively)
                 }
             }
-            .searchable(
-                text: $appState.searchText,
-                isPresented: Binding(
-                    get: { appState.selectedTab == .search },
-                    set: { isPresented in
-                        if isPresented {
-                            appState.selectedTab = .search
-                        } else if appState.selectedTab == .search,
-                                  appState.searchText.trimmingCharacters(in: .whitespaces).isEmpty {
-                            appState.selectedTab = .all
-                        }
-                    }
-                ),
-                prompt: "Search patterns, context..."
-            )
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    addImagesMenu
-                }
-            }
+            .navigationTitle("SnapGrid")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
@@ -430,8 +413,9 @@ struct MainView: View {
             appState.activeSpaceId = nil
         }
 
-        for item in space.items {
-            item.space = nil
+        let itemsToUpdate = space.items
+        for item in itemsToUpdate {
+            item.removeSpace(id: id)
         }
         modelContext.delete(space)
         modelContext.saveOrLog()
@@ -439,6 +423,9 @@ struct MainView: View {
         if let rootURL = fileSystem.rootURL {
             let allSpaces = (try? modelContext.fetch(FetchDescriptor<Space>(sortBy: [SortDescriptor(\.order)]))) ?? []
             SidecarWriteService.writeSpaces(allSpaces, rootURL: rootURL)
+            for item in itemsToUpdate {
+                SidecarWriteService.writeSpaceMembership(for: item, rootURL: rootURL)
+            }
         }
 
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -448,18 +435,24 @@ struct MainView: View {
 
     private func handleAssignToSpace(itemId: String, spaceId: String?) {
         guard let item = allItems.first(where: { $0.id == itemId }) else { return }
+        var shouldReanalyze = false
 
-        let currentSpaceId = item.space?.id
-        if currentSpaceId == spaceId { return }
-
-        let space: Space? = spaceId.flatMap { sid in
-            spaces.first(where: { $0.id == sid })
+        if let spaceId {
+            guard let space = spaces.first(where: { $0.id == spaceId }) else { return }
+            let added = item.toggleSpace(space)
+            shouldReanalyze = added && space.useCustomPrompt && space.customPrompt != nil
+        } else {
+            guard item.clearSpaces() else { return }
         }
-        item.space = space
+
         modelContext.saveOrLog()
 
         if let rootURL = fileSystem.rootURL {
-            SidecarWriteService.writeSpaceId(for: item, rootURL: rootURL)
+            SidecarWriteService.writeSpaceMembership(for: item, rootURL: rootURL)
+        }
+
+        if shouldReanalyze {
+            analysisCoordinator.analyzeItems([item], allItems: allItems)
         }
 
         UINotificationFeedbackGenerator().notificationOccurred(.success)

@@ -7,21 +7,26 @@ import SwiftData
 @MainActor
 struct ModelRelationshipTests {
 
-    @Test("MediaItem can be assigned to a Space")
-    func assignToSpace() throws {
+    @Test("MediaItem can belong to multiple Spaces")
+    func assignToMultipleSpaces() throws {
         let container = try TestContainer.create()
         let context = container.mainContext
 
-        let space = Space(name: "UI", order: 0)
+        let primarySpace = Space(name: "UI", order: 0)
+        let secondarySpace = Space(name: "Favorites", order: 1)
         let item = MediaItem(mediaType: .image, filename: "test.png", width: 100, height: 100)
-        context.insert(space)
+        context.insert(primarySpace)
+        context.insert(secondarySpace)
         context.insert(item)
-        item.space = space
+        item.addSpace(primarySpace)
+        item.addSpace(secondarySpace)
 
         try context.save()
 
-        #expect(item.space?.id == space.id)
-        #expect(space.items.contains(where: { $0.id == item.id }))
+        #expect(item.belongs(to: primarySpace.id))
+        #expect(item.belongs(to: secondarySpace.id))
+        #expect(primarySpace.items.contains(where: { $0.id == item.id }))
+        #expect(secondarySpace.items.contains(where: { $0.id == item.id }))
     }
 
     @Test("AnalysisResult cascades on MediaItem delete")
@@ -51,23 +56,28 @@ struct ModelRelationshipTests {
         #expect(remaining.isEmpty)
     }
 
-    @Test("Deleting Space nullifies MediaItem.space")
+    @Test("Deleting Space removes only that membership")
     func spaceDeleteNullifies() throws {
         let container = try TestContainer.create()
         let context = container.mainContext
 
-        let space = Space(name: "Photos", order: 0)
+        let removedSpace = Space(name: "Photos", order: 0)
+        let keptSpace = Space(name: "Saved", order: 1)
         let item = MediaItem(mediaType: .image, filename: "test.png", width: 100, height: 100)
-        context.insert(space)
+        context.insert(removedSpace)
+        context.insert(keptSpace)
         context.insert(item)
-        item.space = space
+        item.addSpace(removedSpace)
+        item.addSpace(keptSpace)
 
         try context.save()
 
-        context.delete(space)
+        context.delete(removedSpace)
         try context.save()
 
-        #expect(item.space == nil)
+        #expect(!item.belongs(to: removedSpace.id))
+        #expect(item.belongs(to: keptSpace.id))
+        #expect(item.orderedSpaceIDs == [keptSpace.id])
     }
 
     @Test("Multiple items can belong to same Space")
@@ -81,8 +91,8 @@ struct ModelRelationshipTests {
         context.insert(space)
         context.insert(item1)
         context.insert(item2)
-        item1.space = space
-        item2.space = space
+        item1.addSpace(space)
+        item2.addSpace(space)
 
         try context.save()
 

@@ -29,7 +29,7 @@ struct SidecarCodableTests {
             height: 1080,
             createdAt: Date(timeIntervalSince1970: 1700000000),
             duration: nil,
-            spaceId: "space-1",
+            spaceIds: ["space-1", "space-2"],
             imageContext: "A landscape photo",
             imageSummary: "Landscape",
             patterns: [
@@ -41,13 +41,17 @@ struct SidecarCodableTests {
         )
 
         let data = try Self.encoder.encode(original)
+        let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
         let decoded = try Self.decoder.decode(SidecarMetadata.self, from: data)
 
         #expect(decoded.id == original.id)
         #expect(decoded.type == original.type)
         #expect(decoded.width == original.width)
         #expect(decoded.height == original.height)
-        #expect(decoded.spaceId == original.spaceId)
+        #expect(decoded.spaceIds == ["space-1", "space-2"])
+        #expect(decoded.normalizedSpaceIDs == ["space-1", "space-2"])
+        #expect(json["spaceIds"] as? [String] == ["space-1", "space-2"])
+        #expect(json["spaceId"] == nil)
         #expect(decoded.imageContext == original.imageContext)
         #expect(decoded.imageSummary == original.imageSummary)
         #expect(decoded.patterns?.count == 2)
@@ -64,7 +68,7 @@ struct SidecarCodableTests {
             height: 480,
             createdAt: Date(timeIntervalSince1970: 1700000000),
             duration: 12.5,
-            spaceId: nil,
+            spaceIds: nil,
             imageContext: nil,
             imageSummary: nil,
             patterns: nil,
@@ -75,7 +79,8 @@ struct SidecarCodableTests {
         let data = try Self.encoder.encode(original)
         let decoded = try Self.decoder.decode(SidecarMetadata.self, from: data)
 
-        #expect(decoded.spaceId == nil)
+        #expect(decoded.spaceIds == nil)
+        #expect(decoded.normalizedSpaceIDs.isEmpty)
         #expect(decoded.imageContext == nil)
         #expect(decoded.imageSummary == nil)
         #expect(decoded.patterns == nil)
@@ -94,7 +99,7 @@ struct SidecarCodableTests {
             height: 720,
             createdAt: Date(timeIntervalSince1970: 1700000000),
             duration: 30.0,
-            spaceId: nil,
+            spaceIds: nil,
             imageContext: nil,
             imageSummary: nil,
             patterns: nil,
@@ -126,6 +131,25 @@ struct SidecarCodableTests {
         let decoded = try Self.decoder.decode(SidecarMetadata.self, from: data)
         #expect(decoded.sourceURL == nil)
         #expect(decoded.id == "old-item")
+    }
+
+    @Test("Legacy spaceId decodes into normalized spaceIds")
+    func legacySpaceIdDecodes() throws {
+        let json = """
+        {
+            "id": "legacy-item",
+            "type": "image",
+            "width": 100,
+            "height": 100,
+            "createdAt": "2023-11-14T22:13:20Z",
+            "spaceId": "legacy-space"
+        }
+        """
+
+        let decoded = try Self.decoder.decode(SidecarMetadata.self, from: Data(json.utf8))
+        #expect(decoded.spaceIds == ["legacy-space"])
+        #expect(decoded.normalizedSpaceIDs == ["legacy-space"])
+        #expect(decoded.spaceId == "legacy-space")
     }
 
     // MARK: - SidecarSpacesFile

@@ -73,7 +73,7 @@ struct ImageImportServiceTests {
         #expect(sidecar.type == "image")
     }
 
-    @Test("spaceId parameter appears in sidecar")
+    @Test("spaceId parameter is normalized to spaceIds in sidecar")
     func spaceIdInSidecar() async throws {
         let root = try makeTempRoot()
         defer { cleanup(root) }
@@ -89,7 +89,8 @@ struct ImageImportServiceTests {
         decoder.dateDecodingStrategy = .iso8601
         let sidecar = try decoder.decode(SidecarMetadata.self, from: data)
 
-        #expect(sidecar.spaceId == "space-42")
+        #expect(sidecar.spaceIds == ["space-42"])
+        #expect(sidecar.normalizedSpaceIDs == ["space-42"])
     }
 
     @Test("Multiple images returns correct counts")

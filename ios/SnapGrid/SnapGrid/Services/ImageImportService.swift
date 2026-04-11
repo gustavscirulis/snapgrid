@@ -12,7 +12,7 @@ enum ImageImportService {
 
     /// Import an array of UIImages into the SnapGrid iCloud container.
     /// Writes each image as PNG + sidecar JSON to `rootURL/images/` and `rootURL/metadata/`.
-    /// If `spaceId` is provided, the sidecar will reference that space.
+    /// If `spaceId` is provided, the sidecar will reference that space membership.
     static func importImages(_ images: [UIImage], to rootURL: URL, spaceId: String? = nil) async -> ImportResult {
         let fm = FileManager.default
         let imagesDir = rootURL.appendingPathComponent("images", isDirectory: true)
@@ -56,7 +56,7 @@ enum ImageImportService {
                     height: height,
                     createdAt: Date(),
                     duration: nil,
-                    spaceId: spaceId,
+                    spaceIds: spaceId.map { [$0] },
                     imageContext: nil,
                     imageSummary: nil,
                     patterns: nil,

@@ -12,17 +12,24 @@ enum SidecarWriteService {
         return e
     }()
 
-    /// Update the spaceId field in a media item's sidecar JSON.
-    /// Removes the key when spaceId is nil (not NSNull — that was a bug).
+    /// Update the spaceIds field in a media item's sidecar JSON.
+    /// Removes both membership keys when the item has no spaces.
     /// Falls back to writing a complete sidecar if the file doesn't exist yet.
-    static func writeSpaceId(for item: MediaItem, rootURL: URL) {
+    static func writeSpaceMembership(for item: MediaItem, rootURL: URL) {
         updateSidecar(for: item, rootURL: rootURL) { json in
-            if let spaceId = item.space?.id {
-                json["spaceId"] = spaceId
+            let spaceIds = item.orderedSpaceIDs
+            if spaceIds.isEmpty {
+                json.removeValue(forKey: "spaceIds")
+                json.removeValue(forKey: "spaceId")
             } else {
+                json["spaceIds"] = spaceIds
                 json.removeValue(forKey: "spaceId")
             }
         }
+    }
+
+    static func writeSpaceId(for item: MediaItem, rootURL: URL) {
+        writeSpaceMembership(for: item, rootURL: rootURL)
     }
 
     /// Write analysis results back to a media item's sidecar JSON.
@@ -104,7 +111,7 @@ enum SidecarWriteService {
             height: item.height,
             createdAt: item.createdAt,
             duration: item.duration,
-            spaceId: item.space?.id,
+            spaceIds: item.orderedSpaceIDs,
             imageContext: item.analysisResult?.imageContext,
             imageSummary: item.analysisResult?.imageSummary,
             patterns: item.analysisResult?.patterns.map { SidecarPattern(name: $0.name, confidence: $0.confidence) },

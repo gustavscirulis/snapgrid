@@ -104,7 +104,7 @@ struct AppStateTests {
     @Test("Push and pop delete batch")
     func undoStack() {
         let state = AppState()
-        let batch = [DeletedItemInfo(id: "1", filename: "test.png", mediaType: .image, width: 100, height: 100, duration: nil, spaceId: nil, imageContext: nil, imageSummary: nil, patterns: nil, analyzedAt: nil, analysisProvider: nil, analysisModel: nil)]
+        let batch = [DeletedItemInfo(id: "1", filename: "test.png", mediaType: .image, width: 100, height: 100, duration: nil, spaceIds: [], imageContext: nil, imageSummary: nil, patterns: nil, analyzedAt: nil, analysisProvider: nil, analysisModel: nil)]
 
         state.pushDeleteBatch(batch)
         let popped = state.popDeleteBatch()
@@ -117,7 +117,7 @@ struct AppStateTests {
     func undoStackCap() {
         let state = AppState()
         for i in 0..<25 {
-            let batch = [DeletedItemInfo(id: "\(i)", filename: "\(i).png", mediaType: .image, width: 100, height: 100, duration: nil, spaceId: nil, imageContext: nil, imageSummary: nil, patterns: nil, analyzedAt: nil, analysisProvider: nil, analysisModel: nil)]
+            let batch = [DeletedItemInfo(id: "\(i)", filename: "\(i).png", mediaType: .image, width: 100, height: 100, duration: nil, spaceIds: [], imageContext: nil, imageSummary: nil, patterns: nil, analyzedAt: nil, analysisProvider: nil, analysisModel: nil)]
             state.pushDeleteBatch(batch)
         }
 

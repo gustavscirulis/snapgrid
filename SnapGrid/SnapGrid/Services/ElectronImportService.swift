@@ -387,7 +387,7 @@ final class ElectronImportService {
         item.sourceId = electronId
 
         if let spaceId = metadata.spaceId, let space = spaceMap[spaceId] {
-            item.space = space
+            item.addSpace(space)
         }
 
         if let imageContext = metadata.imageContext, !imageContext.isEmpty {

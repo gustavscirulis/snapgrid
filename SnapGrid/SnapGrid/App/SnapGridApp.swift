@@ -4,6 +4,7 @@ import SwiftData
 @main
 struct SnapGridApp: App {
     let container: ModelContainer
+    private static let multiSpaceStoreResetKey = "multiSpaceStoreReset_v1"
 
     init() {
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -12,6 +13,11 @@ struct SnapGridApp: App {
         let snapGridDir = appSupport.appendingPathComponent("SnapGrid", isDirectory: true)
         try? FileManager.default.createDirectory(at: snapGridDir, withIntermediateDirectories: true)
         let storeURL = snapGridDir.appendingPathComponent("default.store")
+
+        if !UserDefaults.standard.bool(forKey: Self.multiSpaceStoreResetKey) {
+            Self.deleteStoreFiles(at: storeURL)
+            UserDefaults.standard.set(true, forKey: Self.multiSpaceStoreResetKey)
+        }
 
         do {
             let config = ModelConfiguration("SnapGrid", url: storeURL)
@@ -25,6 +31,16 @@ struct SnapGridApp: App {
                 container = try ModelContainer(for: MediaItem.self, Space.self, AnalysisResult.self, configurations: config)
             } catch {
                 fatalError("Failed to create ModelContainer after recovery: \(error)")
+            }
+        }
+    }
+
+    private static func deleteStoreFiles(at storeURL: URL) {
+        let fm = FileManager.default
+        for suffix in ["", "-wal", "-shm"] {
+            let url = URL(fileURLWithPath: storeURL.path + suffix)
+            if fm.fileExists(atPath: url.path) {
+                try? fm.removeItem(at: url)
             }
         }
     }

@@ -76,13 +76,13 @@ struct SyncServiceIntegrationTests {
         #expect(result.provider == "synced")
     }
 
-    @Test("Sidecar with spaceId assigns Space to new item")
+    @Test("Sidecar with spaceIds assigns Spaces to new item")
     @MainActor func syncAssignsSpaceToNewItem() async throws {
         let space = Space(id: "sp-1", name: "Screenshots", order: 0)
         context.insert(space)
         context.saveOrLog()
 
-        let sidecar = IntegrationTestSupport.makeSidecar(id: "spaced-1", spaceId: "sp-1")
+        let sidecar = IntegrationTestSupport.makeSidecar(id: "spaced-1", spaceIds: ["sp-1"])
         try IntegrationTestSupport.writeSidecarJSON(sidecar, to: tempRoot)
         try IntegrationTestSupport.createDummyMedia(id: "spaced-1", in: tempRoot)
 
@@ -99,7 +99,7 @@ struct SyncServiceIntegrationTests {
 
         let items = try context.fetch(FetchDescriptor<MediaItem>())
         let item = try #require(items.first)
-        #expect(item.space?.id == "sp-1")
+        #expect(item.belongs(to: "sp-1"))
     }
 
     // MARK: - Update Existing Items
@@ -115,7 +115,7 @@ struct SyncServiceIntegrationTests {
         context.saveOrLog()
 
         // Write sidecar assigning it to space
-        let sidecar = IntegrationTestSupport.makeSidecar(id: "update-1", spaceId: "sp-2")
+        let sidecar = IntegrationTestSupport.makeSidecar(id: "update-1", spaceIds: ["sp-2"])
         try IntegrationTestSupport.writeSidecarJSON(sidecar, to: tempRoot)
         try IntegrationTestSupport.createDummyMedia(id: "update-1", in: tempRoot)
 
@@ -129,20 +129,20 @@ struct SyncServiceIntegrationTests {
         let service = SyncService()
         await service.sync(rootURL: tempRoot, context: context)
 
-        #expect(item.space?.id == "sp-2")
+        #expect(item.belongs(to: "sp-2"))
     }
 
-    @Test("Removes space when sidecar has nil spaceId")
+    @Test("Removes all spaces when sidecar has no memberships")
     @MainActor func syncRemovesSpaceWhenSidecarHasNilSpaceId() async throws {
         let space = Space(id: "sp-3", name: "Old Space", order: 0)
         context.insert(space)
 
         let item = MediaItem(id: "unspace-1", mediaType: .image, filename: "unspace-1.png", width: 800, height: 600)
-        item.space = space
+        item.addSpace(space)
         context.insert(item)
         context.saveOrLog()
 
-        // Sidecar with no spaceId
+        // Sidecar with no memberships
         let sidecar = IntegrationTestSupport.makeSidecar(id: "unspace-1", spaceId: nil)
         try IntegrationTestSupport.writeSidecarJSON(sidecar, to: tempRoot)
         try IntegrationTestSupport.createDummyMedia(id: "unspace-1", in: tempRoot)
@@ -150,7 +150,36 @@ struct SyncServiceIntegrationTests {
         let service = SyncService()
         await service.sync(rootURL: tempRoot, context: context)
 
-        #expect(item.space == nil)
+        #expect(item.orderedSpaceIDs.isEmpty)
+    }
+
+    @Test("Sidecar with multiple spaceIds assigns all memberships")
+    @MainActor func syncAssignsMultipleSpacesToItem() async throws {
+        let firstSpace = Space(id: "sp-a", name: "Screenshots", order: 0)
+        let secondSpace = Space(id: "sp-b", name: "Inspiration", order: 1)
+        context.insert(firstSpace)
+        context.insert(secondSpace)
+        context.saveOrLog()
+
+        let sidecar = IntegrationTestSupport.makeSidecar(id: "multi-space-1", spaceIds: ["sp-b", "sp-a"])
+        try IntegrationTestSupport.writeSidecarJSON(sidecar, to: tempRoot)
+        try IntegrationTestSupport.createDummyMedia(id: "multi-space-1", in: tempRoot)
+
+        let spacesFile = SidecarSpacesFile(
+            spaces: [
+                SidecarSpace(id: "sp-a", name: "Screenshots", order: 0, createdAt: Date(), customPrompt: nil, useCustomPrompt: false),
+                SidecarSpace(id: "sp-b", name: "Inspiration", order: 1, createdAt: Date(), customPrompt: nil, useCustomPrompt: false)
+            ],
+            allSpaceGuidance: nil,
+            useAllSpaceGuidance: false
+        )
+        try IntegrationTestSupport.writeSpacesJSON(spacesFile, to: tempRoot)
+
+        let service = SyncService()
+        await service.sync(rootURL: tempRoot, context: context)
+
+        let item = try #require(try context.fetch(FetchDescriptor<MediaItem>()).first)
+        #expect(item.orderedSpaceIDs == ["sp-a", "sp-b"])
     }
 
     @Test("Updates analysis when remote is newer")

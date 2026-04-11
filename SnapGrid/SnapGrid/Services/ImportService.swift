@@ -55,7 +55,7 @@ final class ImportService {
             if let spaceId {
                 let descriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
                 if let space = try? context.fetch(descriptor).first {
-                    item.space = space
+                    item.addSpace(space)
                 }
             }
 
@@ -128,7 +128,7 @@ final class ImportService {
         if let spaceId {
             let descriptor = FetchDescriptor<Space>(predicate: #Predicate { $0.id == spaceId })
             if let space = try? context.fetch(descriptor).first {
-                item.space = space
+                item.addSpace(space)
             }
         }
 
@@ -176,22 +176,9 @@ final class ImportService {
             let result: AnalysisResult
             let storage = self.storage
 
-            // Resolve guidance and space context separately
-            var guidance: String?
-            var spaceContext: String?
-
-            if let space = item.space {
-                spaceContext = "This image belongs to a collection called \"\(space.name)\". Use this as context to inform your analysis."
-                if space.useCustomPrompt, let custom = space.customPrompt, !custom.isEmpty {
-                    guidance = custom
-                }
-            }
-            if guidance == nil, UserDefaults.standard.bool(forKey: "useAllSpacePrompt") {
-                let allGuidance = UserDefaults.standard.string(forKey: "allSpacePrompt") ?? ""
-                if !allGuidance.isEmpty {
-                    guidance = allGuidance
-                }
-            }
+            let resolvedGuidance = SpaceGuidanceResolver.resolve(for: item)
+            let guidance = resolvedGuidance.guidance
+            let spaceContext = resolvedGuidance.spaceContext
 
             if item.isVideo {
                 let frames = try await VideoFrameExtractor.extractAnalysisFrames(from: storage.mediaURL(filename: item.filename))

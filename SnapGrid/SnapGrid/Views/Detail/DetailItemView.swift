@@ -34,7 +34,7 @@ struct DetailItemView: View {
     let onShare: ((String, CGRect) -> Void)?
     let onRedoAnalysis: ((String) -> Void)?
     let onDelete: ((String) -> Void)?
-    let onAssignToSpace: ((String, String?) -> Void)?
+    let onChangeSpaceMembership: ((String, SpaceMembershipAction) -> Void)?
     let spaces: [Space]
     let activeSpaceId: String?
 
@@ -91,7 +91,7 @@ struct DetailItemView: View {
         onShare: ((String, CGRect) -> Void)? = nil,
         onRedoAnalysis: ((String) -> Void)? = nil,
         onDelete: ((String) -> Void)? = nil,
-        onAssignToSpace: ((String, String?) -> Void)? = nil,
+        onChangeSpaceMembership: ((String, SpaceMembershipAction) -> Void)? = nil,
         spaces: [Space] = [],
         activeSpaceId: String? = nil
     ) {
@@ -107,7 +107,7 @@ struct DetailItemView: View {
         self.onShare = onShare
         self.onRedoAnalysis = onRedoAnalysis
         self.onDelete = onDelete
-        self.onAssignToSpace = onAssignToSpace
+        self.onChangeSpaceMembership = onChangeSpaceMembership
         self.spaces = spaces
         self.activeSpaceId = activeSpaceId
     }
@@ -166,6 +166,7 @@ struct DetailItemView: View {
                         .position(x: currentFrame.midX, y: currentFrame.midY)
                 }
             }
+            .clipped() // Prevent adjacent swipe images from bleeding under the sidebar
             .onChange(of: windowSize.width) { _, w in lastWindowWidth = w }
             .onChange(of: currentGeoOrigin) { _, origin in geoOrigin = origin }
             .onChange(of: appState.detailSourceFrame) { _, newFrame in
@@ -714,13 +715,21 @@ struct DetailItemView: View {
 
     @ViewBuilder
     private func detailContextMenu(frame: CGRect) -> some View {
+        let removeFromActiveSpace: (() -> Void)? = {
+            guard let activeSpaceId, currentItem.belongs(to: activeSpaceId) else {
+                return nil
+            }
+            return { onChangeSpaceMembership?(currentItem.id, .remove(activeSpaceId)) }
+        }()
+
         MediaItemContextMenu(
             spaces: spaces,
             activeSpaceId: activeSpaceId,
-            currentSpaceId: currentItem.space?.id,
-            onMoveToSpace: { spaceId in
-                onAssignToSpace?(currentItem.id, spaceId)
+            currentSpaceIds: currentItem.orderedSpaceIDs,
+            onToggleSpace: { spaceId in
+                onChangeSpaceMembership?(currentItem.id, .toggle(spaceId))
             },
+            onRemoveFromActiveSpace: removeFromActiveSpace,
             onShare: { onShare?(currentItem.id, frame) },
             onRedoAnalysis: { onRedoAnalysis?(currentItem.id) },
             onDelete: {
@@ -902,15 +911,17 @@ final class TrackpadScrollState {
     private(set) var cumulativeOffset: CGFloat = 0
     private(set) var scrollDelta: CGSize = .zero
     private(set) var phase: ScrollPhase = .idle
-    nonisolated(unsafe) private var monitor: Any?
+    private var monitor: Any?
     private var isHorizontalLocked = false
     var trackBothAxes = false
 
     enum ScrollPhase { case idle, scrolling, ended }
 
     deinit {
-        if let m = monitor {
-            NSEvent.removeMonitor(m)
+        MainActor.assumeIsolated {
+            if let m = monitor {
+                NSEvent.removeMonitor(m)
+            }
         }
     }
 
