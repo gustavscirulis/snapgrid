@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var searchScores: [String: Double] = [:]
     @State private var isSearchActive = false
     @State private var isSearchFieldPresented = false
+    @State private var shareAnchorView: NSView?
 
     #if DEBUG
     @AppStorage("debugSimulateEmptyState") private var debugSimulateEmptyState = false
@@ -173,17 +174,13 @@ struct ContentView: View {
             if let detailId = appState.detailItem {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        if let window = NSApp.keyWindow {
-                            let frame = CGRect(
-                                x: window.frame.width - 100,
-                                y: window.frame.height - 50,
-                                width: 40, height: 40
-                            )
-                            shareItems(Set([detailId]), sourceFrame: frame)
+                        if let anchor = shareAnchorView {
+                            shareItems(Set([detailId]), anchorView: anchor)
                         }
                     } label: {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
+                    .background(ShareAnchorView(nsView: $shareAnchorView))
                 }
             }
         }
@@ -806,11 +803,22 @@ struct ContentView: View {
     }
 
     private func shareItems(_ ids: Set<String>, sourceFrame: CGRect) {
+        guard let tempURLs = prepareShareURLs(for: ids), !tempURLs.isEmpty else { return }
+        showPicker(items: tempURLs, sourceFrame: sourceFrame)
+    }
+
+    private func shareItems(_ ids: Set<String>, anchorView: NSView) {
+        guard let tempURLs = prepareShareURLs(for: ids), !tempURLs.isEmpty else { return }
+        let picker = NSSharingServicePicker(items: tempURLs)
+        picker.show(relativeTo: anchorView.bounds, of: anchorView, preferredEdge: .maxY)
+    }
+
+    private func prepareShareURLs(for ids: Set<String>) -> [URL]? {
         let urls = allItems
             .filter { ids.contains($0.id) }
             .map { MediaStorageService.shared.mediaURL(filename: $0.filename) }
             .filter { FileManager.default.fileExists(atPath: $0.path) }
-        guard !urls.isEmpty else { return }
+        guard !urls.isEmpty else { return nil }
 
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("SnapGridShare")
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -820,9 +828,11 @@ struct ContentView: View {
             try? FileManager.default.copyItem(at: url, to: dest)
             return dest
         }
-        guard !tempURLs.isEmpty else { return }
+        return tempURLs.isEmpty ? nil : tempURLs
+    }
 
-        let picker = NSSharingServicePicker(items: tempURLs)
+    private func showPicker(items: [URL], sourceFrame: CGRect) {
+        let picker = NSSharingServicePicker(items: items)
         if let window = NSApp.keyWindow,
            let contentView = window.contentView {
             let rect = contentView.convert(sourceFrame, from: nil)
@@ -832,6 +842,22 @@ struct ContentView: View {
 
 }
 
+
+// MARK: - Share Anchor
+
+/// Invisible NSViewRepresentable that captures the underlying NSView so we can
+/// anchor an NSSharingServicePicker to the exact toolbar button position.
+private struct ShareAnchorView: NSViewRepresentable {
+    @Binding var nsView: NSView?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { self.nsView = view }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
 
 // MARK: - Notification Modifier
 // Extracted to reduce body complexity and avoid Swift type-checker timeouts.
