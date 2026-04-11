@@ -812,15 +812,6 @@ struct DetailMetadataSection: View {
                 }
                 .stageReveal(stage: stage, threshold: 1)
             } else if let result = item.analysisResult {
-                if !result.imageSummary.isEmpty {
-                    Text(result.imageSummary)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .stageReveal(stage: stage, threshold: 1)
-                        .padding(.bottom, 10)
-                }
-
                 if !result.patterns.isEmpty {
                     let pillsContent = FlowLayout(spacing: 6) {
                         ForEach(Array(result.patterns.enumerated()), id: \.element.name) { index, pattern in
