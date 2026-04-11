@@ -29,15 +29,6 @@ struct DetailMetadataSection: View {
                 }
                 .stageReveal(stage: stage, threshold: 1)
             } else if let result = item.analysisResult {
-                if !result.imageSummary.isEmpty {
-                    Text(result.imageSummary)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(2)
-                        .stageReveal(stage: stage, threshold: 1)
-                        .padding(.bottom, 12)
-                }
-
                 if !result.patterns.isEmpty {
                     patternPillsGrid(result.patterns)
                         .padding(.bottom, 18)
