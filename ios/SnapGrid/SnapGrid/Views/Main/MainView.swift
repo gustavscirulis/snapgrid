@@ -235,6 +235,7 @@ struct MainView: View {
                     searchContent(gridWidth: gridWidth)
                 }
             }
+            .tabBarMinimizeBehavior(.onScrollDown)
             .tabViewSearchActivation(.searchTabSelection)
             .tint(.white)
         } else {
