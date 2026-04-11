@@ -151,7 +151,7 @@ struct ContentView: View {
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
                         .transition(.opacity)
-                }
+                    }
             }
         }
         .frame(minWidth: 720, minHeight: 400)
@@ -830,6 +830,7 @@ struct ContentView: View {
     }
 
 }
+
 
 // MARK: - Notification Modifier
 // Extracted to reduce body complexity and avoid Swift type-checker timeouts.

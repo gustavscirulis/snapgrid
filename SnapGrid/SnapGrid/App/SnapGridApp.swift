@@ -51,7 +51,6 @@ struct SnapGridApp: App {
                 .task { KeySyncService.syncToiCloud() }
         }
         .modelContainer(container)
-        .windowToolbarStyle(.unified)
         .defaultSize(width: 1280, height: 800)
         .windowResizability(.contentMinSize)
         .defaultPosition(.center)
