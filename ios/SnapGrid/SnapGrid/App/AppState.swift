@@ -23,6 +23,7 @@ final class AppState {
     var thumbnailImage: UIImage?
     var showOverlay = false
     var pendingSearchActivation = false
+    var pendingSearchPattern: String?
     var activeSpaceId: String? = nil
     var searchText = ""
     var searchScores: [String: Double] = [:]
@@ -31,4 +32,21 @@ final class AppState {
     var isImporting = false
     var itemToDelete: MediaItem?
     var shareItem: URL?
+
+    func queuePatternSearch(_ pattern: String) {
+        pendingSearchPattern = pattern
+        pendingSearchActivation = true
+    }
+
+    func applyPendingSearchIfNeeded(prefersDedicatedSearchTab: Bool) {
+        guard pendingSearchActivation else { return }
+
+        if let pendingSearchPattern {
+            searchText = pendingSearchPattern
+        }
+
+        selectedTab = prefersDedicatedSearchTab ? .search : .all
+        pendingSearchPattern = nil
+        pendingSearchActivation = false
+    }
 }
