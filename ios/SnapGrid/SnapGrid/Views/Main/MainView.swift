@@ -155,7 +155,12 @@ struct MainView: View {
         }
         .onChange(of: appState.selectedTab) { _, newTab in
             if newTab == .search {
-                appState.searchSpaceId = appState.activeSpaceId
+                if appState.pendingGlobalSearch {
+                    appState.searchSpaceId = nil
+                    appState.pendingGlobalSearch = false
+                } else {
+                    appState.searchSpaceId = appState.activeSpaceId
+                }
             } else {
                 appState.searchSpaceId = nil
             }
