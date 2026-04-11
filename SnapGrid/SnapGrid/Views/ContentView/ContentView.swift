@@ -155,6 +155,7 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 720, minHeight: 400)
+        .coordinateSpace(name: DetailCoordinateSpace.splitViewRoot)
         .navigationTitle(detailNavigationTitle)
         .searchable(text: $appState.searchText, isPresented: $isSearchFieldPresented, placement: .toolbar, prompt: "Search patterns, descriptions...")
         .toolbar {
