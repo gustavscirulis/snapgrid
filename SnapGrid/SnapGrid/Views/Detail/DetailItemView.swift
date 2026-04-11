@@ -1,6 +1,10 @@
 import SwiftUI
 import AVFoundation
 
+enum DetailCoordinateSpace {
+    static let splitViewRoot = "DetailSplitViewRoot"
+}
+
 /* ─────────────────────────────────────────────────────────
  * DETAIL ITEM VIEW
  *
@@ -50,6 +54,7 @@ struct DetailItemView: View {
     @State private var adjacentImages: [String: NSImage] = [:]
     @State private var loadTask: Task<Void, Never>?
     @State private var lastWindowWidth: CGFloat = 800
+    @State private var detailColumnLeadingInset: CGFloat = 0
     @State private var trackpadScroll = TrackpadScrollState()
     @State private var scrollOffset: CGFloat = 0
     @State private var metadataStage: Int = 0
@@ -77,6 +82,10 @@ struct DetailItemView: View {
     @FocusState private var isFocused: Bool
 
     private var currentItem: MediaItem { items[currentIndex] }
+
+    private var pageTravelDistance: CGFloat {
+        lastWindowWidth + detailColumnLeadingInset
+    }
 
     private var isTallImage: Bool {
         !currentItem.isVideo && currentItem.aspectRatio < 0.5
@@ -126,6 +135,7 @@ struct DetailItemView: View {
         GeometryReader { geo in
             let windowSize = geo.size
             let currentGeoOrigin = geo.frame(in: .global).origin
+            let detailColumnOrigin = geo.frame(in: .named(DetailCoordinateSpace.splitViewRoot)).origin
             let finalFrame = computeImageFrame(windowSize: windowSize, item: currentItem)
             let localCloseTarget = CGRect(
                 x: closeTargetFrame.origin.x - currentGeoOrigin.x,
@@ -140,11 +150,11 @@ struct DetailItemView: View {
                 if heroComplete && !isClosing {
                     if currentIndex > 0 {
                         adjacentItemView(for: items[currentIndex - 1], windowSize: windowSize)
-                            .offset(x: -windowSize.width + swipeOffset)
+                            .offset(x: -pageTravelDistance + swipeOffset)
                     }
                     if currentIndex < items.count - 1 {
                         adjacentItemView(for: items[currentIndex + 1], windowSize: windowSize)
-                            .offset(x: windowSize.width + swipeOffset)
+                            .offset(x: pageTravelDistance + swipeOffset)
                     }
                 }
 
@@ -166,14 +176,17 @@ struct DetailItemView: View {
                         .position(x: currentFrame.midX, y: currentFrame.midY)
                 }
             }
-            .clipped() // Prevent adjacent swipe images from bleeding under the sidebar
             .onChange(of: windowSize.width) { _, w in lastWindowWidth = w }
+            .onChange(of: detailColumnOrigin.x) { _, x in
+                detailColumnLeadingInset = max(0, x)
+            }
             .onChange(of: currentGeoOrigin) { _, origin in geoOrigin = origin }
             .onChange(of: appState.detailSourceFrame) { _, newFrame in
                 if let newFrame { closeTargetFrame = newFrame }
             }
             .onAppear {
                 lastWindowWidth = windowSize.width
+                detailColumnLeadingInset = max(0, detailColumnOrigin.x)
                 geoOrigin = currentGeoOrigin
             }
         } // GeometryReader
@@ -484,7 +497,7 @@ struct DetailItemView: View {
         }
 
         withAnimation(SnapSpring.standard(reduced: reduceMotion)) {
-            swipeOffset = direction * lastWindowWidth
+            swipeOffset = direction * pageTravelDistance
         } completion: {
             self.completeNavigation(to: newIndex)
         }
