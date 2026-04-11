@@ -24,6 +24,7 @@ final class AppState {
     var showOverlay = false
     var pendingSearchActivation = false
     var pendingSearchPattern: String?
+    var pendingGlobalSearch = false
     var activeSpaceId: String? = nil
     var searchSpaceId: String? = nil
     var searchText = ""
@@ -37,10 +38,14 @@ final class AppState {
     func queuePatternSearch(_ pattern: String) {
         pendingSearchPattern = pattern
         pendingSearchActivation = true
+        pendingGlobalSearch = true
     }
 
     func applyPendingSearchIfNeeded(prefersDedicatedSearchTab: Bool) {
-        guard pendingSearchActivation else { return }
+        guard pendingSearchActivation else {
+            pendingGlobalSearch = false
+            return
+        }
 
         if let pendingSearchPattern {
             searchText = pendingSearchPattern
