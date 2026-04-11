@@ -215,7 +215,6 @@ struct MainView: View {
                     searchContent(gridWidth: gridWidth)
                 }
             }
-            .searchable(text: $appState.searchText, prompt: "Search patterns, context...")
             .tabViewSearchActivation(.searchTabSelection)
             .tint(.white)
         } else {
@@ -317,6 +316,7 @@ struct MainView: View {
             .navigationTitle("SnapGrid")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .searchable(text: $appState.searchText, prompt: "Search patterns, context...")
         }
     }
 
