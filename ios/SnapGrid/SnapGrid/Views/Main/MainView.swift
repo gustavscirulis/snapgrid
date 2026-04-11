@@ -27,25 +27,33 @@ struct MainView: View {
 
     // MARK: - Filtering
 
+    private var searchBaseItems: [MediaItem] {
+        if let spaceId = appState.searchSpaceId {
+            return allItems.filter { $0.belongs(to: spaceId) }
+        }
+        return Array(allItems)
+    }
+
     private var searchResultItems: [MediaItem] {
         let scores = appState.searchScores
         let query = appState.searchText.lowercased().trimmingCharacters(in: .whitespaces)
+        let base = searchBaseItems
 
         guard !query.isEmpty else { return [] }
 
-        if query == "vid" { return allItems.filter { $0.isVideo } }
-        if query == "img" { return allItems.filter { !$0.isVideo } }
+        if query == "vid" { return base.filter { $0.isVideo } }
+        if query == "img" { return base.filter { !$0.isVideo } }
 
         guard !scores.isEmpty else { return [] }
 
-        return allItems
+        return base
             .filter { scores[$0.id] != nil }
             .sorted { (scores[$0.id] ?? 0) > (scores[$1.id] ?? 0) }
     }
 
     private var searchContentItems: [MediaItem] {
         let query = appState.searchText.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return Array(allItems) }
+        guard !query.isEmpty else { return searchBaseItems }
         return searchResultItems
     }
 
@@ -143,6 +151,13 @@ struct MainView: View {
                     ShareImportService.importPendingItems(to: rootURL)
                 }
                 Task { await loadContent() }
+            }
+        }
+        .onChange(of: appState.selectedTab) { _, newTab in
+            if newTab == .search {
+                appState.searchSpaceId = appState.activeSpaceId
+            } else {
+                appState.searchSpaceId = nil
             }
         }
         .sheet(isPresented: $appState.showPhotosPicker) {
@@ -282,6 +297,7 @@ struct MainView: View {
     private func searchContent(gridWidth: CGFloat) -> some View {
         @Bindable var appState = appState
         let items = searchContentItems
+        let scopedSpaceName = appState.searchSpaceId.flatMap { id in spaces.first { $0.id == id }?.name }
 
         NavigationStack {
             ZStack {
@@ -313,10 +329,13 @@ struct MainView: View {
                     .scrollDismissesKeyboard(.interactively)
                 }
             }
-            .navigationTitle("SnapGrid")
+            .navigationTitle(scopedSpaceName ?? "SnapGrid")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .searchable(text: $appState.searchText, prompt: "Search patterns, context...")
+            .searchable(
+                text: $appState.searchText,
+                prompt: scopedSpaceName.map { "Search in \($0)..." } ?? "Search patterns, context..."
+            )
         }
     }
 
