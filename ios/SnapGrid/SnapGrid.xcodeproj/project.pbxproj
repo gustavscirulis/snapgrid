@@ -18,6 +18,7 @@
 		69A2FAEBC4355557E9BBF91D /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA2C659B43CBFC9C4825931 /* MediaItem.swift */; };
 		777AC6FDEA6C14A464172559 /* SidecarCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54ADC2195271038AAEE8E275 /* SidecarCodableTests.swift */; };
 		787BBD33FD14A7CC420B8C71 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC24EBA6AD6068C4ADA26030 /* SyncService.swift */; };
+		A1MIGR0001 /* LocalToiCloudMigrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1MIGR0001 /* LocalToiCloudMigrationService.swift */; };
 		810E66F164E96C78F5095B7B /* AnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A78C6996F3AEB37B949CCE /* AnalysisResult.swift */; };
 		81BCDEF1234567890ABCDE12 /* SpaceMembership.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91BCDEF1234567890ABCDE12 /* SpaceMembership.swift */; };
 		93BCDEF1234567890ABCDE12 /* SpaceGuidanceResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BCDEF1234567890ABCDE12 /* SpaceGuidanceResolverTests.swift */; };
@@ -30,7 +31,6 @@
 		A100000005 /* FileSystemManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000005 /* FileSystemManager.swift */; };
 		A100000008 /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000008 /* ThumbnailCache.swift */; };
 		A100000009 /* Color+SnapGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000009 /* Color+SnapGrid.swift */; };
-		A100000010 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000010 /* OnboardingView.swift */; };
 		A100000011 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000011 /* MainView.swift */; };
 		A100000050 /* AllItemsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000050 /* AllItemsTab.swift */; };
 		A100000051 /* SpacesTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000051 /* SpacesTab.swift */; };
@@ -121,7 +121,6 @@
 		B100000005 /* FileSystemManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystemManager.swift; sourceTree = "<group>"; };
 		B100000008 /* ThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCache.swift; sourceTree = "<group>"; };
 		B100000009 /* Color+SnapGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+SnapGrid.swift"; sourceTree = "<group>"; };
-		B100000010 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		B100000011 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		B100000050 /* AllItemsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllItemsTab.swift; sourceTree = "<group>"; };
 		B100000051 /* SpacesTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpacesTab.swift; sourceTree = "<group>"; };
@@ -162,6 +161,7 @@
 		EB2E6651487D0EFEE5E52932 /* GuidanceFallbackTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GuidanceFallbackTests.swift; sourceTree = "<group>"; };
 		F5136715774C9C5C0651A4D4 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		F9E80534FE421A32D569AAE8 /* SearchIndexServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SearchIndexServiceTests.swift; sourceTree = "<group>"; };
+		B1MIGR0001 /* LocalToiCloudMigrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalToiCloudMigrationService.swift; sourceTree = "<group>"; };
 		FC24EBA6AD6068C4ADA26030 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
 		FCAFF8A2EC042170AE7D0DA4 /* SyncServiceDataTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncServiceDataTests.swift; sourceTree = "<group>"; };
 		91BCDEF1234567890ABCDE12 /* SpaceMembership.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceMembership.swift; sourceTree = "<group>"; };
@@ -317,7 +317,6 @@
 		E100000005 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				E100000010 /* Onboarding */,
 				E100000011 /* Main */,
 				E100000050 /* Spaces */,
 				E100000012 /* Grid */,
@@ -334,6 +333,7 @@
 				B100000020 /* iCloudDownloadMonitor.swift */,
 				B100000025 /* ShareImportService.swift */,
 				FC24EBA6AD6068C4ADA26030 /* SyncService.swift */,
+				B1MIGR0001 /* LocalToiCloudMigrationService.swift */,
 				5CFAB07291230EAED58390B4 /* SearchIndexService.swift */,
 				B100000008 /* ThumbnailCache.swift */,
 				B100000031 /* ImageImportService.swift */,
@@ -366,14 +366,6 @@
 				B100000060 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Resources;
-			sourceTree = "<group>";
-		};
-		E100000010 /* Onboarding */ = {
-			isa = PBXGroup;
-			children = (
-				B100000010 /* OnboardingView.swift */,
-			);
-			path = Onboarding;
 			sourceTree = "<group>";
 		};
 		E100000011 /* Main */ = {
@@ -604,7 +596,6 @@
 				A100000005 /* FileSystemManager.swift in Sources */,
 				A100000008 /* ThumbnailCache.swift in Sources */,
 				A100000009 /* Color+SnapGrid.swift in Sources */,
-				A100000010 /* OnboardingView.swift in Sources */,
 				A100000011 /* MainView.swift in Sources */,
 				A100000050 /* AllItemsTab.swift in Sources */,
 				A100000051 /* SpacesTab.swift in Sources */,
@@ -625,6 +616,7 @@
 				81BCDEF1234567890ABCDE12 /* SpaceMembership.swift in Sources */,
 				810E66F164E96C78F5095B7B /* AnalysisResult.swift in Sources */,
 				787BBD33FD14A7CC420B8C71 /* SyncService.swift in Sources */,
+				A1MIGR0001 /* LocalToiCloudMigrationService.swift in Sources */,
 				F2AD76603369201957F4E1FD /* SearchIndexService.swift in Sources */,
 				A100000030 /* AnimationTokens.swift in Sources */,
 				A100000031 /* ImageImportService.swift in Sources */,

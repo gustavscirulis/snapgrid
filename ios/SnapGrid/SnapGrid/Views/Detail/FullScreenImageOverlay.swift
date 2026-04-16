@@ -370,6 +370,16 @@ struct FullScreenImageOverlay: View {
     // MARK: - Body
 
     var body: some View {
+        if items.isEmpty {
+            Color.clear
+                .onAppear { onClose() }
+        } else {
+            bodyContent
+        }
+    }
+
+    @ViewBuilder
+    private var bodyContent: some View {
         let finalFrame = computeFinalFrame(for: item)
 
         ZStack {
@@ -1013,6 +1023,17 @@ struct FullScreenImageOverlay: View {
         zoomPanOffset = .zero
         zoomPanLastOffset = .zero
         isZoomed = false
+
+        // If all items were deleted, just fade out — no hero target
+        guard !items.isEmpty else {
+            withAnimation(.easeOut(duration: 0.25)) {
+                dismissOffset = screenSize.height
+                isExpanded = false
+            } completion: {
+                onClose()
+            }
+            return
+        }
 
         let currentItemId = items[currentIndex].id
         onCurrentItemChanged?(currentItemId)
