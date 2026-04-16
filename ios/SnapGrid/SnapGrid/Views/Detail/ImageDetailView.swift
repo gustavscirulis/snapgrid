@@ -146,10 +146,11 @@ struct MediaDetailModal: View {
                             }
                         }
                         .toolbarColorScheme(.dark, for: .navigationBar)
-                        .confirmationDialog("Delete this item?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+                        .alert("Delete this item?", isPresented: $showDeleteConfirmation) {
                             Button("Delete", role: .destructive) {
                                 deleteRequestID += 1
                             }
+                            Button("Cancel", role: .cancel) {}
                         }
                 }
             }
