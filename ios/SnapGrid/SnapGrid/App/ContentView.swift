@@ -25,10 +25,11 @@ struct ContentView: View {
             fileSystem.restoreAccess()
         }
         .task {
-            // Wait for access to be granted, then check for synced API keys
             for await granted in fileSystem.$isAccessGranted.values where granted {
-                if fileSystem.isUsingiCloud, let rootURL = fileSystem.rootURL {
+                if let rootURL = fileSystem.rootURL {
                     keySyncService.checkForKeys(rootURL: rootURL)
+                } else {
+                    keySyncService.checkForSettingsKeys()
                 }
                 break
             }
@@ -38,17 +39,17 @@ struct ContentView: View {
                 if !fileSystem.isAccessGranted {
                     fileSystem.restoreAccess()
                 }
-                // Silently check for iCloud availability when in local mode
                 if !fileSystem.isUsingiCloud {
                     fileSystem.checkAndMigrateToiCloud(context: modelContext)
                 }
-                if fileSystem.isUsingiCloud, let rootURL = fileSystem.rootURL {
+                if let rootURL = fileSystem.rootURL {
                     keySyncService.checkForKeys(rootURL: rootURL)
+                } else {
+                    keySyncService.checkForSettingsKeys()
                 }
             }
         }
         .onChange(of: fileSystem.isUsingiCloud) { _, usingiCloud in
-            // When we switch to iCloud (after migration), sync keys
             if usingiCloud, let rootURL = fileSystem.rootURL {
                 keySyncService.checkForKeys(rootURL: rootURL)
             }

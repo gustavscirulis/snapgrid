@@ -312,6 +312,7 @@ struct ContentView: View {
         .task {
             // Re-sync when app regains focus (picks up iCloud changes from other devices).
             for await _ in NotificationCenter.default.notifications(named: NSApplication.didBecomeActiveNotification) {
+                KeySyncService.syncFromiCloud()
                 await syncWatcher.resyncFromDisk()
                 await importService.analyzeUnanalyzedItems(from: allItems, context: modelContext)
             }

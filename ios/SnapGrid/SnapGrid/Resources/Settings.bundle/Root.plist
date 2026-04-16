@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>StringsTable</key>
+	<string>Root</string>
+	<key>PreferenceSpecifiers</key>
+	<array>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>AI Provider</string>
+			<key>FooterText</key>
+			<string>Configure your AI provider to enable image analysis without the Mac app. Keys sync automatically between devices via iCloud.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSMultiValueSpecifier</string>
+			<key>Title</key>
+			<string>Provider</string>
+			<key>Key</key>
+			<string>settings_provider</string>
+			<key>DefaultValue</key>
+			<string>anthropic</string>
+			<key>Titles</key>
+			<array>
+				<string>None</string>
+				<string>OpenAI</string>
+				<string>Anthropic Claude</string>
+				<string>Google Gemini</string>
+				<string>OpenRouter</string>
+			</array>
+			<key>Values</key>
+			<array>
+				<string>none</string>
+				<string>openai</string>
+				<string>anthropic</string>
+				<string>gemini</string>
+				<string>openrouter</string>
+			</array>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTextFieldSpecifier</string>
+			<key>Title</key>
+			<string>API Key</string>
+			<key>Key</key>
+			<string>settings_apiKey</string>
+			<key>DefaultValue</key>
+			<string></string>
+			<key>IsSecure</key>
+			<true/>
+			<key>KeyboardType</key>
+			<string>Alphabet</string>
+			<key>AutocapitalizationType</key>
+			<string>None</string>
+			<key>AutocorrectionType</key>
+			<string>No</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTextFieldSpecifier</string>
+			<key>Title</key>
+			<string>Model</string>
+			<key>Key</key>
+			<string>settings_model</string>
+			<key>DefaultValue</key>
+			<string></string>
+			<key>KeyboardType</key>
+			<string>Alphabet</string>
+			<key>AutocapitalizationType</key>
+			<string>None</string>
+			<key>AutocorrectionType</key>
+			<string>No</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>FooterText</key>
+			<string>Leave Model empty to use the default for your provider. Changes sync to the Mac app via iCloud.</string>
+		</dict>
+	</array>
+</dict>
+</plist>

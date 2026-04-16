@@ -2,8 +2,6 @@ import Testing
 import Foundation
 @testable import SnapGrid
 
-/// Tests for the iOS KeySyncService (PR #124) — the encrypted key file
-/// reading, decryption, and state management logic.
 @Suite("KeySyncService", .tags(.crypto))
 struct KeySyncServiceTests {
 
@@ -60,7 +58,6 @@ struct KeySyncServiceTests {
         let decoded = try JSONDecoder().decode(KeySyncPayload.self, from: data)
 
         #expect(decoded.keys.isEmpty)
-        // hasAnyKey check: empty keys means not unlocked
         let hasAnyKey = decoded.keys.values.contains { !$0.isEmpty }
         #expect(hasAnyKey == false)
     }
@@ -77,7 +74,6 @@ struct KeySyncServiceTests {
         let data = try JSONEncoder().encode(payload)
         let decoded = try JSONDecoder().decode(KeySyncPayload.self, from: data)
 
-        // hasAnyKey should be true because anthropic has a non-empty value
         let hasAnyKey = decoded.keys.values.contains { !$0.isEmpty }
         #expect(hasAnyKey == true)
     }
@@ -112,7 +108,6 @@ struct KeySyncServiceTests {
         let encoded = try JSONEncoder().encode(payload)
         let encrypted = try KeySyncCrypto.encrypt(encoded)
 
-        // Simulate what iOS KeySyncService.checkForKeys does
         let decrypted = try KeySyncCrypto.decrypt(encrypted)
         let decoded = try JSONDecoder().decode(KeySyncPayload.self, from: decrypted)
 
@@ -124,7 +119,7 @@ struct KeySyncServiceTests {
         #expect(hasAnyKey == true)
     }
 
-    // MARK: - iCloud placeholder detection (PR #124)
+    // MARK: - iCloud placeholder detection
 
     @Test("iCloud placeholder names for dotted files")
     func iCloudPlaceholderNames() {
@@ -135,5 +130,124 @@ struct KeySyncServiceTests {
         ]
         #expect(placeholderNames[0] == "..apikeys.encrypted.icloud")
         #expect(placeholderNames[1] == ".apikeys.encrypted.icloud")
+    }
+
+    // MARK: - Settings.bundle key reading
+
+    @Test("Settings.bundle non-empty key unlocks service")
+    @MainActor func settingsBundleUnlocks() async {
+        let defaults = UserDefaults.standard
+        defer {
+            defaults.removeObject(forKey: "settings_apiKey")
+            defaults.removeObject(forKey: "settings_provider")
+            defaults.removeObject(forKey: "settings_model")
+            defaults.removeObject(forKey: "settings_lastSyncedApiKey")
+        }
+
+        defaults.set("sk-ant-test123", forKey: "settings_apiKey")
+        defaults.set("anthropic", forKey: "settings_provider")
+        defaults.set("", forKey: "settings_model")
+
+        let service = KeySyncService.shared
+        service.checkForSettingsKeys()
+
+        #expect(service.isUnlocked == true)
+        #expect(service.keySource == .settingsBundle)
+        #expect(service.activeProvider == "anthropic")
+        #expect(service.activeModel == nil)
+        #expect(service.activeAPIKey() == "sk-ant-test123")
+    }
+
+    @Test("Settings.bundle empty key does not unlock")
+    @MainActor func settingsBundleEmptyKey() async {
+        let defaults = UserDefaults.standard
+        defer {
+            defaults.removeObject(forKey: "settings_apiKey")
+            defaults.removeObject(forKey: "settings_provider")
+        }
+
+        defaults.set("", forKey: "settings_apiKey")
+        defaults.set("openai", forKey: "settings_provider")
+
+        let service = KeySyncService.shared
+        service.checkForSettingsKeys()
+
+        #expect(service.isUnlocked == false)
+        #expect(service.keySource == .none)
+    }
+
+    @Test("Settings.bundle whitespace-only key treated as empty")
+    @MainActor func settingsBundleWhitespaceKey() async {
+        let defaults = UserDefaults.standard
+        defer {
+            defaults.removeObject(forKey: "settings_apiKey")
+            defaults.removeObject(forKey: "settings_provider")
+        }
+
+        defaults.set("   ", forKey: "settings_apiKey")
+        defaults.set("openai", forKey: "settings_provider")
+
+        let service = KeySyncService.shared
+        service.checkForSettingsKeys()
+
+        #expect(service.isUnlocked == false)
+        #expect(service.keySource == .none)
+    }
+
+    @Test("Settings.bundle unknown provider is rejected")
+    @MainActor func settingsBundleUnknownProvider() async {
+        let defaults = UserDefaults.standard
+        defer {
+            defaults.removeObject(forKey: "settings_apiKey")
+            defaults.removeObject(forKey: "settings_provider")
+        }
+
+        defaults.set("sk-test123", forKey: "settings_apiKey")
+        defaults.set("invalid_provider", forKey: "settings_provider")
+
+        let service = KeySyncService.shared
+        service.checkForSettingsKeys()
+
+        #expect(service.isUnlocked == false)
+        #expect(service.keySource == .none)
+    }
+
+    @Test("Settings.bundle with model sets activeModel")
+    @MainActor func settingsBundleWithModel() async {
+        let defaults = UserDefaults.standard
+        defer {
+            defaults.removeObject(forKey: "settings_apiKey")
+            defaults.removeObject(forKey: "settings_provider")
+            defaults.removeObject(forKey: "settings_model")
+            defaults.removeObject(forKey: "settings_lastSyncedApiKey")
+        }
+
+        defaults.set("sk-test123", forKey: "settings_apiKey")
+        defaults.set("openai", forKey: "settings_provider")
+        defaults.set("gpt-4o-mini", forKey: "settings_model")
+
+        let service = KeySyncService.shared
+        service.checkForSettingsKeys()
+
+        #expect(service.isUnlocked == true)
+        #expect(service.activeModel == "gpt-4o-mini")
+    }
+
+    @Test("Settings.bundle provider 'none' does not unlock")
+    @MainActor func settingsBundleNoneProvider() async {
+        let defaults = UserDefaults.standard
+        defer {
+            defaults.removeObject(forKey: "settings_apiKey")
+            defaults.removeObject(forKey: "settings_provider")
+        }
+
+        defaults.set("sk-test123", forKey: "settings_apiKey")
+        defaults.set("none", forKey: "settings_provider")
+
+        let service = KeySyncService.shared
+        service.checkForSettingsKeys()
+
+        #expect(service.isUnlocked == false)
+        #expect(service.keySource == .none)
     }
 }
