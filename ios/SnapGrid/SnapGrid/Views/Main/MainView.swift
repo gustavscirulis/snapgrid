@@ -184,20 +184,17 @@ struct MainView: View {
                     .presentationDetents([.medium, .large])
             }
         }
-        .confirmationDialog(
-            "Delete this item?",
-            isPresented: Binding(
-                get: { appState.itemToDelete != nil },
-                set: { if !$0 { appState.itemToDelete = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
+        .alert("Delete this item?", isPresented: Binding(
+            get: { appState.itemToDelete != nil },
+            set: { if !$0 { appState.itemToDelete = nil } }
+        )) {
             Button("Delete", role: .destructive) {
                 if let item = appState.itemToDelete {
                     handleItemDeleted(item)
                     appState.itemToDelete = nil
                 }
             }
+            Button("Cancel", role: .cancel) {}
         }
         .alert("New Space", isPresented: $showNewSpaceAlert) {
             TextField("Space name", text: $newSpaceName)
