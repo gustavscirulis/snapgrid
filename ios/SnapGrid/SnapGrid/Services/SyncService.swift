@@ -171,9 +171,14 @@ final class SyncService {
             return 0
         }
 
+        let isUsingiCloud = FileSystemManager.shared?.isUsingiCloud ?? false
+
         let jsonFiles = contents.filter { url in
             let name = url.lastPathComponent
-            return name.hasSuffix(".json") || name.hasSuffix(".json.icloud")
+            if isUsingiCloud {
+                return name.hasSuffix(".json") || name.hasSuffix(".json.icloud")
+            }
+            return name.hasSuffix(".json")
         }
 
         print("[SyncService] Found \(jsonFiles.count) metadata files")
@@ -193,7 +198,7 @@ final class SyncService {
             let fileName = url.lastPathComponent
 
             // iCloud placeholder — trigger download, skip
-            if fileName.hasSuffix(".json.icloud") {
+            if isUsingiCloud && fileName.hasSuffix(".json.icloud") {
                 var realName = String(fileName.dropLast(".icloud".count))
                 if realName.hasPrefix(".") { realName = String(realName.dropFirst()) }
                 let realURL = url.deletingLastPathComponent().appendingPathComponent(realName)
@@ -202,8 +207,9 @@ final class SyncService {
                 continue
             }
 
-            // Check if JSON is downloaded
-            if let rv = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
+            // Check if JSON is downloaded (iCloud only)
+            if isUsingiCloud,
+               let rv = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
                let status = rv.ubiquitousItemDownloadingStatus,
                status != .current {
                 try? fm.startDownloadingUbiquitousItem(at: url)
@@ -224,15 +230,20 @@ final class SyncService {
             let iCloudPlaceholder = imagesDir.appendingPathComponent(".\(id).\(ext).icloud")
 
             if !fm.fileExists(atPath: mediaURL.path) {
-                if fm.fileExists(atPath: iCloudPlaceholder.path) {
-                    try? fm.startDownloadingUbiquitousItem(at: mediaURL)
-                } else if let rv = try? mediaURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
-                          rv.ubiquitousItemDownloadingStatus != nil {
-                    if rv.ubiquitousItemDownloadingStatus != .current {
+                if isUsingiCloud {
+                    // iCloud: check for placeholder and trigger download
+                    if fm.fileExists(atPath: iCloudPlaceholder.path) {
                         try? fm.startDownloadingUbiquitousItem(at: mediaURL)
+                    } else if let rv = try? mediaURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
+                              rv.ubiquitousItemDownloadingStatus != nil {
+                        if rv.ubiquitousItemDownloadingStatus != .current {
+                            try? fm.startDownloadingUbiquitousItem(at: mediaURL)
+                        }
+                    } else {
+                        continue // Orphaned sidecar
                     }
                 } else {
-                    // Truly orphaned — no media file
+                    // Local mode: no media file means orphaned sidecar
                     continue
                 }
             }

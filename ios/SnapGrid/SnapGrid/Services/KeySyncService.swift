@@ -18,7 +18,10 @@ final class KeySyncService: ObservableObject {
 
     /// Check for the encrypted key file and decrypt if found.
     /// Called on launch (when iCloud access is granted) and on every foreground transition.
+    /// Skips entirely in local mode — encrypted key file only exists in iCloud.
     func checkForKeys(rootURL: URL) {
+        guard FileSystemManager.shared?.isUsingiCloud == true else { return }
+
         let fileURL = rootURL.appendingPathComponent(fileName)
         let fm = FileManager.default
 

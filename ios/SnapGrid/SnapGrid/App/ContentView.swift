@@ -1,23 +1,23 @@
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
     @EnvironmentObject var fileSystem: FileSystemManager
     @EnvironmentObject var keySyncService: KeySyncService
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         Group {
             if fileSystem.isAccessGranted {
                 MainView()
-            } else if fileSystem.isCheckingAccess {
+            } else {
                 ZStack {
                     Color.snapDarkBackground
                         .ignoresSafeArea()
                     ProgressView()
                         .tint(.white)
                 }
-            } else {
-                OnboardingView()
             }
         }
         .animation(.easeInOut(duration: 0.3), value: fileSystem.isAccessGranted)
@@ -27,7 +27,7 @@ struct ContentView: View {
         .task {
             // Wait for access to be granted, then check for synced API keys
             for await granted in fileSystem.$isAccessGranted.values where granted {
-                if let rootURL = fileSystem.rootURL {
+                if fileSystem.isUsingiCloud, let rootURL = fileSystem.rootURL {
                     keySyncService.checkForKeys(rootURL: rootURL)
                 }
                 break
@@ -38,13 +38,18 @@ struct ContentView: View {
                 if !fileSystem.isAccessGranted {
                     fileSystem.restoreAccess()
                 }
-                if let rootURL = fileSystem.rootURL {
+                // Silently check for iCloud availability when in local mode
+                if !fileSystem.isUsingiCloud {
+                    fileSystem.checkAndMigrateToiCloud(context: modelContext)
+                }
+                if fileSystem.isUsingiCloud, let rootURL = fileSystem.rootURL {
                     keySyncService.checkForKeys(rootURL: rootURL)
                 }
             }
         }
-        .onChange(of: fileSystem.isAccessGranted) { _, granted in
-            if granted, let rootURL = fileSystem.rootURL {
+        .onChange(of: fileSystem.isUsingiCloud) { _, usingiCloud in
+            // When we switch to iCloud (after migration), sync keys
+            if usingiCloud, let rootURL = fileSystem.rootURL {
                 keySyncService.checkForKeys(rootURL: rootURL)
             }
         }

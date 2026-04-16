@@ -582,7 +582,7 @@ struct MainView: View {
 
         analysisCoordinator.analyzeUnanalyzed(allItems: allItems)
 
-        if skipped > 0 && !hasAttemptedRescan {
+        if skipped > 0 && !hasAttemptedRescan && (FileSystemManager.shared?.isUsingiCloud ?? false) {
             hasAttemptedRescan = true
             print("[MainView] \(skipped) files pending iCloud download, will re-scan in 15s")
             Task {

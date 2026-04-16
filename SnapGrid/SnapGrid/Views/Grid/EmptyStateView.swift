@@ -48,11 +48,11 @@ struct EmptyStateView: View {
                         .foregroundStyle(Color.snapMutedForeground.opacity(0.5))
 
                     VStack(spacing: 8) {
-                        Text(mode == .appLevel ? "Drop screenshots here" : "No items in this space")
+                        Text(mode == .appLevel ? "Add images or videos" : "No items in this space")
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(Color.snapForeground)
 
-                        Text(mode == .appLevel ? "Or use File \u{2192} Import (\u{2318}O) to get started" : "Drop images here or move items from All")
+                        Text(mode == .appLevel ? "Drop files here, or use File \u{2192} Import (\u{2318}O)" : "Drop images here or move items from All")
                             .font(.body)
                             .foregroundStyle(Color.snapMutedForeground)
                     }
