@@ -54,7 +54,10 @@ struct SnapGridApp: App {
         WindowGroup("SnapGrid") {
             ContentView()
                 .preferredColorScheme(appearanceColorScheme)
-                .task { KeySyncService.syncToiCloud() }
+                .task {
+                    KeySyncService.syncFromiCloud()
+                    KeySyncService.syncToiCloud()
+                }
         }
         .modelContainer(container)
         .defaultSize(width: 1280, height: 800)

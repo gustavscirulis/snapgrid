@@ -9,6 +9,12 @@ struct SnapGridApp: App {
     private static let multiSpaceStoreResetKey = "multiSpaceStoreReset_v1"
 
     init() {
+        UserDefaults.standard.register(defaults: [
+            "settings_provider": "anthropic",
+            "settings_apiKey": "",
+            "settings_model": ""
+        ])
+
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let snapGridDir = appSupport.appendingPathComponent("SnapGrid", isDirectory: true)
         try? FileManager.default.createDirectory(at: snapGridDir, withIntermediateDirectories: true)
