@@ -32,29 +32,30 @@ struct EmptyStateView: View {
                                 let index = col * 3 + row
                                 let h = skeletonHeights[index % skeletonHeights.count]
                                 RoundedRectangle(cornerRadius: 12)  // Match GridItemView radius
-                                    .fill(Color.snapMuted.opacity(0.5))
+                                    .fill(Color(nsColor: .quaternaryLabelColor))
                                     .frame(width: columnWidth, height: h)
                             }
                         }
                     }
                 }
-                .padding(.horizontal, 16)  // Match grid padding
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
                 .opacity(0.5)
 
                 // Onboarding card centered on top
                 VStack(spacing: 24) {
                     Image(systemName: mode == .appLevel ? "photo.on.rectangle.angled" : "rectangle.stack.badge.plus")
                         .font(.system(size: 56, weight: .light))  // Decorative icon — fixed size intentional
-                        .foregroundStyle(Color.snapMutedForeground.opacity(0.5))
+                        .foregroundStyle(.tertiary)
 
                     VStack(spacing: 8) {
                         Text(mode == .appLevel ? "Add images or videos" : "No items in this space")
                             .font(.title3.weight(.semibold))
-                            .foregroundStyle(Color.snapForeground)
+                            .foregroundStyle(.primary)
 
                         Text(mode == .appLevel ? "Drop files here, or use File \u{2192} Import (\u{2318}O)" : "Drop images here or move items from All")
                             .font(.body)
-                            .foregroundStyle(Color.snapMutedForeground)
+                            .foregroundStyle(.secondary)
                     }
 
                     if mode == .appLevel {
@@ -77,7 +78,7 @@ struct EmptyStateView: View {
 
                             Text("Add an AI API key in Settings (\u{2318},) to enable automatic image analysis")
                                 .font(.callout)
-                                .foregroundStyle(Color.snapMutedForeground.opacity(0.7))
+                                .foregroundStyle(.tertiary)
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: 300)
                         }
@@ -86,10 +87,10 @@ struct EmptyStateView: View {
                 .padding(40)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.snapCard)
+                        .fill(.ultraThickMaterial)
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
-                                .stroke(isDragTargeted ? Color.snapAccent : Color.snapBorder, lineWidth: isDragTargeted ? 2 : 1)
+                                .stroke(isDragTargeted ? Color.snapAccent : Color(nsColor: .separatorColor), lineWidth: isDragTargeted ? 2 : 1)
                         )
                 )
                 .accessibilityElement(children: .combine)
