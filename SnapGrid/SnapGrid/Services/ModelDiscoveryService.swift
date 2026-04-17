@@ -209,8 +209,9 @@ final class ModelDiscoveryService: @unchecked Sendable {
     }
 
     private func fetchGeminiModels(apiKey: String) async throws -> [DiscoveredModel] {
-        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models?key=\(apiKey)")!
-        let request = URLRequest(url: url)
+        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models")!
+        var request = URLRequest(url: url)
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         try validateHTTP(response, data: data)

@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.snapgrid", category: "KeySync")
 
 enum KeySyncService {
 
@@ -37,9 +40,9 @@ enum KeySyncService {
             let encrypted = try KeySyncCrypto.encrypt(plaintext)
             try encrypted.write(to: url, options: .atomic)
             UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: lastImportedAtKey)
-            print("[KeySync] Wrote encrypted keys to iCloud")
+            logger.info("Wrote encrypted keys to iCloud")
         } catch {
-            print("[KeySync] Failed to sync: \(error.localizedDescription)")
+            logger.error("Failed to sync: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -62,7 +65,7 @@ enum KeySyncService {
             let payloadTimestamp = payload.updatedAt.timeIntervalSince1970
 
             guard payloadTimestamp > lastImported else {
-                print("[KeySync] iCloud file not newer than last import, skipping")
+                logger.info("iCloud file not newer than last import, skipping")
                 return
             }
 
@@ -72,7 +75,7 @@ enum KeySyncService {
                 }
                 UserDefaults.standard.set(payloadTimestamp, forKey: lastImportedAtKey)
                 NotificationCenter.default.post(name: .apiKeySaved, object: nil)
-                print("[KeySync] Imported key removal from iCloud")
+                logger.info("Imported key removal from iCloud")
                 return
             }
 
@@ -87,9 +90,9 @@ enum KeySyncService {
             UserDefaults.standard.set(payloadTimestamp, forKey: lastImportedAtKey)
 
             NotificationCenter.default.post(name: .apiKeySaved, object: nil)
-            print("[KeySync] Imported keys from iCloud — provider: \(payload.provider)")
+            logger.info("Imported keys from iCloud — provider: \(payload.provider, privacy: .private)")
         } catch {
-            print("[KeySync] Failed to read from iCloud: \(error.localizedDescription)")
+            logger.error("Failed to read from iCloud: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -99,6 +102,6 @@ enum KeySyncService {
         guard MediaStorageService.shared.isUsingiCloud else { return }
         let url = MediaStorageService.shared.baseURL.appendingPathComponent(fileName)
         try? FileManager.default.removeItem(at: url)
-        print("[KeySync] Removed encrypted keys from iCloud")
+        logger.info("Removed encrypted keys from iCloud")
     }
 }

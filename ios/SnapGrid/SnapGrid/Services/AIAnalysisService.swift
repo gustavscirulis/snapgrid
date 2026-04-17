@@ -215,8 +215,8 @@ final class AIAnalysisService: Sendable {
             )
         case .gemini:
             return ProviderRequest(
-                url: URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)")!,
-                headers: [:],
+                url: URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!,
+                headers: ["x-goog-api-key": apiKey],
                 body: [
                     "contents": [
                         ["parts": [

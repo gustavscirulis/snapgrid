@@ -56,6 +56,7 @@
 		A100000033 /* MediaDeleteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000033 /* MediaDeleteService.swift */; };
 		A100000036 /* KeySyncCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000036 /* KeySyncCrypto.swift */; };
 		A100000037 /* KeySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000037 /* KeySyncService.swift */; };
+		KC00000002 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = KC00000001 /* KeychainService.swift */; };
 		A100000038 /* AIAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000038 /* AIAnalysisService.swift */; };
 		A100000040 /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000040 /* ActivityView.swift */; };
 		C325B2DE9C4EBB590CE9AA5B /* MediaItemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BC6070D4921036591CAB048 /* MediaItemTests.swift */; };
@@ -150,6 +151,7 @@
 		B100000033 /* MediaDeleteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDeleteService.swift; sourceTree = "<group>"; };
 		B100000036 /* KeySyncCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncCrypto.swift; sourceTree = "<group>"; };
 		B100000037 /* KeySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeySyncService.swift; sourceTree = "<group>"; };
+		KC00000001 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		B100000038 /* AIAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAnalysisService.swift; sourceTree = "<group>"; };
 		B100000040 /* ActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityView.swift; sourceTree = "<group>"; };
 		B100000041 /* ModelContext+SaveOrLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelContext+SaveOrLog.swift"; sourceTree = "<group>"; };
@@ -342,6 +344,7 @@
 				B100000033 /* MediaDeleteService.swift */,
 				B100000036 /* KeySyncCrypto.swift */,
 				B100000037 /* KeySyncService.swift */,
+				KC00000001 /* KeychainService.swift */,
 				B100000038 /* AIAnalysisService.swift */,
 				B100000043 /* AnalysisCoordinator.swift */,
 				B100000044 /* SidecarWriteService.swift */,
@@ -628,6 +631,7 @@
 				A100000033 /* MediaDeleteService.swift in Sources */,
 				A100000036 /* KeySyncCrypto.swift in Sources */,
 				A100000037 /* KeySyncService.swift in Sources */,
+				KC00000002 /* KeychainService.swift in Sources */,
 				A100000038 /* AIAnalysisService.swift in Sources */,
 				A100000040 /* ActivityView.swift in Sources */,
 				A100000041 /* ModelContext+SaveOrLog.swift in Sources */,
