@@ -7,6 +7,7 @@ struct EmptyStateView: View {
     }
 
     var mode: Mode = .appLevel
+    var electronLibraryDetected: Bool = false
     var isDragTargeted: Bool = false
 
     // Random-looking heights for skeleton placeholders
@@ -59,12 +60,17 @@ struct EmptyStateView: View {
                     }
 
                     if mode == .appLevel {
-                        Button {
-                            NotificationCenter.default.post(name: .importElectronLibrary, object: nil)
-                        } label: {
-                            Label("Import from SnapGrid 1", systemImage: "square.and.arrow.down.on.square")
+                        if electronLibraryDetected {
+                            Button("Import from SnapGrid") {
+                                NotificationCenter.default.post(name: .importElectronLibrary, object: nil)
+                            }
+                            .controlSize(.large)
+                        } else {
+                            Button("Import") {
+                                NotificationCenter.default.post(name: .importFolder, object: nil)
+                            }
+                            .controlSize(.large)
                         }
-                        .controlSize(.large)
                     }
 
                     if mode == .appLevel,

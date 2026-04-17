@@ -25,6 +25,7 @@ struct ContentView: View {
     @State private var isSearchFieldPresented = false
     @State private var shareAnchorView: NSView?
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
+    @State private var electronLibraryDetected = false
 
     #if DEBUG
     @AppStorage("debugSimulateEmptyState") private var debugSimulateEmptyState = false
@@ -203,6 +204,7 @@ struct ContentView: View {
         .modifier(NotificationModifier(
             onImportFiles: { showImportPanel = true },
             onImportElectron: { showElectronImport = true },
+            onImportFolder: { handleFolderImport() },
             onUndoDelete: { undoLastDelete() },
             onApiKeySaved: {
                 Task {
@@ -279,6 +281,8 @@ struct ContentView: View {
             DataCleanupService.cleanOrphanedRecords(context: modelContext)
             DataCleanupService.cleanOrphanedSidecars()
             await DataCleanupService.migrateVideoDimensions(context: modelContext)
+
+            electronLibraryDetected = ElectronImportService().detectElectronLibrary() != nil
 
             // Sync items that arrived via iCloud while app was closed
             await syncWatcher.initialSync(context: modelContext)
@@ -375,7 +379,7 @@ struct ContentView: View {
     private var detailContent: some View {
         let items = activeFilteredItems
         if allItems.isEmpty || debugSimulateEmptyState {
-            EmptyStateView(isDragTargeted: isDragTargeted)
+            EmptyStateView(electronLibraryDetected: electronLibraryDetected, isDragTargeted: isDragTargeted)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if items.isEmpty && isSearchActive {
             VStack(spacing: 12) {
@@ -433,6 +437,39 @@ struct ContentView: View {
                 await importService.importFiles(urls, into: modelContext, spaceId: appState.activeSpaceId)
                 syncWatcher.endLocalChange()
             }
+        }
+    }
+
+    private func handleFolderImport() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose a folder to import media from"
+        panel.prompt = "Import"
+
+        let response = panel.runModal()
+        guard response == .OK, let folderURL = panel.url else { return }
+
+        guard let enumerator = FileManager.default.enumerator(
+            at: folderURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        var mediaURLs: [URL] = []
+        for case let fileURL as URL in enumerator {
+            if SupportedMedia.isSupported(fileURL.pathExtension) {
+                mediaURLs.append(fileURL)
+            }
+        }
+
+        guard !mediaURLs.isEmpty else { return }
+
+        syncWatcher.beginLocalChange()
+        Task {
+            await importService.importFiles(mediaURLs, into: modelContext, spaceId: appState.activeSpaceId)
+            syncWatcher.endLocalChange()
         }
     }
 
@@ -871,6 +908,7 @@ private struct ShareAnchorView: NSViewRepresentable {
 private struct NotificationModifier: ViewModifier {
     let onImportFiles: () -> Void
     let onImportElectron: () -> Void
+    let onImportFolder: () -> Void
     let onUndoDelete: () -> Void
     let onApiKeySaved: () -> Void
     let onCreateNewSpace: () -> Void
@@ -886,6 +924,9 @@ private struct NotificationModifier: ViewModifier {
             }
             .onReceive(NotificationCenter.default.publisher(for: .importElectronLibrary)) { _ in
                 onImportElectron()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .importFolder)) { _ in
+                onImportFolder()
             }
             .onReceive(NotificationCenter.default.publisher(for: .undoDelete)) { _ in
                 onUndoDelete()
