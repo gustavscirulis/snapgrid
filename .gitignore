@@ -32,3 +32,9 @@ release/*
 # Xcode user-specific files
 xcuserdata/
 *.xcuserstate
+
+# Xcode build artifacts
+SnapGrid/build/
+ios/SnapGrid/build/
+*.xcarchive
+*.ipa
