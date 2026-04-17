@@ -8,35 +8,6 @@ import UIKit
 final class AnalysisCoordinator {
     private var analysisTask: Task<Void, Never>?
 
-    /// Set to `true` when analysis needs user consent. View layer shows the alert.
-    var needsConsentPrompt = false
-    /// Pending items waiting for consent before analysis can proceed.
-    private var pendingConsentItems: [MediaItem] = []
-    private var pendingConsentAllItems: [MediaItem] = []
-
-    /// Whether the user has granted consent for AI analysis.
-    static var hasConsent: Bool {
-        UserDefaults.standard.bool(forKey: "aiAnalysisConsentGiven")
-    }
-
-    /// Call from view layer after user confirms the consent alert.
-    func grantConsent() {
-        UserDefaults.standard.set(true, forKey: "aiAnalysisConsentGiven")
-        needsConsentPrompt = false
-        let items = pendingConsentItems
-        let allItems = pendingConsentAllItems
-        pendingConsentItems = []
-        pendingConsentAllItems = []
-        analyzeItems(items, allItems: allItems)
-    }
-
-    /// Call from view layer if user declines.
-    func declineConsent() {
-        needsConsentPrompt = false
-        pendingConsentItems = []
-        pendingConsentAllItems = []
-    }
-
     // Dependencies — set once via configure(), used by all analysis methods.
     private var keySyncService: KeySyncService?
     private var fileSystem: FileSystemManager?
@@ -60,14 +31,6 @@ final class AnalysisCoordinator {
     func analyzeItems(_ items: [MediaItem], allItems: [MediaItem]) {
         guard let keySyncService, let fileSystem, let modelContext, let searchService else {
             print("[Analysis] Skipped — coordinator not configured")
-            return
-        }
-
-        // First-time consent check
-        if !Self.hasConsent {
-            pendingConsentItems = items
-            pendingConsentAllItems = allItems
-            needsConsentPrompt = true
             return
         }
 
