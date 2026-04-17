@@ -24,6 +24,7 @@ struct ContentView: View {
     @State private var isSearchActive = false
     @State private var isSearchFieldPresented = false
     @State private var shareAnchorView: NSView?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
 
     #if DEBUG
     @AppStorage("debugSimulateEmptyState") private var debugSimulateEmptyState = false
@@ -78,7 +79,7 @@ struct ContentView: View {
 
     var body: some View {
         @Bindable var appState = appState
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             SpaceSidebarView(
                 spaces: spaces,
                 selection: $appState.sidebarSelection,
