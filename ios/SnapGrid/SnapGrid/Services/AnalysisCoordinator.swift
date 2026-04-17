@@ -7,6 +7,7 @@ import UIKit
 @MainActor
 final class AnalysisCoordinator {
     private var analysisTask: Task<Void, Never>?
+    var analysisAlertError: String?
 
     // Dependencies — set once via configure(), used by all analysis methods.
     private var keySyncService: KeySyncService?
@@ -62,6 +63,7 @@ final class AnalysisCoordinator {
 
         print("[Analysis] Starting analysis of \(items.count) item(s)")
 
+        analysisAlertError = nil
         analysisTask?.cancel()
         analysisTask = Task {
             for item in items {
@@ -104,7 +106,9 @@ final class AnalysisCoordinator {
                 } catch {
                     item.isAnalyzing = false
                     item.analysisError = error.localizedDescription
+                    self.analysisAlertError = error.localizedDescription
                     print("[Analysis] Failed for \(item.id): \(error.localizedDescription)")
+                    break
                 }
             }
         }

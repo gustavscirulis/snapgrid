@@ -11,6 +11,8 @@ final class ImportService {
     private let analysisService = AIAnalysisService.shared
     let sidecarService: MetadataSidecarService
 
+    var analysisAlertError: String?
+
     init(storage: MediaStorageService = .shared, sidecarService: MetadataSidecarService = .shared) {
         self.storage = storage
         self.sidecarService = sidecarService
@@ -146,18 +148,19 @@ final class ImportService {
         }
     }
 
-    func analyzeItem(_ item: MediaItem, context: ModelContext) async {
+    @discardableResult
+    func analyzeItem(_ item: MediaItem, context: ModelContext) async -> Bool {
         // Prevent duplicate analysis (e.g. SyncWatcher detecting our own sidecar write)
         guard !item.isAnalyzing else {
             print("[Analysis] Skipping \(item.id) — already analyzing")
-            return
+            return true
         }
 
         // Check for API key
         let provider = AIProvider(rawValue: UserDefaults.standard.string(forKey: "aiProvider") ?? "openai") ?? .openai
         guard KeychainService.exists(service: provider.keychainService) else {
             print("[Analysis] No API key for \(provider.rawValue), skipping")
-            return
+            return true
         }
 
         let storedModel = UserDefaults.standard.string(forKey: "\(provider.rawValue)Model") ?? ModelDiscoveryService.autoModelValue
@@ -170,6 +173,7 @@ final class ImportService {
         print("[Analysis] Starting analysis with \(provider.rawValue)/\(model) for \(item.id)")
 
         item.isAnalyzing = true
+        analysisAlertError = nil
         context.saveOrLog()
 
         do {
@@ -197,11 +201,14 @@ final class ImportService {
             context.saveOrLog()
             sidecarService.writeSidecar(for: item)
             NotificationCenter.default.post(name: .analysisCompleted, object: nil, userInfo: ["itemId": item.id])
+            return true
         } catch {
             print("[Analysis] Failed for \(item.id): \(error)")
             item.isAnalyzing = false
             item.analysisError = error.localizedDescription
+            analysisAlertError = error.localizedDescription
             context.saveOrLog()
+            return false
         }
     }
 
@@ -211,7 +218,8 @@ final class ImportService {
 
         print("[Analysis] Batch analyzing \(unanalyzed.count) unanalyzed items")
         for item in unanalyzed {
-            await analyzeItem(item, context: context)
+            let success = await analyzeItem(item, context: context)
+            if !success { break }
             try? await Task.sleep(for: .milliseconds(300))
         }
     }
