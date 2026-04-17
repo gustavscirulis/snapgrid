@@ -230,6 +230,14 @@ struct ContentView: View {
             ElectronImportView(isPresented: $showElectronImport)
                 .presentationBackground(Color.snapCard)
         }
+        .alert("Analysis Failed", isPresented: Binding(
+            get: { importService.analysisAlertError != nil },
+            set: { if !$0 { importService.analysisAlertError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(importService.analysisAlertError ?? "")
+        }
         .onChange(of: showElectronImport) { _, isPresented in
             if !isPresented {
                 syncWatcher.beginLocalChange()
@@ -304,7 +312,8 @@ struct ContentView: View {
                     guard let items = try? modelContext.fetch(descriptor) else { return }
                     let newItems = items.filter { ids.contains($0.id) }
                     for item in newItems {
-                        await importService.analyzeItem(item, context: modelContext)
+                        let success = await importService.analyzeItem(item, context: modelContext)
+                        if !success { break }
                     }
                 }
             }
@@ -801,9 +810,10 @@ struct ContentView: View {
             item.analysisResult = nil
         }
         modelContext.saveOrLog()
-        for item in items {
-            Task {
-                await importService.analyzeItem(item, context: modelContext)
+        Task {
+            for item in items {
+                let success = await importService.analyzeItem(item, context: modelContext)
+                if !success { break }
             }
         }
     }

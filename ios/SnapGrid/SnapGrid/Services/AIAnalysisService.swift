@@ -390,7 +390,14 @@ final class AIAnalysisService: Sendable {
             case .noAPIKey: return "No API key configured"
             case .imageConversionFailed: return "Failed to convert image for analysis"
             case .invalidResponse: return "Invalid response from AI provider"
-            case .apiError(let code, let msg): return "API error (\(code)): \(msg)"
+            case .apiError(let code, _):
+                switch code {
+                case 401, 403: return "Your API key is invalid or unauthorized. Check your key in Settings."
+                case 402: return "Insufficient credits. Check your account balance with your AI provider."
+                case 429: return "Rate limit exceeded. Wait a moment and try again."
+                case 500...599: return "The AI provider is experiencing issues (HTTP \(code)). Try again later."
+                default: return "API request failed with HTTP \(code). Check your provider settings."
+                }
             case .parseFailed: return "Failed to parse AI response"
             }
         }

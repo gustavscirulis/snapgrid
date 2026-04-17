@@ -214,6 +214,14 @@ struct MainView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+        .alert("Analysis Failed", isPresented: Binding(
+            get: { analysisCoordinator.analysisAlertError != nil },
+            set: { if !$0 { analysisCoordinator.analysisAlertError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(analysisCoordinator.analysisAlertError ?? "")
+        }
     }
 
     // MARK: - Tab Content
