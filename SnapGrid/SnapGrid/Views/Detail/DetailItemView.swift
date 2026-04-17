@@ -813,7 +813,7 @@ struct DetailMetadataSection: View {
                 .stageReveal(stage: stage, threshold: 1)
             } else if let result = item.analysisResult {
                 if !result.patterns.isEmpty {
-                    let pillsContent = FlowLayout(spacing: 8) {
+                    FlowLayout(spacing: 8) {
                         ForEach(Array(result.patterns.enumerated()), id: \.element.name) { index, pattern in
                             Button {
                                 onSearchPattern?(pattern.name)
@@ -833,16 +833,6 @@ struct DetailMetadataSection: View {
                     }
                     .padding(.leading, -8)
                     .padding(.bottom, 16)
-
-                    #if compiler(>=6.3)
-                    if #available(macOS 26, *) {
-                        GlassEffectContainer(spacing: 8) { pillsContent }
-                    } else {
-                        pillsContent
-                    }
-                    #else
-                    pillsContent
-                    #endif
                 }
 
                 if hasDescription(result) {
