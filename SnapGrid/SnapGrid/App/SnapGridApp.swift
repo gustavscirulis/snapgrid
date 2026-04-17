@@ -192,6 +192,7 @@ extension Notification.Name {
     static let focusSearch = Notification.Name("focusSearch")
     static let selectAll = Notification.Name("selectAll")
     static let pasteImages = Notification.Name("pasteImages")
+    static let importFolder = Notification.Name("importFolder")
     static let deleteSelected = Notification.Name("deleteSelected")
     static let analysisCompleted = Notification.Name("analysisCompleted")
     static let zoomIn = Notification.Name("zoomIn")
