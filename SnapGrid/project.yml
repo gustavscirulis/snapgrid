@@ -57,6 +57,8 @@ targets:
         com.apple.security.files.user-selected.read-write: true
         com.apple.developer.ubiquity-container-identifiers:
           - iCloud.com.SnapGrid
+        keychain-access-groups:
+          - $(TeamIdentifierPrefix)com.snapgrid.shared
 
   SnapGridTests:
     type: bundle.unit-test

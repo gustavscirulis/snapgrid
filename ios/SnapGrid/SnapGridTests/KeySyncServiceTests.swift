@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CryptoKit
 @testable import SnapGrid
 
 @Suite("KeySyncService", .tags(.crypto))
@@ -12,7 +13,7 @@ struct KeySyncServiceTests {
         let payload = KeySyncPayload(
             provider: "anthropic",
             model: "claude-sonnet-4-5",
-            keys: ["anthropic": "sk-ant-test", "openai": "sk-test"],
+            keys: ["anthropic": "test-ant-key", "openai": "test-oai-key"],
             updatedAt: Date(timeIntervalSince1970: 1700000000)
         )
 
@@ -24,8 +25,8 @@ struct KeySyncServiceTests {
         #expect(json?["provider"] as? String == "anthropic")
         #expect(json?["model"] as? String == "claude-sonnet-4-5")
         let keys = json?["keys"] as? [String: String]
-        #expect(keys?["anthropic"] == "sk-ant-test")
-        #expect(keys?["openai"] == "sk-test")
+        #expect(keys?["anthropic"] == "test-ant-key")
+        #expect(keys?["openai"] == "test-oai-key")
     }
 
     @Test("KeySyncPayload decode roundtrip")
@@ -33,7 +34,7 @@ struct KeySyncServiceTests {
         let original = KeySyncPayload(
             provider: "openai",
             model: "gpt-4o",
-            keys: ["openai": "sk-123"],
+            keys: ["openai": "test-key-123"],
             updatedAt: Date(timeIntervalSince1970: 1700000000)
         )
 
@@ -42,7 +43,7 @@ struct KeySyncServiceTests {
 
         #expect(decoded.provider == "openai")
         #expect(decoded.model == "gpt-4o")
-        #expect(decoded.keys["openai"] == "sk-123")
+        #expect(decoded.keys["openai"] == "test-key-123")
     }
 
     @Test("KeySyncPayload with empty keys dict")
@@ -67,7 +68,7 @@ struct KeySyncServiceTests {
         let payload = KeySyncPayload(
             provider: "openai",
             model: "gpt-4o",
-            keys: ["openai": "", "anthropic": "sk-valid"],
+            keys: ["openai": "", "anthropic": "test-valid-key"],
             updatedAt: Date()
         )
 
@@ -98,6 +99,7 @@ struct KeySyncServiceTests {
 
     @Test("End-to-end: encrypt payload, decrypt, decode")
     func endToEndPipeline() throws {
+        let testKey = SymmetricKey(size: .bits256)
         let payload = KeySyncPayload(
             provider: "gemini",
             model: "gemini-2.0-flash",
@@ -106,9 +108,9 @@ struct KeySyncServiceTests {
         )
 
         let encoded = try JSONEncoder().encode(payload)
-        let encrypted = try KeySyncCrypto.encrypt(encoded)
+        let encrypted = try KeySyncCrypto.encrypt(encoded, using: testKey)
 
-        let decrypted = try KeySyncCrypto.decrypt(encrypted)
+        let decrypted = try KeySyncCrypto.decrypt(encrypted, using: testKey)
         let decoded = try JSONDecoder().decode(KeySyncPayload.self, from: decrypted)
 
         #expect(decoded.provider == "gemini")
@@ -134,17 +136,25 @@ struct KeySyncServiceTests {
 
     // MARK: - Settings.bundle key reading
 
+    private func cleanupDefaults(_ defaults: UserDefaults) {
+        defaults.removeObject(forKey: "settings_apiKey")
+        defaults.removeObject(forKey: "settings_provider")
+        defaults.removeObject(forKey: "settings_model")
+        defaults.removeObject(forKey: "settings_lastSyncedKeyHash")
+    }
+
+    private func cleanupKeychain() {
+        for provider in AIProvider.allCases {
+            try? KeychainService.delete(service: provider.rawValue)
+        }
+    }
+
     @Test("Settings.bundle non-empty key unlocks service")
     @MainActor func settingsBundleUnlocks() async {
         let defaults = UserDefaults.standard
-        defer {
-            defaults.removeObject(forKey: "settings_apiKey")
-            defaults.removeObject(forKey: "settings_provider")
-            defaults.removeObject(forKey: "settings_model")
-            defaults.removeObject(forKey: "settings_lastSyncedApiKey")
-        }
+        defer { cleanupDefaults(defaults); cleanupKeychain() }
 
-        defaults.set("sk-ant-test123", forKey: "settings_apiKey")
+        defaults.set("test-ant-key-123", forKey: "settings_apiKey")
         defaults.set("anthropic", forKey: "settings_provider")
         defaults.set("", forKey: "settings_model")
 
@@ -155,16 +165,13 @@ struct KeySyncServiceTests {
         #expect(service.keySource == .settingsBundle)
         #expect(service.activeProvider == "anthropic")
         #expect(service.activeModel == nil)
-        #expect(service.activeAPIKey() == "sk-ant-test123")
+        #expect(service.activeAPIKey() == "test-ant-key-123")
     }
 
     @Test("Settings.bundle empty key does not unlock")
     @MainActor func settingsBundleEmptyKey() async {
         let defaults = UserDefaults.standard
-        defer {
-            defaults.removeObject(forKey: "settings_apiKey")
-            defaults.removeObject(forKey: "settings_provider")
-        }
+        defer { cleanupDefaults(defaults); cleanupKeychain() }
 
         defaults.set("", forKey: "settings_apiKey")
         defaults.set("openai", forKey: "settings_provider")
@@ -179,10 +186,7 @@ struct KeySyncServiceTests {
     @Test("Settings.bundle whitespace-only key treated as empty")
     @MainActor func settingsBundleWhitespaceKey() async {
         let defaults = UserDefaults.standard
-        defer {
-            defaults.removeObject(forKey: "settings_apiKey")
-            defaults.removeObject(forKey: "settings_provider")
-        }
+        defer { cleanupDefaults(defaults); cleanupKeychain() }
 
         defaults.set("   ", forKey: "settings_apiKey")
         defaults.set("openai", forKey: "settings_provider")
@@ -197,12 +201,9 @@ struct KeySyncServiceTests {
     @Test("Settings.bundle unknown provider is rejected")
     @MainActor func settingsBundleUnknownProvider() async {
         let defaults = UserDefaults.standard
-        defer {
-            defaults.removeObject(forKey: "settings_apiKey")
-            defaults.removeObject(forKey: "settings_provider")
-        }
+        defer { cleanupDefaults(defaults); cleanupKeychain() }
 
-        defaults.set("sk-test123", forKey: "settings_apiKey")
+        defaults.set("test-key-123", forKey: "settings_apiKey")
         defaults.set("invalid_provider", forKey: "settings_provider")
 
         let service = KeySyncService.shared
@@ -215,14 +216,9 @@ struct KeySyncServiceTests {
     @Test("Settings.bundle with model sets activeModel")
     @MainActor func settingsBundleWithModel() async {
         let defaults = UserDefaults.standard
-        defer {
-            defaults.removeObject(forKey: "settings_apiKey")
-            defaults.removeObject(forKey: "settings_provider")
-            defaults.removeObject(forKey: "settings_model")
-            defaults.removeObject(forKey: "settings_lastSyncedApiKey")
-        }
+        defer { cleanupDefaults(defaults); cleanupKeychain() }
 
-        defaults.set("sk-test123", forKey: "settings_apiKey")
+        defaults.set("test-key-123", forKey: "settings_apiKey")
         defaults.set("openai", forKey: "settings_provider")
         defaults.set("gpt-4o-mini", forKey: "settings_model")
 
@@ -236,12 +232,9 @@ struct KeySyncServiceTests {
     @Test("Settings.bundle provider 'none' does not unlock")
     @MainActor func settingsBundleNoneProvider() async {
         let defaults = UserDefaults.standard
-        defer {
-            defaults.removeObject(forKey: "settings_apiKey")
-            defaults.removeObject(forKey: "settings_provider")
-        }
+        defer { cleanupDefaults(defaults); cleanupKeychain() }
 
-        defaults.set("sk-test123", forKey: "settings_apiKey")
+        defaults.set("test-key-123", forKey: "settings_apiKey")
         defaults.set("none", forKey: "settings_provider")
 
         let service = KeySyncService.shared
