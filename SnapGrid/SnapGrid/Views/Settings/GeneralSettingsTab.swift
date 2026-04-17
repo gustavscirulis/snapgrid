@@ -65,9 +65,6 @@ struct GeneralSettingsTab: View {
         }
     }
 
-    private let privacyPolicyURL = URL(string: "https://snapgrid.app/privacy")!
-    private let supportURL = URL(string: "https://snapgrid.app/support")!
-
     var body: some View {
         Form {
             Section("Appearance") {
@@ -126,14 +123,6 @@ struct GeneralSettingsTab: View {
                 modelPicker
             }
 
-            Section("About") {
-                Link(destination: privacyPolicyURL) {
-                    Label("Privacy Policy", systemImage: "hand.raised")
-                }
-                Link(destination: supportURL) {
-                    Label("Support", systemImage: "questionmark.circle")
-                }
-            }
         }
         .formStyle(.grouped)
         .onAppear {
