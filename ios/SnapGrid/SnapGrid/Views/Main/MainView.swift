@@ -500,7 +500,9 @@ struct MainView: View {
             )
         }
         modelContext.delete(item)
-        modelContext.saveOrLog()
+        withAnimation(SnapSpring.resolvedStandard) {
+            modelContext.saveOrLog()
+        }
     }
 
     // MARK: - Item Sharing
