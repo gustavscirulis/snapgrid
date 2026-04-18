@@ -9,7 +9,7 @@ enum KeychainService {
     private static let serviceName = "com.snapgrid.apikeys"
 
     nonisolated(unsafe) private static var cache: [String: String]?
-    nonisolated(unsafe) private static let lock = NSLock()
+    private static let lock = NSLock()
 
     private static let legacyStorageURL: URL = {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
