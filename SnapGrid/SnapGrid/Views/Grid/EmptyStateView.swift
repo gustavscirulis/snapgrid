@@ -53,7 +53,7 @@ struct EmptyStateView: View {
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(.primary)
 
-                        Text(mode == .appLevel ? "Drop files here or import a folder to get started." : "Drop images here or move items from All")
+                        Text(mode == .appLevel ? "Drop files here or import a folder to get started.\nIf you have a SnapGrid 1.0 library, select it to migrate." : "Drop images here or move items from All")
                             .font(.body)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
