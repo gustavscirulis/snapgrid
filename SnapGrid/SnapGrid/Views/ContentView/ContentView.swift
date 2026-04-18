@@ -629,28 +629,16 @@ struct ContentView: View {
         appState.clearSelection()
 
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let anim = reduceMotion ? DeleteAnim.reducedMotionFade : DeleteAnim.shrinkFade
 
-        if reduceMotion {
-            withAnimation(CardCrush.reducedMotionFade) {
-                for id in ids { appState.deletingItemStages[id] = 2 }
-            }
-            Task { @MainActor in
-                try? await Task.sleep(for: CardCrush.reducedMotionDelay)
-                commitDeletion(ids)
-            }
-        } else {
-            withAnimation(CardCrush.heightCrush) {
-                for id in ids { appState.deletingItemStages[id] = 1 }
-            }
-            Task { @MainActor in
-                try? await Task.sleep(for: CardCrush.widthDelay)
-                withAnimation(CardCrush.widthCrush) {
-                    for id in ids { appState.deletingItemStages[id] = 2 }
-                }
+        withAnimation(anim) {
+            for id in ids { appState.deletingItemStages[id] = 1 }
+        }
 
-                try? await Task.sleep(for: CardCrush.completeDelay)
-                commitDeletion(ids)
-            }
+        let delay = reduceMotion ? DeleteAnim.reducedMotionDelay : DeleteAnim.commitDelay
+        Task { @MainActor in
+            try? await Task.sleep(for: delay)
+            commitDeletion(ids)
         }
     }
 

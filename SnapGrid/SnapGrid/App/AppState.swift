@@ -52,8 +52,7 @@ final class AppState {
     var isSettingsOpen: Bool = false
     var isDraggingFromApp: Bool = false
 
-    /// Per-item delete animation stage: 1 = height crush, 2 = width crush + fade.
-    /// Items not in this dictionary are at stage 0 (normal).
+    /// Items currently animating deletion (value 1). Absent entries are normal (stage 0).
     var deletingItemStages: [String: Int] = [:]
 
     func deleteStage(for id: String) -> Int {

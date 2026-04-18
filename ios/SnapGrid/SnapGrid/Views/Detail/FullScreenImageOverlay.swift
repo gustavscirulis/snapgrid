@@ -37,46 +37,10 @@ enum MetadataReveal {
     static let slideDistance:    CGFloat  = 8
 }
 
-/* ─────────────────────────────────────────────────────────
- * ANIMATION STORYBOARD — Delete (Wallet Card Crush)
- *
- *    0ms   height clips inward (top + bottom) → 5%, width stays 100%
- *  280ms   width shrinks → 0%, opacity fades → 0
- *  500ms   animation complete, item removed, next image loads
- * ───────────────────────────────────────────────────────── */
-
 private enum DeleteAnimation {
-    static let heightCrush = Animation.spring(response: 0.32, dampingFraction: 0.82)
-    static let widthCrush  = Animation.spring(response: 0.25, dampingFraction: 0.9)
-    static let widthDelay: Duration = .milliseconds(280)
-    static let completeDelay: Duration = .milliseconds(500)
-    static let crushedScaleY: CGFloat = 0.05   // near-zero height slit
-    static let crushedScaleX: CGFloat = 0.0     // fully collapsed
-}
-
-/// Conditionally applies the delete-animation mask only when active.
-/// Skipping `.mask {}` entirely when `deleteStage == 0` avoids an
-/// unnecessary offscreen compositing pass on every frame.
-private struct DeleteMaskModifier: ViewModifier {
-    let deleteStage: Int
-    let finalFrame: CGRect
-    let zoomScale: CGFloat
-    let cornerRadius: CGFloat
-
-    func body(content: Content) -> some View {
-        if deleteStage >= 1 {
-            content.mask {
-                let maskH = finalFrame.height * DeleteAnimation.crushedScaleY
-                let maskW = deleteStage >= 2
-                    ? finalFrame.width * DeleteAnimation.crushedScaleX
-                    : finalFrame.width * zoomScale
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .frame(width: maskW, height: maskH)
-            }
-        } else {
-            content
-        }
-    }
+    static let shrinkFade = Animation.spring(response: 0.2, dampingFraction: 0.85)
+    static let targetScale: CGFloat = 0.8
+    static let commitDelay: Duration = .milliseconds(250)
 }
 
 // MARK: - Stage Reveal Modifier
@@ -165,9 +129,7 @@ struct FullScreenImageOverlay: View {
     private enum GestureMode { case none, dismiss, scroll, swipe, zoomPan }
     @State private var gestureMode: GestureMode = .none
 
-    // Delete animation — wallet-style card crush
-    // Stage 0: normal, 1: height clips inward, 2: width shrinks + fade, 3: complete
-    @State private var deleteStage: Int = 0
+    @State private var isDeleting = false
 
     // Share sheet
     @State private var shareItem: URL?
@@ -437,7 +399,7 @@ struct FullScreenImageOverlay: View {
             prepareShareItem()
         }
         .onChange(of: deleteRequestID) { oldValue, newValue in
-            guard newValue != oldValue, deleteStage == 0, !isClosing else { return }
+            guard newValue != oldValue, !isDeleting, !isClosing else { return }
             handleDelete()
         }
     }
@@ -499,14 +461,10 @@ struct FullScreenImageOverlay: View {
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: zoomedCornerRadius))
-                    .modifier(DeleteMaskModifier(
-                        deleteStage: deleteStage,
-                        finalFrame: finalFrame,
-                        zoomScale: zoomScale,
-                        cornerRadius: zoomedCornerRadius
-                    ))
+                    .scaleEffect(isDeleting ? DeleteAnimation.targetScale : 1.0)
+                    .opacity(isDeleting ? 0 : 1)
+                    .animation(DeleteAnimation.shrinkFade, value: isDeleting)
                     .offset(effectiveZoomPanOffset)
-                    .opacity(deleteStage >= 2 ? 0 : 1)
                 }
                 .frame(width: screen.width, height: finalFrame.height)
 
@@ -522,7 +480,7 @@ struct FullScreenImageOverlay: View {
                 )
                 .padding(.top, 32)
                 .padding(.bottom, 50)
-                .opacity(deleteStage >= 1 ? 0 : (isZoomed ? 0 : metadataOpacity * metadataDismissOpacity))
+                .opacity(isDeleting ? 0 : (isZoomed ? 0 : metadataOpacity * metadataDismissOpacity))
                 .offset(y: dismissVisualProgress * 24)
             }
             .frame(maxWidth: .infinity)
@@ -927,7 +885,6 @@ struct FullScreenImageOverlay: View {
     // MARK: - Delete
 
     private func handleDelete() {
-        // Reset zoom before delete animation so mask dimensions are correct
         if isZoomed {
             withAnimation(SnapSpring.resolvedFast) {
                 zoomScale = minZoomScale
@@ -942,25 +899,14 @@ struct FullScreenImageOverlay: View {
         let deletedItem = items[deletedIndex]
         let isLastItem = deletedIndex == items.count - 1
 
-        // Stage 1 — height crushes inward
-        withAnimation(DeleteAnimation.heightCrush) {
-            deleteStage = 1
+        withAnimation(DeleteAnimation.shrinkFade) {
+            isDeleting = true
         }
 
         Task { @MainActor in
-            // Stage 2 — width collapses + fade out
-            try? await Task.sleep(for: DeleteAnimation.widthDelay)
-            withAnimation(DeleteAnimation.widthCrush) {
-                deleteStage = 2
-            }
+            try? await Task.sleep(for: DeleteAnimation.commitDelay)
 
-            // Stage 3 — crush complete, commit deletion + slide in replacement
-            try? await Task.sleep(for: DeleteAnimation.completeDelay)
-
-            // Notify parent to handle file move + SwiftData deletion
             onDelete?(deletedItem)
-
-            // Update local items array
             items.remove(at: deletedIndex)
 
             if items.isEmpty {
@@ -968,31 +914,26 @@ struct FullScreenImageOverlay: View {
                 return
             }
 
-            // Adjust index
             if deletedIndex >= items.count {
                 currentIndex = items.count - 1
             }
 
             onCurrentItemChanged?(items[currentIndex].id)
 
-            // Prepare new image before resetting delete state
             player?.pause()
             player = nil
             image = adjacentImages[items[currentIndex].id]
             contentOffset = 0
 
-            // Position replacement off-screen: from right normally, from left if last
             let slideFrom = isLastItem ? -screenSize.width : screenSize.width
             swipeOffset = slideFrom
-            deleteStage = 0
+            isDeleting = false
             metadataStage = 0
 
-            // Animate the slide-in
             withAnimation(SnapSpring.resolvedStandard) {
                 swipeOffset = 0
             }
 
-            // Stagger metadata reveal after slide settles
             try? await Task.sleep(for: .milliseconds(200))
             startMetadataReveal()
 

@@ -35,14 +35,11 @@ enum SnapSpring {
     }
 }
 
-/// Card-crush delete animation presets (matches iOS wallet-style crush).
-enum CardCrush {
-    static let heightCrush = Animation.spring(response: 0.2, dampingFraction: 0.85)
-    static let widthCrush  = Animation.spring(response: 0.15, dampingFraction: 0.92)
-    static let widthDelay: Duration = .milliseconds(160)
-    static let completeDelay: Duration = .milliseconds(300)
-    static let crushedScaleY: CGFloat = 0.05
-    static let crushedScaleX: CGFloat = 0.0
+/// Single-stage delete animation: scale down + fade out, then animated reflow.
+enum DeleteAnim {
+    static let shrinkFade = Animation.spring(response: 0.2, dampingFraction: 0.85)
+    static let targetScale: CGFloat = 0.8
+    static let commitDelay: Duration = .milliseconds(250)
 
     static let reducedMotionFade = Animation.easeInOut(duration: 0.15)
     static let reducedMotionDelay: Duration = .milliseconds(200)
