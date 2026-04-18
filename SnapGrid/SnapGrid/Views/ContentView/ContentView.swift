@@ -730,6 +730,7 @@ struct ContentView: View {
         MetadataSidecarService.shared.writeSpaces(from: modelContext)
         syncWatcher.endLocalChange()
         switchToSpace(space.id)
+        withAnimation { columnVisibility = .all }
         pendingEditSpaceId = space.id
     }
 
