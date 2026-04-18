@@ -105,29 +105,31 @@ struct MasonryGridView: View {
                         ForEach(0..<columns, id: \.self) { column in
                             LazyVStack(spacing: spacing) {
                                 ForEach(distribution[column]) { item in
-                                    GridItemView(
-                                        item: item,
-                                        width: columnWidth,
-                                        spaces: spaces,
-                                        activeSpaceId: activeSpaceId,
-                                        onSelect: { frame in onSelect(item.id, frame) },
-                                        onToggleSelect: { onToggleSelect(item.id) },
-                                        onShiftSelect: { onShiftSelect(item.id) },
-                                        onDelete: onDelete,
-                                        onChangeSpaceMembership: onChangeSpaceMembership,
-                                        onRetryAnalysis: onRetryAnalysis,
-                                        onShare: onShare
-                                    )
-                                    .background(
-                                        GeometryReader { geo in
-                                            Color.clear.preference(
-                                                key: ItemFramePreferenceKey.self,
-                                                value: rubberBandStart != nil
-                                                    ? [item.id: geo.frame(in: .named(coordinateSpaceName))]
-                                                    : [:]
-                                            )
-                                        }
-                                    )
+                                    if !item.isDeleted {
+                                        GridItemView(
+                                            item: item,
+                                            width: columnWidth,
+                                            spaces: spaces,
+                                            activeSpaceId: activeSpaceId,
+                                            onSelect: { frame in onSelect(item.id, frame) },
+                                            onToggleSelect: { onToggleSelect(item.id) },
+                                            onShiftSelect: { onShiftSelect(item.id) },
+                                            onDelete: onDelete,
+                                            onChangeSpaceMembership: onChangeSpaceMembership,
+                                            onRetryAnalysis: onRetryAnalysis,
+                                            onShare: onShare
+                                        )
+                                        .background(
+                                            GeometryReader { geo in
+                                                Color.clear.preference(
+                                                    key: ItemFramePreferenceKey.self,
+                                                    value: rubberBandStart != nil
+                                                        ? [item.id: geo.frame(in: .named(coordinateSpaceName))]
+                                                        : [:]
+                                                )
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -166,7 +168,7 @@ struct MasonryGridView: View {
         var columnHeights = Array(repeating: CGFloat(0), count: totalColumns)
         var columnItems = Array(repeating: [MediaItem](), count: totalColumns)
 
-        for item in items {
+        for item in items where !item.isDeleted {
             let shortest = columnHeights.enumerated().min(by: { $0.element < $1.element })?.offset ?? 0
             columnItems[shortest].append(item)
             let estimatedHeight = 1.0 / item.aspectRatio
