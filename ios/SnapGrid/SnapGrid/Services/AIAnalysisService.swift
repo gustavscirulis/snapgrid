@@ -29,37 +29,34 @@ enum AIProvider: String, CaseIterable, Codable, Sendable {
 final class AIAnalysisService: Sendable {
     static let shared = AIAnalysisService()
 
-    private let masterSystemPrompt = """
-    You are an expert AI in analyzing images. Your task is to analyze the content of images and provide appropriate descriptions.
+    private let systemPrompt = """
+    You are an expert image analyst.
 
-    Provide your response in the following JSON format:
+    <output_format>
+    Return a JSON object with this structure:
     {
-      "imageContext": "Detailed description of the entire image, including its purpose and main characteristics",
-      "imageSummary": "Very brief summary (1-2 words) of the main content or purpose",
+      "imageContext": "Detailed description of the image",
+      "imageSummary": "1-2 word summary",
       "patterns": [
-        {
-          "name": "Main object, subject, or element",
-          "confidence": 0.95
-        }
+        {"name": "Element Name", "confidence": 0.95}
       ]
     }
+    </output_format>
 
-    Guidelines:
-      1. The "imageSummary" should be a very brief (1-2 words) description of what the image shows
-      2. The "imageContext" should provide detailed information about the entire image
-      3. List the most prominent objects, subjects, or elements visible in the image
-      4. Use specific, descriptive language appropriate to the content (e.g. technical terms for UI screenshots, descriptive language for photos)
-      5. Each pattern should be 1-2 words maximum, not duplicative of imageSummary
-      6. Include confidence scores between 0.8 and 1.0
-      7. List patterns in order of confidence/importance
-      8. Ensure that the patterns are unique and not duplicates of each other and imageSummary
-      9. Provide exactly 6 patterns, ordered by confidence
-      10. Respond with a strict, valid JSON object — do not include markdown formatting, explanations, or code block symbols
-      11. Use title case for pattern/object names
-      12. Provide up to 6 patterns, ordered by confidence
+    <rules>
+    - imageSummary: 1-2 words only
+    - imageContext: detailed description of the entire image, its purpose and characteristics
+    - Pattern names: 1-2 words, title case, not duplicating imageSummary
+    - Up to 6 unique patterns, ordered by confidence (0.8–1.0)
+    - Respond with valid JSON only — no markdown, code blocks, or explanations
+    </rules>
     """
 
-    static let defaultGuidance = "If it's a UI screenshot, focus on UI patterns and components. If it's a general scene, focus on objects and subjects."
+    static let defaultGuidance = """
+    If it's a UI screenshot, focus on UI patterns and components. \
+    If it's a general scene, focus on objects and subjects. \
+    Use specific, descriptive language appropriate to the content.
+    """
 
     private let userText = "Analyze this image."
 
@@ -293,9 +290,9 @@ final class AIAnalysisService: Sendable {
 
     func buildPrompt(guidance: String? = nil, spaceContext: String? = nil) -> String {
         let effectiveGuidance = (guidance?.isEmpty == false ? guidance : nil) ?? Self.defaultGuidance
-        var result = masterSystemPrompt + "\n\nGuidance:\n" + effectiveGuidance
+        var result = systemPrompt + "\n<analysis_focus>\n" + effectiveGuidance + "\n</analysis_focus>"
         if let spaceContext, !spaceContext.isEmpty {
-            result += "\n" + spaceContext
+            result += "\n\n" + spaceContext
         }
         return result
     }

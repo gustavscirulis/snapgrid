@@ -186,6 +186,7 @@ final class ImportService {
             let resolvedGuidance = SpaceGuidanceResolver.resolve(for: item)
             let guidance = resolvedGuidance.guidance
             let spaceContext = resolvedGuidance.spaceContext
+            print("[Analysis] Guidance for \(item.id): \(guidance ?? "<default>")")
 
             if item.isVideo {
                 let frames = try await VideoFrameExtractor.extractAnalysisFrames(from: storage.mediaURL(filename: item.filename))
