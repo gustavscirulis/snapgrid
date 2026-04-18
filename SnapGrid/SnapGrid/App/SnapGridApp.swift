@@ -138,13 +138,14 @@ struct SnapGridApp: App {
 
             CommandGroup(replacing: .undoRedo) {
                 Button("Undo") {
-                    NotificationCenter.default.post(name: .undoDelete, object: nil)
+                    NotificationCenter.default.post(name: .undo, object: nil)
                 }
                 .keyboardShortcut("z")
 
-                Button("Redo") {}
-                    .keyboardShortcut("z", modifiers: [.command, .shift])
-                    .disabled(true)
+                Button("Redo") {
+                    NotificationCenter.default.post(name: .redo, object: nil)
+                }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
 
                 Divider()
 
@@ -183,7 +184,8 @@ private struct SpacesMenuContent: View {
 
 extension Notification.Name {
     static let importFiles = Notification.Name("importFiles")
-    static let undoDelete = Notification.Name("undoDelete")
+    static let undo = Notification.Name("undo")
+    static let redo = Notification.Name("redo")
     static let apiKeySaved = Notification.Name("apiKeySaved")
     static let importElectronLibrary = Notification.Name("importElectronLibrary")
     static let willResetAllData = Notification.Name("willResetAllData")

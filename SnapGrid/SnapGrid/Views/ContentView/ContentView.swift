@@ -205,7 +205,8 @@ struct ContentView: View {
             onImportFiles: { showImportPanel = true },
             onImportElectron: { showElectronImport = true },
             onImportFolder: { handleFolderImport() },
-            onUndoDelete: { undoLastDelete() },
+            onUndo: { undoLast() },
+            onRedo: { redoLast() },
             onApiKeySaved: {
                 Task {
                     await importService.analyzeUnanalyzedItems(from: Array(allItems), context: modelContext)
@@ -681,9 +682,43 @@ struct ContentView: View {
         deleteItems(appState.selectedIds)
     }
 
-    private func undoLastDelete() {
-        guard let batch = appState.popDeleteBatch() else { return }
+    private func undoLast() {
+        guard let batch = appState.popUndoBatch() else { return }
+        switch batch {
+        case .deletion(let items):
+            appState.pushRedoBatch(.deletion(items))
+            restoreDeletedItems(items)
+        case .spaceChange(let changes):
+            let reverseSnapshot = changes.compactMap { change -> SpaceChangeInfo? in
+                guard let item = allItems.first(where: { $0.id == change.itemId }) else { return nil }
+                return SpaceChangeInfo(itemId: item.id, previousSpaceIds: item.orderedSpaceIDs)
+            }
+            appState.pushRedoBatch(.spaceChange(reverseSnapshot))
+            applySpaceChange(changes, toast: "Undid space change")
+        case .spaceDeletion(let info):
+            appState.pushRedoBatch(.spaceDeletion(info))
+            restoreDeletedSpace(info)
+        }
+    }
 
+    private func redoLast() {
+        guard let batch = appState.popRedoBatch() else { return }
+        switch batch {
+        case .deletion(let infos):
+            redoDeletion(infos)
+        case .spaceChange(let changes):
+            let reverseSnapshot = changes.compactMap { change -> SpaceChangeInfo? in
+                guard let item = allItems.first(where: { $0.id == change.itemId }) else { return nil }
+                return SpaceChangeInfo(itemId: item.id, previousSpaceIds: item.orderedSpaceIDs)
+            }
+            appState.pushUndoBatch(.spaceChange(reverseSnapshot))
+            applySpaceChange(changes, toast: "Redid space change")
+        case .spaceDeletion(let info):
+            reDeleteSpace(info)
+        }
+    }
+
+    private func restoreDeletedItems(_ batch: [DeletedItemInfo]) {
         syncWatcher.beginLocalChange()
         for info in batch {
             try? MediaStorageService.shared.restoreFromTrash(filename: info.filename, id: info.id)
@@ -722,6 +757,105 @@ struct ContentView: View {
         appState.showToast("Restored \(batch.count) item\(batch.count == 1 ? "" : "s")")
     }
 
+    private func redoDeletion(_ infos: [DeletedItemInfo]) {
+        let items = infos.compactMap { info in allItems.first(where: { $0.id == info.id }) }
+        guard !items.isEmpty else { return }
+
+        let batch = items.map { item in
+            let ar = item.analysisResult
+            return DeletedItemInfo(
+                id: item.id,
+                filename: item.filename,
+                mediaType: item.mediaType,
+                width: item.width,
+                height: item.height,
+                duration: item.duration,
+                spaceIds: item.orderedSpaceIDs,
+                imageContext: ar?.imageContext,
+                imageSummary: ar?.imageSummary,
+                patterns: ar?.patterns,
+                analyzedAt: ar?.analyzedAt,
+                analysisProvider: ar?.provider,
+                analysisModel: ar?.model
+            )
+        }
+        appState.pushUndoBatch(.deletion(batch))
+
+        syncWatcher.beginLocalChange()
+        for item in items {
+            try? MediaStorageService.shared.moveToTrash(filename: item.filename, id: item.id)
+            modelContext.delete(item)
+        }
+        modelContext.saveOrLog()
+        syncWatcher.endLocalChange()
+        appState.showToast("Moved \(items.count) item\(items.count == 1 ? "" : "s") to trash")
+    }
+
+    private func applySpaceChange(_ changes: [SpaceChangeInfo], toast: String) {
+        syncWatcher.beginLocalChange()
+        for change in changes {
+            guard let item = allItems.first(where: { $0.id == change.itemId }) else { continue }
+            let targetSpaces = spaces.filter { change.previousSpaceIds.contains($0.id) }
+            item.setMembership(targetSpaces)
+            MetadataSidecarService.shared.writeSidecar(for: item)
+        }
+        modelContext.saveOrLog()
+        syncWatcher.endLocalChange()
+        let count = changes.count
+        appState.showToast("\(toast) for \(count) item\(count == 1 ? "" : "s")")
+    }
+
+    private func restoreDeletedSpace(_ info: DeletedSpaceInfo) {
+        syncWatcher.beginLocalChange()
+        let space = Space(id: info.id, name: info.name, order: info.order, createdAt: info.createdAt)
+        space.customPrompt = info.customPrompt
+        space.useCustomPrompt = info.useCustomPrompt
+        modelContext.insert(space)
+
+        let memberItems = allItems.filter { info.itemIds.contains($0.id) }
+        for item in memberItems {
+            item.addSpace(space)
+            MetadataSidecarService.shared.writeSidecar(for: item)
+        }
+        modelContext.saveOrLog()
+        MetadataSidecarService.shared.writeSpaces(from: modelContext)
+        syncWatcher.endLocalChange()
+        appState.showToast("Restored space \"\(info.name)\"")
+    }
+
+    private func reDeleteSpace(_ info: DeletedSpaceInfo) {
+        guard let space = spaces.first(where: { $0.id == info.id }) else { return }
+
+        let freshSnapshot = DeletedSpaceInfo(
+            id: space.id,
+            name: space.name,
+            order: space.order,
+            createdAt: space.createdAt,
+            customPrompt: space.customPrompt,
+            useCustomPrompt: space.useCustomPrompt,
+            itemIds: space.items.map(\.id)
+        )
+        appState.pushUndoBatch(.spaceDeletion(freshSnapshot))
+
+        if appState.activeSpaceId == space.id {
+            appState.sidebarSelection = .all
+        }
+
+        syncWatcher.beginLocalChange()
+        let itemsToUpdate = space.items
+        for item in itemsToUpdate {
+            item.removeSpace(id: space.id)
+        }
+        modelContext.delete(space)
+        modelContext.saveOrLog()
+        MetadataSidecarService.shared.writeSpaces(from: modelContext)
+        for item in itemsToUpdate {
+            MetadataSidecarService.shared.writeSidecar(for: item)
+        }
+        syncWatcher.endLocalChange()
+        appState.showToast("Deleted space \"\(info.name)\"")
+    }
+
     private func createSpace() {
         syncWatcher.beginLocalChange()
         let space = Space(name: "New Space", order: spaces.count)
@@ -736,6 +870,18 @@ struct ContentView: View {
 
     private func deleteSpace(_ id: String) {
         guard let space = spaces.first(where: { $0.id == id }) else { return }
+
+        let snapshot = DeletedSpaceInfo(
+            id: space.id,
+            name: space.name,
+            order: space.order,
+            createdAt: space.createdAt,
+            customPrompt: space.customPrompt,
+            useCustomPrompt: space.useCustomPrompt,
+            itemIds: space.items.map(\.id)
+        )
+        appState.pushUndoBatch(.spaceDeletion(snapshot))
+        appState.clearRedoStack()
 
         if appState.activeSpaceId == id {
             appState.sidebarSelection = .all
@@ -785,7 +931,11 @@ struct ContentView: View {
 
     private func updateSpaceMembership(itemIds: Set<String>, action: SpaceMembershipAction) {
         let itemsToUpdate = allItems.filter { itemIds.contains($0.id) }
+        guard !itemsToUpdate.isEmpty else { return }
         var reanalyzeItems: [MediaItem] = []
+
+        let snapshot = itemsToUpdate.map { SpaceChangeInfo(itemId: $0.id, previousSpaceIds: $0.orderedSpaceIDs) }
+        appState.pushSpaceChangeBatch(snapshot)
 
         syncWatcher.beginLocalChange()
         for item in itemsToUpdate {
@@ -908,7 +1058,8 @@ private struct NotificationModifier: ViewModifier {
     let onImportFiles: () -> Void
     let onImportElectron: () -> Void
     let onImportFolder: () -> Void
-    let onUndoDelete: () -> Void
+    let onUndo: () -> Void
+    let onRedo: () -> Void
     let onApiKeySaved: () -> Void
     let onCreateNewSpace: () -> Void
     let onFocusSearch: () -> Void
@@ -927,8 +1078,11 @@ private struct NotificationModifier: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .importFolder)) { _ in
                 onImportFolder()
             }
-            .onReceive(NotificationCenter.default.publisher(for: .undoDelete)) { _ in
-                onUndoDelete()
+            .onReceive(NotificationCenter.default.publisher(for: .undo)) { _ in
+                onUndo()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .redo)) { _ in
+                onRedo()
             }
             .onReceive(NotificationCenter.default.publisher(for: .apiKeySaved)) { _ in
                 onApiKeySaved()
