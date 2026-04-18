@@ -465,12 +465,16 @@ struct ContentView: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.message = "Select your SnapGrid 1 library folder"
+        panel.message = "Select your SnapGrid 1 library folder or a folder with images"
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Documents")
-        guard panel.runModal() == .OK, let url = panel.url,
-              service.validateLibraryFolder(url) else { return }
-        electronImportURL = url
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        if service.validateLibraryFolder(url) {
+            electronImportURL = url
+        } else {
+            importFolderContents(url)
+        }
     }
 
     private func handleFolderImport() {
@@ -481,9 +485,11 @@ struct ContentView: View {
         panel.message = "Choose a folder to import media from"
         panel.prompt = "Import"
 
-        let response = panel.runModal()
-        guard response == .OK, let folderURL = panel.url else { return }
+        guard panel.runModal() == .OK, let folderURL = panel.url else { return }
+        importFolderContents(folderURL)
+    }
 
+    private func importFolderContents(_ folderURL: URL) {
         guard let enumerator = FileManager.default.enumerator(
             at: folderURL,
             includingPropertiesForKeys: [.isRegularFileKey],
