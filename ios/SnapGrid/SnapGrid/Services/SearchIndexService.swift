@@ -1,12 +1,14 @@
+import Accelerate
 import Foundation
+import NaturalLanguage
 
 struct SearchResult {
     let itemId: String
     let score: Double
 }
 
-/// Full-text search using an inverted index with BM25 scoring.
-/// Builds the index at startup from metadata; queries are <1ms.
+/// Full-text search using an inverted index with BM25 scoring, plus lightweight
+/// word-vector embeddings for synonym matching. Queries are <1ms.
 @Observable
 @MainActor
 final class SearchIndexService {
@@ -24,18 +26,31 @@ final class SearchIndexService {
     private var docCount: Int = 0
     private var sortedVocabulary: [String] = []
 
+    // MARK: - Embedding Structures
+
+    private var itemEmbeddings: [String: [Double]] = [:]
+    private var embeddingsReady = false
+    nonisolated(unsafe) private static let wordEmbedding = NLEmbedding.wordEmbedding(for: .english)
+    private var embeddingDimension: Int { Self.wordEmbedding?.dimension ?? 0 }
+    private let embeddingSimilarityThreshold: Double = 0.65
+    private let embeddingFallbackThreshold = 3
+
     // MARK: - Field Weights
 
     private let patternWeight = 3.0
     private let summaryWeight = 2.0
     private let contextWeight = 1.0
 
-    // MARK: - Tokenization
+    // MARK: - Tokenization & Text Helpers
 
-    static func tokenize(_ text: String) -> [String] {
+    nonisolated static func tokenize(_ text: String) -> [String] {
         text.lowercased()
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { $0.count >= 2 }
+    }
+
+    private nonisolated static func searchableText(from result: AnalysisResult) -> String {
+        "\(result.imageSummary) \(result.patterns.map(\.name).joined(separator: " ")) \(result.imageContext)"
     }
 
     // MARK: - Index Building
@@ -52,10 +67,46 @@ final class SearchIndexService {
         print("[SearchIndex] Built index: \(docCount) docs, \(postings.count) unique tokens")
     }
 
+    func buildEmbeddingsInBackground(items: [MediaItem]) {
+        guard Self.wordEmbedding != nil else {
+            print("[SearchIndex] Word embeddings not available, skipping")
+            return
+        }
+
+        var textData: [(id: String, text: String)] = []
+        for item in items {
+            guard let result = item.analysisResult else { continue }
+            let text = Self.searchableText(from: result)
+            textData.append((id: item.id, text: text))
+        }
+
+        Task.detached {
+            var embeddings: [String: [Double]] = [:]
+            for entry in textData {
+                if let vec = Self.averageWordVectors(entry.text) {
+                    embeddings[entry.id] = vec
+                }
+            }
+
+            await MainActor.run {
+                self.itemEmbeddings = embeddings
+                self.embeddingsReady = true
+                print("[SearchIndex] Built \(embeddings.count) word-vector embeddings in background")
+            }
+        }
+    }
+
     func addToIndex(item: MediaItem) {
         removeFromIndex(itemId: item.id)
         indexItem(item)
         finalizeIndex()
+
+        if let result = item.analysisResult {
+            let text = Self.searchableText(from: result)
+            if let vec = Self.averageWordVectors(text) {
+                itemEmbeddings[item.id] = vec
+            }
+        }
     }
 
     func removeFromIndex(itemId: String) {
@@ -68,6 +119,7 @@ final class SearchIndexService {
             }
         }
 
+        itemEmbeddings.removeValue(forKey: itemId)
         finalizeIndex()
     }
 
@@ -106,7 +158,8 @@ final class SearchIndexService {
         let queryTerms = Self.tokenize(query)
         guard !queryTerms.isEmpty else { return [] }
 
-        var scores: [String: Double] = [:]
+        // Stage 1: BM25 keyword search with AND logic
+        var bm25Scores: [String: Double] = [:]
         var termMatches: [String: Int] = [:]
 
         for term in queryTerms {
@@ -115,7 +168,7 @@ final class SearchIndexService {
             if let list = postings[term] {
                 let idf = idfScore(documentFrequency: list.count)
                 for entry in list {
-                    scores[entry.itemId, default: 0] += bm25Term(tf: entry.tf, docLength: docLengths[entry.itemId] ?? 0, idf: idf)
+                    bm25Scores[entry.itemId, default: 0] += bm25Term(tf: entry.tf, docLength: docLengths[entry.itemId] ?? 0, idf: idf)
                     matchedIds.insert(entry.itemId)
                 }
             }
@@ -125,7 +178,7 @@ final class SearchIndexService {
                 guard matchedToken != term, let list = postings[matchedToken] else { continue }
                 let idf = idfScore(documentFrequency: list.count)
                 for entry in list {
-                    scores[entry.itemId, default: 0] += bm25Term(tf: entry.tf, docLength: docLengths[entry.itemId] ?? 0, idf: idf) * 0.7
+                    bm25Scores[entry.itemId, default: 0] += bm25Term(tf: entry.tf, docLength: docLengths[entry.itemId] ?? 0, idf: idf) * 0.7
                     matchedIds.insert(entry.itemId)
                 }
             }
@@ -136,8 +189,28 @@ final class SearchIndexService {
         }
 
         let requiredTermCount = queryTerms.count
-        return scores
-            .filter { termMatches[$0.key] == requiredTermCount }
+        var results: [String: Double] = [:]
+        for (id, score) in bm25Scores where termMatches[id] == requiredTermCount {
+            results[id] = score
+        }
+
+        // Stage 2: Embedding similarity — only when BM25 found few/no keyword matches
+        if embeddingsReady, results.count < embeddingFallbackThreshold,
+           let queryVec = Self.averageWordVectors(query) {
+            let dim = queryVec.count
+            for (itemId, itemVec) in itemEmbeddings {
+                if results[itemId] != nil { continue }
+                guard itemVec.count == dim else { continue }
+
+                var dot = 0.0
+                vDSP_dotprD(queryVec, 1, itemVec, 1, &dot, vDSP_Length(dim))
+                if dot >= embeddingSimilarityThreshold {
+                    results[itemId] = dot * 0.5
+                }
+            }
+        }
+
+        return results
             .map { SearchResult(itemId: $0.key, score: $0.value) }
             .sorted { $0.score > $1.score }
     }
@@ -176,5 +249,36 @@ final class SearchIndexService {
             lo += 1
         }
         return matches
+    }
+
+    // MARK: - Word Vector Embeddings
+
+    private nonisolated static func averageWordVectors(_ text: String) -> [Double]? {
+        guard let embedding = wordEmbedding else { return nil }
+        let dim = embedding.dimension
+
+        let words = tokenize(text)
+
+        var sum = [Double](repeating: 0, count: dim)
+        var count = 0
+
+        for word in words {
+            guard let vec = embedding.vector(for: word) else { continue }
+            vDSP.add(sum, vec, result: &sum)
+            count += 1
+        }
+
+        guard count > 0 else { return nil }
+
+        var divisor = Double(count)
+        vDSP_vsdivD(sum, 1, &divisor, &sum, 1, vDSP_Length(dim))
+
+        var mag = 0.0
+        vDSP_dotprD(sum, 1, sum, 1, &mag, vDSP_Length(dim))
+        mag = sqrt(mag)
+        guard mag > 0 else { return nil }
+        vDSP_vsdivD(sum, 1, &mag, &sum, 1, vDSP_Length(dim))
+
+        return sum
     }
 }

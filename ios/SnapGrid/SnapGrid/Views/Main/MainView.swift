@@ -41,8 +41,8 @@ struct MainView: View {
 
         guard !query.isEmpty else { return [] }
 
-        if query == "vid" { return base.filter { $0.isVideo } }
-        if query == "img" { return base.filter { !$0.isVideo } }
+        if query == "video" { return base.filter { $0.isVideo } }
+        if query == "image" { return base.filter { !$0.isVideo } }
 
         guard !scores.isEmpty else { return [] }
 
@@ -126,7 +126,7 @@ struct MainView: View {
                     guard !Task.isCancelled else { return }
 
                     let lowered = trimmed.lowercased()
-                    if lowered == "vid" || lowered == "img" {
+                    if lowered == "video" || lowered == "image" {
                         appState.searchScores = [:]
                         return
                     }
@@ -568,6 +568,7 @@ struct MainView: View {
         isLoading = false
 
         searchService.buildIndex(items: allItems)
+        searchService.buildEmbeddingsInBackground(items: allItems)
 
         prefetchTask?.cancel()
         let screenWidth = UIScreen.main.bounds.width
