@@ -24,11 +24,17 @@ final class ImportService {
     func importFiles(_ urls: [URL], into context: ModelContext, spaceId: String? = nil) async {
         for url in urls {
             do {
-                try await importSingleFile(url, into: context, spaceId: spaceId)
+                try await importSingleFile(url, into: context, spaceId: spaceId, analyze: false)
             } catch {
                 print("[ImportService] Failed to import \(url.lastPathComponent): \(error)")
             }
+            await Task.yield()
         }
+
+        let unanalyzed = (try? context.fetch(FetchDescriptor<MediaItem>()))?.filter {
+            $0.analysisResult == nil && $0.analysisError == nil && !$0.isAnalyzing
+        } ?? []
+        await analyzeUnanalyzedItems(from: unanalyzed, context: context)
     }
 
     /// Import a raw NSImage (e.g. from pasteboard or browser drag) — converts to PNG and runs the full pipeline.
@@ -73,7 +79,7 @@ final class ImportService {
         }
     }
 
-    func importSingleFile(_ url: URL, into context: ModelContext, spaceId: String?, sourceURL: String? = nil) async throws {
+    func importSingleFile(_ url: URL, into context: ModelContext, spaceId: String?, sourceURL: String? = nil, analyze: Bool = true) async throws {
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
 
@@ -145,9 +151,10 @@ final class ImportService {
         try context.save()
         sidecarService.writeSidecar(for: item)
 
-        // Queue AI analysis in background
-        Task { @MainActor [weak self] in
-            await self?.analyzeItem(item, context: context)
+        if analyze {
+            Task { @MainActor [weak self] in
+                await self?.analyzeItem(item, context: context)
+            }
         }
     }
 
