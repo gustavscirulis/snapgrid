@@ -37,12 +37,18 @@ final class VideoPreviewManager {
     /// Pattern names to display on the floating layer during grid hover
     private(set) var gridPatternNames: [String] = []
 
+    /// Whether the previewed item is currently being analyzed
+    private(set) var isAnalyzing: Bool = false
+
+    /// Whether the previewed item has a failed analysis (shows retry badge on floating layer)
+    private(set) var hasAnalysisError: Bool = false
+
     private var loopObserver: NSObjectProtocol?
 
     // MARK: - Grid Hover
 
     /// Start hover preview — creates player, positions floating layer at grid cell
-    func startPreview(itemId: String, url: URL, frame: CGRect, patternNames: [String] = []) {
+    func startPreview(itemId: String, url: URL, frame: CGRect, patternNames: [String] = [], isAnalyzing: Bool = false, hasAnalysisError: Bool = false) {
         if activeItemId == itemId, player != nil {
             gridItemFrame = frame
             if displayState == .grid {
@@ -59,6 +65,8 @@ final class VideoPreviewManager {
         activeItemId = itemId
         gridItemFrame = frame
         gridPatternNames = patternNames
+        self.isAnalyzing = isAnalyzing
+        self.hasAnalysisError = hasAnalysisError
         currentFrame = frame
         cornerRadius = 12
         displayState = .grid
@@ -75,6 +83,12 @@ final class VideoPreviewManager {
         }
     }
 
+    /// Update analysis state for the currently previewed item (called reactively from GridItemView)
+    func updateAnalysisState(isAnalyzing: Bool, hasError: Bool) {
+        self.isAnalyzing = isAnalyzing
+        self.hasAnalysisError = hasError
+    }
+
     /// Stop hover preview
     func stopPreview() {
         displayState = .hidden
@@ -89,6 +103,8 @@ final class VideoPreviewManager {
         player = nil
         activeItemId = nil
         gridPatternNames = []
+        isAnalyzing = false
+        hasAnalysisError = false
     }
 
     private func addLoopObserver(for player: AVPlayer?) {
