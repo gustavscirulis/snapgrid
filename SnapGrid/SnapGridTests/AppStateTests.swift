@@ -107,10 +107,42 @@ struct AppStateTests {
         let batch = [DeletedItemInfo(id: "1", filename: "test.png", mediaType: .image, width: 100, height: 100, duration: nil, spaceIds: [], imageContext: nil, imageSummary: nil, patterns: nil, analyzedAt: nil, analysisProvider: nil, analysisModel: nil)]
 
         state.pushDeleteBatch(batch)
-        let popped = state.popDeleteBatch()
+        guard case .deletion(let items) = state.popUndoBatch() else {
+            Issue.record("Expected deletion batch")
+            return
+        }
 
-        #expect(popped?.count == 1)
-        #expect(popped?[0].id == "1")
+        #expect(items.count == 1)
+        #expect(items[0].id == "1")
+    }
+
+    @Test("Push and pop space change batch")
+    func spaceChangeUndoStack() {
+        let state = AppState()
+        let changes = [SpaceChangeInfo(itemId: "item1", previousSpaceIds: ["spaceA", "spaceB"])]
+
+        state.pushSpaceChangeBatch(changes)
+        guard case .spaceChange(let popped) = state.popUndoBatch() else {
+            Issue.record("Expected space change batch")
+            return
+        }
+
+        #expect(popped.count == 1)
+        #expect(popped[0].itemId == "item1")
+        #expect(popped[0].previousSpaceIds == ["spaceA", "spaceB"])
+    }
+
+    @Test("Interleaved undo batches maintain LIFO order")
+    func interleavedUndoOrder() {
+        let state = AppState()
+        state.pushDeleteBatch([DeletedItemInfo(id: "del1", filename: "1.png", mediaType: .image, width: 1, height: 1, duration: nil, spaceIds: [], imageContext: nil, imageSummary: nil, patterns: nil, analyzedAt: nil, analysisProvider: nil, analysisModel: nil)])
+        state.pushSpaceChangeBatch([SpaceChangeInfo(itemId: "item1", previousSpaceIds: ["s1"])])
+        state.pushDeleteBatch([DeletedItemInfo(id: "del2", filename: "2.png", mediaType: .image, width: 1, height: 1, duration: nil, spaceIds: [], imageContext: nil, imageSummary: nil, patterns: nil, analyzedAt: nil, analysisProvider: nil, analysisModel: nil)])
+
+        guard case .deletion = state.popUndoBatch() else { Issue.record("Expected deletion"); return }
+        guard case .spaceChange = state.popUndoBatch() else { Issue.record("Expected space change"); return }
+        guard case .deletion = state.popUndoBatch() else { Issue.record("Expected deletion"); return }
+        #expect(state.popUndoBatch() == nil)
     }
 
     @Test("Undo stack caps at 20 batches")
@@ -121,15 +153,71 @@ struct AppStateTests {
             state.pushDeleteBatch(batch)
         }
 
-        #expect(state.deletedBatches.count == 20)
-        // Oldest batches should have been removed
-        #expect(state.deletedBatches.first?[0].id == "5")
+        #expect(state.undoStack.count == 20)
+        guard case .deletion(let first) = state.undoStack.first else {
+            Issue.record("Expected deletion batch")
+            return
+        }
+        #expect(first[0].id == "5")
     }
 
     @Test("Pop from empty stack returns nil")
     func popEmptyStack() {
         let state = AppState()
-        #expect(state.popDeleteBatch() == nil)
+        #expect(state.popUndoBatch() == nil)
+        #expect(state.popRedoBatch() == nil)
+    }
+
+    // MARK: - Redo Stack
+
+    @Test("Push and pop redo batch")
+    func redoStack() {
+        let state = AppState()
+        let changes = [SpaceChangeInfo(itemId: "item1", previousSpaceIds: ["s1"])]
+        state.pushRedoBatch(.spaceChange(changes))
+
+        guard case .spaceChange(let popped) = state.popRedoBatch() else {
+            Issue.record("Expected space change batch")
+            return
+        }
+        #expect(popped.count == 1)
+        #expect(popped[0].itemId == "item1")
+    }
+
+    @Test("New action clears redo stack")
+    func newActionClearsRedo() {
+        let state = AppState()
+        state.pushRedoBatch(.spaceChange([SpaceChangeInfo(itemId: "item1", previousSpaceIds: ["s1"])]))
+        #expect(state.redoStack.count == 1)
+
+        state.pushSpaceChangeBatch([SpaceChangeInfo(itemId: "item2", previousSpaceIds: ["s2"])])
+        #expect(state.redoStack.isEmpty)
+    }
+
+    @Test("Redo stack caps at 20 batches")
+    func redoStackCap() {
+        let state = AppState()
+        for i in 0..<25 {
+            state.pushRedoBatch(.spaceChange([SpaceChangeInfo(itemId: "\(i)", previousSpaceIds: [])]))
+        }
+        #expect(state.redoStack.count == 20)
+    }
+
+    @Test("Push and pop space deletion batch")
+    func spaceDeletionUndoStack() {
+        let state = AppState()
+        let info = DeletedSpaceInfo(id: "s1", name: "Design", order: 0, createdAt: .now, customPrompt: "Analyze design", useCustomPrompt: true, itemIds: ["item1", "item2"])
+        state.pushUndoBatch(.spaceDeletion(info))
+
+        guard case .spaceDeletion(let popped) = state.popUndoBatch() else {
+            Issue.record("Expected space deletion batch")
+            return
+        }
+        #expect(popped.id == "s1")
+        #expect(popped.name == "Design")
+        #expect(popped.itemIds == ["item1", "item2"])
+        #expect(popped.customPrompt == "Analyze design")
+        #expect(popped.useCustomPrompt == true)
     }
 
     // MARK: - Zoom

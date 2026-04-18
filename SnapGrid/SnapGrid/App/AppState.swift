@@ -59,8 +59,9 @@ final class AppState {
         deletingItemStages[id] ?? 0
     }
 
-    // Undo stack — stores enough info to fully restore deleted items
-    private(set) var deletedBatches: [[DeletedItemInfo]] = []
+    // Unified undo/redo stacks — hold both deletion and space-change snapshots in LIFO order
+    private(set) var undoStack: [UndoBatch] = []
+    private(set) var redoStack: [UndoBatch] = []
 
     // Toast notifications
     var toasts: [ToastMessage] = []
@@ -136,15 +137,40 @@ final class AppState {
 
     private let maxUndoBatches = 20
 
-    func pushDeleteBatch(_ items: [DeletedItemInfo]) {
-        deletedBatches.append(items)
-        if deletedBatches.count > maxUndoBatches {
-            deletedBatches.removeFirst(deletedBatches.count - maxUndoBatches)
+    func pushUndoBatch(_ batch: UndoBatch) {
+        undoStack.append(batch)
+        if undoStack.count > maxUndoBatches {
+            undoStack.removeFirst(undoStack.count - maxUndoBatches)
         }
     }
 
-    func popDeleteBatch() -> [DeletedItemInfo]? {
-        deletedBatches.popLast()
+    func popUndoBatch() -> UndoBatch? {
+        undoStack.popLast()
+    }
+
+    func pushRedoBatch(_ batch: UndoBatch) {
+        redoStack.append(batch)
+        if redoStack.count > maxUndoBatches {
+            redoStack.removeFirst(redoStack.count - maxUndoBatches)
+        }
+    }
+
+    func popRedoBatch() -> UndoBatch? {
+        redoStack.popLast()
+    }
+
+    func clearRedoStack() {
+        redoStack.removeAll()
+    }
+
+    func pushDeleteBatch(_ items: [DeletedItemInfo]) {
+        pushUndoBatch(.deletion(items))
+        clearRedoStack()
+    }
+
+    func pushSpaceChangeBatch(_ changes: [SpaceChangeInfo]) {
+        pushUndoBatch(.spaceChange(changes))
+        clearRedoStack()
     }
 }
 
@@ -165,6 +191,27 @@ struct DeletedItemInfo {
     let analyzedAt: Date?
     let analysisProvider: String?
     let analysisModel: String?
+}
+
+struct SpaceChangeInfo {
+    let itemId: String
+    let previousSpaceIds: [String]
+}
+
+struct DeletedSpaceInfo {
+    let id: String
+    let name: String
+    let order: Int
+    let createdAt: Date
+    let customPrompt: String?
+    let useCustomPrompt: Bool
+    let itemIds: [String]
+}
+
+enum UndoBatch {
+    case deletion([DeletedItemInfo])
+    case spaceChange([SpaceChangeInfo])
+    case spaceDeletion(DeletedSpaceInfo)
 }
 
 struct ToastMessage: Identifiable {
