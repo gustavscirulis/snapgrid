@@ -70,7 +70,7 @@ struct SnapGridApp: App {
                 }
                 .keyboardShortcut("o")
 
-                Button("Import from SnapGrid 1...") {
+                Button("Import Folder...") {
                     NotificationCenter.default.post(name: .importElectronLibrary, object: nil)
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])

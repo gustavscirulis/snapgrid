@@ -465,7 +465,7 @@ struct ContentView: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.message = "Select your SnapGrid 1 library folder or a folder with images"
+        panel.message = "Select a folder with your media"
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Documents")
         guard panel.runModal() == .OK, let url = panel.url else { return }
