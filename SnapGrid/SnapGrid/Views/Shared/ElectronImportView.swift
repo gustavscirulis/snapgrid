@@ -6,20 +6,19 @@ struct ElectronImportView: View {
     @Binding var isPresented: Bool
 
     @State private var importService = ElectronImportService()
+    var initialLibraryURL: URL
     @State private var libraryURL: URL?
     @State private var itemCount = 0
 
     private enum Phase {
-        case detecting, ready, importing, done
+        case ready, importing, done
     }
 
-    @State private var phase: Phase = .detecting
+    @State private var phase: Phase = .ready
 
     var body: some View {
         VStack(spacing: 0) {
             switch phase {
-            case .detecting:
-                detectingView
             case .ready:
                 readyView
             case .importing:
@@ -30,42 +29,13 @@ struct ElectronImportView: View {
         }
         .frame(width: 400)
         .fixedSize(horizontal: false, vertical: true)
-        .task {
-            if let detected = importService.detectElectronLibrary() {
-                libraryURL = detected
-                itemCount = importService.countItems(in: detected)
-                phase = .ready
-            } else {
-                phase = .detecting
-            }
+        .onAppear {
+            libraryURL = initialLibraryURL
+            itemCount = importService.countItems(in: initialLibraryURL)
         }
     }
 
     // MARK: - Phases
-
-    private var detectingView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "questionmark.folder")
-                .font(.system(size: 36, weight: .light))
-                .foregroundStyle(.secondary)
-
-            VStack(spacing: 6) {
-                Text("SnapGrid 1 Library Not Found")
-                    .font(.headline)
-                Text("No library found at ~/Documents/SnapGrid/")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 12) {
-                Button("Cancel") { isPresented = false }
-                    .keyboardShortcut(.cancelAction)
-                Button("Choose Folder...") { pickFolder() }
-                    .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(32)
-    }
 
     private var readyView: some View {
         VStack(spacing: 20) {
@@ -178,6 +148,8 @@ struct ElectronImportView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.message = "Select your SnapGrid 1 library folder"
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Documents")
 
         let response = panel.runModal()
         if response == .OK, let url = panel.url {

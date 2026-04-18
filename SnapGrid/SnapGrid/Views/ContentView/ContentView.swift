@@ -15,7 +15,7 @@ struct ContentView: View {
     @State private var syncWatcher = SyncWatcher()
     @State private var isDragTargeted = false
     @State private var pendingEditSpaceId: String?
-    @State private var showElectronImport = false
+    @State private var electronImportURL: URL?
     @State private var showImportPanel = false
     @State private var debounceTask: Task<Void, Never>?
     @State private var indexRebuildTask: Task<Void, Never>?
@@ -25,7 +25,6 @@ struct ContentView: View {
     @State private var isSearchFieldPresented = false
     @State private var shareAnchorView: NSView?
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
-    @State private var electronLibraryDetected = false
 
     #if DEBUG
     @AppStorage("debugSimulateEmptyState") private var debugSimulateEmptyState = false
@@ -203,7 +202,7 @@ struct ContentView: View {
         )
         .modifier(NotificationModifier(
             onImportFiles: { showImportPanel = true },
-            onImportElectron: { showElectronImport = true },
+            onImportElectron: { handleElectronImport() },
             onImportFolder: { handleFolderImport() },
             onUndo: { undoLast() },
             onRedo: { redoLast() },
@@ -229,9 +228,17 @@ struct ContentView: View {
             },
             onPasteImages: { handlePaste() }
         ))
-        .sheet(isPresented: $showElectronImport) {
-            ElectronImportView(isPresented: $showElectronImport)
+        .sheet(isPresented: Binding(
+            get: { electronImportURL != nil },
+            set: { if !$0 { electronImportURL = nil } }
+        )) {
+            if let url = electronImportURL {
+                ElectronImportView(isPresented: Binding(
+                    get: { electronImportURL != nil },
+                    set: { if !$0 { electronImportURL = nil } }
+                ), initialLibraryURL: url)
                 .presentationBackground(Color.snapCard)
+            }
         }
         .alert("Analysis Failed", isPresented: Binding(
             get: { importService.analysisAlertError != nil },
@@ -241,8 +248,8 @@ struct ContentView: View {
         } message: {
             Text(importService.analysisAlertError ?? "")
         }
-        .onChange(of: showElectronImport) { _, isPresented in
-            if !isPresented {
+        .onChange(of: electronImportURL) { old, new in
+            if old != nil && new == nil {
                 syncWatcher.beginLocalChange()
                 syncWatcher.endLocalChange()
             }
@@ -290,8 +297,6 @@ struct ContentView: View {
             DataCleanupService.cleanOrphanedRecords(context: modelContext)
             DataCleanupService.cleanOrphanedSidecars()
             await DataCleanupService.migrateVideoDimensions(context: modelContext)
-
-            electronLibraryDetected = ElectronImportService().detectElectronLibrary() != nil
 
             // Sync items that arrived via iCloud while app was closed
             await syncWatcher.initialSync(context: modelContext)
@@ -389,7 +394,7 @@ struct ContentView: View {
     private var detailContent: some View {
         let items = activeFilteredItems
         if allItems.isEmpty || debugSimulateEmptyState {
-            EmptyStateView(electronLibraryDetected: electronLibraryDetected, isDragTargeted: isDragTargeted)
+            EmptyStateView(isDragTargeted: isDragTargeted)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if items.isEmpty && isSearchActive {
             VStack(spacing: 12) {
@@ -448,6 +453,24 @@ struct ContentView: View {
                 syncWatcher.endLocalChange()
             }
         }
+    }
+
+    private func handleElectronImport() {
+        let service = ElectronImportService()
+        if let detected = service.detectElectronLibrary() {
+            electronImportURL = detected
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.message = "Select your SnapGrid 1 library folder"
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Documents")
+        guard panel.runModal() == .OK, let url = panel.url,
+              service.validateLibraryFolder(url) else { return }
+        electronImportURL = url
     }
 
     private func handleFolderImport() {

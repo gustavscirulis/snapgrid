@@ -7,7 +7,6 @@ struct EmptyStateView: View {
     }
 
     var mode: Mode = .appLevel
-    var electronLibraryDetected: Bool = false
     var isDragTargeted: Bool = false
 
     // Random-looking heights for skeleton placeholders
@@ -54,23 +53,17 @@ struct EmptyStateView: View {
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(.primary)
 
-                        Text(mode == .appLevel ? "Drop files here, or use File \u{2192} Import (\u{2318}O)" : "Drop images here or move items from All")
+                        Text(mode == .appLevel ? "Drop files here or import a folder to get started.\nIf you have a SnapGrid 1.0 library, select it to migrate." : "Drop images here or move items from All")
                             .font(.body)
                             .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                     }
 
                     if mode == .appLevel {
-                        if electronLibraryDetected {
-                            Button("Import from SnapGrid") {
-                                NotificationCenter.default.post(name: .importElectronLibrary, object: nil)
-                            }
-                            .controlSize(.large)
-                        } else {
-                            Button("Import") {
-                                NotificationCenter.default.post(name: .importFolder, object: nil)
-                            }
-                            .controlSize(.large)
+                        Button("Import") {
+                            NotificationCenter.default.post(name: .importElectronLibrary, object: nil)
                         }
+                        .controlSize(.large)
                     }
 
                     if mode == .appLevel,
@@ -90,6 +83,7 @@ struct EmptyStateView: View {
                         }
                     }
                 }
+                .frame(maxWidth: 360)
                 .padding(40)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
