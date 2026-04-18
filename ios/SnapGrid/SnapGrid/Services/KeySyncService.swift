@@ -14,6 +14,7 @@ enum KeySource: String {
 final class KeySyncService: ObservableObject {
 
     static let shared = KeySyncService()
+    private static let maskedPlaceholder = String(repeating: "•", count: 48)
 
     @Published private(set) var isUnlocked = false
     @Published private(set) var activeProvider: String?
@@ -31,7 +32,7 @@ final class KeySyncService: ObservableObject {
         let defaults = UserDefaults.standard
 
         let sbApiKey = readAndClearSettingsBundleKey(defaults: defaults)
-        let sbProvider = defaults.string(forKey: "settings_provider") ?? "anthropic"
+        let sbProvider = defaults.string(forKey: "settings_provider") ?? "none"
         let sbModel = (defaults.string(forKey: "settings_model") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let lastSyncedHash = defaults.string(forKey: "settings_lastSyncedKeyHash") ?? ""
 
@@ -90,6 +91,7 @@ final class KeySyncService: ObservableObject {
                 defaults.set(iCloudHash, forKey: "settings_lastSyncedKeyHash")
                 defaults.set(payload.provider, forKey: "settings_provider")
                 defaults.set(payload.model, forKey: "settings_model")
+                defaults.set(Self.maskedPlaceholder, forKey: "settings_apiKey")
                 return
             }
 
@@ -116,7 +118,7 @@ final class KeySyncService: ObservableObject {
     func checkForSettingsKeys() {
         let defaults = UserDefaults.standard
         let sbApiKey = readAndClearSettingsBundleKey(defaults: defaults)
-        let sbProvider = defaults.string(forKey: "settings_provider") ?? "anthropic"
+        let sbProvider = defaults.string(forKey: "settings_provider") ?? "none"
         let sbModel = (defaults.string(forKey: "settings_model") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !sbApiKey.isEmpty, sbProvider != "none", AIProvider(rawValue: sbProvider) != nil else {
@@ -144,9 +146,10 @@ final class KeySyncService: ObservableObject {
 
     private func readAndClearSettingsBundleKey(defaults: UserDefaults) -> String {
         let key = (defaults.string(forKey: "settings_apiKey") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if !key.isEmpty {
-            defaults.set("", forKey: "settings_apiKey")
+        if key == Self.maskedPlaceholder || key.isEmpty {
+            return ""
         }
+        defaults.set(Self.maskedPlaceholder, forKey: "settings_apiKey")
         return key
     }
 

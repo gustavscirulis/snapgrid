@@ -9,11 +9,19 @@ struct SnapGridApp: App {
     private static let multiSpaceStoreResetKey = "multiSpaceStoreReset_v1"
 
     init() {
-        UserDefaults.standard.register(defaults: [
-            "settings_provider": "anthropic",
+        let defaults = UserDefaults.standard
+        defaults.register(defaults: [
+            "settings_provider": "none",
             "settings_apiKey": "",
-            "settings_model": ""
+            "settings_model": "auto"
         ])
+
+        if !defaults.bool(forKey: "settings_defaults_v2") {
+            if (defaults.string(forKey: "settings_model") ?? "").isEmpty {
+                defaults.set("auto", forKey: "settings_model")
+            }
+            defaults.set(true, forKey: "settings_defaults_v2")
+        }
 
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let snapGridDir = appSupport.appendingPathComponent("SnapGrid", isDirectory: true)

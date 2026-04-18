@@ -141,6 +141,7 @@ struct KeySyncServiceTests {
         defaults.removeObject(forKey: "settings_provider")
         defaults.removeObject(forKey: "settings_model")
         defaults.removeObject(forKey: "settings_lastSyncedKeyHash")
+        defaults.removeObject(forKey: "settings_defaults_v2")
     }
 
     private func cleanupKeychain() {
@@ -242,5 +243,57 @@ struct KeySyncServiceTests {
 
         #expect(service.isUnlocked == false)
         #expect(service.keySource == .none)
+    }
+
+    @Test("Settings.bundle key is replaced with masked placeholder after read")
+    @MainActor func settingsBundleWritesPlaceholder() async {
+        let defaults = UserDefaults.standard
+        defer { cleanupDefaults(defaults); cleanupKeychain() }
+
+        defaults.set("test-key-xyz", forKey: "settings_apiKey")
+        defaults.set("anthropic", forKey: "settings_provider")
+
+        let service = KeySyncService.shared
+        service.checkForSettingsKeys()
+
+        let remaining = defaults.string(forKey: "settings_apiKey") ?? ""
+        #expect(remaining == String(repeating: "•", count: 48))
+    }
+
+    @Test("Settings.bundle masked placeholder is ignored on subsequent reads")
+    @MainActor func settingsBundlePlaceholderIgnored() async {
+        let defaults = UserDefaults.standard
+        defer { cleanupDefaults(defaults); cleanupKeychain() }
+
+        defaults.set("test-key-abc", forKey: "settings_apiKey")
+        defaults.set("openai", forKey: "settings_provider")
+
+        let service = KeySyncService.shared
+        service.checkForSettingsKeys()
+
+        #expect(service.isUnlocked == true)
+        #expect(service.activeAPIKey() == "test-key-abc")
+
+        let placeholderValue = defaults.string(forKey: "settings_apiKey") ?? ""
+        #expect(placeholderValue == String(repeating: "•", count: 48))
+
+        service.checkForSettingsKeys()
+        #expect(service.isUnlocked == true)
+    }
+
+    @Test("Settings.bundle model 'auto' sets activeModel to auto")
+    @MainActor func settingsBundleAutoModel() async {
+        let defaults = UserDefaults.standard
+        defer { cleanupDefaults(defaults); cleanupKeychain() }
+
+        defaults.set("test-key-123", forKey: "settings_apiKey")
+        defaults.set("anthropic", forKey: "settings_provider")
+        defaults.set("auto", forKey: "settings_model")
+
+        let service = KeySyncService.shared
+        service.checkForSettingsKeys()
+
+        #expect(service.isUnlocked == true)
+        #expect(service.activeModel == "auto")
     }
 }

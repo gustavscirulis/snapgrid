@@ -22,7 +22,7 @@
 			<key>Key</key>
 			<string>settings_provider</string>
 			<key>DefaultValue</key>
-			<string>anthropic</string>
+			<string>none</string>
 			<key>Titles</key>
 			<array>
 				<string>None</string>
@@ -66,7 +66,7 @@
 			<key>Key</key>
 			<string>settings_model</string>
 			<key>DefaultValue</key>
-			<string></string>
+			<string>auto</string>
 			<key>KeyboardType</key>
 			<string>Alphabet</string>
 			<key>AutocapitalizationType</key>
@@ -78,7 +78,7 @@
 			<key>Type</key>
 			<string>PSGroupSpecifier</string>
 			<key>FooterText</key>
-			<string>Leave Model empty to use the default for your provider. Changes sync to the Mac app via iCloud.</string>
+			<string>"auto" uses the recommended model for your provider. You can specify a model name to override. Changes sync via iCloud.</string>
 		</dict>
 	</array>
 </dict>
