@@ -257,12 +257,14 @@ struct VideoControlsOverlay: View {
         removeTimeObserver()
         observedPlayer = player
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
-        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
-            currentTime = time.seconds
-            isPlaying = player.rate > 0
-            if let item = player.currentItem {
-                let dur = item.duration.seconds
-                if dur.isFinite { duration = dur }
+        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak player] time in
+            Task { @MainActor [weak player] in
+                self.currentTime = time.seconds
+                self.isPlaying = (player?.rate ?? 0) > 0
+                if let item = player?.currentItem {
+                    let dur = item.duration.seconds
+                    if dur.isFinite { self.duration = dur }
+                }
             }
         }
     }
