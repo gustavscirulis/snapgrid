@@ -74,6 +74,9 @@ final class ImportService {
     }
 
     func importSingleFile(_ url: URL, into context: ModelContext, spaceId: String?, sourceURL: String? = nil) async throws {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+
         let ext = url.pathExtension.lowercased()
         let isVideo = videoTypes.contains(ext)
         let isImage = imageTypes.contains(ext)
