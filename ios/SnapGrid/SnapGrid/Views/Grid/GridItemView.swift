@@ -107,27 +107,6 @@ struct GridItemView: View {
                         removal: .opacity
                     )
                 )
-            } else if !item.isAnalyzing && item.analysisError != nil {
-                Button {
-                    onRetryAnalysis?()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.caption2)
-                        Text("Retry")
-                            .font(.caption2.weight(.medium))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.red.opacity(0.7))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .padding(8)
-                .frame(width: width, height: height, alignment: .bottomLeading)
-                .transition(.opacity.combined(with: .scale(scale: 0.8)))
             }
         }
         .frame(width: width, height: height)
@@ -150,6 +129,29 @@ struct GridItemView: View {
                     )
             }
         )
+        .overlay(alignment: .bottomLeading) {
+            if !item.isAnalyzing && item.analysisError != nil {
+                Button {
+                    onRetryAnalysis?()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption2)
+                        Text("Retry")
+                            .font(.caption2.weight(.medium))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.red.opacity(0.7))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .frame(minWidth: 44, minHeight: 44, alignment: .bottomLeading)
+                    .contentShape(Rectangle())
+                }
+                .padding(8)
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+            }
+        }
         .contextMenu {
             Button {
                 onShare?()
