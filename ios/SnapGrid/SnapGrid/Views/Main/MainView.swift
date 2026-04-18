@@ -242,7 +242,7 @@ struct MainView: View {
             }
             .tabBarMinimizeBehavior(.onScrollDown)
             .tabViewSearchActivation(.searchTabSelection)
-            .tint(.white)
+            .toolbarColorScheme(.dark, for: .tabBar)
         } else {
             TabView(selection: $appState.selectedTab) {
                 allItemsContent(gridWidth: gridWidth)
@@ -252,7 +252,7 @@ struct MainView: View {
                     .tabItem { Label("Spaces", systemImage: "folder") }
                     .tag(AppTab.spaces)
             }
-            .tint(.white)
+            .toolbarColorScheme(.dark, for: .tabBar)
         }
     }
 
