@@ -309,7 +309,9 @@ struct GridItemView: View {
                             itemId: item.id,
                             url: MediaStorageService.shared.mediaURL(filename: item.filename),
                             frame: globalFrame,
-                            patternNames: item.analysisResult?.patterns.prefix(5).map(\.name) ?? []
+                            patternNames: item.analysisResult?.patterns.prefix(5).map(\.name) ?? [],
+                            isAnalyzing: item.isAnalyzing,
+                            hasAnalysisError: !item.isAnalyzing && item.analysisError != nil
                         )
                     }
                 } else if videoPreview.activeItemId == item.id {
@@ -394,6 +396,20 @@ struct GridItemView: View {
                 isHovered = false
                 suppressHoverExit = false
             }
+        }
+        .onChange(of: item.isAnalyzing) {
+            guard videoPreview.activeItemId == item.id else { return }
+            videoPreview.updateAnalysisState(
+                isAnalyzing: item.isAnalyzing,
+                hasError: !item.isAnalyzing && item.analysisError != nil
+            )
+        }
+        .onChange(of: item.analysisError) {
+            guard videoPreview.activeItemId == item.id else { return }
+            videoPreview.updateAnalysisState(
+                isAnalyzing: item.isAnalyzing,
+                hasError: !item.isAnalyzing && item.analysisError != nil
+            )
         }
         .contextMenu {
             let removeFromActiveSpace: (() -> Void)? = {

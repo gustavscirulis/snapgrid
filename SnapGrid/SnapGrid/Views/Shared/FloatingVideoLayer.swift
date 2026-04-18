@@ -111,6 +111,31 @@ struct FloatingVideoLayer: View {
                             .allowsHitTesting(false)
                         }
                     }
+                    .overlay(alignment: .bottomLeading) {
+                        Group {
+                            if videoPreview.isAnalyzing {
+                                ShimmerText("Analyzing...")
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                                    .environment(\.colorScheme, .dark)
+                            } else if videoPreview.hasAnalysisError {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.caption2)
+                                    Text("Retry")
+                                        .font(.caption.weight(.medium))
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.red.opacity(0.7))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                        }
+                        .padding(8)
+                        .allowsHitTesting(false)
+                    }
                     .frame(width: videoPreview.currentFrame.width, height: videoPreview.currentFrame.height)
                     .clipShape(RoundedRectangle(cornerRadius: videoPreview.cornerRadius))
                     .overlay(
